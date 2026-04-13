@@ -14,11 +14,26 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   await prisma.vehicle.deleteMany();
   await prisma.rideProfile.deleteMany();
+  await prisma.subscription.deleteMany();
+  await prisma.user.deleteMany();
   await prisma.modelVariant.deleteMany();
   await prisma.model.deleteMany();
   await prisma.brand.deleteMany();
 
-  const bmw = await prisma.brand.create({
+  const testUser = await prisma.user.create({
+    data: {
+      email: "demo@mototwin.local",
+      passwordHash: null,
+      subscription: {
+        create: {
+          planType: "FREE",
+          status: "ACTIVE",
+        },
+      },
+    },
+  });
+
+  await prisma.brand.create({
     data: {
       name: "BMW",
       slug: "bmw",
@@ -67,16 +82,9 @@ async function main() {
         ],
       },
     },
-    include: {
-      models: {
-        include: {
-          variants: true,
-        },
-      },
-    },
   });
 
-  const ktm = await prisma.brand.create({
+  await prisma.brand.create({
     data: {
       name: "KTM",
       slug: "ktm",
@@ -125,18 +133,12 @@ async function main() {
         ],
       },
     },
-    include: {
-      models: {
-        include: {
-          variants: true,
-        },
-      },
-    },
   });
 
   console.log("Seed completed");
   console.log({
-    brands: [bmw.name, ktm.name],
+    brands: ["BMW", "KTM"],
+    testUserEmail: testUser.email,
   });
 }
 
