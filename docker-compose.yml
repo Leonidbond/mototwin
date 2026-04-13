@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  mototwin-postgres:
+    image: postgres:16
+    container_name: mototwin-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mototwin
+    ports:
+      - "5432:5432"
+    volumes:
+      - mototwin_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  mototwin_postgres_data:
