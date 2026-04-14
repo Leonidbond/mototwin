@@ -390,6 +390,11 @@ The initial supported nodes must include:
 	•	basic cooling consumables;
 	•	basic brake system consumables.  ￼
 
+Node Taxonomy Reference
+
+For the current hierarchical node taxonomy and data model details, see:
+- `docs/node-tree.md`
+
 Domain Model
 
 User

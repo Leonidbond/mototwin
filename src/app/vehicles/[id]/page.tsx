@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 type VehicleDetail = {
@@ -42,7 +42,7 @@ type VehiclePageProps = {
 
 type ServiceEvent = {
   id: string;
-  node: string;
+  nodeId: string;
   eventDate: string;
   odometer: number;
   engineHours: number | null;
@@ -51,20 +51,25 @@ type ServiceEvent = {
   currency: string | null;
   comment: string | null;
   createdAt: string;
-};
-
-type TopNodeState = {
-  id: string;
-  status: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED";
-  note: string | null;
-  updatedAt: string;
-  node: {
+  node?: {
     id: string;
     code: string;
     name: string;
     level: number;
     displayOrder: number;
   };
+};
+
+type NodeTreeItem = {
+  id: string;
+  code: string;
+  name: string;
+  level: number;
+  displayOrder: number;
+  status: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED" | null;
+  note: string | null;
+  updatedAt: string | null;
+  children: NodeTreeItem[];
 };
 
 export default function VehiclePage({ params }: VehiclePageProps) {
@@ -75,13 +80,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [serviceEvents, setServiceEvents] = useState<ServiceEvent[]>([]);
   const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false);
   const [serviceEventsError, setServiceEventsError] = useState("");
-  const [topNodes, setTopNodes] = useState<TopNodeState[]>([]);
-  const [isTopNodesLoading, setIsTopNodesLoading] = useState(false);
-  const [topNodesError, setTopNodesError] = useState("");
+  const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
+  const [nodeTreeError, setNodeTreeError] = useState("");
   const [isCreatingServiceEvent, setIsCreatingServiceEvent] = useState(false);
   const [serviceEventFormError, setServiceEventFormError] = useState("");
   const [serviceEventFormSuccess, setServiceEventFormSuccess] = useState("");
-  const [node, setNode] = useState("");
+  const [selectedNodePath, setSelectedNodePath] = useState<string[]>([]);
   const [serviceType, setServiceType] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [odometer, setOdometer] = useState("");
@@ -89,6 +94,56 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [costAmount, setCostAmount] = useState("");
   const [currency, setCurrency] = useState("");
   const [comment, setComment] = useState("");
+  const todayDate = getTodayDateString();
+  const nodeSelectLevels = useMemo(() => {
+    const levels: NodeTreeItem[][] = [];
+    let currentLevelNodes = nodeTree;
+    let levelIndex = 0;
+
+    while (currentLevelNodes.length > 0) {
+      levels.push(currentLevelNodes);
+      const selectedNodeId = selectedNodePath[levelIndex];
+
+      if (!selectedNodeId) {
+        break;
+      }
+
+      const selectedNode = currentLevelNodes.find(
+        (node) => node.id === selectedNodeId
+      );
+
+      if (!selectedNode || selectedNode.children.length === 0) {
+        break;
+      }
+
+      currentLevelNodes = selectedNode.children;
+      levelIndex += 1;
+    }
+
+    return levels;
+  }, [nodeTree, selectedNodePath]);
+
+  const selectedFinalNode = useMemo(() => {
+    let currentLevelNodes = nodeTree;
+    let selectedNode: NodeTreeItem | null = null;
+
+    for (const nodeId of selectedNodePath) {
+      const current = currentLevelNodes.find((node) => node.id === nodeId);
+
+      if (!current) {
+        break;
+      }
+
+      selectedNode = current;
+      currentLevelNodes = current.children;
+    }
+
+    return selectedNode;
+  }, [nodeTree, selectedNodePath]);
+
+  const isLeafNodeSelected = Boolean(
+    selectedFinalNode && selectedFinalNode.children.length === 0
+  );
 
   useEffect(() => {
     const loadVehicle = async () => {
@@ -149,33 +204,37 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     loadServiceEvents();
   }, [vehicleId]);
 
+  const loadNodeTree = async () => {
+    if (!vehicleId) {
+      return;
+    }
+
+    try {
+      setIsNodeTreeLoading(true);
+      setNodeTreeError("");
+      const response = await fetch(`/api/vehicles/${vehicleId}/node-tree`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setNodeTreeError(data.error || "Не удалось загрузить дерево узлов.");
+        return;
+      }
+
+      setNodeTree(data.nodeTree ?? []);
+    } catch (nodeTreeLoadError) {
+      console.error(nodeTreeLoadError);
+      setNodeTreeError("Произошла ошибка при загрузке дерева узлов.");
+    } finally {
+      setIsNodeTreeLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!vehicleId) {
       return;
     }
 
-    const loadTopNodes = async () => {
-      try {
-        setIsTopNodesLoading(true);
-        setTopNodesError("");
-        const response = await fetch(`/api/vehicles/${vehicleId}/top-nodes`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          setTopNodesError(data.error || "Не удалось загрузить основные узлы.");
-          return;
-        }
-
-        setTopNodes(data.topNodes ?? []);
-      } catch (topNodesLoadError) {
-        console.error(topNodesLoadError);
-        setTopNodesError("Произошла ошибка при загрузке основных узлов.");
-      } finally {
-        setIsTopNodesLoading(false);
-      }
-    };
-
-    loadTopNodes();
+    loadNodeTree();
   }, [vehicleId]);
 
   const loadServiceEvents = async () => {
@@ -206,7 +265,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   };
 
   const resetServiceEventForm = () => {
-    setNode("");
+    setSelectedNodePath([]);
     setServiceType("");
     setEventDate("");
     setOdometer("");
@@ -226,13 +285,35 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         return;
       }
 
-      if (!node.trim() || !serviceType.trim() || !eventDate.trim()) {
-        setServiceEventFormError("Заполните node, тип сервиса и дату.");
+      if (!selectedFinalNode) {
+        setServiceEventFormError("Выберите узел.");
+        return;
+      }
+
+      if (!isLeafNodeSelected) {
+        setServiceEventFormError("Выберите узел последнего уровня.");
+        return;
+      }
+
+      if (!serviceType.trim() || !eventDate.trim()) {
+        setServiceEventFormError("Заполните тип сервиса и дату.");
         return;
       }
 
       if (!odometer.trim()) {
         setServiceEventFormError("Укажите пробег.");
+        return;
+      }
+
+      if (eventDate > todayDate) {
+        setServiceEventFormError("Дата события не может быть в будущем.");
+        return;
+      }
+
+      if (vehicle && Number(odometer) > vehicle.odometer) {
+        setServiceEventFormError(
+          `Пробег события не может быть больше текущего (${vehicle.odometer} км).`
+        );
         return;
       }
 
@@ -244,7 +325,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          node: node.trim(),
+          nodeId: selectedFinalNode.id,
           serviceType: serviceType.trim(),
           eventDate,
           odometer: Number(odometer),
@@ -267,7 +348,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
       setServiceEventFormSuccess("Сервисное событие добавлено.");
       resetServiceEventForm();
-      await loadServiceEvents();
+      await Promise.all([loadServiceEvents(), loadNodeTree()]);
     } catch (createError) {
       console.error(createError);
       setServiceEventFormError("Произошла ошибка при создании события.");
@@ -418,43 +499,49 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
             <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
               <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
-                Основные узлы
+                Дерево узлов
               </h2>
 
-              {isTopNodesLoading ? (
+              {isNodeTreeLoading ? (
+                <p className="mt-4 text-sm text-gray-600">Загрузка дерева узлов...</p>
+              ) : null}
+
+              {!isNodeTreeLoading && nodeTreeError ? (
+                <p className="mt-4 text-sm text-red-600">{nodeTreeError}</p>
+              ) : null}
+
+              {!isNodeTreeLoading && !nodeTreeError && nodeTree.length === 0 ? (
                 <p className="mt-4 text-sm text-gray-600">
-                  Загрузка основных узлов...
+                  Дерево узлов пока не найдено.
                 </p>
               ) : null}
 
-              {!isTopNodesLoading && topNodesError ? (
-                <p className="mt-4 text-sm text-red-600">{topNodesError}</p>
-              ) : null}
-
-              {!isTopNodesLoading && !topNodesError && topNodes.length === 0 ? (
-                <p className="mt-4 text-sm text-gray-600">
-                  Основные узлы пока не найдены.
-                </p>
-              ) : null}
-
-              {!isTopNodesLoading && !topNodesError && topNodes.length > 0 ? (
-                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {topNodes.map((topNode) => (
+              {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
+                <div className="mt-6 space-y-4">
+                  {nodeTree.map((rootNode) => (
                     <div
-                      key={topNode.id}
+                      key={rootNode.id}
                       className="rounded-2xl border border-gray-200 bg-gray-50 p-5"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <h3 className="text-base font-semibold text-gray-950">
-                          {topNode.node.name}
+                          {rootNode.name}
                         </h3>
-                        <span className="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700">
-                          {formatTopNodeStatus(topNode.status)}
-                        </span>
+                        {rootNode.status ? (
+                          <span className="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700">
+                            {formatTopNodeStatus(rootNode.status)}
+                          </span>
+                        ) : null}
                       </div>
 
-                      {topNode.note ? (
-                        <p className="mt-3 text-sm text-gray-700">{topNode.note}</p>
+                      {rootNode.note ? (
+                        <p className="mt-2 text-sm text-gray-700">{rootNode.note}</p>
+                      ) : null}
+
+                      {rootNode.children.length > 0 ? (
+                        <div className="mt-4">
+                          {renderNodeChildren(rootNode.children, 0)}
+                        </div>
                       ) : null}
                     </div>
                   ))}
@@ -506,7 +593,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                       <div className="mt-3 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
                         <div>
                           <span className="font-medium text-gray-950">Node:</span>{" "}
-                          {serviceEvent.node}
+                          {serviceEvent.node?.name || serviceEvent.nodeId}
                         </div>
                         <div>
                           <span className="font-medium text-gray-950">
@@ -554,12 +641,36 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <InputField label="Node">
-                  <input
-                    value={node}
-                    onChange={(event) => setNode(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
-                    placeholder="Например: engine"
-                  />
+                  <div className="grid gap-4">
+                    {nodeSelectLevels.map((nodesAtLevel, levelIndex) => (
+                      <InputField
+                        key={`level-${levelIndex}`}
+                        label={`Уровень ${levelIndex + 1}`}
+                      >
+                        <select
+                          value={selectedNodePath[levelIndex] ?? ""}
+                          onChange={(event) => {
+                            const nextNodeId = event.target.value;
+                            setSelectedNodePath((prev) => {
+                              const next = prev.slice(0, levelIndex);
+                              if (nextNodeId) {
+                                next[levelIndex] = nextNodeId;
+                              }
+                              return next;
+                            });
+                          }}
+                          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
+                        >
+                          <option value="">{`Выберите узел уровня ${levelIndex + 1}`}</option>
+                          {nodesAtLevel.map((nodeAtLevel) => (
+                            <option key={nodeAtLevel.id} value={nodeAtLevel.id}>
+                              {nodeAtLevel.name}
+                            </option>
+                          ))}
+                        </select>
+                      </InputField>
+                    ))}
+                  </div>
                 </InputField>
 
                 <InputField label="Тип сервиса">
@@ -576,6 +687,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     type="date"
                     value={eventDate}
                     onChange={(event) => setEventDate(event.target.value)}
+                    max={todayDate}
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                   />
                 </InputField>
@@ -585,6 +697,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     value={odometer}
                     onChange={(event) => setOdometer(event.target.value)}
                     inputMode="numeric"
+                    max={vehicle?.odometer ?? undefined}
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                     placeholder="Например: 15000"
                   />
@@ -639,11 +752,21 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 <button
                   type="button"
                   onClick={handleCreateServiceEvent}
-                  disabled={isCreatingServiceEvent}
+                  disabled={
+                    isCreatingServiceEvent ||
+                    !isLeafNodeSelected ||
+                    !eventDate
+                  }
                   className="inline-flex items-center justify-center rounded-xl bg-gray-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isCreatingServiceEvent ? "Сохраняем..." : "Добавить событие"}
                 </button>
+
+                {!isLeafNodeSelected && selectedFinalNode ? (
+                  <p className="mt-3 text-sm text-amber-700">
+                    Для создания события выберите узел последнего уровня.
+                  </p>
+                ) : null}
 
                 {serviceEventFormError ? (
                   <p className="mt-3 text-sm text-red-600">{serviceEventFormError}</p>
@@ -784,3 +907,31 @@ function formatTopNodeStatus(
       return status;
   }
 }
+
+function getTodayDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function renderNodeChildren(nodes: NodeTreeItem[], depth: number): ReactNode {
+  return (
+    <div className="space-y-2">
+      {nodes.map((node) => (
+        <div key={node.id}>
+          <div
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800"
+            style={{ marginLeft: `${depth * 16}px` }}
+          >
+            {node.name}
+          </div>
+          {node.children.length > 0 ? renderNodeChildren(node.children, depth + 1) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+

@@ -9,7 +9,7 @@ type RouteContext = {
 };
 
 const createServiceEventSchema = z.object({
-  node: z.string().trim().min(1),
+  nodeId: z.string().trim().min(1),
   eventDate: z
     .string()
     .trim()
@@ -32,7 +32,7 @@ export async function GET(_: NextRequest, context: RouteContext) {
 
     const vehicle = await prisma.vehicle.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, odometer: true },
     });
 
     if (!vehicle) {
@@ -42,6 +42,17 @@ export async function GET(_: NextRequest, context: RouteContext) {
     const serviceEvents = await prisma.serviceEvent.findMany({
       where: { vehicleId: id },
       orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
+      include: {
+        node: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            level: true,
+            displayOrder: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({ serviceEvents });
@@ -62,18 +73,92 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const vehicle = await prisma.vehicle.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, odometer: true },
     });
 
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
+    const node = await prisma.node.findUnique({
+      where: { id: data.nodeId },
+      select: { id: true, parentId: true },
+    });
+
+    if (!node) {
+      return NextResponse.json({ error: "Node not found" }, { status: 404 });
+    }
+
+    const nodeChildrenCount = await prisma.node.count({
+      where: { parentId: node.id },
+    });
+
+    if (nodeChildrenCount > 0) {
+      return NextResponse.json(
+        {
+          error: "Service events can only be created for the last available node level",
+        },
+        { status: 400 }
+      );
+    }
+
+    let currentNodeId = node.id;
+    let currentParentId = node.parentId;
+
+    while (currentParentId) {
+      const parentNode = await prisma.node.findUnique({
+        where: { id: currentParentId },
+        select: { id: true, parentId: true },
+      });
+
+      if (!parentNode) {
+        return NextResponse.json({ error: "Node not found" }, { status: 404 });
+      }
+
+      currentNodeId = parentNode.id;
+      currentParentId = parentNode.parentId;
+    }
+
+    const topNodeState = await prisma.topNodeState.findUnique({
+      where: {
+        vehicleId_nodeId: {
+          vehicleId: id,
+          nodeId: currentNodeId,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!topNodeState) {
+      return NextResponse.json(
+        { error: "Top node state not found for this vehicle" },
+        { status: 400 }
+      );
+    }
+
+    const eventDate = new Date(data.eventDate);
+
+    if (eventDate.getTime() > Date.now()) {
+      return NextResponse.json(
+        { error: "Event date cannot be in the future" },
+        { status: 400 }
+      );
+    }
+
+    if (data.odometer > vehicle.odometer) {
+      return NextResponse.json(
+        {
+          error: `Event odometer cannot be greater than current vehicle odometer (${vehicle.odometer})`,
+        },
+        { status: 400 }
+      );
+    }
+
     const serviceEvent = await prisma.serviceEvent.create({
       data: {
         vehicleId: id,
-        node: data.node,
-        eventDate: new Date(data.eventDate),
+        nodeId: data.nodeId,
+        eventDate,
         odometer: data.odometer,
         engineHours: data.engineHours ?? null,
         serviceType: data.serviceType,
@@ -81,6 +166,30 @@ export async function POST(request: NextRequest, context: RouteContext) {
         costAmount: data.costAmount ?? null,
         currency: data.currency || null,
         comment: data.comment || null,
+      },
+      include: {
+        node: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            level: true,
+            displayOrder: true,
+          },
+        },
+      },
+    });
+
+    await prisma.topNodeState.update({
+      where: {
+        vehicleId_nodeId: {
+          vehicleId: id,
+          nodeId: currentNodeId,
+        },
+      },
+      data: {
+        status: "RECENTLY_REPLACED",
+        lastServiceEventId: serviceEvent.id,
       },
     });
 

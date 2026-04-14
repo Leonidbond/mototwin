@@ -11,17 +11,177 @@ if (!connectionString) {
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
-const topLevelNodes = [
-  { code: "engine_oil", name: "Масло двигателя", displayOrder: 1 },
-  { code: "oil_filter", name: "Масляный фильтр", displayOrder: 2 },
-  { code: "air_filter", name: "Воздушный фильтр", displayOrder: 3 },
-  { code: "spark_plug", name: "Свеча", displayOrder: 4 },
-  { code: "brake_pads", name: "Тормозные колодки", displayOrder: 5 },
-  { code: "brake_discs", name: "Тормозные диски", displayOrder: 6 },
-  { code: "chain_drive", name: "Цепь и звезды", displayOrder: 7 },
-  { code: "battery", name: "Аккумулятор", displayOrder: 8 },
-  { code: "tires", name: "Шины", displayOrder: 9 },
-  { code: "cooling_system", name: "Система охлаждения", displayOrder: 10 },
+const nodeTaxonomy = [
+  ["ENGINE", "Двигатель"],
+  ["ENGINE.TOPEND", "Верх двигателя"],
+  ["ENGINE.TOPEND.CYLINDER", "Цилиндр"],
+  ["ENGINE.TOPEND.PISTON", "Поршень"],
+  ["ENGINE.TOPEND.RINGS", "Кольца"],
+  ["ENGINE.TOPEND.HEAD", "ГБЦ"],
+  ["ENGINE.TOPEND.VALVES", "Клапаны/сальники/пружины"],
+  ["ENGINE.TOPEND.CAM", "Распредвал/рокеры"],
+  ["ENGINE.TIMING", "ГРМ"],
+  ["ENGINE.TIMING.CHAIN", "Цепь ГРМ"],
+  ["ENGINE.TIMING.TENSIONER", "Натяжитель/успокоители"],
+  ["ENGINE.BOTTOMEND", "Низ двигателя"],
+  ["ENGINE.BOTTOMEND.CRANK", "Коленвал/шатун"],
+  ["ENGINE.BOTTOMEND.BEARINGS", "Подшипники/сальники"],
+  ["ENGINE.LUBE", "Смазка"],
+  ["ENGINE.LUBE.PUMP", "Маслонасос"],
+  ["ENGINE.LUBE.OIL", "Масло двигателя"],
+  ["ENGINE.LUBE.FILTER", "Маслофильтр/сетка"],
+  ["ENGINE.LUBE.GASKETS", "Прокладки/сальники (двигатель)"],
+  ["ENGINE.CLUTCH", "Сцепление"],
+  ["ENGINE.CLUTCH.PLATES", "Диски сцепления"],
+  ["ENGINE.CLUTCH.BASKET", "Корзина/ступица"],
+  ["ENGINE.CLUTCH.ACTUATION", "Привод сцепления (трос/гидро)"],
+  ["ENGINE.GEARBOX", "КПП"],
+  ["ENGINE.GEARBOX.GEARS", "Шестерни/валы"],
+  ["ENGINE.GEARBOX.SHIFT", "Барабан/вилки/механизм переключения"],
+  ["ENGINE.START", "Запуск двигателя"],
+  ["ENGINE.START.STARTER", "Стартер/реле/бендикс (если есть)"],
+  ["ENGINE.START.KICK", "Кикстартер (если есть)"],
+  ["ENGINE.MOUNTS", "Крепления двигателя/опоры"],
+  ["FUEL", "Топливная система"],
+  ["FUEL.TANK", "Бак/крышка/клапаны"],
+  ["FUEL.LINES", "Топливные шланги/фильтр/кран"],
+  ["FUEL.PUMP", "Насос (если EFI)"],
+  ["FUEL.CARB", "Карбюратор"],
+  ["FUEL.CARB.REPAIR", "Ремкомплект/жиклёры/игла/поплавок"],
+  ["FUEL.EFI", "Инжектор (если EFI)"],
+  ["FUEL.EFI.INJECTOR", "Форсунка"],
+  ["FUEL.EFI.THROTTLE", "Дроссель"],
+  ["FUEL.EFI.SENSORS", "Датчики (TPS/MAP/…)"],
+  ["INTAKE", "Впуск воздуха"],
+  ["INTAKE.AIRBOX", "Airbox/патрубки"],
+  ["INTAKE.FILTER", "Воздушный фильтр"],
+  ["COOLING", "Охлаждение"],
+  ["COOLING.AIR", "Воздушное (если есть элементы)"],
+  ["COOLING.LIQUID", "Жидкостное"],
+  ["COOLING.LIQUID.RADIATOR", "Радиаторы/крышка"],
+  ["COOLING.LIQUID.PUMP", "Помпа/крыльчатка/сальники"],
+  ["COOLING.LIQUID.HOSES", "Патрубки/хомуты"],
+  ["COOLING.LIQUID.THERMOSTAT", "Термостат (если есть)"],
+  ["COOLING.LIQUID.EXPANSION", "Расширительный бачок"],
+  ["EXHAUST", "Выпуск"],
+  ["EXHAUST.HEADER", "Коллектор/прокладки"],
+  ["EXHAUST.MUFFLER", "Глушитель/банка"],
+  ["EXHAUST.MOUNTS", "Крепёж/теплоэкраны"],
+  ["EXHAUST.SENSOR", "Лямбда/датчики (если есть)"],
+  ["EXHAUST.DBKILLER", "DB-killer/вставки (если есть)"],
+  ["ELECTRICS", "Электрика"],
+  ["ELECTRICS.BATTERY", "АКБ/клеммы"],
+  ["ELECTRICS.FUSES", "Предохранители/реле"],
+  ["ELECTRICS.CHARGING", "Зарядка"],
+  ["ELECTRICS.CHARGING.STATOR", "Статор/ротор"],
+  ["ELECTRICS.CHARGING.REGULATOR", "Регулятор напряжения"],
+  ["ELECTRICS.IGNITION", "Зажигание"],
+  ["ELECTRICS.IGNITION.CDI_ECU", "CDI/ECU"],
+  ["ELECTRICS.IGNITION.COIL", "Катушка"],
+  ["ELECTRICS.IGNITION.SPARK", "Свеча/колпачок"],
+  ["ELECTRICS.WIRING", "Проводка/жгуты/разъёмы"],
+  ["ELECTRICS.LIGHTS", "Свет"],
+  ["ELECTRICS.LIGHTS.HEAD", "Фара"],
+  ["ELECTRICS.LIGHTS.TAIL", "Задний фонарь"],
+  ["ELECTRICS.LIGHTS.TURN", "Поворотники (если есть)"],
+  ["ELECTRICS.HORN", "Сигнал"],
+  ["ELECTRICS.DASH", "Приборка/датчики"],
+  ["ELECTRICS.DASH.SPEED", "Датчик скорости"],
+  ["ELECTRICS.DASH.NEUTRAL", "Датчик нейтрали"],
+  ["CHASSIS", "Рама и кузов"],
+  ["CHASSIS.FRAME", "Рама"],
+  ["CHASSIS.SUBFRAME", "Подрамник"],
+  ["CHASSIS.MOUNTS", "Крепёж/оси/втулки (общие)"],
+  ["CHASSIS.SEAT", "Сиденье/чехол"],
+  ["CHASSIS.PLASTICS", "Пластик"],
+  ["CHASSIS.PLASTICS.FENDERS", "Крылья"],
+  ["CHASSIS.PLASTICS.SIDE", "Боковины/панели"],
+  ["CHASSIS.PLASTICS.FORK_GUARDS", "Защита вилки"],
+  ["CHASSIS.PLASTICS.HANDGUARDS", "Защита рук (если есть)"],
+  ["CHASSIS.PROTECTION", "Защита"],
+  ["CHASSIS.PROTECTION.SKID", "Защита картера"],
+  ["CHASSIS.PROTECTION.RADIATOR", "Защита радиаторов (если есть)"],
+  ["CHASSIS.PROTECTION.FRAME", "Защита рамы/маятника"],
+  ["STEERING", "Рулевое"],
+  ["STEERING.HANDLEBAR", "Руль/крепления/проставки"],
+  ["STEERING.GRIPS", "Грипсы"],
+  ["STEERING.CONTROLS", "Пульты/кнопки"],
+  ["STEERING.DAMPER", "Демпфер руля (если есть)"],
+  ["STEERING.HEADSET", "Рулевая колонка"],
+  ["STEERING.HEADSET.BEARINGS", "Подшипники рулевой"],
+  ["STEERING.TRIPLES", "Траверсы"],
+  ["SUSPENSION", "Подвеска"],
+  ["SUSPENSION.FRONT", "Передняя"],
+  ["SUSPENSION.FRONT.FORK", "Вилка"],
+  ["SUSPENSION.FRONT.SEALS", "Сальники/пыльники"],
+  ["SUSPENSION.FRONT.BUSHINGS", "Втулки скольжения"],
+  ["SUSPENSION.FRONT.OIL", "Масло/обслуживание"],
+  ["SUSPENSION.FRONT.SPRINGS", "Пружины (если отдельно)"],
+  ["SUSPENSION.REAR", "Задняя"],
+  ["SUSPENSION.REAR.SHOCK", "Амортизатор"],
+  ["SUSPENSION.REAR.LINKAGE", "Линк/прогрессия"],
+  ["SUSPENSION.REAR.SWINGARM", "Маятник"],
+  ["SUSPENSION.REAR.BEARINGS", "Подшипники/сальники/втулки маятника/линка"],
+  ["WHEELS", "Колёса/шины"],
+  ["WHEELS.FRONT", "Переднее колесо"],
+  ["WHEELS.FRONT.RIM", "Обод"],
+  ["WHEELS.FRONT.SPOKES", "Спицы/ниппели"],
+  ["WHEELS.FRONT.HUB", "Ступица"],
+  ["WHEELS.FRONT.BEARINGS", "Подшипники/ось/проставки"],
+  ["WHEELS.REAR", "Заднее колесо"],
+  ["WHEELS.REAR.RIM", "Обод"],
+  ["WHEELS.REAR.SPOKES", "Спицы/ниппели"],
+  ["WHEELS.REAR.HUB", "Ступица"],
+  ["WHEELS.REAR.BEARINGS", "Подшипники/ось/проставки"],
+  ["TIRES", "Резина/камеры"],
+  ["TIRES.FRONT", "Передняя шина/камера"],
+  ["TIRES.REAR", "Задняя шина/камера"],
+  ["TIRES.RIMLOCK", "Буксаторы/ободная лента"],
+  ["BRAKES", "Тормоза"],
+  ["BRAKES.FRONT", "Передний тормоз"],
+  ["BRAKES.FRONT.MASTER", "Главный цилиндр/рычаг"],
+  ["BRAKES.FRONT.CALIPER", "Суппорт (перед)"],
+  ["BRAKES.FRONT.PADS", "Колодки (перед)"],
+  ["BRAKES.FRONT.DISC", "Диск (перед)"],
+  ["BRAKES.FRONT.LINE", "Шланг/фитинги (перед)"],
+  ["BRAKES.REAR", "Задний тормоз"],
+  ["BRAKES.REAR.MASTER", "Главный цилиндр/педаль"],
+  ["BRAKES.REAR.CALIPER", "Суппорт (зад)"],
+  ["BRAKES.REAR.PADS", "Колодки (зад)"],
+  ["BRAKES.REAR.DISC", "Диск (зад)"],
+  ["BRAKES.REAR.LINE", "Шланг/фитинги (зад)"],
+  ["BRAKES.FLUID", "Тормозная жидкость/прокачка"],
+  ["DRIVETRAIN", "Привод"],
+  ["DRIVETRAIN.CHAIN", "Цепь"],
+  ["DRIVETRAIN.FRONT_SPROCKET", "Ведущая звезда"],
+  ["DRIVETRAIN.REAR_SPROCKET", "Ведомая звезда"],
+  ["DRIVETRAIN.CHAIN_GUIDE", "Ролики/направляющая"],
+  ["DRIVETRAIN.SWINGARM_SLIDER", "Слайдер/ползун цепи"],
+  ["DRIVETRAIN.TENSIONERS", "Натяжители/регулировка"],
+  ["DRIVETRAIN.GUARD", "Защита цепи (если есть)"],
+  ["CONTROLS", "Органы управления"],
+  ["CONTROLS.THROTTLE", "Ручка газа/трос"],
+  ["CONTROLS.CLUTCH", "Рычаг/трос/гидро (как орган управления)"],
+  ["CONTROLS.FRONT_BRAKE", "Рычаг переднего тормоза"],
+  ["CONTROLS.REAR_BRAKE", "Педаль заднего тормоза"],
+  ["CONTROLS.SHIFTER", "Лапка КПП"],
+  ["CONTROLS.FOOTPEG", "Подножки"],
+  ["CONTROLS.CABLES", "Тросы/рубашки (общие)"],
+] as const;
+
+const topLevelNodeCodes = [
+  "ENGINE",
+  "FUEL",
+  "COOLING",
+  "EXHAUST",
+  "ELECTRICS",
+  "CHASSIS",
+  "STEERING",
+  "SUSPENSION",
+  "WHEELS",
+  "BRAKES",
+  "DRIVETRAIN",
+  "CONTROLS",
 ] as const;
 
 async function main() {
@@ -171,14 +331,28 @@ async function main() {
     stockSprockets: "15/45",
   });
 
-  const seededNodes = await Promise.all(
-    topLevelNodes.map((node) =>
+  const nodesForSeed = nodeTaxonomy.map(([code, name], index) => {
+    const segments = code.split(".");
+    const parentCode =
+      segments.length > 1 ? segments.slice(0, segments.length - 1).join(".") : null;
+
+    return {
+      code,
+      name,
+      parentCode,
+      level: segments.length,
+      displayOrder: index + 1,
+    };
+  });
+
+  await Promise.all(
+    nodesForSeed.map((node) =>
       prisma.node.upsert({
         where: { code: node.code },
         update: {
           name: node.name,
           parentId: null,
-          level: 1,
+          level: node.level,
           displayOrder: node.displayOrder,
           isActive: true,
         },
@@ -186,7 +360,7 @@ async function main() {
           code: node.code,
           name: node.name,
           parentId: null,
-          level: 1,
+          level: node.level,
           displayOrder: node.displayOrder,
           isActive: true,
         },
@@ -194,12 +368,124 @@ async function main() {
     )
   );
 
+  const seededNodes = await prisma.node.findMany({
+    where: {
+      code: {
+        in: nodesForSeed.map((node) => node.code),
+      },
+    },
+    select: {
+      id: true,
+      code: true,
+    },
+  });
+
+  const nodeIdByCode = new Map(seededNodes.map((node) => [node.code, node.id]));
+
+  await Promise.all(
+    nodesForSeed.map((node) =>
+      prisma.node.update({
+        where: { code: node.code },
+        data: {
+          name: node.name,
+          parentId: node.parentCode ? nodeIdByCode.get(node.parentCode) ?? null : null,
+          level: node.level,
+          displayOrder: node.displayOrder,
+          isActive: true,
+        },
+      })
+    )
+  );
+
+  const validNodeCodes = new Set(nodesForSeed.map((node) => node.code));
+  const legacyNodes = await prisma.node.findMany({
+    where: {
+      code: {
+        notIn: [...validNodeCodes],
+      },
+    },
+    select: {
+      id: true,
+      code: true,
+    },
+  });
+
+  const legacyNodeIds = legacyNodes.map((node) => node.id);
+
+  if (legacyNodeIds.length > 0) {
+    await prisma.topNodeState.deleteMany({
+      where: {
+        nodeId: {
+          in: legacyNodeIds,
+        },
+      },
+    });
+  }
+
+  const removableLegacyNodes = legacyNodes.length
+    ? await prisma.node.findMany({
+        where: {
+          id: {
+            in: legacyNodeIds,
+          },
+          serviceEvents: {
+            none: {},
+          },
+          topNodeStates: {
+            none: {},
+          },
+          children: {
+            none: {},
+          },
+        },
+        select: {
+          id: true,
+        },
+      })
+    : [];
+
+  if (removableLegacyNodes.length > 0) {
+    await prisma.node.deleteMany({
+      where: {
+        id: {
+          in: removableLegacyNodes.map((node) => node.id),
+        },
+      },
+    });
+  }
+
+  const refreshedTopLevelNodes = await prisma.node.findMany({
+    where: {
+      code: {
+        in: [...topLevelNodeCodes],
+      },
+      level: 1,
+      parentId: null,
+    },
+    select: {
+      id: true,
+      code: true,
+    },
+  });
+
+  const validTopLevelNodeIds = refreshedTopLevelNodes.map((node) => node.id);
+
+  await prisma.topNodeState.deleteMany({
+    where: {
+      nodeId: {
+        notIn: validTopLevelNodeIds,
+      },
+    },
+  });
+
+  const topLevelNodes = refreshedTopLevelNodes;
+
   const vehicles = await prisma.vehicle.findMany({
     select: { id: true },
   });
 
   const topNodeStateRows = vehicles.flatMap((vehicle) =>
-    seededNodes.map((node) => ({
+    topLevelNodes.map((node) => ({
       vehicleId: vehicle.id,
       nodeId: node.id,
       status: "OK" as const,
@@ -219,8 +505,11 @@ async function main() {
   console.log({
     brands: ["BMW", "KTM"],
     testUserEmail: testUser.email,
-    topLevelNodes: seededNodes.length,
+    seededNodes: seededNodes.length,
+    topLevelNodes: topLevelNodes.length,
     topNodeStates: topNodeStateRows.length,
+    legacyNodesFound: legacyNodes.length,
+    legacyNodesDeleted: removableLegacyNodes.length,
   });
 }
 

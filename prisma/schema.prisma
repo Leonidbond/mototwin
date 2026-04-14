@@ -155,7 +155,7 @@ model Vehicle {
 model ServiceEvent {
   id                 String   @id @default(cuid())
   vehicleId          String
-  node               String
+  nodeId             String
   eventDate          DateTime
   odometer           Int
   engineHours        Int?
@@ -167,8 +167,10 @@ model ServiceEvent {
   createdAt          DateTime @default(now())
 
   vehicle            Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node               Node     @relation(fields: [nodeId], references: [id], onDelete: Restrict)
 
   @@index([vehicleId])
+  @@index([nodeId])
   @@map("service_events")
 }
 
@@ -184,6 +186,7 @@ model Node {
 
   parent        Node?          @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children      Node[]         @relation("NodeHierarchy")
+  serviceEvents ServiceEvent[]
   topNodeStates TopNodeState[]
 
   @@index([parentId])

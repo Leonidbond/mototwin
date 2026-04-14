@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const TOP_LEVEL_NODE_CODES = [
+  "ENGINE",
+  "FUEL",
+  "COOLING",
+  "EXHAUST",
+  "ELECTRICS",
+  "CHASSIS",
+  "STEERING",
+  "SUSPENSION",
+  "WHEELS",
+  "BRAKES",
+  "DRIVETRAIN",
+  "CONTROLS",
+] as const;
+
 type RouteContext = {
   params: Promise<{
     id: string;
@@ -38,13 +53,23 @@ export async function GET(_: NextRequest, context: RouteContext) {
             code: true,
             name: true,
             level: true,
+            parentId: true,
             displayOrder: true,
           },
         },
       },
     });
 
-    return NextResponse.json({ topNodes });
+    const filteredTopNodes = topNodes.filter(
+      (topNode) =>
+        topNode.node.level === 1 &&
+        topNode.node.parentId === null &&
+        TOP_LEVEL_NODE_CODES.includes(
+          topNode.node.code as (typeof TOP_LEVEL_NODE_CODES)[number]
+        )
+    );
+
+    return NextResponse.json({ topNodes: filteredTopNodes });
   } catch (error) {
     console.error("Failed to fetch top nodes:", error);
     return NextResponse.json(
