@@ -44,6 +44,13 @@ enum UsageIntensity {
   HIGH
 }
 
+enum TopNodeStatus {
+  OK
+  SOON
+  OVERDUE
+  RECENTLY_REPLACED
+}
+
 model User {
   id            String        @id @default(cuid())
   email         String        @unique
@@ -137,10 +144,69 @@ model Vehicle {
   model          Model        @relation(fields: [modelId], references: [id], onDelete: Restrict)
   modelVariant   ModelVariant @relation(fields: [modelVariantId], references: [id], onDelete: Restrict)
   rideProfile    RideProfile?
+  serviceEvents  ServiceEvent[]
+  topNodeStates  TopNodeState[]
 
   @@index([userId])
   @@index([brandId, modelId, modelVariantId])
   @@map("vehicles")
+}
+
+model ServiceEvent {
+  id                 String   @id @default(cuid())
+  vehicleId          String
+  node               String
+  eventDate          DateTime
+  odometer           Int
+  engineHours        Int?
+  serviceType        String
+  installedPartsJson Json?
+  costAmount         Float?
+  currency           String?
+  comment            String?
+  createdAt          DateTime @default(now())
+
+  vehicle            Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@map("service_events")
+}
+
+model Node {
+  id            String         @id @default(cuid())
+  code          String         @unique
+  name          String
+  parentId      String?
+  level         Int
+  displayOrder  Int
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+
+  parent        Node?          @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Node[]         @relation("NodeHierarchy")
+  topNodeStates TopNodeState[]
+
+  @@index([parentId])
+  @@map("nodes")
+}
+
+model TopNodeState {
+  id                 String        @id @default(cuid())
+  vehicleId          String
+  nodeId             String
+  status             TopNodeStatus
+  lastServiceEventId String?
+  note               String?
+  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime      @default(now())
+
+  vehicle            Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node               Node          @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+
+  @@index([vehicleId])
+  @@index([nodeId])
+  @@unique([vehicleId, nodeId])
+  @@map("top_node_states")
 }
 
 model RideProfile {

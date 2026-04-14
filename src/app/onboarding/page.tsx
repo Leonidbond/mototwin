@@ -193,15 +193,26 @@ export default function OnboardingPage() {
         }),
       });
 
-      const data = await response.json();
+      const raw = await response.text();
+      let data: any = null;
+
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        console.error("Non-JSON response:", raw);
+        setSubmitError(
+          "Сервер вернул не JSON. Проверь /api/vehicles и консоль сервера."
+        );
+        return;
+      }
 
       if (!response.ok) {
-        setSubmitError(data.error || "Не удалось сохранить мотоцикл.");
+        setSubmitError(data?.error || "Не удалось сохранить мотоцикл.");
         return;
       }
 
       setSubmitSuccess("Мотоцикл успешно сохранен в гараж.");
-      console.log("Created vehicle:", data.vehicle);
+      console.log("Created vehicle:", data?.vehicle);
     } catch (error) {
       console.error(error);
       setSubmitError("Произошла ошибка при сохранении.");
@@ -455,9 +466,15 @@ export default function OnboardingPage() {
                 ) : null}
 
                 {submitSuccess ? (
-                  <p className="mt-4 text-sm text-green-600">
-                    {submitSuccess}
-                  </p>
+                  <div className="mt-4 space-y-3">
+                    <p className="text-sm text-green-600">{submitSuccess}</p>
+                    <a
+                      href="/garage"
+                      className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                    >
+                      Перейти в гараж
+                    </a>
+                  </div>
                 ) : null}
               </div>
             </div>
