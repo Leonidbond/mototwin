@@ -51,6 +51,24 @@ enum TopNodeStatus {
   RECENTLY_REPLACED
 }
 
+enum NodeStatus {
+  OK
+  SOON
+  OVERDUE
+  RECENTLY_REPLACED
+}
+
+enum MaintenanceTriggerMode {
+  WHICHEVER_COMES_FIRST
+  ANY
+  ALL
+}
+
+enum ServiceEventKind {
+  SERVICE
+  STATE_UPDATE
+}
+
 model User {
   id            String        @id @default(cuid())
   email         String        @unique
@@ -146,6 +164,7 @@ model Vehicle {
   rideProfile    RideProfile?
   serviceEvents  ServiceEvent[]
   topNodeStates  TopNodeState[]
+  nodeStates     NodeState[]
 
   @@index([userId])
   @@index([brandId, modelId, modelVariantId])
@@ -156,6 +175,7 @@ model ServiceEvent {
   id                 String   @id @default(cuid())
   vehicleId          String
   nodeId             String
+  eventKind          ServiceEventKind @default(SERVICE)
   eventDate          DateTime
   odometer           Int
   engineHours        Int?
@@ -188,6 +208,8 @@ model Node {
   children      Node[]         @relation("NodeHierarchy")
   serviceEvents ServiceEvent[]
   topNodeStates TopNodeState[]
+  nodeStates    NodeState[]
+  maintenanceRule NodeMaintenanceRule?
 
   @@index([parentId])
   @@map("nodes")
@@ -210,6 +232,46 @@ model TopNodeState {
   @@index([nodeId])
   @@unique([vehicleId, nodeId])
   @@map("top_node_states")
+}
+
+model NodeState {
+  id                 String     @id @default(cuid())
+  vehicleId          String
+  nodeId             String
+  status             NodeStatus
+  lastServiceEventId String?
+  note               String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  vehicle            Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node               Node       @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+
+  @@index([vehicleId])
+  @@index([nodeId])
+  @@unique([vehicleId, nodeId])
+  @@map("node_states")
+}
+
+model NodeMaintenanceRule {
+  id            String                 @id @default(cuid())
+  nodeId        String
+  intervalKm    Int?
+  intervalHours Int?
+  intervalDays  Int?
+  triggerMode   MaintenanceTriggerMode
+  warningKm     Int?
+  warningHours  Int?
+  warningDays   Int?
+  isActive      Boolean                @default(true)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  node          Node                   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@unique([nodeId])
+  @@map("node_maintenance_rules")
 }
 
 model RideProfile {

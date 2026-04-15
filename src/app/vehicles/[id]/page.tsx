@@ -67,6 +67,41 @@ type NodeTreeItem = {
   level: number;
   displayOrder: number;
   status: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED" | null;
+  directStatus: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED" | null;
+  computedStatus: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED" | null;
+  effectiveStatus: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED" | null;
+  statusExplanation: {
+    reasonShort: string | null;
+    reasonDetailed: string | null;
+    triggerMode: string | null;
+    current: {
+      odometer: number | null;
+      engineHours: number | null;
+      date: string;
+    };
+    lastService: {
+      eventDate: string | null;
+      odometer: number | null;
+      engineHours: number | null;
+    } | null;
+    rule: {
+      intervalKm: number | null;
+      intervalHours: number | null;
+      intervalDays: number | null;
+      warningKm: number | null;
+      warningHours: number | null;
+      warningDays: number | null;
+    } | null;
+    usage: {
+      elapsedKm: number | null;
+      elapsedHours: number | null;
+      elapsedDays: number | null;
+      remainingKm: number | null;
+      remainingHours: number | null;
+      remainingDays: number | null;
+    } | null;
+    triggeredBy: "km" | "hours" | "days" | null;
+  } | null;
   note: string | null;
   updatedAt: string | null;
   children: NodeTreeItem[];
@@ -83,10 +118,20 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [nodeTreeError, setNodeTreeError] = useState("");
+  const [isServiceLogModalOpen, setIsServiceLogModalOpen] = useState(false);
+  const [isAddServiceEventModalOpen, setIsAddServiceEventModalOpen] = useState(false);
   const [isCreatingServiceEvent, setIsCreatingServiceEvent] = useState(false);
   const [serviceEventFormError, setServiceEventFormError] = useState("");
   const [serviceEventFormSuccess, setServiceEventFormSuccess] = useState("");
   const [selectedNodePath, setSelectedNodePath] = useState<string[]>([]);
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+  const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
+    useState<NodeTreeItem | null>(null);
+  const [isEditingVehicleState, setIsEditingVehicleState] = useState(false);
+  const [vehicleStateOdometer, setVehicleStateOdometer] = useState("");
+  const [vehicleStateEngineHours, setVehicleStateEngineHours] = useState("");
+  const [vehicleStateError, setVehicleStateError] = useState("");
+  const [isSavingVehicleState, setIsSavingVehicleState] = useState(false);
   const [serviceType, setServiceType] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [odometer, setOdometer] = useState("");
@@ -229,6 +274,136 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
   };
 
+  const toggleNodeExpansion = (nodeId: string) => {
+    setExpandedNodes((prev) => ({
+      ...prev,
+      [nodeId]: !prev[nodeId],
+    }));
+  };
+
+  const findNodePathById = (
+    nodes: NodeTreeItem[],
+    targetNodeId: string,
+    path: string[] = []
+  ): string[] | null => {
+    for (const node of nodes) {
+      const nextPath = [...path, node.id];
+
+      if (node.id === targetNodeId) {
+        return nextPath;
+      }
+
+      if (node.children.length > 0) {
+        const result = findNodePathById(node.children, targetNodeId, nextPath);
+        if (result) {
+          return result;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const openAddServiceEventFromLeafNode = (leafNodeId: string) => {
+    const nodePath = findNodePathById(nodeTree, leafNodeId);
+
+    if (!nodePath) {
+      setServiceEventFormError("Не удалось определить путь узла.");
+      return;
+    }
+
+    setServiceEventFormError("");
+    setServiceEventFormSuccess("");
+    setSelectedNodePath(nodePath);
+    setIsAddServiceEventModalOpen(true);
+  };
+
+  const getLeafStatusExplanation = (node: NodeTreeItem): string | null => {
+    if (node.children.length > 0) {
+      return null;
+    }
+
+    if (!node.statusExplanation?.reasonShort) {
+      return null;
+    }
+
+    return node.statusExplanation.reasonShort;
+  };
+
+  const renderChildTreeNode = (node: NodeTreeItem, depth: number): ReactNode => {
+    const hasChildren = node.children.length > 0;
+    const isExpanded = Boolean(expandedNodes[node.id]);
+
+    return (
+      <div key={node.id} className="space-y-2">
+        <div
+          className="rounded-xl border border-gray-200 bg-white px-4 py-3"
+          style={{ marginLeft: `${depth * 16}px` }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                {hasChildren ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleNodeExpansion(node.id)}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition hover:bg-gray-50"
+                    aria-label={isExpanded ? "Свернуть ветку" : "Развернуть ветку"}
+                  >
+                    {isExpanded ? "−" : "+"}
+                  </button>
+                ) : (
+                  <span className="inline-flex h-6 w-6 items-center justify-center text-gray-400">
+                    •
+                  </span>
+                )}
+                <span className="truncate text-sm font-medium text-gray-950">
+                  {node.name}
+                </span>
+              </div>
+              {getLeafStatusExplanation(node) ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatusExplanationNode(node)}
+                  className="mt-1 pl-8 text-left text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-gray-700"
+                >
+                  {getLeafStatusExplanation(node)}
+                </button>
+              ) : null}
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              {node.effectiveStatus ? (
+                <span
+                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClassName(node.effectiveStatus)}`}
+                >
+                  {formatTopNodeStatus(node.effectiveStatus)}
+                </span>
+              ) : null}
+              {!hasChildren ? (
+                <button
+                  type="button"
+                  onClick={() => openAddServiceEventFromLeafNode(node.id)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                  aria-label="Добавить сервисное событие"
+                  title="Добавить сервисное событие"
+                >
+                  +
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {hasChildren && isExpanded ? (
+          <div className="space-y-2">
+            {node.children.map((child) => renderChildTreeNode(child, depth + 1))}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
   useEffect(() => {
     if (!vehicleId) {
       return;
@@ -261,6 +436,99 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       setServiceEventsError("Произошла ошибка при загрузке журнала.");
     } finally {
       setIsServiceEventsLoading(false);
+    }
+  };
+
+  const openVehicleStateEditor = () => {
+    if (!vehicle) {
+      return;
+    }
+
+    setVehicleStateOdometer(String(vehicle.odometer));
+    setVehicleStateEngineHours(
+      vehicle.engineHours !== null ? String(vehicle.engineHours) : ""
+    );
+    setVehicleStateError("");
+    setIsEditingVehicleState(true);
+  };
+
+  const cancelVehicleStateEditor = () => {
+    setVehicleStateError("");
+    setIsEditingVehicleState(false);
+  };
+
+  const saveVehicleState = async () => {
+    if (!vehicleId || !vehicle) {
+      setVehicleStateError("Не удалось определить мотоцикл.");
+      return;
+    }
+
+    if (!vehicleStateOdometer.trim()) {
+      setVehicleStateError("Укажите пробег.");
+      return;
+    }
+
+    const parsedOdometer = Number(vehicleStateOdometer);
+    if (!Number.isInteger(parsedOdometer) || parsedOdometer < 0) {
+      setVehicleStateError("Пробег должен быть целым числом не меньше 0.");
+      return;
+    }
+
+    const trimmedEngineHours = vehicleStateEngineHours.trim();
+    let parsedEngineHours: number | null = null;
+
+    if (trimmedEngineHours) {
+      const parsed = Number(trimmedEngineHours);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        setVehicleStateError("Моточасы должны быть целым числом не меньше 0.");
+        return;
+      }
+      parsedEngineHours = parsed;
+    }
+
+    try {
+      setIsSavingVehicleState(true);
+      setVehicleStateError("");
+
+      const response = await fetch(`/api/vehicles/${vehicleId}/state`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          odometer: parsedOdometer,
+          engineHours: parsedEngineHours,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setVehicleStateError(
+          data.error || "Не удалось обновить текущее состояние мотоцикла."
+        );
+        return;
+      }
+
+      setVehicle((currentVehicle) =>
+        currentVehicle
+          ? {
+              ...currentVehicle,
+              odometer: data.vehicle?.odometer ?? currentVehicle.odometer,
+              engineHours:
+                data.vehicle?.engineHours !== undefined
+                  ? data.vehicle.engineHours
+                  : currentVehicle.engineHours,
+            }
+          : currentVehicle
+      );
+      setIsEditingVehicleState(false);
+      await Promise.all([loadNodeTree(), loadServiceEvents()]);
+    } catch (saveError) {
+      console.error(saveError);
+      setVehicleStateError("Произошла ошибка при сохранении состояния.");
+    } finally {
+      setIsSavingVehicleState(false);
     }
   };
 
@@ -349,6 +617,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       setServiceEventFormSuccess("Сервисное событие добавлено.");
       resetServiceEventForm();
       await Promise.all([loadServiceEvents(), loadNodeTree()]);
+      setIsAddServiceEventModalOpen(false);
     } catch (createError) {
       console.error(createError);
       setServiceEventFormError("Произошла ошибка при создании события.");
@@ -410,18 +679,96 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 {vehicle.modelVariant.year} | {vehicle.modelVariant.versionName}
               </p>
 
-              <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
                 <InfoCard label="Никнейм" value={vehicle.nickname || "Не задан"} />
                 <InfoCard label="VIN" value={vehicle.vin || "Не указан"} />
-                <InfoCard label="Пробег" value={`${vehicle.odometer} км`} />
-                <InfoCard
-                  label="Моточасы"
-                  value={
-                    vehicle.engineHours !== null
-                      ? `${vehicle.engineHours}`
-                      : "Не указаны"
-                  }
-                />
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-base font-semibold text-gray-950">
+                    Текущее состояние
+                  </h2>
+                  {!isEditingVehicleState ? (
+                    <button
+                      type="button"
+                      onClick={openVehicleStateEditor}
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
+                    >
+                      Редактировать
+                    </button>
+                  ) : null}
+                </div>
+
+                {!isEditingVehicleState ? (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 text-sm text-gray-700">
+                    <div>
+                      <span className="font-medium text-gray-950">Пробег:</span>{" "}
+                      {vehicle.odometer} км
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-950">Моточасы:</span>{" "}
+                      {vehicle.engineHours !== null ? vehicle.engineHours : "Не указаны"}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <InputField label="Пробег, км">
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={vehicleStateOdometer}
+                          onChange={(event) =>
+                            setVehicleStateOdometer(event.target.value)
+                          }
+                          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                          placeholder="Например, 15000"
+                          disabled={isSavingVehicleState}
+                        />
+                      </InputField>
+
+                      <InputField label="Моточасы">
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={vehicleStateEngineHours}
+                          onChange={(event) =>
+                            setVehicleStateEngineHours(event.target.value)
+                          }
+                          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                          placeholder="Пусто = не указаны"
+                          disabled={isSavingVehicleState}
+                        />
+                      </InputField>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={saveVehicleState}
+                        disabled={isSavingVehicleState}
+                        className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isSavingVehicleState ? "Сохраняем..." : "Сохранить"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelVehicleStateEditor}
+                        disabled={isSavingVehicleState}
+                        className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+
+                    {vehicleStateError ? (
+                      <p className="text-sm text-red-600">{vehicleStateError}</p>
+                    ) : null}
+                  </div>
+                )}
               </div>
 
               <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -502,6 +849,16 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 Дерево узлов
               </h2>
 
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsServiceLogModalOpen(true)}
+                  className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                >
+                  Открыть журнал обслуживания
+                </button>
+              </div>
+
               {isNodeTreeLoading ? (
                 <p className="mt-4 text-sm text-gray-600">Загрузка дерева узлов...</p>
               ) : null}
@@ -517,65 +874,149 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               ) : null}
 
               {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
-                <div className="mt-6 space-y-4">
-                  {nodeTree.map((rootNode) => (
-                    <div
-                      key={rootNode.id}
-                      className="rounded-2xl border border-gray-200 bg-gray-50 p-5"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="text-base font-semibold text-gray-950">
-                          {rootNode.name}
-                        </h3>
-                        {rootNode.status ? (
-                          <span className="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700">
-                            {formatTopNodeStatus(rootNode.status)}
-                          </span>
+                <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {nodeTree.map((rootNode) => {
+                    const hasChildren = rootNode.children.length > 0;
+                    const isExpanded = Boolean(expandedNodes[rootNode.id]);
+
+                    return (
+                      <div
+                        key={rootNode.id}
+                        className="rounded-2xl border border-gray-200 bg-gray-50 p-5"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              {hasChildren ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleNodeExpansion(rootNode.id)}
+                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition hover:bg-gray-50"
+                                  aria-label={
+                                    isExpanded ? "Свернуть ветку" : "Развернуть ветку"
+                                  }
+                                >
+                                  {isExpanded ? "−" : "+"}
+                                </button>
+                              ) : (
+                                <span className="inline-flex h-6 w-6 items-center justify-center text-gray-400">
+                                  •
+                                </span>
+                              )}
+                              <h3 className="truncate text-base font-semibold text-gray-950">
+                                {rootNode.name}
+                              </h3>
+                            </div>
+                            {getLeafStatusExplanation(rootNode) ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedStatusExplanationNode(rootNode)
+                                }
+                                className="mt-1 pl-8 text-left text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-gray-700"
+                              >
+                                {getLeafStatusExplanation(rootNode)}
+                              </button>
+                            ) : null}
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-2">
+                            {rootNode.effectiveStatus ? (
+                              <span
+                                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClassName(rootNode.effectiveStatus)}`}
+                              >
+                                {formatTopNodeStatus(rootNode.effectiveStatus)}
+                              </span>
+                            ) : null}
+                            {!hasChildren ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openAddServiceEventFromLeafNode(rootNode.id)
+                                }
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                                aria-label="Добавить сервисное событие"
+                                title="Добавить сервисное событие"
+                              >
+                                +
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {hasChildren && isExpanded ? (
+                          <div className="mt-4 space-y-2">
+                            {rootNode.children.map((child) =>
+                              renderChildTreeNode(child, 0)
+                            )}
+                          </div>
                         ) : null}
                       </div>
-
-                      {rootNode.note ? (
-                        <p className="mt-2 text-sm text-gray-700">{rootNode.note}</p>
-                      ) : null}
-
-                      {rootNode.children.length > 0 ? (
-                        <div className="mt-4">
-                          {renderNodeChildren(rootNode.children, 0)}
-                        </div>
-                      ) : null}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : null}
             </section>
 
-            <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
-              <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
+          </div>
+        ) : null}
+      </div>
+
+      {isServiceLogModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-6 sm:items-center">
+          <div className="w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold tracking-tight text-gray-950">
                 Журнал обслуживания
               </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetServiceEventForm();
+                    setServiceEventFormError("");
+                    setServiceEventFormSuccess("");
+                    setIsAddServiceEventModalOpen(true);
+                  }}
+                  className="inline-flex items-center justify-center rounded-lg bg-gray-950 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-gray-800"
+                >
+                  Добавить сервисное событие
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsServiceLogModalOpen(false)}
+                  className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
 
-              {isServiceEventsLoading ? (
-                <p className="mt-4 text-sm text-gray-600">
-                  Загрузка журнала обслуживания...
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+              {serviceEventFormSuccess ? (
+                <p className="mb-4 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                  {serviceEventFormSuccess}
                 </p>
               ) : null}
 
+              {isServiceEventsLoading ? (
+                <p className="text-sm text-gray-600">Загрузка журнала обслуживания...</p>
+              ) : null}
+
               {!isServiceEventsLoading && serviceEventsError ? (
-                <p className="mt-4 text-sm text-red-600">{serviceEventsError}</p>
+                <p className="text-sm text-red-600">{serviceEventsError}</p>
               ) : null}
 
               {!isServiceEventsLoading &&
               !serviceEventsError &&
               serviceEvents.length === 0 ? (
-                <p className="mt-4 text-sm text-gray-600">
-                  Сервисных событий пока нет.
-                </p>
+                <p className="text-sm text-gray-600">Сервисных событий пока нет.</p>
               ) : null}
 
               {!isServiceEventsLoading &&
               !serviceEventsError &&
               serviceEvents.length > 0 ? (
-                <div className="mt-6 space-y-4">
+                <div className="space-y-4">
                   {serviceEvents.map((serviceEvent) => (
                     <div
                       key={serviceEvent.id}
@@ -596,9 +1037,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                           {serviceEvent.node?.name || serviceEvent.nodeId}
                         </div>
                         <div>
-                          <span className="font-medium text-gray-950">
-                            Пробег:
-                          </span>{" "}
+                          <span className="font-medium text-gray-950">Пробег:</span>{" "}
                           {serviceEvent.odometer} км
                         </div>
                         {serviceEvent.engineHours !== null ? (
@@ -632,14 +1071,29 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   ))}
                 </div>
               ) : null}
-            </section>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
-            <section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
-              <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
+      {isAddServiceEventModalOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 px-4 py-6 sm:items-center">
+          <div className="w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold tracking-tight text-gray-950">
                 Добавить сервисное событие
               </h2>
+              <button
+                type="button"
+                onClick={() => setIsAddServiceEventModalOpen(false)}
+                className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+              >
+                Закрыть
+              </button>
+            </div>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <InputField label="Node">
                   <div className="grid gap-4">
                     {nodeSelectLevels.map((nodesAtLevel, levelIndex) => (
@@ -771,17 +1225,257 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 {serviceEventFormError ? (
                   <p className="mt-3 text-sm text-red-600">{serviceEventFormError}</p>
                 ) : null}
-
-                {serviceEventFormSuccess ? (
-                  <p className="mt-3 text-sm text-green-600">
-                    {serviceEventFormSuccess}
-                  </p>
-                ) : null}
               </div>
-            </section>
+            </div>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
+
+      {selectedStatusExplanationNode?.statusExplanation ? (
+        <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/50 px-4 py-6 sm:items-center">
+          <div className="w-full max-w-3xl rounded-3xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                Пояснение расчета: {selectedStatusExplanationNode.name}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSelectedStatusExplanationNode(null)}
+                className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+              >
+                Закрыть
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5 text-sm text-gray-700">
+              {selectedStatusExplanationNode.statusExplanation.reasonShort ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Кратко
+                  </div>
+                  <div className="mt-1 font-medium text-gray-900">
+                    {selectedStatusExplanationNode.statusExplanation.reasonShort}
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedStatusExplanationNode.statusExplanation.reasonDetailed ? (
+                <div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Подробно
+                  </div>
+                  <p className="mt-1 text-gray-800">
+                    {selectedStatusExplanationNode.statusExplanation.reasonDetailed}
+                  </p>
+                </div>
+              ) : null}
+
+              {selectedStatusExplanationNode.statusExplanation.triggeredBy ? (
+                <div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Сработавшее измерение
+                  </div>
+                  <p className="mt-1 text-gray-800">
+                    {selectedStatusExplanationNode.statusExplanation.triggeredBy === "km"
+                      ? "Пробег"
+                      : selectedStatusExplanationNode.statusExplanation.triggeredBy ===
+                          "hours"
+                        ? "Моточасы"
+                        : "Время"}
+                  </p>
+                </div>
+              ) : null}
+
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Детали расчета
+                </div>
+                <div className="mt-2 overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="min-w-full text-left text-xs text-gray-700">
+                    <thead className="bg-gray-50 text-gray-600">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Параметр</th>
+                        <th className="px-3 py-2 font-medium">Текущее</th>
+                        <th className="px-3 py-2 font-medium">Последний сервис</th>
+                        <th className="px-3 py-2 font-medium">Интервал</th>
+                        <th className="px-3 py-2 font-medium">Warning</th>
+                        <th className="px-3 py-2 font-medium">Использовано</th>
+                        <th className="px-3 py-2 font-medium">Осталось</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedStatusExplanationNode.statusExplanation.current.odometer !==
+                        null ||
+                      selectedStatusExplanationNode.statusExplanation.lastService
+                        ?.odometer !== null ||
+                      selectedStatusExplanationNode.statusExplanation.rule
+                        ?.intervalKm !== null ||
+                      selectedStatusExplanationNode.statusExplanation.rule
+                        ?.warningKm !== null ||
+                      selectedStatusExplanationNode.statusExplanation.usage
+                        ?.elapsedKm !== null ||
+                      selectedStatusExplanationNode.statusExplanation.usage
+                        ?.remainingKm !== null ? (
+                        <tr className="border-t border-gray-200">
+                          <td className="px-3 py-2 font-medium text-gray-900">Пробег</td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.current.odometer !==
+                            null
+                              ? `${selectedStatusExplanationNode.statusExplanation.current.odometer} км`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.lastService
+                              ?.odometer !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.lastService.odometer} км`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.rule
+                              ?.intervalKm !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule.intervalKm} км`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.rule
+                              ?.warningKm !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule.warningKm} км`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.usage
+                              ?.elapsedKm !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage.elapsedKm} км`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.usage
+                              ?.remainingKm !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage.remainingKm} км`
+                              : "—"}
+                          </td>
+                        </tr>
+                      ) : null}
+
+                      {selectedStatusExplanationNode.statusExplanation.current.engineHours !==
+                        null ||
+                      selectedStatusExplanationNode.statusExplanation.lastService
+                        ?.engineHours !== null ||
+                      selectedStatusExplanationNode.statusExplanation.rule
+                        ?.intervalHours !== null ||
+                      selectedStatusExplanationNode.statusExplanation.rule
+                        ?.warningHours !== null ||
+                      selectedStatusExplanationNode.statusExplanation.usage
+                        ?.elapsedHours !== null ||
+                      selectedStatusExplanationNode.statusExplanation.usage
+                        ?.remainingHours !== null ? (
+                        <tr className="border-t border-gray-200">
+                          <td className="px-3 py-2 font-medium text-gray-900">Моточасы</td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.current
+                              .engineHours !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.current.engineHours} ч`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.lastService
+                              ?.engineHours !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.lastService.engineHours} ч`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.rule
+                              ?.intervalHours !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule.intervalHours} ч`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.rule
+                              ?.warningHours !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule.warningHours} ч`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.usage
+                              ?.elapsedHours !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage.elapsedHours} ч`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.usage
+                              ?.remainingHours !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage.remainingHours} ч`
+                              : "—"}
+                          </td>
+                        </tr>
+                      ) : null}
+
+                      {selectedStatusExplanationNode.statusExplanation.rule
+                        ?.intervalDays !== null ||
+                      selectedStatusExplanationNode.statusExplanation.rule
+                        ?.warningDays !== null ||
+                      selectedStatusExplanationNode.statusExplanation.usage
+                        ?.elapsedDays !== null ||
+                      selectedStatusExplanationNode.statusExplanation.usage
+                        ?.remainingDays !== null ? (
+                        <tr className="border-t border-gray-200">
+                          <td className="px-3 py-2 font-medium text-gray-900">Время</td>
+                          <td className="px-3 py-2">—</td>
+                          <td className="px-3 py-2">—</td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.rule
+                              ?.intervalDays !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule.intervalDays} дн`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.rule
+                              ?.warningDays !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule.warningDays} дн`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.usage
+                              ?.elapsedDays !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage.elapsedDays} дн`
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {selectedStatusExplanationNode.statusExplanation.usage
+                              ?.remainingDays !== null
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage.remainingDays} дн`
+                              : "—"}
+                          </td>
+                        </tr>
+                      ) : null}
+
+                      <tr className="border-t border-gray-200">
+                        <td className="px-3 py-2 font-medium text-gray-900">Дата расчета</td>
+                        <td className="px-3 py-2">
+                          {formatDate(selectedStatusExplanationNode.statusExplanation.current.date)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {selectedStatusExplanationNode.statusExplanation.lastService
+                            ?.eventDate
+                            ? formatDate(
+                                selectedStatusExplanationNode.statusExplanation.lastService.eventDate
+                              )
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2" colSpan={4}>
+                          Trigger mode:{" "}
+                          {selectedStatusExplanationNode.statusExplanation.triggerMode ||
+                            "—"}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -908,6 +1602,23 @@ function formatTopNodeStatus(
   }
 }
 
+function getStatusBadgeClassName(
+  status: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED"
+) {
+  switch (status) {
+    case "OVERDUE":
+      return "border-red-600 bg-red-100 text-red-800";
+    case "SOON":
+      return "border-amber-500 bg-amber-100 text-amber-800";
+    case "RECENTLY_REPLACED":
+      return "border-emerald-600 bg-emerald-100 text-emerald-800";
+    case "OK":
+      return "border-green-600 bg-green-100 text-green-800";
+    default:
+      return "border-gray-300 bg-gray-100 text-gray-700";
+  }
+}
+
 function getTodayDateString() {
   const now = new Date();
   const year = now.getFullYear();
@@ -915,23 +1626,5 @@ function getTodayDateString() {
   const day = String(now.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
-}
-
-function renderNodeChildren(nodes: NodeTreeItem[], depth: number): ReactNode {
-  return (
-    <div className="space-y-2">
-      {nodes.map((node) => (
-        <div key={node.id}>
-          <div
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800"
-            style={{ marginLeft: `${depth * 16}px` }}
-          >
-            {node.name}
-          </div>
-          {node.children.length > 0 ? renderNodeChildren(node.children, depth + 1) : null}
-        </div>
-      ))}
-    </div>
-  );
 }
 

@@ -184,6 +184,81 @@ const topLevelNodeCodes = [
   "CONTROLS",
 ] as const;
 
+const maintenanceRuleSeed = [
+  {
+    code: "ENGINE.LUBE.OIL",
+    intervalKm: 5000,
+    intervalHours: 120,
+    intervalDays: 180,
+    warningKm: 500,
+    warningHours: 15,
+    warningDays: 30,
+  },
+  {
+    code: "ENGINE.LUBE.FILTER",
+    intervalKm: 5000,
+    intervalHours: 120,
+    intervalDays: 180,
+    warningKm: 500,
+    warningHours: 15,
+    warningDays: 30,
+  },
+  {
+    code: "INTAKE.FILTER",
+    intervalKm: 8000,
+    intervalHours: 180,
+    intervalDays: 365,
+    warningKm: 1000,
+    warningHours: 20,
+    warningDays: 45,
+  },
+  {
+    code: "BRAKES.FRONT.PADS",
+    intervalKm: 12000,
+    intervalHours: null,
+    intervalDays: 365,
+    warningKm: 1500,
+    warningHours: null,
+    warningDays: 45,
+  },
+  {
+    code: "BRAKES.REAR.PADS",
+    intervalKm: 15000,
+    intervalHours: null,
+    intervalDays: 365,
+    warningKm: 1500,
+    warningHours: null,
+    warningDays: 45,
+  },
+  {
+    code: "DRIVETRAIN.CHAIN",
+    intervalKm: 18000,
+    intervalHours: null,
+    intervalDays: 365,
+    warningKm: 2000,
+    warningHours: null,
+    warningDays: 45,
+  },
+  {
+    code: "TIRES.FRONT",
+    intervalKm: 15000,
+    intervalHours: null,
+    intervalDays: 540,
+    warningKm: 2000,
+    warningHours: null,
+    warningDays: 60,
+  },
+  {
+    code: "TIRES.REAR",
+    intervalKm: 10000,
+    intervalHours: null,
+    intervalDays: 365,
+    warningKm: 1500,
+    warningHours: null,
+    warningDays: 45,
+  },
+] as const;
+
 async function main() {
   const testUser = await prisma.user.upsert({
     where: { email: "demo@mototwin.local" },
@@ -501,6 +576,50 @@ async function main() {
     });
   }
 
+  let maintenanceRulesUpserted = 0;
+  let maintenanceRulesSkipped = 0;
+
+  for (const rule of maintenanceRuleSeed) {
+    const nodeId = nodeIdByCode.get(rule.code);
+
+    if (!nodeId) {
+      maintenanceRulesSkipped += 1;
+      console.warn(
+        `[seed] NodeMaintenanceRule skipped: node code not found (${rule.code})`
+      );
+      continue;
+    }
+
+    await prisma.nodeMaintenanceRule.upsert({
+      where: {
+        nodeId,
+      },
+      update: {
+        intervalKm: rule.intervalKm,
+        intervalHours: rule.intervalHours,
+        intervalDays: rule.intervalDays,
+        triggerMode: "WHICHEVER_COMES_FIRST",
+        warningKm: rule.warningKm,
+        warningHours: rule.warningHours,
+        warningDays: rule.warningDays,
+        isActive: true,
+      },
+      create: {
+        nodeId,
+        intervalKm: rule.intervalKm,
+        intervalHours: rule.intervalHours,
+        intervalDays: rule.intervalDays,
+        triggerMode: "WHICHEVER_COMES_FIRST",
+        warningKm: rule.warningKm,
+        warningHours: rule.warningHours,
+        warningDays: rule.warningDays,
+        isActive: true,
+      },
+    });
+
+    maintenanceRulesUpserted += 1;
+  }
+
   console.log("Seed completed");
   console.log({
     brands: ["BMW", "KTM"],
@@ -508,6 +627,8 @@ async function main() {
     seededNodes: seededNodes.length,
     topLevelNodes: topLevelNodes.length,
     topNodeStates: topNodeStateRows.length,
+    maintenanceRulesUpserted,
+    maintenanceRulesSkipped,
     legacyNodesFound: legacyNodes.length,
     legacyNodesDeleted: removableLegacyNodes.length,
   });

@@ -180,6 +180,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
     });
 
+    await prisma.nodeState.upsert({
+      where: {
+        vehicleId_nodeId: {
+          vehicleId: id,
+          nodeId: data.nodeId,
+        },
+      },
+      update: {
+        status: "RECENTLY_REPLACED",
+        lastServiceEventId: serviceEvent.id,
+        note: null,
+      },
+      create: {
+        vehicleId: id,
+        nodeId: data.nodeId,
+        status: "RECENTLY_REPLACED",
+        lastServiceEventId: serviceEvent.id,
+        note: null,
+      },
+    });
+
     await prisma.topNodeState.update({
       where: {
         vehicleId_nodeId: {
