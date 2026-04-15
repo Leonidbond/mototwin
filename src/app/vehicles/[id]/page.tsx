@@ -43,6 +43,7 @@ type VehiclePageProps = {
 type ServiceEvent = {
   id: string;
   nodeId: string;
+  eventKind?: "SERVICE" | "STATE_UPDATE";
   eventDate: string;
   odometer: number;
   engineHours: number | null;
@@ -58,6 +59,26 @@ type ServiceEvent = {
     level: number;
     displayOrder: number;
   };
+};
+
+type ServiceEventsSortField =
+  | "eventDate"
+  | "eventKind"
+  | "serviceType"
+  | "node"
+  | "odometer"
+  | "engineHours"
+  | "cost"
+  | "comment";
+
+type ServiceEventsSortDirection = "asc" | "desc";
+
+type ServiceEventsFilters = {
+  dateFrom: string;
+  dateTo: string;
+  eventKind: string;
+  serviceType: string;
+  node: string;
 };
 
 type NodeTreeItem = {
@@ -115,6 +136,20 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [serviceEvents, setServiceEvents] = useState<ServiceEvent[]>([]);
   const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false);
   const [serviceEventsError, setServiceEventsError] = useState("");
+  const [serviceEventsFilters, setServiceEventsFilters] = useState<ServiceEventsFilters>({
+    dateFrom: "",
+    dateTo: "",
+    eventKind: "",
+    serviceType: "",
+    node: "",
+  });
+  const [serviceEventsSort, setServiceEventsSort] = useState<{
+    field: ServiceEventsSortField;
+    direction: ServiceEventsSortDirection;
+  }>({
+    field: "eventDate",
+    direction: "desc",
+  });
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [nodeTreeError, setNodeTreeError] = useState("");
@@ -127,6 +162,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
     useState<NodeTreeItem | null>(null);
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [isEditingVehicleState, setIsEditingVehicleState] = useState(false);
   const [vehicleStateOdometer, setVehicleStateOdometer] = useState("");
   const [vehicleStateEngineHours, setVehicleStateEngineHours] = useState("");
@@ -189,6 +225,140 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const isLeafNodeSelected = Boolean(
     selectedFinalNode && selectedFinalNode.children.length === 0
   );
+
+  const filteredAndSortedServiceEvents = useMemo(() => {
+    const normalizedFilters = {
+      dateFrom: serviceEventsFilters.dateFrom.trim(),
+      dateTo: serviceEventsFilters.dateTo.trim(),
+      eventKind: serviceEventsFilters.eventKind.trim().toLowerCase(),
+      serviceType: serviceEventsFilters.serviceType.trim().toLowerCase(),
+      node: serviceEventsFilters.node.trim().toLowerCase(),
+    };
+
+    const filtered = serviceEvents.filter((event) => {
+      const eventDateOnly = event.eventDate.slice(0, 10);
+      const eventKindLabel =
+        event.eventKind === "STATE_UPDATE" ? "обновление состояния" : "сервис";
+      const nodeLabel = event.node?.name || event.nodeId;
+      const normalizedNodeLabel = nodeLabel.toLowerCase();
+      const nodeStartsWith = normalizedNodeLabel.startsWith(normalizedFilters.node);
+      const nodeIncludes = normalizedNodeLabel.includes(normalizedFilters.node);
+
+      return (
+        (!normalizedFilters.dateFrom || eventDateOnly >= normalizedFilters.dateFrom) &&
+        (!normalizedFilters.dateTo || eventDateOnly <= normalizedFilters.dateTo) &&
+        (!normalizedFilters.eventKind ||
+          (event.eventKind || "SERVICE") === normalizedFilters.eventKind.toUpperCase() ||
+          eventKindLabel.includes(normalizedFilters.eventKind)) &&
+        (!normalizedFilters.serviceType ||
+          event.serviceType.toLowerCase().includes(normalizedFilters.serviceType)) &&
+        (!normalizedFilters.node || nodeStartsWith || nodeIncludes)
+      );
+    });
+
+    const sorted = [...filtered].sort((left, right) => {
+      const directionMultiplier = serviceEventsSort.direction === "asc" ? 1 : -1;
+
+      const compareStrings = (a: string, b: string) =>
+        a.localeCompare(b, "ru-RU") * directionMultiplier;
+
+      const compareNumbers = (a: number, b: number) => (a - b) * directionMultiplier;
+
+      const compareNullableNumbers = (a: number | null, b: number | null) => {
+        if (a === null && b === null) {
+          return 0;
+        }
+        if (a === null) {
+          return 1;
+        }
+        if (b === null) {
+          return -1;
+        }
+        return compareNumbers(a, b);
+      };
+
+      switch (serviceEventsSort.field) {
+        case "eventDate":
+          return (
+            (new Date(left.eventDate).getTime() - new Date(right.eventDate).getTime()) *
+            directionMultiplier
+          );
+        case "eventKind": {
+          const leftKind =
+            left.eventKind === "STATE_UPDATE" ? "Обновление состояния" : "Сервис";
+          const rightKind =
+            right.eventKind === "STATE_UPDATE" ? "Обновление состояния" : "Сервис";
+          return compareStrings(leftKind, rightKind);
+        }
+        case "serviceType":
+          return compareStrings(left.serviceType, right.serviceType);
+        case "node":
+          return compareStrings(
+            left.node?.name || left.nodeId,
+            right.node?.name || right.nodeId
+          );
+        case "odometer":
+          return compareNumbers(left.odometer, right.odometer);
+        case "engineHours":
+          return compareNullableNumbers(left.engineHours, right.engineHours);
+        case "cost":
+          return compareNullableNumbers(left.costAmount, right.costAmount);
+        case "comment":
+          return compareStrings(left.comment || "", right.comment || "");
+        default:
+          return 0;
+      }
+    });
+
+    return sorted;
+  }, [serviceEvents, serviceEventsFilters, serviceEventsSort]);
+
+  const updateServiceEventsFilter = (
+    field: keyof ServiceEventsFilters,
+    value: string
+  ) => {
+    setServiceEventsFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const toggleServiceEventsSort = (field: ServiceEventsSortField) => {
+    setServiceEventsSort((prev) => {
+      if (prev.field === field) {
+        return {
+          field,
+          direction: prev.direction === "asc" ? "desc" : "asc",
+        };
+      }
+
+      return {
+        field,
+        direction: field === "eventDate" ? "desc" : "asc",
+      };
+    });
+  };
+
+  const getServiceEventsSortIndicator = (field: ServiceEventsSortField) => {
+    if (serviceEventsSort.field !== field) {
+      return "↕";
+    }
+    return serviceEventsSort.direction === "asc" ? "↑" : "↓";
+  };
+
+  const resetServiceEventsFilters = () => {
+    setServiceEventsFilters({
+      dateFrom: "",
+      dateTo: "",
+      eventKind: "",
+      serviceType: "",
+      node: "",
+    });
+    setServiceEventsSort({
+      field: "eventDate",
+      direction: "desc",
+    });
+  };
 
   useEffect(() => {
     const loadVehicle = async () => {
@@ -964,7 +1134,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
       {isServiceLogModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-6 sm:items-center">
-          <div className="w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl">
+          <div className="w-full max-w-6xl rounded-3xl border border-gray-200 bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-xl font-semibold tracking-tight text-gray-950">
                 Журнал обслуживания
@@ -1016,59 +1186,197 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               {!isServiceEventsLoading &&
               !serviceEventsError &&
               serviceEvents.length > 0 ? (
-                <div className="space-y-4">
-                  {serviceEvents.map((serviceEvent) => (
-                    <div
-                      key={serviceEvent.id}
-                      className="rounded-2xl border border-gray-200 bg-gray-50 p-5"
+                <div className="space-y-3">
+                  <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-5">
+                    <label className="text-xs font-medium text-gray-600">
+                      Дата с
+                      <input
+                        type="date"
+                        value={serviceEventsFilters.dateFrom}
+                        onChange={(event) =>
+                          updateServiceEventsFilter("dateFrom", event.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                      />
+                    </label>
+                    <label className="text-xs font-medium text-gray-600">
+                      Дата по
+                      <input
+                        type="date"
+                        value={serviceEventsFilters.dateTo}
+                        onChange={(event) =>
+                          updateServiceEventsFilter("dateTo", event.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                      />
+                    </label>
+                    <label className="text-xs font-medium text-gray-600">
+                      Узел
+                      <input
+                        value={serviceEventsFilters.node}
+                        onChange={(event) =>
+                          updateServiceEventsFilter("node", event.target.value)
+                        }
+                        placeholder="Первые буквы узла"
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                      />
+                    </label>
+                    <label className="text-xs font-medium text-gray-600">
+                      Тип записи
+                      <select
+                        value={serviceEventsFilters.eventKind}
+                        onChange={(event) =>
+                          updateServiceEventsFilter("eventKind", event.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                      >
+                        <option value="">Все</option>
+                        <option value="SERVICE">SERVICE</option>
+                        <option value="STATE_UPDATE">STATE_UPDATE</option>
+                      </select>
+                    </label>
+                    <label className="text-xs font-medium text-gray-600">
+                      Тип сервиса
+                      <input
+                        value={serviceEventsFilters.serviceType}
+                        onChange={(event) =>
+                          updateServiceEventsFilter("serviceType", event.target.value)
+                        }
+                        placeholder="Текст типа сервиса"
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={resetServiceEventsFilters}
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <h3 className="text-base font-semibold text-gray-950">
-                          {serviceEvent.serviceType}
-                        </h3>
-                        <div className="text-sm text-gray-600">
-                          {formatDate(serviceEvent.eventDate)}
-                        </div>
-                      </div>
+                      Сбросить фильтры
+                    </button>
+                  </div>
 
-                      <div className="mt-3 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
-                        <div>
-                          <span className="font-medium text-gray-950">Node:</span>{" "}
-                          {serviceEvent.node?.name || serviceEvent.nodeId}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-950">Пробег:</span>{" "}
-                          {serviceEvent.odometer} км
-                        </div>
-                        {serviceEvent.engineHours !== null ? (
-                          <div>
-                            <span className="font-medium text-gray-950">
-                              Моточасы:
-                            </span>{" "}
-                            {serviceEvent.engineHours}
-                          </div>
-                        ) : null}
-                        {serviceEvent.costAmount !== null &&
-                        serviceEvent.currency ? (
-                          <div>
-                            <span className="font-medium text-gray-950">
-                              Стоимость:
-                            </span>{" "}
-                            {serviceEvent.costAmount} {serviceEvent.currency}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {serviceEvent.comment ? (
-                        <p className="mt-3 text-sm text-gray-700">
-                          <span className="font-medium text-gray-950">
-                            Комментарий:
-                          </span>{" "}
-                          {serviceEvent.comment}
-                        </p>
+                  <div className="overflow-x-auto rounded-2xl border border-gray-200">
+                  <table className="min-w-full text-left text-sm text-gray-700">
+                    <thead className="sticky top-0 z-10 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">
+                          <button type="button" onClick={() => toggleServiceEventsSort("eventDate")}>
+                            Дата {getServiceEventsSortIndicator("eventDate")}
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">
+                          <button type="button" onClick={() => toggleServiceEventsSort("eventKind")}>
+                            Тип записи {getServiceEventsSortIndicator("eventKind")}
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">
+                          <button type="button" onClick={() => toggleServiceEventsSort("serviceType")}>
+                            Событие {getServiceEventsSortIndicator("serviceType")}
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">
+                          <button type="button" onClick={() => toggleServiceEventsSort("node")}>
+                            Узел {getServiceEventsSortIndicator("node")}
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">
+                          <button type="button" onClick={() => toggleServiceEventsSort("odometer")}>
+                            Пробег {getServiceEventsSortIndicator("odometer")}
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">
+                          <button type="button" onClick={() => toggleServiceEventsSort("engineHours")}>
+                            Моточасы {getServiceEventsSortIndicator("engineHours")}
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">
+                          <button type="button" onClick={() => toggleServiceEventsSort("cost")}>
+                            Стоимость {getServiceEventsSortIndicator("cost")}
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 font-medium">
+                          <button type="button" onClick={() => toggleServiceEventsSort("comment")}>
+                            Комментарий {getServiceEventsSortIndicator("comment")}
+                          </button>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAndSortedServiceEvents.map((serviceEvent) => (
+                        <tr
+                          key={serviceEvent.id}
+                          className="border-t border-gray-200 align-top"
+                        >
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {formatDate(serviceEvent.eventDate)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {serviceEvent.eventKind === "STATE_UPDATE"
+                              ? "Обновление состояния"
+                              : "Сервис"}
+                          </td>
+                          <td className="px-4 py-3">{serviceEvent.serviceType}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {serviceEvent.node?.name || serviceEvent.nodeId}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {serviceEvent.odometer} км
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {serviceEvent.engineHours !== null
+                              ? serviceEvent.engineHours
+                              : "—"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {serviceEvent.costAmount !== null &&
+                            serviceEvent.currency
+                              ? `${serviceEvent.costAmount} ${serviceEvent.currency}`
+                              : "—"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {serviceEvent.comment ? (
+                              <div className="max-w-[240px]">
+                                <p className="text-sm text-gray-700">
+                                  {expandedComments[serviceEvent.id]
+                                    ? serviceEvent.comment
+                                    : `${serviceEvent.comment.slice(0, 18)}${serviceEvent.comment.length > 18 ? "..." : ""}`}
+                                </p>
+                                {serviceEvent.comment.length > 18 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedComments((prev) => ({
+                                        ...prev,
+                                        [serviceEvent.id]: !prev[serviceEvent.id],
+                                      }))
+                                    }
+                                    className="mt-1 text-xs font-medium text-gray-600 underline decoration-dotted underline-offset-2 transition hover:text-gray-900"
+                                  >
+                                    {expandedComments[serviceEvent.id]
+                                      ? "Скрыть"
+                                      : "Показать"}
+                                  </button>
+                                ) : null}
+                              </div>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredAndSortedServiceEvents.length === 0 ? (
+                        <tr className="border-t border-gray-200">
+                          <td className="px-4 py-4 text-sm text-gray-600" colSpan={8}>
+                            Нет событий по текущим фильтрам.
+                          </td>
+                        </tr>
                       ) : null}
-                    </div>
-                  ))}
+                    </tbody>
+                  </table>
+                </div>
                 </div>
               ) : null}
             </div>

@@ -81,6 +81,12 @@ export default function Home() {
                 Начать
               </Link>
               <Link
+                href="/garage"
+                className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+              >
+                Перейти в гараж
+              </Link>
+              <Link
                 href="/onboarding"
                 className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
               >
