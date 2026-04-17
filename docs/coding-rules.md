@@ -456,3 +456,38 @@ MotoTwin code must feel like:
 - a system that can grow
 - a codebase a human can maintain
 - a focused MVP, not a hackathon demo
+
+---
+
+## 25. Cross-Platform Parity Rules (Web + Mobile)
+
+MotoTwin has two active clients:
+- web client
+- mobile client (Expo)
+
+1. Every new user-facing feature must be evaluated for both clients.
+2. A user-facing feature is not fully complete if it exists only on one client without explicit documented reason.
+3. If parity is intentionally deferred, the deferment must be documented in the task or related docs with a clear follow-up step.
+4. Core business workflows must stay functionally aligned across web and mobile whenever practical.
+5. Platform-specific UX differences are allowed, but the business result and data outcome must remain aligned.
+6. Do not introduce silent workflow divergence between clients.
+7. Web and mobile layouts do not need to be pixel-identical, but they must keep consistent:
+   - information hierarchy
+   - naming and terminology
+   - status semantics
+   - key interaction outcomes
+8. Similar user actions on both clients should lead to similar user understanding of what happened.
+9. Backend API contracts are shared product truth for both clients.
+10. Do not fork business-critical domain logic silently between client implementations.
+11. Prefer shared types, shared helpers, and shared API contracts for business-critical behavior.
+12. When business logic is cross-platform, implement it in shared packages where practical.
+13. UI components may stay platform-specific, but business meaning and data handling must stay aligned.
+14. Every implementation task must explicitly state:
+    - web impact
+    - mobile impact
+    - parity status
+15. If a step changes only one client, explicitly identify the next parity step.
+16. Avoid cross-platform drift in terminology, statuses, and core flow behavior.
+17. Definition of done for user-facing features:
+    - both clients support the feature, or
+    - a documented parity gap exists with a clear follow-up plan.

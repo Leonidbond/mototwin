@@ -1,322 +1,138 @@
-# MotoTwin MVP API / Backend
+# MotoTwin API Backend
 
 ## 1. Scope
 
-Документ описывает **только текущие реализованные** backend routes и бизнес-логику в `src/app/api/**/route.ts`.
+Документ описывает фактически реализованные route handlers в `src/app/api/**/route.ts`.
 
-## 2. Stack and backend shape
+## 2. Backend shape
 
-- Next.js Route Handlers (App Router)
-- Prisma Client (`src/lib/prisma.ts`)
-- PostgreSQL
-- JSON-only API responses
-- Ошибки возвращаются как `{ error: string }` (для Zod-валидации дополнительно `issues`)
+- Next.js Route Handlers
+- Prisma Client + PostgreSQL
+- JSON responses
+- Error shape: `{ error: string }`
+- Validation errors: `{ error: "Validation failed", issues }`
 
 ## 3. Implemented routes
 
-## 3.1 Catalog routes (onboarding data)
+## 3.1 Catalog
 
 ### `GET /api/brands`
-
-**Purpose**
-- Получение списка брендов для onboarding.
-
-**Request**
-- Без параметров.
-
-**Response**
-- `200`: `{ brands: Array<{ id, name, slug }> }`
-- `500`: `{ error: "Failed to fetch brands" }`
-
-**Validation / rules**
-- Явной валидации входа нет.
-
----
+- Response `200`: `{ brands: Array<{ id, name, slug }> }`
+- Response `500`: `{ error: "Failed to fetch brands" }`
 
 ### `GET /api/models?brandId=...`
-
-**Purpose**
-- Получение моделей выбранного бренда.
-
-**Request**
-- Query param: `brandId` (required).
-
-**Response**
-- `200`: `{ models: Array<{ id, name, slug, brandId }> }`
-- `400`: `{ error: "brandId is required" }`
-- `500`: `{ error: "Failed to fetch models" }`
-
-**Validation / rules**
-- Если `brandId` отсутствует -> `400`.
-
----
+- Required query: `brandId`
+- Response `200`: `{ models: Array<{ id, name, slug, brandId }> }`
+- Response `400`: `{ error: "brandId is required" }`
+- Response `500`: `{ error: "Failed to fetch models" }`
 
 ### `GET /api/model-variants?modelId=...`
+- Required query: `modelId`
+- Response `200`: `{ variants: Array<...model variant fields...> }`
+- Response `400`: `{ error: "modelId is required" }`
+- Response `500`: `{ error: "Failed to fetch model variants" }`
+- Sort: `year desc`, then `versionName asc`
 
-**Purpose**
-- Получение модификаций выбранной модели.
-
-**Request**
-- Query param: `modelId` (required).
-
-**Response**
-- `200`: `{ variants: Array<{ id, modelId, year, generation, versionName, market, engineType, coolingType, wheelSizes, brakeSystem, chainPitch, stockSprockets }> }`
-- `400`: `{ error: "modelId is required" }`
-- `500`: `{ error: "Failed to fetch model variants" }`
-
-**Validation / rules**
-- Если `modelId` отсутствует -> `400`.
-- Сортировка: `year desc`, затем `versionName asc`.
-
-## 3.2 Vehicles and garage
-
-### `POST /api/vehicles`
-
-**Purpose**
-- Создание нового `Vehicle` и связанного `RideProfile`.
-
-**Request shape**
-- JSON body (Zod):
-  - `brandId: string`
-  - `modelId: string`
-  - `modelVariantId: string`
-  - `nickname?: string | null`
-  - `vin?: string | null`
-  - `odometer: number (int, min 0)`
-  - `engineHours: number | null (int, min 0)`
-  - `rideProfile: { usageType, ridingStyle, loadType, usageIntensity }` (enum values)
-
-**Response**
-- `201`: `{ vehicle }` (include `brand`, `model`, `modelVariant`, `rideProfile`)
-- `400`: `{ error: "Validation failed", issues }`
-- `500`: `{ error: "Demo user not found" }` или `{ error: "Failed to create vehicle" }`
-
-**Validation / rules**
-- Используется fixed demo user (`demo@mototwin.local`).
-
----
+## 3.2 Garage and vehicle
 
 ### `GET /api/garage`
+- Returns garage vehicles for demo user
+- Response `200`: `{ vehicles }` with `brand`, `model`, `modelVariant`, `rideProfile`
+- Response `500`: demo user/garage load failure errors
 
-**Purpose**
-- Возвращает гараж demo user.
-
-**Request**
-- Без параметров.
-
-**Response**
-- `200`: `{ vehicles }` (include `brand`, `model`, `modelVariant`, `rideProfile`)
-- `500`: `{ error: "Demo user not found" }` или `{ error: "Failed to fetch garage" }`
-
-**Validation / rules**
-- Привязка к demo user по email.
-
----
+### `POST /api/vehicles`
+- Creates vehicle + ride profile
+- Required body:
+  - `brandId`, `modelId`, `modelVariantId`
+  - `odometer` (int >= 0)
+  - `engineHours` (`int >= 0 | null`)
+  - `rideProfile` with enum fields
+- Optional body: `nickname`, `vin`
+- Response `201`: `{ vehicle }`
+- Response `400`: validation failed
+- Response `500`: create failure
 
 ### `GET /api/vehicles/[id]`
+- Response `200`: `{ vehicle }` with related entities
+- Response `404`: `{ error: "Vehicle not found" }`
+- Response `500`: fetch failure
 
-**Purpose**
-- Детали одного мотоцикла.
-
-**Request**
-- Path param: `id`.
-
-**Response**
-- `200`: `{ vehicle }` (include `brand`, `model`, `modelVariant`, `rideProfile`)
-- `404`: `{ error: "Vehicle not found" }`
-- `500`: `{ error: "Failed to fetch vehicle" }`
-
-## 3.3 Vehicle state update
+## 3.3 Vehicle update routes
 
 ### `PATCH /api/vehicles/[id]/state`
+- Updates `vehicle.odometer`, `vehicle.engineHours`
+- In same transaction creates `ServiceEvent` with `eventKind = STATE_UPDATE`
+- Uses first available node as log node (`nodeId` required by schema)
+- Response `200`: `{ vehicle: { id, odometer, engineHours, updatedAt } }`
+- Response `400`: validation or no-node-available
+- Response `404`: vehicle not found
+- Response `500`: update failure
 
-**Purpose**
-- Обновление текущего состояния мотоцикла (`odometer`, `engineHours`) и запись системного события в service log.
-
-**Request shape**
-- Path param: `id`
-- JSON body (Zod):
-  - `odometer: number (int, min 0, required)`
-  - `engineHours: number | null (int, min 0)`
-
-**Response**
-- `200`: `{ vehicle: { id, odometer, engineHours, updatedAt } }`
-- `400`: 
-  - `{ error: "Validation failed", issues }` или
-  - `{ error: "No node available for state update log entry" }`
-- `404`: `{ error: "Vehicle not found" }`
-- `500`: `{ error: "Failed to update vehicle state" }`
-
-**Validation / rules**
-- После апдейта `Vehicle` в той же транзакции создается `ServiceEvent`:
-  - `eventKind = STATE_UPDATE`
-  - `eventDate = now`
-  - `odometer/engineHours` из обновленного vehicle
-  - `serviceType = "Vehicle state updated"`
-  - `comment = "Системная запись: обновлено текущее состояние мотоцикла"`
-  - `nodeId` берется как первый доступный `Node` (т.к. `ServiceEvent.nodeId` required в текущей схеме).
+### `PATCH /api/vehicles/[id]/profile`
+- Updates vehicle profile fields:
+  - `nickname`, `vin`
+  - `rideProfile` (upsert)
+- Response `200`: `{ vehicle }`
+- Response `400`: validation failed
+- Response `404`: vehicle not found
+- Response `500`: update failure
 
 ## 3.4 Service events
 
 ### `GET /api/vehicles/[id]/service-events`
-
-**Purpose**
-- Получение журнала событий по мотоциклу (service + state updates).
-
-**Request**
-- Path param: `id`.
-
-**Response**
-- `200`: `{ serviceEvents }` (include `node`)
-- `404`: `{ error: "Vehicle not found" }`
-- `500`: `{ error: "Failed to fetch service events" }`
-
-**Validation / rules**
-- Сортировка: `eventDate desc`, затем `createdAt desc`.
-
----
+- Returns vehicle service history with node metadata
+- Sort: `eventDate desc`, then `createdAt desc`
+- Response `200`: `{ serviceEvents }`
+- Response `404`: vehicle not found
+- Response `500`: fetch failure
 
 ### `POST /api/vehicles/[id]/service-events`
-
-**Purpose**
-- Создание сервисного события для leaf узла.
-
-**Request shape**
-- Path param: `id`
-- JSON body (Zod):
-  - `nodeId: string (required)`
-  - `eventDate: string` (валидная дата)
-  - `odometer: number (int, min 0)`
-  - `engineHours?: number | null (int, min 0)`
-  - `serviceType: string (required)`
-  - `installedPartsJson?: any | null`
-  - `costAmount?: number | null`
-  - `currency?: string | null`
-  - `comment?: string | null`
-
-**Response**
-- `201`: `{ serviceEvent }` (include `node`)
-- `400`: 
-  - `{ error: "Validation failed", issues }`
-  - `{ error: "Service events can only be created for the last available node level" }`
-  - `{ error: "Top node state not found for this vehicle" }`
-  - `{ error: "Event date cannot be in the future" }`
-  - `{ error: "Event odometer cannot be greater than current vehicle odometer (...)" }`
-- `404`: `{ error: "Vehicle not found" }` / `{ error: "Node not found" }`
-- `500`: `{ error: "Failed to create service event" }`
-
-**Validation / business rules**
-- События разрешены **только для leaf node**.
-- `eventDate` не может быть в будущем.
-- `event.odometer` не может быть больше текущего `vehicle.odometer`.
-- После создания:
-  - `NodeState.upsert` для leaf узла: `status = RECENTLY_REPLACED`, `lastServiceEventId = created event id`
-  - `TopNodeState.update` для top-level узла: `status = RECENTLY_REPLACED`
+- Creates a service event for selected node
+- Validation/business rules:
+  - node must exist
+  - node must be leaf (no children)
+  - event date cannot be in future
+  - event odometer cannot exceed current vehicle odometer
+  - top node state must exist for vehicle (compatibility requirement)
+- Side effects after create:
+  - `NodeState.upsert(..., status = RECENTLY_REPLACED)` for leaf node
+  - `TopNodeState.update(..., status = RECENTLY_REPLACED)` for top-level node
+- Response `201`: `{ serviceEvent }`
+- Response `400` / `404` / `500` depending on failure class
 
 ## 3.5 Node status routes
 
 ### `GET /api/vehicles/[id]/node-tree`
-
-**Purpose**
-- Возвращает дерево узлов со статусами и подробным пояснением для leaf узлов.
-
-**Request**
-- Path param: `id`.
-
-**Response**
-- `200`: `{ nodeTree }`
-- `404`: `{ error: "Vehicle not found" }`
-- `500`: `{ error: "Failed to fetch node tree" }`
-
-**Node payload (per node)**
-- `id`, `code`, `name`, `level`, `displayOrder`
-- `directStatus`
-- `computedStatus`
-- `effectiveStatus`
-- `statusExplanation` (leaf details or `null`)
-- `note`, `updatedAt`
-- `children`
-
-**Implemented business rules**
-- Leaf status calculation использует:
-  - `NodeMaintenanceRule`
-  - latest leaf `ServiceEvent`
-  - current `Vehicle.odometer` / `Vehicle.engineHours`
-  - текущую дату
-- Поддерживается `MaintenanceTriggerMode`:
-  - `WHICHEVER_COMES_FIRST` (основной MVP сценарий)
-  - `ANY` (поведение как whichever в коде)
-  - `ALL`
-- Приоритет статуса: `OVERDUE > SOON > RECENTLY_REPLACED > OK`.
-- `RECENTLY_REPLACED` из `NodeState` сохраняется как leaf effective status только пока computed не стал `SOON/OVERDUE`.
-
-**statusExplanation includes**
-- `reasonShort`, `reasonDetailed`, `triggerMode`
-- `current` (`odometer`, `engineHours`, `date`)
-- `lastService`
-- `rule`
-- `usage` (`elapsed*`, `remaining*`)
-- `triggeredBy` (`km` / `hours` / `days` / `null`)
-
----
+- Returns hierarchical nodes with:
+  - `directStatus`
+  - `computedStatus`
+  - `effectiveStatus`
+  - `statusExplanation`
+  - `children`
+- Uses vehicle state + rules + latest leaf service events + node states
+- Aggregates status upward using fixed priority:
+  `OVERDUE > SOON > RECENTLY_REPLACED > OK`
+- Response `200`: `{ nodeTree }`
+- Response `404`: vehicle not found
+- Response `500`: fetch failure
 
 ### `GET /api/vehicles/[id]/top-nodes`
+- Legacy compatibility endpoint for top-level status list
+- Filters by configured top-level node codes
+- Response `200`: `{ topNodes }`
+- Response `404`: vehicle not found
+- Response `500`: fetch failure
 
-**Purpose**
-- Legacy endpoint верхних узлов для совместимости.
+## 4. Core backend business rules
 
-**Request**
-- Path param: `id`.
+1. Service events can be created only for leaf nodes.
+2. Vehicle state update creates `STATE_UPDATE` log event.
+3. Node-tree status is computed at read-time (no background worker).
+4. `RECENTLY_REPLACED` direct status can be overridden by computed `SOON/OVERDUE`.
+5. `TopNodeState` remains in use for compatibility.
 
-**Response**
-- `200`: `{ topNodes }` (filtered to configured top-level node codes)
-- `404`: `{ error: "Vehicle not found" }`
-- `500`: `{ error: "Failed to fetch top nodes" }`
+## 5. Notes for client implementations
 
-## 4. Backend business logic summary
-
-## 4.1 Service events are allowed only for leaf nodes
-
-`POST /api/vehicles/[id]/service-events` проверяет, что у выбранного `nodeId` нет детей.  
-Если есть дети, route возвращает `400`.
-
-## 4.2 Status propagation after leaf service event
-
-После успешного `POST /service-events`:
-
-1. Leaf `NodeState` создается/обновляется (`RECENTLY_REPLACED`)
-2. Соответствующий `TopNodeState` верхнего узла обновляется (`RECENTLY_REPLACED`)
-
-Это обеспечивает совместимость legacy top-level статусов и новой leaf/node-state модели.
-
-## 4.3 Automatic node status calculation
-
-`GET /node-tree` вычисляет status read-time:
-
-- input: `NodeMaintenanceRule` + latest leaf `ServiceEvent` + current `Vehicle` state + now
-- output: `computedStatus`, `effectiveStatus`, `statusExplanation`
-- если данных недостаточно (нет rule, нет history или измерений) -> `computedStatus = null`, explanation содержит причину
-
-## 5. effectiveStatus tree aggregation
-
-Агрегация идет снизу вверх по дереву:
-
-- Сначала вычисляется leaf self status (`direct` + `computed` merge rules)
-- Затем parent `effectiveStatus` берется как highest-priority среди:
-  - собственного self status
-  - `effectiveStatus` всех children
-
-Fixed priority order:
-
-`OVERDUE > SOON > RECENTLY_REPLACED > OK`.
-
-Если статусов нет ни у узла, ни у потомков -> `effectiveStatus = null`.
-
-## 6. Current backend limitations
-
-- Demo-user привязка в `POST /api/vehicles` и `GET /api/garage` (без полноценных auth sessions).
-- Нет background recalculation jobs: статусы считаются на read-time в `/node-tree`.
-- `TopNodeState` и `NodeState` используются параллельно (legacy compatibility сохранена).
-- Для `STATE_UPDATE` лог-события в `PATCH /state` используется обязательный `nodeId` (текущее ограничение схемы `ServiceEvent`).
-- Нет отдельного audit actor (кто именно создал событие) в текущей модели.
-
+- Backend contracts are shared truth for web and Expo clients.
+- Client-side validation is supportive only; backend remains source of validation.
+- Parity-sensitive flows should keep request/response usage aligned across platforms.

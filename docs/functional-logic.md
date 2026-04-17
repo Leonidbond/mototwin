@@ -1,201 +1,117 @@
-# MotoTwin MVP Functional Logic
+# MotoTwin Functional Logic
 
 ## 1. Scope
 
-Документ описывает **текущую реализованную** функциональную логику обслуживания в MotoTwin MVP:
+Документ фиксирует текущую реализованную бизнес-логику обслуживания:
+- service events
+- state updates
+- leaf-node rule
+- automatic status calculation
+- effectiveStatus aggregation
+- explanation payload
 
-- текущее состояние мотоцикла,
-- история сервиса,
-- правила обслуживания,
-- расчет статусов leaf узлов,
-- агрегация статусов вверх по дереву,
-- отображение в UI.
+## 2. Core chain
 
-Документ основан на текущей backend/frontend реализации, без описания будущих фич как готовых.
+1. `Vehicle` stores current operational state (`odometer`, `engineHours`).
+2. `ServiceEvent` stores maintenance history (`SERVICE`) and system state logs (`STATE_UPDATE`).
+3. `NodeMaintenanceRule` defines intervals/warnings for leaf nodes.
+4. `GET /api/vehicles/[id]/node-tree` computes node statuses.
+5. Client renders `effectiveStatus` tree and explanation details.
 
-## 2. End-to-end functional chain
+## 3. Service events logic
 
-Текущая цепочка работает так:
+### 3.1 Leaf-node-only servicing rule
 
-1. В системе есть `Vehicle` с текущими значениями:
-   - `odometer`
-   - `engineHours`
-2. В системе есть `ServiceEvent` (история обслуживания и state updates).
-3. Для leaf узлов могут быть настроены `NodeMaintenanceRule`.
-4. Endpoint `GET /api/vehicles/[id]/node-tree` собирает:
-   - дерево `Node`,
-   - `NodeState` для мотоцикла,
-   - правила `NodeMaintenanceRule` для leaf,
-   - последние `ServiceEvent` по leaf узлам,
-   - текущее состояние `Vehicle`.
-5. Для каждого leaf узла вычисляется `computedStatus`.
-6. Из `computedStatus` + `directStatus` формируется leaf `effectiveStatus`.
-7. `effectiveStatus` агрегируется по дереву к parent узлам.
-8. UI отображает дерево со статусами, short explanation и подробным explanation modal.
+`POST /api/vehicles/[id]/service-events` validates that selected `nodeId` has no children.
 
-## 3. Inputs used in status calculation
+If node is not leaf -> request fails with `400`.
 
-Для leaf статуса используются следующие входы:
+### 3.2 Service event creation side effects
 
-- **Current motorcycle state** (`Vehicle`):
-  - `odometer`
-  - `engineHours`
-- **Last service baseline** (`ServiceEvent`):
-  - `eventDate`
-  - `odometer`
-  - `engineHours`
-- **Maintenance rule** (`NodeMaintenanceRule`):
-  - `intervalKm`, `intervalHours`, `intervalDays`
-  - `warningKm`, `warningHours`, `warningDays`
-  - `triggerMode`
-  - `isActive`
-- **Current direct node state** (`NodeState.status`) для leaf merge-логики.
+After successful create:
+- `NodeState` is upserted for leaf node with `RECENTLY_REPLACED`
+- matching `TopNodeState` is updated to `RECENTLY_REPLACED` (compatibility)
 
-## 4. How last service event is determined
+### 3.3 State update logging
 
-В `node-tree` backend запрашивает `ServiceEvent` для leaf узлов текущего мотоцикла, сортирует их так:
+`PATCH /api/vehicles/[id]/state`:
+- updates vehicle `odometer` / `engineHours`
+- writes `ServiceEvent` with `eventKind = STATE_UPDATE`
+- uses a selected node id for log entry due to current schema constraint (`ServiceEvent.nodeId` required)
 
-- `nodeId asc`
-- `eventDate desc`
-- `createdAt desc`
+## 4. Automatic status calculation
 
-Далее для каждого `nodeId` берется **первое** событие из отсортированного набора, то есть фактически latest event для узла.
+Implemented in `/api/vehicles/[id]/node-tree`.
 
-## 5. How maintenance rules are applied
+### 4.1 Inputs
 
-Для leaf узла:
+For each leaf node, backend uses:
+- current vehicle state
+- latest leaf service event
+- maintenance rule
+- direct node state snapshot
 
-1. Если rule отсутствует -> `computedStatus = null`.
-2. Если rule неактивно (`isActive = false`) -> `computedStatus = null`.
-3. Если rule есть, но нет last service event -> `computedStatus = null`.
-4. Если rule + latest event есть:
-   - считается elapsed по активным измерениям:
-     - `elapsedKm = currentOdometer - lastServiceOdometer`
-     - `elapsedHours = currentEngineHours - lastServiceEngineHours` (если оба значения есть)
-     - `elapsedDays = now - lastServiceDate` (в днях)
-   - считается remaining:
-     - `remainingKm = intervalKm - elapsedKm`
-     - `remainingHours = intervalHours - elapsedHours`
-     - `remainingDays = intervalDays - elapsedDays`
-   - проверяется `interval exceeded` и `warning reached`.
+### 4.2 Computed status
 
-### Trigger mode behavior (as implemented)
+If no active rule or no baseline service event -> `computedStatus = null`.
 
-- `WHICHEVER_COMES_FIRST` (основной MVP режим) и `ANY`:
-  - если любое активное измерение превысило interval -> `OVERDUE`
-  - иначе если любое активное измерение вошло в warning -> `SOON`
-  - иначе -> `OK`
-- `ALL`:
-  - `OVERDUE` только если все активные измерения exceeded
-  - `SOON` только если все warning-условия выполнены
-  - иначе `OK`
+With sufficient data:
+- calculates elapsed/remaining for km/hours/days
+- applies `triggerMode`:
+  - `WHICHEVER_COMES_FIRST` and `ANY`: any exceeded -> `OVERDUE`, any warning -> `SOON`, else `OK`
+  - `ALL`: all active dimensions must meet condition
 
-Если активные измерения не удалось вычислить (из-за missing source values), вычисление по ним игнорируется; при недостатке данных итог может остаться `null`.
+### 4.3 Merge with direct status
 
-## 6. How statuses are derived (leaf)
+For leaf effective status:
+- `SOON`/`OVERDUE` from computed status override direct `RECENTLY_REPLACED`
+- `RECENTLY_REPLACED` remains while computed status is `OK` or `null`
+- otherwise fallback to available computed/direct status
 
-В реализации используются 4 ключевых статуса:
+## 5. `effectiveStatus` aggregation
 
-- `OVERDUE`
-- `SOON`
-- `RECENTLY_REPLACED`
-- `OK`
-
-Для leaf сначала вычисляется `computedStatus` (rule-based), затем применяется merge с `directStatus`:
-
-- если `computedStatus` = `OVERDUE` или `SOON` -> это приоритетный leaf `effectiveStatus`
-- иначе если `directStatus` = `RECENTLY_REPLACED` и `computedStatus` = `OK` или `null` -> `effectiveStatus = RECENTLY_REPLACED`
-- иначе `effectiveStatus = computedStatus ?? directStatus`
-
-Таким образом, `RECENTLY_REPLACED` работает как временный позитивный статус, но не перекрывает `SOON/OVERDUE`.
-
-## 7. effectiveStatus aggregation to parent nodes
-
-Для parent узлов `effectiveStatus` агрегируется из:
-
-- собственного node self effective status,
-- `effectiveStatus` всех children.
-
-Приоритет фиксирован:
+Parent status is aggregated bottom-up from own + children statuses using fixed priority:
 
 `OVERDUE > SOON > RECENTLY_REPLACED > OK`
 
-Если ни у узла, ни у потомков статуса нет -> `effectiveStatus = null`.
+If no status candidates exist -> `effectiveStatus = null`.
 
-## 8. How recalculation is triggered
+## 6. Explanation logic
 
-## 8.1 State update flow
+Leaf nodes may include `statusExplanation` with:
+- short and detailed reason
+- trigger mode
+- current values
+- latest service baseline
+- rule intervals/warnings
+- elapsed/remaining usage metrics
+- triggering dimension (`km` / `hours` / `days`)
 
-Пользователь редактирует `odometer/engineHours` на vehicle detail странице:
+Used by both clients to explain status outcome.
 
-- `PATCH /api/vehicles/[id]/state` обновляет `Vehicle` и пишет `ServiceEvent` с `eventKind = STATE_UPDATE`.
-- После успеха frontend перезагружает:
-  - `GET /api/vehicles/[id]/node-tree`
-  - `GET /api/vehicles/[id]/service-events`
+## 7. Maintenance rule usage
 
-За счет новых current values recalculation в `node-tree` дает новый статус.
+`NodeMaintenanceRule` is the rule source for automatic status computation.
 
-## 8.2 Service event flow
+- intervals: `intervalKm`, `intervalHours`, `intervalDays`
+- warnings: `warningKm`, `warningHours`, `warningDays`
+- mode: `triggerMode`
+- active flag: `isActive`
 
-Пользователь создает сервисное событие:
+## 8. Cross-platform behavior
 
-- `POST /api/vehicles/[id]/service-events` (только leaf узел)
-- backend:
-  - создает `ServiceEvent`
-  - upsert в `NodeState` -> `RECENTLY_REPLACED`
-  - обновляет `TopNodeState` (compatibility)
-- frontend после успеха перезагружает:
-  - `node-tree`
-  - `service-events`
+- Backend computes status logic once; both web and Expo consume same endpoint output.
+- UI presentation can differ per platform, but business outcome (`effectiveStatus`, explanation payload) stays aligned.
 
-Новый latest service baseline и/или `NodeState` влияют на следующий расчет.
+## 9. Current limitations
 
-## 9. Short explanation and detailed explanation
+- Read-time computation only; no background precompute job.
+- `TopNodeState` still coexists with `NodeState`.
+- `STATE_UPDATE` events require `nodeId` under current schema.
 
-## 9.1 Short explanation
+## 10. Related docs
 
-`reasonShort` формируется backend-логикой на основе:
-
-- итогового `computedStatus` (`SOON` / `OVERDUE`)
-- `triggeredBy` (`km`, `hours`, `days`)
-
-Примеры:
-
-- `Скоро по пробегу`
-- `Просрочено по времени`
-
-UI показывает short explanation в leaf строке дерева как clickable элемент.
-
-## 9.2 Detailed explanation
-
-`statusExplanation` для leaf узлов включает:
-
-- `reasonShort`, `reasonDetailed`
-- `triggerMode`
-- `current` state (`odometer`, `engineHours`, `date`)
-- `lastService`
-- `rule`
-- `usage` (`elapsed*`, `remaining*`)
-- `triggeredBy`
-
-UI открывает модалку `Пояснение расчета` и рендерит эти данные в табличном виде для сравнения по измерениям.
-
-## 10. Tree visualization in UI (functional effect)
-
-На странице `/vehicles/[id]`:
-
-- дерево узлов рендерится иерархически;
-- parent/child разворачиваются через local expand state;
-- статусы отображаются бейджами;
-- leaf узлы показывают short explanation и action `+` для быстрого сервисного события;
-- сервисный журнал и форма события вынесены в модальные окна;
-- после операций UI перезагружает данные, поэтому пользователь сразу видит перерасчитанные статусы.
-
-## 11. Current simplifications and MVP assumptions
-
-- Расчет статусов выполняется на чтении (`GET /node-tree`), без background jobs и без persisted precompute.
-- `WHICHEVER_COMES_FIRST` является основным практическим режимом MVP.
-- `TopNodeState` сохранен для совместимости, хотя основная leaf-логика опирается на `NodeState` + rule calculation.
-- Для `STATE_UPDATE` в `ServiceEvent` используется обязательный `nodeId` (ограничение текущей схемы).
-- API/garage слой пока работает с demo-user сценарием.
-
+- `api-backend.md`
+- `data-model.md`
+- `frontend-web.md`
+- `frontend-expo.md`
