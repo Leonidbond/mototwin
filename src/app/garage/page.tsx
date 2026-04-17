@@ -144,8 +144,13 @@ export default function GaragePage() {
                     </div>
 
                     <h2 className="mt-3 text-3xl font-semibold tracking-tight text-gray-950">
-                      {vehicle.nickname ||
-                        `${vehicle.brand.name} ${vehicle.model.name}`}
+                      <Link
+                        href={`/vehicles/${vehicle.id}`}
+                        className="transition hover:text-gray-700 hover:underline"
+                      >
+                        {vehicle.nickname ||
+                          `${vehicle.brand.name} ${vehicle.model.name}`}
+                      </Link>
                     </h2>
 
                     <p className="mt-3 text-base leading-7 text-gray-600">
@@ -166,14 +171,6 @@ export default function GaragePage() {
                       <InfoCard label="VIN" value={vehicle.vin || "Не указан"} />
                     </div>
 
-                    <div className="mt-6">
-                      <Link
-                        href={`/vehicles/${vehicle.id}`}
-                        className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-                      >
-                        Открыть
-                      </Link>
-                    </div>
                   </div>
 
                   <div className="min-w-[280px] rounded-2xl border border-gray-200 bg-gray-50 p-5">

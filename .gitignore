@@ -2,7 +2,11 @@ node_modules
 .next
 .env
 .env.local
+apps/app/.env
+apps/app/.env.local
 dist
 coverage
 .DS_Store
 prisma/dev.db
+.expo
+apps/app/.expo

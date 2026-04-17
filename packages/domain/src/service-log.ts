@@ -1,0 +1,201 @@
+import type {
+  MonthlyServiceLogGroup,
+  ServiceEventItem,
+  ServiceEventsFilters,
+  ServiceEventsSortDirection,
+  ServiceEventsSortField,
+} from "@mototwin/types";
+
+export function filterAndSortServiceEvents(
+  serviceEvents: ServiceEventItem[],
+  serviceEventsFilters: ServiceEventsFilters,
+  serviceEventsSort: {
+    field: ServiceEventsSortField;
+    direction: ServiceEventsSortDirection;
+  }
+) {
+  const normalizedFilters = {
+    dateFrom: serviceEventsFilters.dateFrom.trim(),
+    dateTo: serviceEventsFilters.dateTo.trim(),
+    eventKind: serviceEventsFilters.eventKind.trim().toLowerCase(),
+    serviceType: serviceEventsFilters.serviceType.trim().toLowerCase(),
+    node: serviceEventsFilters.node.trim().toLowerCase(),
+  };
+
+  const filtered = serviceEvents.filter((event) => {
+    const eventDateOnly = event.eventDate.slice(0, 10);
+    const eventKindLabel =
+      event.eventKind === "STATE_UPDATE" ? "обновление состояния" : "сервис";
+    const nodeLabel = event.node?.name || event.nodeId;
+    const normalizedNodeLabel = nodeLabel.toLowerCase();
+    const nodeStartsWith = normalizedNodeLabel.startsWith(normalizedFilters.node);
+    const nodeIncludes = normalizedNodeLabel.includes(normalizedFilters.node);
+
+    return (
+      (!normalizedFilters.dateFrom || eventDateOnly >= normalizedFilters.dateFrom) &&
+      (!normalizedFilters.dateTo || eventDateOnly <= normalizedFilters.dateTo) &&
+      (!normalizedFilters.eventKind ||
+        (event.eventKind || "SERVICE") === normalizedFilters.eventKind.toUpperCase() ||
+        eventKindLabel.includes(normalizedFilters.eventKind)) &&
+      (!normalizedFilters.serviceType ||
+        event.serviceType.toLowerCase().includes(normalizedFilters.serviceType)) &&
+      (!normalizedFilters.node || nodeStartsWith || nodeIncludes)
+    );
+  });
+
+  return [...filtered].sort((left, right) => {
+    const directionMultiplier = serviceEventsSort.direction === "asc" ? 1 : -1;
+
+    const compareStrings = (a: string, b: string) =>
+      a.localeCompare(b, "ru-RU") * directionMultiplier;
+
+    const compareNumbers = (a: number, b: number) => (a - b) * directionMultiplier;
+
+    const compareNullableNumbers = (a: number | null, b: number | null) => {
+      if (a === null && b === null) {
+        return 0;
+      }
+      if (a === null) {
+        return 1;
+      }
+      if (b === null) {
+        return -1;
+      }
+      return compareNumbers(a, b);
+    };
+
+    switch (serviceEventsSort.field) {
+      case "eventDate":
+        return (
+          (new Date(left.eventDate).getTime() - new Date(right.eventDate).getTime()) *
+          directionMultiplier
+        );
+      case "eventKind": {
+        const leftKind =
+          left.eventKind === "STATE_UPDATE" ? "Обновление состояния" : "Сервис";
+        const rightKind =
+          right.eventKind === "STATE_UPDATE" ? "Обновление состояния" : "Сервис";
+        return compareStrings(leftKind, rightKind);
+      }
+      case "serviceType":
+        return compareStrings(left.serviceType, right.serviceType);
+      case "node":
+        return compareStrings(
+          left.node?.name || left.nodeId,
+          right.node?.name || right.nodeId
+        );
+      case "odometer":
+        return compareNumbers(left.odometer, right.odometer);
+      case "engineHours":
+        return compareNullableNumbers(left.engineHours, right.engineHours);
+      case "cost":
+        return compareNullableNumbers(left.costAmount, right.costAmount);
+      case "comment":
+        return compareStrings(left.comment || "", right.comment || "");
+      default:
+        return 0;
+    }
+  });
+}
+
+export function groupServiceEventsByMonth(
+  serviceEvents: ServiceEventItem[]
+): MonthlyServiceLogGroup[] {
+  const groupsMap = new Map<string, MonthlyServiceLogGroup>();
+
+  serviceEvents.forEach((event) => {
+    const key = getMonthYearKey(event.eventDate);
+    const monthStart = getMonthStartTimestamp(event.eventDate);
+    const existingGroup = groupsMap.get(key);
+
+    if (existingGroup) {
+      existingGroup.events.push(event);
+      if (event.eventKind === "STATE_UPDATE") {
+        existingGroup.summary.stateUpdateCount += 1;
+      } else {
+        existingGroup.summary.serviceCount += 1;
+      }
+      if (event.costAmount !== null && event.costAmount > 0 && event.currency) {
+        existingGroup.summary.costByCurrency[event.currency] =
+          (existingGroup.summary.costByCurrency[event.currency] || 0) + event.costAmount;
+      }
+      return;
+    }
+
+    groupsMap.set(key, {
+      monthKey: key,
+      monthStart,
+      label: formatMonthYearLabel(event.eventDate),
+      events: [event],
+      summary: {
+        serviceCount: event.eventKind === "STATE_UPDATE" ? 0 : 1,
+        stateUpdateCount: event.eventKind === "STATE_UPDATE" ? 1 : 0,
+        costByCurrency:
+          event.costAmount !== null && event.costAmount > 0 && event.currency
+            ? { [event.currency]: event.costAmount }
+            : {},
+      },
+    });
+  });
+
+  return Array.from(groupsMap.values()).sort((left, right) => right.monthStart - left.monthStart);
+}
+
+export function getStateUpdateSummary(serviceEvent: ServiceEventItem) {
+  if (serviceEvent.engineHours !== null) {
+    return "Пробег и моточасы обновлены";
+  }
+
+  return "Пробег обновлен";
+}
+
+export function getMonthlyCostLabel(costByCurrency: Record<string, number>) {
+  const entries = Object.entries(costByCurrency).filter(([, amount]) => amount > 0);
+
+  if (entries.length === 0) {
+    return "";
+  }
+
+  return entries
+    .map(([currency, amount]) => `${formatNumber(amount)} ${currency}`)
+    .join(" + ");
+}
+
+function getMonthYearKey(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value.slice(0, 7);
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function getMonthStartTimestamp(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 0;
+  }
+
+  return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+}
+
+function formatMonthYearLabel(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Неизвестный месяц";
+  }
+
+  return date.toLocaleDateString("ru-RU", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("ru-RU").format(value);
+}

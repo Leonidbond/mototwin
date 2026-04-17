@@ -3,6 +3,27 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import {
+  filterAndSortServiceEvents,
+  findNodePathById,
+  getAvailableChildrenForSelectedPath,
+  getLeafStatusReasonShort,
+  getMonthlyCostLabel,
+  getNodeSelectLevels,
+  getSelectedNodeFromPath,
+  getStatusExplanationTriggeredByLabel,
+  getStateUpdateSummary,
+  getTopNodeStatusBadgeLabel,
+  groupServiceEventsByMonth,
+} from "@mototwin/domain";
+import type {
+  NodeTreeItem,
+  SelectedNodePath,
+  ServiceEventItem,
+  ServiceEventsFilters,
+  ServiceEventsSortDirection,
+  ServiceEventsSortField,
+} from "@mototwin/types";
 
 type VehicleDetail = {
   id: string;
@@ -40,47 +61,6 @@ type VehiclePageProps = {
   }>;
 };
 
-type ServiceEvent = {
-  id: string;
-  nodeId: string;
-  eventKind?: "SERVICE" | "STATE_UPDATE";
-  eventDate: string;
-  odometer: number;
-  engineHours: number | null;
-  serviceType: string;
-  costAmount: number | null;
-  currency: string | null;
-  comment: string | null;
-  createdAt: string;
-  node?: {
-    id: string;
-    code: string;
-    name: string;
-    level: number;
-    displayOrder: number;
-  };
-};
-
-type ServiceEventsSortField =
-  | "eventDate"
-  | "eventKind"
-  | "serviceType"
-  | "node"
-  | "odometer"
-  | "engineHours"
-  | "cost"
-  | "comment";
-
-type ServiceEventsSortDirection = "asc" | "desc";
-
-type ServiceEventsFilters = {
-  dateFrom: string;
-  dateTo: string;
-  eventKind: string;
-  serviceType: string;
-  node: string;
-};
-
 type VehicleProfileForm = {
   nickname: string;
   vin: string;
@@ -90,59 +70,12 @@ type VehicleProfileForm = {
   usageIntensity: "LOW" | "MEDIUM" | "HIGH";
 };
 
-type NodeTreeItem = {
-  id: string;
-  code: string;
-  name: string;
-  level: number;
-  displayOrder: number;
-  status: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED" | null;
-  directStatus: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED" | null;
-  computedStatus: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED" | null;
-  effectiveStatus: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED" | null;
-  statusExplanation: {
-    reasonShort: string | null;
-    reasonDetailed: string | null;
-    triggerMode: string | null;
-    current: {
-      odometer: number | null;
-      engineHours: number | null;
-      date: string;
-    };
-    lastService: {
-      eventDate: string | null;
-      odometer: number | null;
-      engineHours: number | null;
-    } | null;
-    rule: {
-      intervalKm: number | null;
-      intervalHours: number | null;
-      intervalDays: number | null;
-      warningKm: number | null;
-      warningHours: number | null;
-      warningDays: number | null;
-    } | null;
-    usage: {
-      elapsedKm: number | null;
-      elapsedHours: number | null;
-      elapsedDays: number | null;
-      remainingKm: number | null;
-      remainingHours: number | null;
-      remainingDays: number | null;
-    } | null;
-    triggeredBy: "km" | "hours" | "days" | null;
-  } | null;
-  note: string | null;
-  updatedAt: string | null;
-  children: NodeTreeItem[];
-};
-
 export default function VehiclePage({ params }: VehiclePageProps) {
   const [vehicleId, setVehicleId] = useState("");
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [serviceEvents, setServiceEvents] = useState<ServiceEvent[]>([]);
+  const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
   const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false);
   const [serviceEventsError, setServiceEventsError] = useState("");
   const [serviceEventsFilters, setServiceEventsFilters] = useState<ServiceEventsFilters>({
@@ -167,7 +100,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [isCreatingServiceEvent, setIsCreatingServiceEvent] = useState(false);
   const [serviceEventFormError, setServiceEventFormError] = useState("");
   const [serviceEventFormSuccess, setServiceEventFormSuccess] = useState("");
-  const [selectedNodePath, setSelectedNodePath] = useState<string[]>([]);
+  const [selectedNodePath, setSelectedNodePath] = useState<SelectedNodePath>([]);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
     useState<NodeTreeItem | null>(null);
@@ -197,192 +130,31 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [comment, setComment] = useState("");
   const todayDate = getTodayDateString();
   const nodeSelectLevels = useMemo(() => {
-    const levels: NodeTreeItem[][] = [];
-    let currentLevelNodes = nodeTree;
-    let levelIndex = 0;
-
-    while (currentLevelNodes.length > 0) {
-      levels.push(currentLevelNodes);
-      const selectedNodeId = selectedNodePath[levelIndex];
-
-      if (!selectedNodeId) {
-        break;
-      }
-
-      const selectedNode = currentLevelNodes.find(
-        (node) => node.id === selectedNodeId
-      );
-
-      if (!selectedNode || selectedNode.children.length === 0) {
-        break;
-      }
-
-      currentLevelNodes = selectedNode.children;
-      levelIndex += 1;
-    }
-
-    return levels;
+    return getNodeSelectLevels(nodeTree, selectedNodePath);
   }, [nodeTree, selectedNodePath]);
 
   const selectedFinalNode = useMemo(() => {
-    let currentLevelNodes = nodeTree;
-    let selectedNode: NodeTreeItem | null = null;
+    return getSelectedNodeFromPath(nodeTree, selectedNodePath);
+  }, [nodeTree, selectedNodePath]);
 
-    for (const nodeId of selectedNodePath) {
-      const current = currentLevelNodes.find((node) => node.id === nodeId);
-
-      if (!current) {
-        break;
-      }
-
-      selectedNode = current;
-      currentLevelNodes = current.children;
-    }
-
-    return selectedNode;
+  const selectedPathChildren = useMemo(() => {
+    return getAvailableChildrenForSelectedPath(nodeTree, selectedNodePath);
   }, [nodeTree, selectedNodePath]);
 
   const isLeafNodeSelected = Boolean(
-    selectedFinalNode && selectedFinalNode.children.length === 0
+    selectedFinalNode && selectedPathChildren.length === 0
   );
 
   const filteredAndSortedServiceEvents = useMemo(() => {
-    const normalizedFilters = {
-      dateFrom: serviceEventsFilters.dateFrom.trim(),
-      dateTo: serviceEventsFilters.dateTo.trim(),
-      eventKind: serviceEventsFilters.eventKind.trim().toLowerCase(),
-      serviceType: serviceEventsFilters.serviceType.trim().toLowerCase(),
-      node: serviceEventsFilters.node.trim().toLowerCase(),
-    };
-
-    const filtered = serviceEvents.filter((event) => {
-      const eventDateOnly = event.eventDate.slice(0, 10);
-      const eventKindLabel =
-        event.eventKind === "STATE_UPDATE" ? "обновление состояния" : "сервис";
-      const nodeLabel = event.node?.name || event.nodeId;
-      const normalizedNodeLabel = nodeLabel.toLowerCase();
-      const nodeStartsWith = normalizedNodeLabel.startsWith(normalizedFilters.node);
-      const nodeIncludes = normalizedNodeLabel.includes(normalizedFilters.node);
-
-      return (
-        (!normalizedFilters.dateFrom || eventDateOnly >= normalizedFilters.dateFrom) &&
-        (!normalizedFilters.dateTo || eventDateOnly <= normalizedFilters.dateTo) &&
-        (!normalizedFilters.eventKind ||
-          (event.eventKind || "SERVICE") === normalizedFilters.eventKind.toUpperCase() ||
-          eventKindLabel.includes(normalizedFilters.eventKind)) &&
-        (!normalizedFilters.serviceType ||
-          event.serviceType.toLowerCase().includes(normalizedFilters.serviceType)) &&
-        (!normalizedFilters.node || nodeStartsWith || nodeIncludes)
-      );
-    });
-
-    const sorted = [...filtered].sort((left, right) => {
-      const directionMultiplier = serviceEventsSort.direction === "asc" ? 1 : -1;
-
-      const compareStrings = (a: string, b: string) =>
-        a.localeCompare(b, "ru-RU") * directionMultiplier;
-
-      const compareNumbers = (a: number, b: number) => (a - b) * directionMultiplier;
-
-      const compareNullableNumbers = (a: number | null, b: number | null) => {
-        if (a === null && b === null) {
-          return 0;
-        }
-        if (a === null) {
-          return 1;
-        }
-        if (b === null) {
-          return -1;
-        }
-        return compareNumbers(a, b);
-      };
-
-      switch (serviceEventsSort.field) {
-        case "eventDate":
-          return (
-            (new Date(left.eventDate).getTime() - new Date(right.eventDate).getTime()) *
-            directionMultiplier
-          );
-        case "eventKind": {
-          const leftKind =
-            left.eventKind === "STATE_UPDATE" ? "Обновление состояния" : "Сервис";
-          const rightKind =
-            right.eventKind === "STATE_UPDATE" ? "Обновление состояния" : "Сервис";
-          return compareStrings(leftKind, rightKind);
-        }
-        case "serviceType":
-          return compareStrings(left.serviceType, right.serviceType);
-        case "node":
-          return compareStrings(
-            left.node?.name || left.nodeId,
-            right.node?.name || right.nodeId
-          );
-        case "odometer":
-          return compareNumbers(left.odometer, right.odometer);
-        case "engineHours":
-          return compareNullableNumbers(left.engineHours, right.engineHours);
-        case "cost":
-          return compareNullableNumbers(left.costAmount, right.costAmount);
-        case "comment":
-          return compareStrings(left.comment || "", right.comment || "");
-        default:
-          return 0;
-      }
-    });
-
-    return sorted;
+    return filterAndSortServiceEvents(
+      serviceEvents,
+      serviceEventsFilters,
+      serviceEventsSort
+    );
   }, [serviceEvents, serviceEventsFilters, serviceEventsSort]);
 
   const serviceEventsByMonth = useMemo(() => {
-    const groupsMap = new Map<
-      string,
-      {
-        monthStart: number;
-        label: string;
-        events: ServiceEvent[];
-        serviceCount: number;
-        stateUpdateCount: number;
-        costByCurrency: Record<string, number>;
-      }
-    >();
-
-    filteredAndSortedServiceEvents.forEach((event) => {
-      const key = getMonthYearKey(event.eventDate);
-      const monthStart = getMonthStartTimestamp(event.eventDate);
-      const existingGroup = groupsMap.get(key);
-
-      if (existingGroup) {
-        existingGroup.events.push(event);
-        if (event.eventKind === "STATE_UPDATE") {
-          existingGroup.stateUpdateCount += 1;
-        } else {
-          existingGroup.serviceCount += 1;
-        }
-        if (
-          event.costAmount !== null &&
-          event.costAmount > 0 &&
-          event.currency
-        ) {
-          existingGroup.costByCurrency[event.currency] =
-            (existingGroup.costByCurrency[event.currency] || 0) + event.costAmount;
-        }
-        return;
-      }
-
-      groupsMap.set(key, {
-        monthStart,
-        label: formatMonthYearLabel(event.eventDate),
-        events: [event],
-        serviceCount: event.eventKind === "STATE_UPDATE" ? 0 : 1,
-        stateUpdateCount: event.eventKind === "STATE_UPDATE" ? 1 : 0,
-        costByCurrency:
-          event.costAmount !== null && event.costAmount > 0 && event.currency
-            ? { [event.currency]: event.costAmount }
-            : {},
-      });
-    });
-
-    return Array.from(groupsMap.values()).sort((left, right) => right.monthStart - left.monthStart);
+    return groupServiceEventsByMonth(filteredAndSortedServiceEvents);
   }, [filteredAndSortedServiceEvents]);
 
   const updateServiceEventsFilter = (
@@ -523,29 +295,6 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }));
   };
 
-  const findNodePathById = (
-    nodes: NodeTreeItem[],
-    targetNodeId: string,
-    path: string[] = []
-  ): string[] | null => {
-    for (const node of nodes) {
-      const nextPath = [...path, node.id];
-
-      if (node.id === targetNodeId) {
-        return nextPath;
-      }
-
-      if (node.children.length > 0) {
-        const result = findNodePathById(node.children, targetNodeId, nextPath);
-        if (result) {
-          return result;
-        }
-      }
-    }
-
-    return null;
-  };
-
   const openAddServiceEventFromLeafNode = (leafNodeId: string) => {
     const nodePath = findNodePathById(nodeTree, leafNodeId);
 
@@ -561,15 +310,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   };
 
   const getLeafStatusExplanation = (node: NodeTreeItem): string | null => {
-    if (node.children.length > 0) {
-      return null;
-    }
-
-    if (!node.statusExplanation?.reasonShort) {
-      return null;
-    }
-
-    return node.statusExplanation.reasonShort;
+    return getLeafStatusReasonShort(node);
   };
 
   const renderChildTreeNode = (node: NodeTreeItem, depth: number): ReactNode => {
@@ -619,7 +360,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 <span
                   className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium ${getStatusBadgeClassName(node.effectiveStatus)}`}
                 >
-                  {formatTopNodeStatus(node.effectiveStatus)}
+                  {getTopNodeStatusBadgeLabel(node.effectiveStatus)}
                 </span>
               ) : null}
               {!hasChildren ? (
@@ -1238,7 +979,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                               <span
                                 className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium ${getStatusBadgeClassName(rootNode.effectiveStatus)}`}
                               >
-                                {formatTopNodeStatus(rootNode.effectiveStatus)}
+                                {getTopNodeStatusBadgeLabel(rootNode.effectiveStatus)}
                               </span>
                             ) : null}
                             {!hasChildren ? (
@@ -1484,14 +1225,14 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                             </div>
                             <div className="flex flex-wrap gap-2 text-xs">
                               <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
-                                Обслуживание: {group.serviceCount}
+                                Обслуживание: {group.summary.serviceCount}
                               </span>
                               <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
-                                Обновления состояния: {group.stateUpdateCount}
+                                Обновления состояния: {group.summary.stateUpdateCount}
                               </span>
-                              {getMonthlyCostLabel(group.costByCurrency) ? (
+                              {getMonthlyCostLabel(group.summary.costByCurrency) ? (
                                 <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
-                                  Расходы: {getMonthlyCostLabel(group.costByCurrency)}
+                                  Расходы: {getMonthlyCostLabel(group.summary.costByCurrency)}
                                 </span>
                               ) : null}
                             </div>
@@ -1827,12 +1568,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     Сработавшее измерение
                   </div>
                   <p className="mt-1 text-gray-800">
-                    {selectedStatusExplanationNode.statusExplanation.triggeredBy === "km"
-                      ? "Пробег"
-                      : selectedStatusExplanationNode.statusExplanation.triggeredBy ===
-                          "hours"
-                        ? "Моточасы"
-                        : "Время"}
+                    {getStatusExplanationTriggeredByLabel(
+                      selectedStatusExplanationNode.statusExplanation.triggeredBy
+                    )}
                   </p>
                 </div>
               ) : null}
@@ -2271,82 +2009,6 @@ function formatDate(value: string) {
   }
 
   return date.toLocaleDateString("ru-RU");
-}
-
-function getStateUpdateSummary(serviceEvent: ServiceEvent) {
-  if (serviceEvent.engineHours !== null) {
-    return "Пробег и моточасы обновлены";
-  }
-
-  return "Пробег обновлен";
-}
-
-function getMonthYearKey(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value.slice(0, 7);
-  }
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
-}
-
-function getMonthStartTimestamp(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return 0;
-  }
-
-  return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
-}
-
-function formatMonthYearLabel(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Неизвестный месяц";
-  }
-
-  return date.toLocaleDateString("ru-RU", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function getMonthlyCostLabel(costByCurrency: Record<string, number>) {
-  const entries = Object.entries(costByCurrency).filter(([, amount]) => amount > 0);
-
-  if (entries.length === 0) {
-    return "";
-  }
-
-  return entries
-    .map(([currency, amount]) => `${formatNumber(amount)} ${currency}`)
-    .join(" + ");
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("ru-RU").format(value);
-}
-
-function formatTopNodeStatus(
-  status: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED"
-) {
-  switch (status) {
-    case "OK":
-      return "OK";
-    case "SOON":
-      return "Soon";
-    case "OVERDUE":
-      return "Overdue";
-    case "RECENTLY_REPLACED":
-      return "Recently replaced";
-    default:
-      return status;
-  }
 }
 
 function getStatusBadgeClassName(

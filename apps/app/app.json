@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "MotoTwin",
+    "slug": "mototwin-app",
+    "scheme": "mototwin",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}

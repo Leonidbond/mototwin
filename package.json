@@ -2,14 +2,24 @@
   "name": "mototwin",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "mobile:dev": "npm run dev --workspace @mototwin/app",
+    "mobile:android": "npm run android --workspace @mototwin/app",
+    "mobile:ios": "npm run ios --workspace @mototwin/app",
+    "mobile:web": "npm run web --workspace @mototwin/app"
   },
   "dependencies": {
+    "@mototwin/domain": "*",
+    "@mototwin/types": "*",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "dotenv": "^17.4.2",
@@ -18,6 +28,7 @@
     "prisma": "^7.7.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "whatwg-fetch": "^3.6.20",
     "zod": "^4.3.6"
   },
   "devDependencies": {
