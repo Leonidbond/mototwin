@@ -52,6 +52,13 @@ export type VehicleTechnicalInfoViewModel = {
   }>;
 };
 
+/** Counts from the same attention rules as `buildAttentionSummaryFromNodeTree` (garage API). */
+export type GarageAttentionSummaryWire = {
+  totalCount: number;
+  overdueCount: number;
+  soonCount: number;
+};
+
 export type GarageVehicleItem = {
   id: string;
   nickname: string | null;
@@ -76,6 +83,8 @@ export type GarageVehicleItem = {
     stockSprockets?: string | null;
   } | null;
   rideProfile: VehicleRideProfile | null;
+  /** Present when garage API computed maintenance attention for this row. */
+  attentionSummary?: GarageAttentionSummaryWire | null;
 };
 
 export type VehicleRideProfile = {

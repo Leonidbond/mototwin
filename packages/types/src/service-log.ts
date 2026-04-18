@@ -18,6 +18,11 @@ export type ServiceEventsFilters = {
   eventKind: string;
   serviceType: string;
   node: string;
+  /**
+   * When true, only events with costAmount &gt; 0 and non-empty currency (client-side).
+   * Combines with other filters and with optional node subtree restriction.
+   */
+  paidOnly?: boolean;
 };
 
 /** Client-side subtree filter: events whose `nodeId` is in `nodeIds`. */

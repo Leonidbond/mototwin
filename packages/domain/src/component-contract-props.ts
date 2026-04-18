@@ -19,6 +19,7 @@ import {
   buildVehicleSummaryViewModel,
   buildRideProfileViewModel,
 } from "./vehicle-view-models";
+import { buildGarageAttentionIndicatorViewModel } from "./garage-attention";
 
 export function buildGarageCardProps(vehicle: GarageVehicleItem): GarageCardProps {
   const summary = buildVehicleSummaryViewModel(vehicle);
@@ -37,6 +38,7 @@ export function buildGarageCardProps(vehicle: GarageVehicleItem): GarageCardProp
     summary,
     rideProfile,
     specHighlights,
+    attentionIndicator: buildGarageAttentionIndicatorViewModel(vehicle.attentionSummary ?? null),
   };
 }
 

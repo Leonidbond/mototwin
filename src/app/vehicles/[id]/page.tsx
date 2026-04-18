@@ -35,10 +35,17 @@ import {
   validateAddServiceEventFormValues,
   validateVehicleStateFormValues,
   isServiceLogTimelineQueryActive,
+  buildExpenseSummaryFromServiceEvents,
+  filterPaidServiceEvents,
+  formatExpenseAmountRu,
+  buildAttentionActionViewModel,
+  buildAttentionSummaryFromNodeTree,
+  buildNodeTreeItemViewModel,
 } from "@mototwin/domain";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
 import type {
+  AttentionItemViewModel,
   EditVehicleProfileFormValues,
   NodeStatus,
   NodeTreeItem,
@@ -98,6 +105,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [isExpenseSectionExpanded, setIsExpenseSectionExpanded] = useState(false);
+  const [isAttentionModalOpen, setIsAttentionModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileFormError, setProfileFormError] = useState("");
@@ -160,6 +169,31 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     [nodeTree]
   );
 
+  const expenseSummary = useMemo(
+    () => buildExpenseSummaryFromServiceEvents(serviceEvents),
+    [serviceEvents]
+  );
+
+  const attentionSummary = useMemo(
+    () => buildAttentionSummaryFromNodeTree(nodeTree),
+    [nodeTree]
+  );
+
+  const attentionAction = useMemo(
+    () => buildAttentionActionViewModel(attentionSummary),
+    [attentionSummary]
+  );
+  const attentionTok = statusSemanticTokens[attentionAction.semanticKey];
+  const attentionBadgeBg =
+    attentionAction.totalCount > 0 && attentionTok.accent !== "transparent"
+      ? attentionTok.accent
+      : productSemanticColors.divider;
+
+  const hasAnyPaidServiceEventsInDataset = useMemo(
+    () => filterPaidServiceEvents(serviceEvents).length > 0,
+    [serviceEvents]
+  );
+
   const updateServiceEventsFilter = (
     field: keyof ServiceEventsFilters,
     value: string
@@ -200,12 +234,34 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       eventKind: "",
       serviceType: "",
       node: "",
+      paidOnly: undefined,
     });
     setServiceEventsSort({
       field: "eventDate",
       direction: "desc",
     });
     setServiceLogNodeFilter(null);
+  };
+
+  const setPaidOnlyFilter = (paidOnly: boolean) => {
+    setServiceEventsFilters((prev) => ({
+      ...prev,
+      paidOnly: paidOnly ? true : undefined,
+    }));
+  };
+
+  const clearPaidOnlyFilter = () => {
+    setPaidOnlyFilter(false);
+  };
+
+  const openServiceLogModalWithPaidExpenses = () => {
+    setPaidOnlyFilter(true);
+    setIsServiceLogModalOpen(true);
+  };
+
+  const openServiceLogModalFull = () => {
+    setPaidOnlyFilter(false);
+    setIsServiceLogModalOpen(true);
   };
 
   const openServiceLogFilteredByNode = (node: NodeTreeItemViewModel) => {
@@ -314,6 +370,41 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setServiceEventFormSuccess("");
     setSelectedNodePath(nodePath);
     setIsAddServiceEventModalOpen(true);
+  };
+
+  const openServiceLogForAttentionItem = (item: AttentionItemViewModel) => {
+    const raw = findNodeTreeItemById(nodeTree, item.nodeId);
+    if (!raw) {
+      return;
+    }
+    setIsAttentionModalOpen(false);
+    setPaidOnlyFilter(false);
+    setServiceLogNodeFilter(createServiceLogNodeFilter(raw));
+    setIsServiceLogModalOpen(true);
+  };
+
+  const openAddServiceFromAttentionItem = (item: AttentionItemViewModel) => {
+    if (!item.canAddServiceEvent) {
+      return;
+    }
+    setIsAttentionModalOpen(false);
+    openAddServiceEventFromLeafNode(item.nodeId);
+  };
+
+  const openStatusExplanationForAttentionItem = (item: AttentionItemViewModel) => {
+    if (!item.canOpenStatusExplanation) {
+      return;
+    }
+    const raw = findNodeTreeItemById(nodeTree, item.nodeId);
+    if (!raw) {
+      return;
+    }
+    const vm = buildNodeTreeItemViewModel(raw);
+    if (!canOpenNodeStatusExplanationModal(vm)) {
+      return;
+    }
+    setIsAttentionModalOpen(false);
+    setSelectedStatusExplanationNode(vm);
   };
 
   const renderChildTreeNode = (node: NodeTreeItemViewModel, depth: number): ReactNode => {
@@ -690,9 +781,35 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 {vehicle.brandName} | {vehicle.modelName}
               </div>
 
-              <h1 className="mt-3 text-4xl font-semibold tracking-tight text-gray-950 sm:text-5xl">
-                {detailViewModel?.displayName || title}
-              </h1>
+              <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                <h1 className="min-w-0 flex-1 text-4xl font-semibold tracking-tight text-gray-950 sm:text-5xl">
+                  {detailViewModel?.displayName || title}
+                </h1>
+                <button
+                  type="button"
+                  onClick={() => setIsAttentionModalOpen(true)}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition hover:opacity-95"
+                  style={{
+                    borderColor: attentionTok.border,
+                    backgroundColor: attentionTok.background,
+                    color: attentionTok.foreground,
+                  }}
+                >
+                  Требует внимания
+                  <span
+                    className="rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+                    style={{
+                      backgroundColor: attentionBadgeBg,
+                      color:
+                        attentionAction.totalCount > 0
+                          ? attentionTok.foreground
+                          : productSemanticColors.textMuted,
+                    }}
+                  >
+                    {attentionSummary.totalCount}
+                  </span>
+                </button>
+              </div>
 
               <p className="mt-3 text-base leading-7 text-gray-600">
                 {(
@@ -862,13 +979,180 @@ export default function VehiclePage({ params }: VehiclePageProps) {
             </section>
 
             <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
+              <button
+                type="button"
+                aria-expanded={isExpenseSectionExpanded}
+                onClick={() => setIsExpenseSectionExpanded((prev) => !prev)}
+                className="flex w-full items-start gap-3 rounded-xl text-left transition hover:bg-gray-50/80 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-300 -m-1 p-1"
+              >
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                    Расходы на обслуживание
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {isServiceEventsLoading
+                      ? "Загрузка данных журнала…"
+                      : serviceEventsError
+                        ? "Не удалось загрузить расходы."
+                        : expenseSummary.paidEventCount === 0
+                          ? "Расходы пока не указаны"
+                          : `${expenseSummary.paidEventCount} ${
+                              expenseSummary.paidEventCount === 1
+                                ? "запись с суммой"
+                                : "записей с суммой"
+                            }`}
+                  </p>
+                </div>
+                <span className="shrink-0 pt-1 text-base text-gray-500 tabular-nums" aria-hidden>
+                  {isExpenseSectionExpanded ? "▾" : "▸"}
+                </span>
+              </button>
+
+              {isExpenseSectionExpanded ? (
+                <>
+                  {expenseSummary.paidEventCount > 0 ? (
+                    <div className="mt-4 flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={openServiceLogModalWithPaidExpenses}
+                        className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
+                      >
+                        Детали расходов
+                      </button>
+                    </div>
+                  ) : null}
+                  <p className="mt-3 text-xs text-gray-500">
+                    Сводка по полям стоимости в сервисных записях. Валюты не суммируются между
+                    собой.
+                  </p>
+
+                  {isServiceEventsLoading ? (
+                    <p className="mt-4 text-sm text-gray-600">Загрузка данных журнала…</p>
+                  ) : serviceEventsError ? (
+                    <p className="mt-4 text-sm" style={{ color: productSemanticColors.error }}>
+                      Не удалось загрузить расходы: проверьте журнал обслуживания.
+                    </p>
+                  ) : expenseSummary.paidEventCount === 0 ? (
+                    <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-3 text-sm text-gray-600">
+                      <p className="font-medium text-gray-900">Расходы пока не указаны</p>
+                      <p className="mt-1 text-xs leading-5 text-gray-600">
+                        Добавьте сумму и валюту при создании сервисного события — здесь появятся итоги
+                        по каждой валюте и за текущий месяц.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-4 text-sm">
+                      <div className="flex flex-wrap gap-x-6 gap-y-2">
+                        <div>
+                          <span className="text-gray-500">Записей с суммой</span>
+                          <p className="font-semibold text-gray-950">
+                            {expenseSummary.paidEventCount}
+                          </p>
+                        </div>
+                        {expenseSummary.latestPaidEvent ? (
+                          <div className="min-w-0 flex-1">
+                            <span className="text-gray-500">Последняя оплаченная</span>
+                            <p className="font-medium text-gray-950">
+                              {formatIsoCalendarDateRu(expenseSummary.latestPaidEvent.eventDate)} ·{" "}
+                              {expenseSummary.latestPaidEvent.serviceType}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {formatExpenseAmountRu(expenseSummary.latestPaidEvent.totalAmount)}{" "}
+                              {expenseSummary.latestPaidEvent.currency} ·{" "}
+                              {expenseSummary.latestPaidEvent.nodeLabel}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Всего по валютам
+                        </p>
+                        <ul className="mt-2 space-y-1">
+                          {expenseSummary.totalsByCurrency.map((row) => (
+                            <li
+                              key={row.currency}
+                              className="flex justify-between gap-4 text-gray-900"
+                            >
+                              <span>{row.currency}</span>
+                              <span className="font-medium tabular-nums">
+                                {formatExpenseAmountRu(row.totalAmount)} {row.currency}
+                                <span className="ml-2 text-xs font-normal text-gray-500">
+                                  ({row.paidEventCount}{" "}
+                                  {row.paidEventCount === 1 ? "запись" : "записей"})
+                                </span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {expenseSummary.currentMonthTotalsByCurrency.length > 0 ? (
+                        <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2.5">
+                          <p className="text-xs font-medium text-gray-600">
+                            Текущий месяц ({expenseSummary.currentMonthLabel})
+                          </p>
+                          <ul className="mt-1 space-y-0.5">
+                            {expenseSummary.currentMonthTotalsByCurrency.map((row) => (
+                              <li
+                                key={row.currency}
+                                className="flex justify-between text-sm text-gray-900"
+                              >
+                                <span>{row.currency}</span>
+                                <span className="font-medium tabular-nums">
+                                  {formatExpenseAmountRu(row.totalAmount)} {row.currency}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          В {expenseSummary.currentMonthLabel} платных сервисных записей пока нет.
+                        </p>
+                      )}
+
+                      {expenseSummary.byMonth.length > 1 ? (
+                        <details className="rounded-lg border border-gray-100 bg-white">
+                          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-gray-700">
+                            По месяцам ({expenseSummary.byMonth.length})
+                          </summary>
+                          <div className="border-t border-gray-100 px-3 py-2 text-xs text-gray-600">
+                            <ul className="space-y-2">
+                              {expenseSummary.byMonth.slice(0, 6).map((m) => (
+                                <li key={m.monthKey}>
+                                  <span className="font-medium text-gray-800">{m.monthLabel}</span>
+                                  <span className="text-gray-600">
+                                    {" "}
+                                    —{" "}
+                                    {m.totalsByCurrency
+                                      .map(
+                                        (t) =>
+                                          `${formatExpenseAmountRu(t.totalAmount)} ${t.currency}`
+                                      )
+                                      .join(" · ")}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </section>
+
+            <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
                   Дерево узлов
                 </h2>
                 <button
                   type="button"
-                  onClick={() => setIsServiceLogModalOpen(true)}
+                  onClick={openServiceLogModalFull}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
                 >
                   Открыть журнал обслуживания
@@ -1041,6 +1325,22 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 </div>
               ) : null}
 
+              {serviceEventsFilters.paidOnly === true ? (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-amber-50/80 px-4 py-3 text-sm">
+                  <p className="text-gray-900">
+                    <span className="font-medium text-gray-950">Показаны события с расходами</span>
+                    <span className="text-gray-600"> — только записи с суммой &gt; 0 и валютой.</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearPaidOnlyFilter}
+                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                  >
+                    Сбросить фильтр
+                  </button>
+                </div>
+              ) : null}
+
               {serviceEventFormSuccess ? (
                 <p
                   className="mb-4 rounded-xl border px-3 py-2 text-sm"
@@ -1150,6 +1450,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                       </button>
                     </div>
                     </div>
+                    <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-xs font-medium text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={serviceEventsFilters.paidOnly === true}
+                        onChange={(event) => setPaidOnlyFilter(event.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      Только события с расходами
+                    </label>
                   </div>
 
                   <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
@@ -1214,11 +1523,17 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
                     {serviceEventsByMonth.length === 0 ? (
                       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
-                        <p className="font-medium text-gray-900">Ничего не найдено</p>
+                        <p className="font-medium text-gray-900">
+                          {serviceEventsFilters.paidOnly === true && !hasAnyPaidServiceEventsInDataset
+                            ? "Расходов пока нет"
+                            : "Ничего не найдено"}
+                        </p>
                         <p className="mt-1">
-                          {serviceLogNodeFilter
-                            ? `Для узла «${serviceLogNodeFilter.displayLabel}» в журнале нет записей с учётом текущих фильтров. Сбросьте фильтр по узлу или измените условия.`
-                            : "По текущим фильтрам нет записей. Измените условия или сбросьте фильтры."}
+                          {serviceEventsFilters.paidOnly === true && !hasAnyPaidServiceEventsInDataset
+                            ? "Нет сервисных записей с суммой больше нуля и указанной валютой. Добавьте стоимость при создании события."
+                            : serviceLogNodeFilter
+                              ? `Для узла «${serviceLogNodeFilter.displayLabel}» в журнале нет записей с учётом текущих фильтров. Сбросьте фильтр по узлу или измените условия.`
+                              : "По текущим фильтрам нет записей. Измените условия или сбросьте фильтры."}
                         </p>
                       </div>
                     ) : (
@@ -1555,6 +1870,144 @@ export default function VehiclePage({ params }: VehiclePageProps) {
             </div>
           </div>
         </div>
+        </div>
+      ) : null}
+
+      {isAttentionModalOpen ? (
+        <div
+          className="fixed inset-0 z-[65] flex items-start justify-center px-4 py-6 sm:items-center"
+          style={{ backgroundColor: productSemanticColors.overlayModal }}
+        >
+          <div className="w-full max-w-lg rounded-3xl border border-gray-200 bg-white shadow-xl sm:max-w-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                  Требует внимания
+                </h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  Узлы «Просрочено» и «Скоро» по текущему дереву узлов.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAttentionModalOpen(false)}
+                className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
+              <p className="text-sm text-gray-600">
+                Всего:{" "}
+                <span className="font-semibold text-gray-950">
+                  {attentionSummary.totalCount}
+                </span>
+                {attentionSummary.overdueCount > 0 ? (
+                  <>
+                    {" "}
+                    · Просрочено:{" "}
+                    <span className="font-medium text-gray-900">
+                      {attentionSummary.overdueCount}
+                    </span>
+                  </>
+                ) : null}
+                {attentionSummary.soonCount > 0 ? (
+                  <>
+                    {" "}
+                    · Скоро:{" "}
+                    <span className="font-medium text-gray-900">
+                      {attentionSummary.soonCount}
+                    </span>
+                  </>
+                ) : null}
+              </p>
+
+              {isNodeTreeLoading ? (
+                <p className="mt-6 text-sm text-gray-600">Загрузка дерева узлов…</p>
+              ) : nodeTreeError ? (
+                <p className="mt-6 text-sm" style={{ color: productSemanticColors.error }}>
+                  {nodeTreeError}
+                </p>
+              ) : attentionSummary.totalCount === 0 ? (
+                <div className="mt-6 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+                  Нет узлов, требующих внимания
+                </div>
+              ) : (
+                <div className="mt-5 space-y-6">
+                  {attentionSummary.groups.map((group) => (
+                    <section key={group.status}>
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        {group.sectionTitleRu}
+                      </h3>
+                      <ul className="mt-3 space-y-3">
+                        {group.items.map((item) => {
+                          const st =
+                            item.effectiveStatus === "OVERDUE"
+                              ? statusSemanticTokens.OVERDUE
+                              : statusSemanticTokens.SOON;
+                          return (
+                            <li
+                              key={item.nodeId}
+                              className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+                            >
+                              {item.topLevelParentName ? (
+                                <p className="text-xs text-gray-500">
+                                  Раздел: {item.topLevelParentName}
+                                </p>
+                              ) : null}
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <p className="text-base font-semibold text-gray-950">{item.name}</p>
+                                <span
+                                  className="inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
+                                  style={{
+                                    borderColor: st.border,
+                                    backgroundColor: st.background,
+                                    color: st.foreground,
+                                  }}
+                                >
+                                  {item.statusLabelRu}
+                                </span>
+                              </div>
+                              {item.shortExplanation && item.canOpenStatusExplanation ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openStatusExplanationForAttentionItem(item)}
+                                  className="mt-2 text-left text-sm text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-gray-700"
+                                >
+                                  {item.shortExplanation}
+                                </button>
+                              ) : item.shortExplanation ? (
+                                <p className="mt-2 text-sm text-gray-600">{item.shortExplanation}</p>
+                              ) : null}
+
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openServiceLogForAttentionItem(item)}
+                                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                                >
+                                  Журнал по узлу
+                                </button>
+                                {item.canAddServiceEvent ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openAddServiceFromAttentionItem(item)}
+                                    className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
+                                  >
+                                    Добавить сервис
+                                  </button>
+                                ) : null}
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       ) : null}
 

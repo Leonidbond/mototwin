@@ -1,5 +1,15 @@
 export type { NodeStatus, StatusSemanticKey } from "./status";
 export type {
+  AttentionActionSeverity,
+  AttentionSeverity,
+  AttentionActionViewModel,
+  AttentionEffectiveStatus,
+  AttentionItemViewModel,
+  AttentionStatusGroupViewModel,
+  AttentionSummaryViewModel,
+  GarageAttentionIndicatorViewModel,
+} from "./attention";
+export type {
   NodeStatusExplanation,
   NodeTreeItem,
   NodePathItem,
@@ -32,6 +42,7 @@ export type {
   VehicleRideProfile,
   VehicleDetail,
   VehicleDetailApiRecord,
+  GarageAttentionSummaryWire,
   GarageVehicleItem,
   VehicleSummaryViewModel,
   VehicleDetailViewModel,
@@ -54,6 +65,13 @@ export type {
   RideProfileFieldOption,
   AddServiceEventValidationContext,
 } from "./forms";
+export type {
+  ExpenseByCurrencyViewModel,
+  ExpenseByMonthViewModel,
+  ExpenseByNodeViewModel,
+  ExpenseLatestPaidEventViewModel,
+  ExpenseSummaryViewModel,
+} from "./expense-summary";
 export type {
   ServiceEventsSortField,
   ServiceEventsSortDirection,

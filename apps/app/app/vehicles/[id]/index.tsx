@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -12,6 +11,9 @@ import {
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  buildAttentionActionViewModel,
+  buildAttentionSummaryFromNodeTree,
+  buildExpenseSummaryFromServiceEvents,
   buildNodeTreeSectionProps,
   buildRideProfileViewModel,
   buildVehicleDetailViewModel,
@@ -20,18 +22,21 @@ import {
   canOpenNodeStatusExplanationModal,
   createServiceLogNodeFilter,
   findNodeTreeItemById,
+  formatExpenseAmountRu,
   formatIsoCalendarDateRu,
-  getStatusExplanationTriggeredByLabel,
 } from "@mototwin/domain";
 import type {
   NodeStatus,
   NodeTreeItem,
   NodeTreeItemProps,
   NodeTreeItemViewModel,
+  ServiceEventItem,
   VehicleDetail,
 } from "@mototwin/types";
 import { productSemanticColors as c, statusSemanticTokens } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
+import { buildVehicleServiceLogHref } from "./service-log";
+import { StatusExplanationModal } from "./status-explanation-modal";
 
 function getStatusColors(status: NodeStatus | null) {
   const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
@@ -192,167 +197,6 @@ function NodeRow({
   );
 }
 
-function StatusExplanationModal(props: {
-  visible: boolean;
-  node: NodeTreeItemViewModel | null;
-  onClose: () => void;
-}) {
-  const { visible, node, onClose } = props;
-  if (!visible) {
-    return null;
-  }
-  const ex = node?.statusExplanation;
-  if (!node || !ex) {
-    return null;
-  }
-
-  const showKmRow =
-    ex.current.odometer !== null ||
-    ex.lastService?.odometer !== null ||
-    ex.rule?.intervalKm !== null ||
-    ex.rule?.warningKm !== null ||
-    ex.usage?.elapsedKm !== null ||
-    ex.usage?.remainingKm !== null;
-
-  const showHoursRow =
-    ex.current.engineHours !== null ||
-    ex.lastService?.engineHours !== null ||
-    ex.rule?.intervalHours !== null ||
-    ex.rule?.warningHours !== null ||
-    ex.usage?.elapsedHours !== null ||
-    ex.usage?.remainingHours !== null;
-
-  const showDaysRow =
-    ex.rule?.intervalDays !== null ||
-    ex.rule?.warningDays !== null ||
-    ex.usage?.elapsedDays !== null ||
-    ex.usage?.remainingDays !== null;
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} accessibilityLabel="Закрыть" />
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Пояснение расчета: {node.name}</Text>
-          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
-            {ex.reasonShort ? (
-              <View style={styles.modalBlock}>
-                <Text style={styles.modalKicker}>Кратко</Text>
-                <Text style={styles.modalEmphasis}>{ex.reasonShort}</Text>
-              </View>
-            ) : null}
-            {ex.reasonDetailed ? (
-              <View style={styles.modalBlock}>
-                <Text style={styles.modalKicker}>Подробно</Text>
-                <Text style={styles.modalBody}>{ex.reasonDetailed}</Text>
-              </View>
-            ) : null}
-            {ex.triggeredBy ? (
-              <View style={styles.modalBlock}>
-                <Text style={styles.modalKicker}>Сработавшее измерение</Text>
-                <Text style={styles.modalBody}>
-                  {getStatusExplanationTriggeredByLabel(ex.triggeredBy)}
-                </Text>
-              </View>
-            ) : null}
-
-            <Text style={styles.modalKicker}>Детали расчета</Text>
-            {showKmRow ? (
-              <View style={styles.modalTableBlock}>
-                <Text style={styles.modalTableTitle}>Пробег</Text>
-                <Text style={styles.modalMono}>
-                  Текущее:{" "}
-                  {ex.current.odometer !== null ? `${ex.current.odometer} км` : "—"}
-                  {"\n"}
-                  Последний сервис:{" "}
-                  {ex.lastService?.odometer != null
-                    ? `${ex.lastService.odometer} км`
-                    : "—"}
-                  {"\n"}
-                  Интервал:{" "}
-                  {ex.rule?.intervalKm != null ? `${ex.rule.intervalKm} км` : "—"}
-                  {"\n"}
-                  Warning:{" "}
-                  {ex.rule?.warningKm != null ? `${ex.rule.warningKm} км` : "—"}
-                  {"\n"}
-                  Использовано:{" "}
-                  {ex.usage?.elapsedKm != null ? `${ex.usage.elapsedKm} км` : "—"}
-                  {"\n"}
-                  Осталось:{" "}
-                  {ex.usage?.remainingKm != null ? `${ex.usage.remainingKm} км` : "—"}
-                </Text>
-              </View>
-            ) : null}
-            {showHoursRow ? (
-              <View style={styles.modalTableBlock}>
-                <Text style={styles.modalTableTitle}>Моточасы</Text>
-                <Text style={styles.modalMono}>
-                  Текущее:{" "}
-                  {ex.current.engineHours !== null ? `${ex.current.engineHours} ч` : "—"}
-                  {"\n"}
-                  Последний сервис:{" "}
-                  {ex.lastService?.engineHours != null
-                    ? `${ex.lastService.engineHours} ч`
-                    : "—"}
-                  {"\n"}
-                  Интервал:{" "}
-                  {ex.rule?.intervalHours != null ? `${ex.rule.intervalHours} ч` : "—"}
-                  {"\n"}
-                  Warning:{" "}
-                  {ex.rule?.warningHours != null ? `${ex.rule.warningHours} ч` : "—"}
-                  {"\n"}
-                  Использовано:{" "}
-                  {ex.usage?.elapsedHours != null ? `${ex.usage.elapsedHours} ч` : "—"}
-                  {"\n"}
-                  Осталось:{" "}
-                  {ex.usage?.remainingHours != null ? `${ex.usage.remainingHours} ч` : "—"}
-                </Text>
-              </View>
-            ) : null}
-            {showDaysRow ? (
-              <View style={styles.modalTableBlock}>
-                <Text style={styles.modalTableTitle}>Время</Text>
-                <Text style={styles.modalMono}>
-                  Интервал:{" "}
-                  {ex.rule?.intervalDays != null ? `${ex.rule.intervalDays} дн` : "—"}
-                  {"\n"}
-                  Warning:{" "}
-                  {ex.rule?.warningDays != null ? `${ex.rule.warningDays} дн` : "—"}
-                  {"\n"}
-                  Использовано:{" "}
-                  {ex.usage?.elapsedDays != null ? `${ex.usage.elapsedDays} дн` : "—"}
-                  {"\n"}
-                  Осталось:{" "}
-                  {ex.usage?.remainingDays != null ? `${ex.usage.remainingDays} дн` : "—"}
-                </Text>
-              </View>
-            ) : null}
-            <View style={styles.modalTableBlock}>
-              <Text style={styles.modalTableTitle}>Дата расчета</Text>
-              <Text style={styles.modalMono}>
-                {formatIsoCalendarDateRu(ex.current.date)}
-                {"\n"}
-                Последний сервис:{" "}
-                {ex.lastService?.eventDate
-                  ? formatIsoCalendarDateRu(ex.lastService.eventDate)
-                  : "—"}
-                {"\n"}
-                Trigger mode: {ex.triggerMode || "—"}
-              </Text>
-            </View>
-          </ScrollView>
-          <Pressable
-            onPress={onClose}
-            style={({ pressed }) => [styles.modalCloseButton, pressed && styles.modalCloseButtonPressed]}
-          >
-            <Text style={styles.modalCloseButtonText}>Закрыть</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function VehicleDetailScreen() {
@@ -369,8 +213,11 @@ export default function VehicleDetailScreen() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isRideProfileExpanded, setIsRideProfileExpanded] = useState(false);
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(false);
+  const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
   const [statusExplanationNode, setStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
+  const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
+  const [serviceEventsError, setServiceEventsError] = useState("");
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -387,6 +234,8 @@ export default function VehicleDetailScreen() {
     setIsLoading(true);
     setError("");
     setNodeTreeError("");
+    setServiceEvents([]);
+    setServiceEventsError("");
 
     try {
       const detailData = await endpoints.getVehicleDetail(vehicleId);
@@ -396,6 +245,7 @@ export default function VehicleDetailScreen() {
       setError("Не удалось загрузить данные мотоцикла.");
       setVehicle(null);
       setNodeTree([]);
+      setServiceEvents([]);
       setIsLoading(false);
       return;
     }
@@ -403,17 +253,30 @@ export default function VehicleDetailScreen() {
     setIsLoading(false);
 
     setIsNodeTreeLoading(true);
-    try {
-      const nodesData = await endpoints.getNodeTree(vehicleId);
-      setNodeTree(nodesData.nodeTree ?? []);
+    const [nodesResult, eventsResult] = await Promise.allSettled([
+      endpoints.getNodeTree(vehicleId),
+      endpoints.getServiceEvents(vehicleId),
+    ]);
+
+    if (nodesResult.status === "fulfilled") {
+      setNodeTree(nodesResult.value.nodeTree ?? []);
       setNodeTreeError("");
-    } catch (err) {
-      console.error(err);
+    } else {
+      console.error(nodesResult.reason);
       setNodeTreeError("Не удалось загрузить дерево узлов.");
       setNodeTree([]);
-    } finally {
-      setIsNodeTreeLoading(false);
     }
+
+    if (eventsResult.status === "fulfilled") {
+      setServiceEvents(eventsResult.value.serviceEvents ?? []);
+      setServiceEventsError("");
+    } else {
+      console.error(eventsResult.reason);
+      setServiceEvents([]);
+      setServiceEventsError("Не удалось загрузить журнал.");
+    }
+
+    setIsNodeTreeLoading(false);
   }, [apiBaseUrl, vehicleId]);
 
   useFocusEffect(
@@ -426,6 +289,26 @@ export default function VehicleDetailScreen() {
     () => buildNodeTreeSectionProps(nodeTree),
     [nodeTree]
   );
+
+  const expenseSummary = useMemo(
+    () => buildExpenseSummaryFromServiceEvents(serviceEvents),
+    [serviceEvents]
+  );
+
+  const attentionSummary = useMemo(
+    () => buildAttentionSummaryFromNodeTree(nodeTree),
+    [nodeTree]
+  );
+
+  const attentionAction = useMemo(
+    () => buildAttentionActionViewModel(attentionSummary),
+    [attentionSummary]
+  );
+  const attentionTok = statusSemanticTokens[attentionAction.semanticKey];
+  const attentionBadgeBg =
+    attentionAction.totalCount > 0 && attentionTok.accent !== "transparent"
+      ? attentionTok.accent
+      : c.divider;
 
   function toggleNode(id: string) {
     setExpandedIds((prev) => {
@@ -446,10 +329,7 @@ export default function VehicleDetailScreen() {
         return;
       }
       const filter = createServiceLogNodeFilter(raw);
-      const nodeIdsParam = filter.nodeIds.map(encodeURIComponent).join(",");
-      router.push(
-        `/vehicles/${vehicleId}/service-log?nodeIds=${nodeIdsParam}&nodeLabel=${encodeURIComponent(filter.displayLabel)}`
-      );
+      router.push(buildVehicleServiceLogHref(vehicleId, filter, false));
     },
     [nodeTree, router, vehicleId]
   );
@@ -514,7 +394,36 @@ export default function VehicleDetailScreen() {
           ) : (
             <Text style={styles.eyebrow}>Мотоцикл</Text>
           )}
-          <Text style={styles.title}>{detailViewModel.displayName}</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{detailViewModel.displayName}</Text>
+            <Pressable
+              onPress={() => router.push(`/vehicles/${vehicleId}/attention`)}
+              style={({ pressed }) => [
+                styles.attentionPill,
+                {
+                  borderColor: attentionTok.border,
+                  backgroundColor: attentionTok.background,
+                },
+                pressed && styles.attentionPillPressed,
+              ]}
+            >
+              <Text style={[styles.attentionPillText, { color: attentionTok.foreground }]}>
+                Требует внимания
+              </Text>
+              <View style={[styles.attentionCountBadge, { backgroundColor: attentionBadgeBg }]}>
+                <Text
+                  style={[
+                    styles.attentionCountText,
+                    attentionAction.totalCount > 0
+                      ? { color: attentionTok.foreground }
+                      : styles.attentionCountTextNeutral,
+                  ]}
+                >
+                  {attentionSummary.totalCount}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
           <Text style={styles.brandModel}>
             {detailViewModel.brandModelLine}
           </Text>
@@ -598,6 +507,126 @@ export default function VehicleDetailScreen() {
             ) : null}
           </View>
         ) : null}
+
+        <View style={styles.expenseCard}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.expenseHeaderPressable,
+              pressed && styles.expenseHeaderPressablePressed,
+            ]}
+            onPress={() => setIsExpenseExpanded((prev) => !prev)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isExpenseExpanded }}
+          >
+            <View style={styles.expenseHeaderTextCol}>
+              <Text style={styles.expenseTitle}>Расходы на обслуживание</Text>
+              <Text style={styles.expenseCollapsedMeta}>
+                {isNodeTreeLoading
+                  ? "Загрузка данных журнала…"
+                  : serviceEventsError
+                    ? "Не удалось загрузить расходы."
+                    : expenseSummary.paidEventCount === 0
+                      ? "Расходы пока не указаны"
+                      : `${expenseSummary.paidEventCount} ${
+                          expenseSummary.paidEventCount === 1
+                            ? "запись с суммой"
+                            : "записей с суммой"
+                        }`}
+              </Text>
+            </View>
+            <Text style={styles.sectionChevron}>{isExpenseExpanded ? "▾" : "▸"}</Text>
+          </Pressable>
+          {isExpenseExpanded ? (
+            <>
+              {expenseSummary.paidEventCount > 0 ? (
+                <View style={styles.expenseExpandedActions}>
+                  <Pressable
+                    onPress={() =>
+                      router.push(`/vehicles/${vehicleId}/service-log?paidOnly=1`)
+                    }
+                    style={({ pressed }) => [
+                      styles.expenseDetailsLink,
+                      pressed && styles.expenseDetailsLinkPressed,
+                    ]}
+                  >
+                    <Text style={styles.expenseDetailsLinkText}>Детали расходов</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              <Text style={styles.expenseHint}>
+                Сводка по стоимости в сервисных записях. Валюты не суммируются между собой.
+              </Text>
+              {serviceEventsError ? (
+                <Text style={styles.expenseErrorText}>{serviceEventsError}</Text>
+              ) : null}
+              {isNodeTreeLoading ? (
+                <Text style={styles.expenseMuted}>Загрузка данных журнала…</Text>
+              ) : serviceEventsError ? null : expenseSummary.paidEventCount === 0 ? (
+                <View style={styles.expenseEmptyBox}>
+                  <Text style={styles.expenseEmptyTitle}>Расходы пока не указаны</Text>
+                  <Text style={styles.expenseEmptyText}>
+                    Добавьте сумму и валюту при создании сервисного события — здесь появятся итоги
+                    по каждой валюте и за текущий месяц.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.expenseBody}>
+                  <View style={styles.expenseStatRow}>
+                    <Text style={styles.expenseStatLabel}>Записей с суммой</Text>
+                    <Text style={styles.expenseStatValue}>{expenseSummary.paidEventCount}</Text>
+                  </View>
+                  {expenseSummary.latestPaidEvent ? (
+                    <View style={styles.expenseLatestBlock}>
+                      <Text style={styles.expenseStatLabel}>Последняя оплаченная</Text>
+                      <Text style={styles.expenseLatestMain}>
+                        {formatIsoCalendarDateRu(expenseSummary.latestPaidEvent.eventDate)} ·{" "}
+                        {expenseSummary.latestPaidEvent.serviceType}
+                      </Text>
+                      <Text style={styles.expenseLatestMeta}>
+                        {formatExpenseAmountRu(expenseSummary.latestPaidEvent.totalAmount)}{" "}
+                        {expenseSummary.latestPaidEvent.currency} ·{" "}
+                        {expenseSummary.latestPaidEvent.nodeLabel}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Text style={styles.expenseSubheading}>Всего по валютам</Text>
+                  {expenseSummary.totalsByCurrency.map((row) => (
+                    <View key={row.currency} style={styles.expenseCurrencyRow}>
+                      <Text style={styles.expenseCurrencyCode}>{row.currency}</Text>
+                      <Text style={styles.expenseCurrencyAmount}>
+                        {formatExpenseAmountRu(row.totalAmount)} {row.currency}
+                        <Text style={styles.expenseCurrencyCount}>
+                          {" "}
+                          ({row.paidEventCount}{" "}
+                          {row.paidEventCount === 1 ? "запись" : "записей"})
+                        </Text>
+                      </Text>
+                    </View>
+                  ))}
+                  {expenseSummary.currentMonthTotalsByCurrency.length > 0 ? (
+                    <View style={styles.expenseMonthBox}>
+                      <Text style={styles.expenseMonthTitle}>
+                        Текущий месяц ({expenseSummary.currentMonthLabel})
+                      </Text>
+                      {expenseSummary.currentMonthTotalsByCurrency.map((row) => (
+                        <View key={row.currency} style={styles.expenseCurrencyRow}>
+                          <Text style={styles.expenseCurrencyCode}>{row.currency}</Text>
+                          <Text style={styles.expenseCurrencyAmount}>
+                            {formatExpenseAmountRu(row.totalAmount)} {row.currency}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.expenseMuted}>
+                      В {expenseSummary.currentMonthLabel} платных сервисных записей пока нет.
+                    </Text>
+                  )}
+                </View>
+              )}
+            </>
+          ) : null}
+        </View>
 
         {/* Node tree */}
         <View>
@@ -729,10 +758,48 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     color: c.textMuted,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   title: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 22,
     fontWeight: "700",
     color: c.textPrimary,
+  },
+  attentionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  attentionPillPressed: {
+    opacity: 0.9,
+  },
+  attentionPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  attentionCountBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: "center",
+  },
+  attentionCountText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  attentionCountTextNeutral: {
+    color: c.textMuted,
   },
   brandModel: {
     marginTop: 4,
@@ -878,6 +945,173 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: c.textPrimary,
+  },
+  expenseCard: {
+    backgroundColor: c.card,
+    borderColor: c.border,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+  },
+  expenseHeaderPressable: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  expenseHeaderPressablePressed: {
+    opacity: 0.92,
+  },
+  expenseHeaderTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  expenseCollapsedMeta: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 18,
+    color: c.textMuted,
+  },
+  expenseExpandedActions: {
+    marginTop: 12,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  expenseDetailsLink: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.chipBackground,
+  },
+  expenseDetailsLinkPressed: {
+    opacity: 0.92,
+  },
+  expenseDetailsLinkText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  expenseTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  expenseHint: {
+    marginTop: 6,
+    fontSize: 11,
+    lineHeight: 16,
+    color: c.textMuted,
+  },
+  expenseMuted: {
+    marginTop: 10,
+    fontSize: 13,
+    color: c.textMuted,
+  },
+  expenseErrorText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: c.error,
+  },
+  expenseEmptyBox: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.cardMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  expenseEmptyTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: c.textPrimary,
+  },
+  expenseEmptyText: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+    color: c.textMuted,
+  },
+  expenseBody: {
+    marginTop: 12,
+    gap: 10,
+  },
+  expenseStatRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  expenseStatLabel: {
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  expenseStatValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  expenseLatestBlock: {
+    marginTop: 4,
+  },
+  expenseLatestMain: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: "600",
+    color: c.textPrimary,
+  },
+  expenseLatestMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  expenseSubheading: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    color: c.textMuted,
+    textTransform: "uppercase",
+  },
+  expenseCurrencyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginTop: 6,
+  },
+  expenseCurrencyCode: {
+    fontSize: 14,
+    color: c.textPrimary,
+  },
+  expenseCurrencyAmount: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: c.textPrimary,
+    textAlign: "right",
+    flex: 1,
+  },
+  expenseCurrencyCount: {
+    fontSize: 11,
+    fontWeight: "400",
+    color: c.textMuted,
+  },
+  expenseMonthBox: {
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: c.cardMuted,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  expenseMonthTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textSecondary,
   },
   // Section
   sectionHeader: {
@@ -1028,97 +1262,6 @@ const styles = StyleSheet.create({
   reasonShortLink: {
     color: c.textSecondary,
     textDecorationLine: "underline",
-  },
-
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 16,
-    backgroundColor: c.overlayModal,
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalCard: {
-    maxHeight: 560,
-    backgroundColor: c.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: c.border,
-    overflow: "hidden",
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: c.textPrimary,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  modalScroll: {
-    maxHeight: 420,
-  },
-  modalScrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  modalBlock: {
-    marginBottom: 14,
-  },
-  modalKicker: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: c.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 4,
-  },
-  modalEmphasis: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: c.textPrimary,
-  },
-  modalBody: {
-    fontSize: 14,
-    color: c.textMeta,
-    lineHeight: 20,
-  },
-  modalTableBlock: {
-    marginBottom: 12,
-    padding: 10,
-    backgroundColor: c.cardSubtle,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: c.border,
-  },
-  modalTableTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: c.textPrimary,
-    marginBottom: 6,
-  },
-  modalMono: {
-    fontSize: 12,
-    color: c.textMeta,
-    lineHeight: 18,
-  },
-  modalCloseButton: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    marginTop: 4,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    alignItems: "center",
-  },
-  modalCloseButtonPressed: {
-    backgroundColor: c.divider,
-  },
-  modalCloseButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: c.textPrimary,
   },
 
   // Badge

@@ -9,6 +9,37 @@ import type {
 } from "@mototwin/types";
 import { applyServiceLogNodeFilter } from "./service-log-node-filter";
 
+/** Positive finite amount and non-empty currency (any event kind). */
+export function isPaidServiceEvent(event: ServiceEventItem): boolean {
+  if (event.costAmount === null || !Number.isFinite(event.costAmount)) {
+    return false;
+  }
+  if (event.costAmount <= 0) {
+    return false;
+  }
+  const cur = event.currency?.trim();
+  return Boolean(cur && cur.length > 0);
+}
+
+export function filterPaidServiceEvents(
+  serviceEvents: ServiceEventItem[]
+): ServiceEventItem[] {
+  return serviceEvents.filter(isPaidServiceEvent);
+}
+
+export function buildPaidEventsServiceLogFilter(): Pick<ServiceEventsFilters, "paidOnly"> {
+  return { paidOnly: true };
+}
+
+/** Same as {@link filterServiceLogEntries} (explicit name for parity docs). */
+export function applyServiceLogFilters(
+  serviceEvents: ServiceEventItem[],
+  serviceEventsFilters: ServiceEventsFilters,
+  restrictToNodeIds?: string[] | null
+): ServiceEventItem[] {
+  return filterServiceLogEntries(serviceEvents, serviceEventsFilters, restrictToNodeIds);
+}
+
 /** Default timeline query: newest first by event date (web + Expo). */
 export const DEFAULT_SERVICE_LOG_SORT_STATE: ServiceLogSortState = {
   field: "eventDate",
@@ -42,7 +73,8 @@ export function isServiceLogTimelineQueryActive(
     sort.field !== DEFAULT_SERVICE_LOG_SORT_STATE.field ||
     sort.direction !== DEFAULT_SERVICE_LOG_SORT_STATE.direction;
   const hasNodeSubtree = Boolean(nodeSubtreeFilter?.nodeIds.length);
-  return hasFilter || sortNonDefault || hasNodeSubtree;
+  const hasPaidOnly = filters.paidOnly === true;
+  return hasFilter || sortNonDefault || hasNodeSubtree || hasPaidOnly;
 }
 
 function normalizeServiceLogFilters(serviceEventsFilters: ServiceEventsFilters) {
@@ -75,7 +107,11 @@ export function filterServiceLogEntries(
     const nodeStartsWith = normalizedNodeLabel.startsWith(normalizedFilters.node);
     const nodeIncludes = normalizedNodeLabel.includes(normalizedFilters.node);
 
+    const passesPaidOnly =
+      serviceEventsFilters.paidOnly !== true || isPaidServiceEvent(event);
+
     return (
+      passesPaidOnly &&
       (!normalizedFilters.dateFrom || eventDateOnly >= normalizedFilters.dateFrom) &&
       (!normalizedFilters.dateTo || eventDateOnly <= normalizedFilters.dateTo) &&
       (!normalizedFilters.eventKind ||

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildGarageCardProps, filterMeaningfulGarageSpecHighlights } from "@mototwin/domain";
-import { productSemanticColors } from "@mototwin/design-tokens";
+import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 
 const garageApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
@@ -139,14 +139,36 @@ export default function GaragePage() {
                       {card.brandModelCaption}
                     </div>
 
-                    <h2 className="mt-3 text-3xl font-semibold tracking-tight text-gray-950">
-                      <Link
-                        href={`/vehicles/${vehicle.id}`}
-                        className="transition hover:text-gray-700 hover:underline"
-                      >
-                        {card.summary.title}
-                      </Link>
-                    </h2>
+                    <div className="mt-3 flex min-w-0 flex-nowrap items-center gap-2">
+                      <h2 className="min-w-0 flex-1 text-3xl font-semibold leading-tight tracking-tight text-gray-950">
+                        <Link
+                          href={`/vehicles/${vehicle.id}`}
+                          className="block truncate transition hover:text-gray-700 hover:underline"
+                        >
+                          {card.summary.title}
+                        </Link>
+                      </h2>
+                      {card.attentionIndicator.isVisible ? (
+                        <Link
+                          href={`/vehicles/${vehicle.id}`}
+                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-2 text-xs font-semibold tabular-nums leading-none transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/35 focus-visible:ring-offset-1"
+                          style={{
+                            borderColor: statusSemanticTokens[card.attentionIndicator.semanticKey].border,
+                            backgroundColor:
+                              statusSemanticTokens[card.attentionIndicator.semanticKey].background,
+                            color: statusSemanticTokens[card.attentionIndicator.semanticKey].foreground,
+                          }}
+                          title="Требует внимания — открыть мотоцикл"
+                          aria-label={`Требует внимания, ${card.attentionIndicator.totalCount}: открыть карточку мотоцикла`}
+                        >
+                          <span
+                            className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-90"
+                            aria-hidden
+                          />
+                          {card.attentionIndicator.totalCount}
+                        </Link>
+                      ) : null}
+                    </div>
 
                     <p className="mt-3 text-base leading-7 text-gray-600">
                       {card.summary.yearVersionLine.replace(" · ", " | ")}

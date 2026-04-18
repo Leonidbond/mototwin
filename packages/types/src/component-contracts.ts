@@ -14,6 +14,7 @@ import type {
   ServiceLogMonthGroupViewModel,
   ServiceLogSortState,
 } from "./service-log";
+import type { GarageAttentionIndicatorViewModel } from "./attention";
 import type {
   BrandItem,
   ModelItem,
@@ -39,6 +40,8 @@ export type GarageCardProps = {
   /** Short spec strip (engine, cooling, …) — optional; web garage shows four tiles */
   specHighlights?: Array<{ label: string; value: string }>;
   onOpenDetails?: () => void;
+  /** Maintenance attention chip next to title (garage list). */
+  attentionIndicator: GarageAttentionIndicatorViewModel;
 };
 
 /** Vehicle screen hero / title block */

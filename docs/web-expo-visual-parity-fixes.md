@@ -13,20 +13,26 @@
 
 ## Web
 
-- **Гараж** (`src/app/garage/page.tsx`): фон страницы — `canvas`; блок ошибки — `errorSurface` / `errorBorder` / `error`; основные CTA — `primaryAction`; карточки мотоциклов, загрузка/пустое состояние, блок профиля эксплуатации, метрики и спеки — `border` / `card` / `cardMuted`; чип «MotoTwin | Гараж» — `chipBackground`, `borderStrong`, `textSecondary`.
+- **Гараж** (`src/app/garage/page.tsx`): фон страницы — `canvas`; блок ошибки — `errorSurface` / `errorBorder` / `error`; основные CTA — `primaryAction`; карточки мотоциклов, загрузка/пустое состояние, блок профиля эксплуатации, метрики и спеки — `border` / `card` / `cardMuted`; чип «MotoTwin | Гараж» — `chipBackground`, `borderStrong`, `textSecondary`. В **одной строке с заголовком** — компактный inline-чип **внимания** (`attentionIndicator`, `statusSemanticTokens`): визуально как статус-метка карточки, не отдельная крупная CTA; только при `totalCount > 0`; отдельная ссылка на `/vehicles/[id]` (как у названия), заголовок с `truncate` / `leading-tight`.
 - **Onboarding** (`src/app/onboarding/page.tsx`): фон — `canvas` для согласования с гаражом и Expo-оболочкой.
 - **Карточка мотоцикла** (`src/app/vehicles/[id]/page.tsx`): фон страницы — `canvas`; блок ошибки загрузки — те же error-токены.
+- **«Требует внимания»** у заголовка ТС: цвет рамки/фона/текста и бейджа счётчика — **`statusSemanticTokens`** по **`buildAttentionActionViewModel`** (OVERDUE → красный набор, только SOON → янтарный, пустой список → `UNKNOWN`/нейтральный), без отдельных amber-only классов.
 - **Журнал обслуживания (модалка на странице ТС):** оверлей — `overlayModal`; таймлайн (линия, точка, фон/бордер карточки, бейдж «Сервис» / «Обновление состояния») — те же поля `productSemanticColors`, что и в Expo `service-log.tsx` (`timelineService*` / `timelineState*`, `serviceBadge*`, `card` / `cardMuted`, `border`, и т.д.); баннер «сервисное событие добавлено» — `successSurface` / `successBorder` / `successText`; тексты ошибок журнала/формы — `error`.
 - **Карточка ТС (прочее):** inline-ошибки состояния, дерева, профиля, формы сервиса — цвет `error` (вместо Tailwind `text-red-600`).
 
 ## Expo (`apps/app/app/**`)
 
-В экранах гаража, карточки ТС, журнала, добавления мотоцикла/сервиса, состояния и профиля **литералы `#RRGGBB` в `StyleSheet` заменены** на поля `productSemanticColors as c`, плюс `ActivityIndicator` / `placeholderTextColor` завязаны на токены.
+В экранах гаража, карточки ТС, журнала, добавления мотоцикла/сервиса, состояния и профиля **литералы `#RRGGBB` в `StyleSheet` заменены** на поля `productSemanticColors as c`, плюс `ActivityIndicator` / `placeholderTextColor` завязаны на токены. Пилюля **«Требует внимания»** на `vehicles/[id]/index` использует **`statusSemanticTokens`** по **`buildAttentionActionViewModel`**, согласованно с web.
 
 **Гараж** (`app/index.tsx`):
 
 - Заголовок и описание приведены к тону web: «MotoTwin | Гараж», «Ваш гараж», тот же смысл описания.
 - Пустое состояние: **«В гараже пока нет мотоциклов»** и тот же подзаголовок, что на web.
+- Индикатор внимания у названия — как на web (`attentionIndicator`, `statusSemanticTokens`): компактная пилюля (~28pt по высоте, рамка 1px, мелкий маркер и `12pt` число), расширенный `hitSlop` для тапа без увеличения визуала; отдельный `Pressable` на ТС.
+
+## Гараж — уточнение веса индикатора внимания
+
+Индикатор у названия мотоцикла **сознательно лёгкий**: он не конкурирует с заголовком и не выглядит вторичной основной кнопкой; семантика цвета (OVERDUE / SOON) сохраняется через **`statusSemanticTokens`**.
 
 **Добавление мотоцикла** (`vehicles/new.tsx`): заголовок экрана — **«Добавление мотоцикла»** (как на web onboarding).
 

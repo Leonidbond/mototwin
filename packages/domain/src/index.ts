@@ -33,11 +33,15 @@ export {
   DEFAULT_SERVICE_LOG_SORT_STATE,
   filterAndSortServiceEvents,
   filterServiceLogEntries,
+  applyServiceLogFilters,
   sortServiceLogEntries,
   groupServiceEventsByMonth,
   getStateUpdateSummary,
   getMonthlyCostLabel,
   isServiceLogTimelineQueryActive,
+  isPaidServiceEvent,
+  filterPaidServiceEvents,
+  buildPaidEventsServiceLogFilter,
 } from "./service-log";
 export {
   getDescendantLeafNodeIds,
@@ -45,6 +49,16 @@ export {
   createServiceLogNodeFilter,
   applyServiceLogNodeFilter,
 } from "./service-log-node-filter";
+export {
+  filterPaidServiceExpenseEvents,
+  groupExpensesByCurrency,
+  groupExpensesByMonth,
+  groupExpensesByNode,
+  buildExpenseSummaryFromServiceEvents,
+  formatExpenseAmountRu,
+  getExpenseMonthKeyFromIso,
+  getExpenseMonthMeta,
+} from "./expense-summary";
 export {
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
   buildServiceLogEntryViewModel,
@@ -93,3 +107,17 @@ export {
   buildNodeTreeSectionProps,
   buildServiceLogTimelineProps,
 } from "./component-contract-props";
+export {
+  buildAttentionActionViewModel,
+  buildAttentionSummaryFromNodeTree,
+  getAttentionActionSeverity,
+  getAttentionItemsFromNodeTree,
+  getAttentionNodesFromNodeTree,
+  getWorstAttentionStatus,
+  groupAttentionItemsByStatus,
+  sortAttentionItemsByPriority,
+} from "./attention";
+export {
+  buildGarageAttentionIndicatorViewModel,
+  getAttentionSeverityFromStatuses,
+} from "./garage-attention";

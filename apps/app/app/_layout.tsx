@@ -22,6 +22,12 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="vehicles/[id]/attention"
+        options={{
+          title: "Требует внимания",
+        }}
+      />
+      <Stack.Screen
         name="vehicles/new"
         options={{
           title: "Добавить мотоцикл",

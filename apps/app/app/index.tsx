@@ -12,7 +12,11 @@ import {
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildGarageCardProps, filterMeaningfulGarageSpecHighlights } from "@mototwin/domain";
-import { productSemanticColors as c } from "@mototwin/design-tokens";
+import {
+  productSemanticColors as c,
+  radiusScale,
+  statusSemanticTokens,
+} from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
 
@@ -67,9 +71,51 @@ export default function HomeScreen() {
     return (
       <View style={styles.card}>
         <Text style={styles.cardCaption}>{card.brandModelCaption}</Text>
-        <Pressable onPress={() => router.push(`/vehicles/${item.id}`)}>
-          <Text style={styles.cardTitleLink}>{summary.title}</Text>
-        </Pressable>
+        <View style={styles.cardTitleRow}>
+          <Pressable
+            onPress={() => router.push(`/vehicles/${item.id}`)}
+            style={styles.cardTitlePressable}
+          >
+            <Text style={styles.cardTitleLink} numberOfLines={2} ellipsizeMode="tail">
+              {summary.title}
+            </Text>
+          </Pressable>
+          {card.attentionIndicator.isVisible ? (
+            <Pressable
+              onPress={() => router.push(`/vehicles/${item.id}`)}
+              hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Требует внимания, ${card.attentionIndicator.totalCount}. Открыть карточку мотоцикла`}
+              style={({ pressed }) => [
+                styles.attentionChip,
+                {
+                  borderColor: statusSemanticTokens[card.attentionIndicator.semanticKey].border,
+                  backgroundColor:
+                    statusSemanticTokens[card.attentionIndicator.semanticKey].background,
+                  opacity: pressed ? 0.92 : 1,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.attentionDot,
+                  {
+                    backgroundColor:
+                      statusSemanticTokens[card.attentionIndicator.semanticKey].foreground,
+                  },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.attentionChipText,
+                  { color: statusSemanticTokens[card.attentionIndicator.semanticKey].foreground },
+                ]}
+              >
+                {card.attentionIndicator.totalCount}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
         <Text style={styles.cardSubtitle}>{summary.subtitle}</Text>
         <Text style={styles.cardMeta}>{summary.yearVersionLine.replace(" · ", " | ")}</Text>
         <View style={styles.cardDivider} />
@@ -324,11 +370,46 @@ const styles = StyleSheet.create({
     color: c.textMuted,
     marginBottom: 4,
   },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+  },
+  cardTitlePressable: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 2,
+    justifyContent: "center",
+  },
   cardTitleLink: {
     fontSize: 17,
     fontWeight: "700",
+    lineHeight: 22,
     color: c.textPrimary,
     textDecorationLine: "underline",
+  },
+  attentionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 0,
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: radiusScale.pill,
+    flexShrink: 0,
+    alignSelf: "center",
+  },
+  attentionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  attentionChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
   },
   cardSubtitle: {
     marginTop: 4,

@@ -22,6 +22,7 @@ import type {
 } from "@mototwin/types";
 import {
   buildServiceLogTimelineProps,
+  filterPaidServiceEvents,
   getServiceLogEventKindBadgeLabel,
   isServiceLogTimelineQueryActive,
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
@@ -67,6 +68,30 @@ function parseServiceLogNodeFilterFromParams(
     }
   }
   return { nodeIds, displayLabel };
+}
+
+function parsePaidOnlyFromParams(
+  paidOnlyRaw: string | string[] | undefined
+): boolean {
+  const v = readSearchParam(paidOnlyRaw);
+  return v === "1" || v === "true";
+}
+
+export function buildVehicleServiceLogHref(
+  vehicleId: string,
+  nodeFilter: ServiceLogNodeFilter | null,
+  paidOnly: boolean
+): string {
+  const q: string[] = [];
+  if (nodeFilter?.nodeIds.length) {
+    const nodeIdsParam = nodeFilter.nodeIds.map(encodeURIComponent).join(",");
+    q.push(`nodeIds=${nodeIdsParam}`);
+    q.push(`nodeLabel=${encodeURIComponent(nodeFilter.displayLabel)}`);
+  }
+  if (paidOnly) {
+    q.push("paidOnly=1");
+  }
+  return `/vehicles/${vehicleId}/service-log${q.length ? `?${q.join("&")}` : ""}`;
 }
 
 // ─── Event cards ──────────────────────────────────────────────────────────────
@@ -257,6 +282,7 @@ export default function ServiceLogScreen() {
     id?: string;
     nodeIds?: string;
     nodeLabel?: string;
+    paidOnly?: string;
   }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
 
@@ -280,6 +306,24 @@ export default function ServiceLogScreen() {
   const nodeSubtreeFilter = useMemo(
     () => parseServiceLogNodeFilterFromParams(params.nodeIds, params.nodeLabel),
     [params.nodeIds, params.nodeLabel]
+  );
+
+  const paidOnlyActive = useMemo(
+    () => parsePaidOnlyFromParams(params.paidOnly),
+    [params.paidOnly]
+  );
+
+  const effectiveFilters = useMemo(
+    (): ServiceEventsFilters => ({
+      ...filters,
+      paidOnly: paidOnlyActive ? true : undefined,
+    }),
+    [filters, paidOnlyActive]
+  );
+
+  const hasAnyPaidInEvents = useMemo(
+    () => filterPaidServiceEvents(events).length > 0,
+    [events]
   );
 
   const load = useCallback(async () => {
@@ -315,7 +359,7 @@ export default function ServiceLogScreen() {
     () =>
       buildServiceLogTimelineProps(
         events,
-        filters,
+        effectiveFilters,
         {
           field: sortField,
           direction: sortDirection,
@@ -323,19 +367,19 @@ export default function ServiceLogScreen() {
         "compact",
         nodeSubtreeFilter?.nodeIds ?? null
       ).monthGroups,
-    [events, filters, sortField, sortDirection, nodeSubtreeFilter]
+    [events, effectiveFilters, sortField, sortDirection, nodeSubtreeFilter]
   );
   const hasActiveFilters = useMemo(
     () =>
       isServiceLogTimelineQueryActive(
-        filters,
+        effectiveFilters,
         {
           field: sortField,
           direction: sortDirection,
         },
         nodeSubtreeFilter
       ),
-    [filters, sortField, sortDirection, nodeSubtreeFilter]
+    [effectiveFilters, sortField, sortDirection, nodeSubtreeFilter]
   );
 
   const updateFilter = (field: keyof ServiceEventsFilters, value: string) => {
@@ -356,7 +400,19 @@ export default function ServiceLogScreen() {
   };
 
   const clearNodeSubtreeFilter = () => {
-    router.replace(`/vehicles/${vehicleId}/service-log`);
+    router.replace(buildVehicleServiceLogHref(vehicleId, null, paidOnlyActive));
+  };
+
+  const clearPaidOnlyFilter = () => {
+    router.replace(
+      buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, false)
+    );
+  };
+
+  const togglePaidOnlyFilter = () => {
+    router.replace(
+      buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, !paidOnlyActive)
+    );
   };
 
   if (isLoading) {
@@ -412,6 +468,24 @@ export default function ServiceLogScreen() {
             </Text>
             <Pressable
               onPress={clearNodeSubtreeFilter}
+              style={({ pressed }) => [
+                styles.nodeFilterClearButton,
+                pressed && styles.nodeFilterClearButtonPressed,
+              ]}
+            >
+              <Text style={styles.nodeFilterClearButtonText}>Сбросить фильтр</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {paidOnlyActive ? (
+          <View style={styles.paidFilterBanner}>
+            <Text style={styles.paidFilterBannerText}>
+              <Text style={styles.paidFilterBannerStrong}>Показаны события с расходами</Text>
+              {" — только записи с суммой > 0 и валютой."}
+            </Text>
+            <Pressable
+              onPress={clearPaidOnlyFilter}
               style={({ pressed }) => [
                 styles.nodeFilterClearButton,
                 pressed && styles.nodeFilterClearButtonPressed,
@@ -502,6 +576,18 @@ export default function ServiceLogScreen() {
                 })}
               </View>
 
+              <Text style={styles.filterLabel}>Расходы</Text>
+              <View style={styles.chipsRow}>
+                <Pressable
+                  style={[styles.chip, paidOnlyActive && styles.chipActive]}
+                  onPress={togglePaidOnlyFilter}
+                >
+                  <Text style={[styles.chipText, paidOnlyActive && styles.chipTextActive]}>
+                    Только события с расходами
+                  </Text>
+                </Pressable>
+              </View>
+
               <Text style={styles.filterLabel}>Сортировка</Text>
               <View style={styles.chipsRow}>
                 {[
@@ -565,11 +651,17 @@ export default function ServiceLogScreen() {
 
         {visibleGroups.length === 0 ? (
           <View style={styles.filteredEmptyCard}>
-            <Text style={styles.filteredEmptyTitle}>Ничего не найдено</Text>
+            <Text style={styles.filteredEmptyTitle}>
+              {paidOnlyActive && !hasAnyPaidInEvents
+                ? "Расходов пока нет"
+                : "Ничего не найдено"}
+            </Text>
             <Text style={styles.filteredEmptyText}>
-              {nodeSubtreeFilter
-                ? `Для узла «${nodeSubtreeFilter.displayLabel}» в журнале нет записей с учётом текущих фильтров. Сбросьте фильтр по узлу или измените условия.`
-                : "По текущим фильтрам нет записей. Измените условия или сбросьте фильтры."}
+              {paidOnlyActive && !hasAnyPaidInEvents
+                ? "Нет сервисных записей с суммой больше нуля и указанной валютой. Добавьте стоимость при создании события."
+                : nodeSubtreeFilter
+                  ? `Для узла «${nodeSubtreeFilter.displayLabel}» в журнале нет записей с учётом текущих фильтров. Сбросьте фильтр по узлу или измените условия.`
+                  : "По текущим фильтрам нет записей. Измените условия или сбросьте фильтры."}
             </Text>
           </View>
         ) : null}
@@ -671,6 +763,28 @@ const styles = StyleSheet.create({
     color: c.textPrimary,
   },
   nodeFilterBannerStrong: {
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  paidFilterBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    backgroundColor: "#FFFBEB",
+  },
+  paidFilterBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: c.textPrimary,
+  },
+  paidFilterBannerStrong: {
     fontWeight: "700",
     color: c.textPrimary,
   },
