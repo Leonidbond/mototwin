@@ -1616,31 +1616,31 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.lastService
                               ?.odometer !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.lastService.odometer} км`
+                              ? `${selectedStatusExplanationNode.statusExplanation.lastService?.odometer ?? "—"} км`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.rule
                               ?.intervalKm !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.rule.intervalKm} км`
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule?.intervalKm ?? "—"} км`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.rule
                               ?.warningKm !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.rule.warningKm} км`
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule?.warningKm ?? "—"} км`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.usage
                               ?.elapsedKm !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.usage.elapsedKm} км`
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage?.elapsedKm ?? "—"} км`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.usage
                               ?.remainingKm !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.usage.remainingKm} км`
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage?.remainingKm ?? "—"} км`
                               : "—"}
                           </td>
                         </tr>
@@ -1669,31 +1669,31 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.lastService
                               ?.engineHours !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.lastService.engineHours} ч`
+                              ? `${selectedStatusExplanationNode.statusExplanation.lastService?.engineHours ?? "—"} ч`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.rule
                               ?.intervalHours !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.rule.intervalHours} ч`
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule?.intervalHours ?? "—"} ч`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.rule
                               ?.warningHours !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.rule.warningHours} ч`
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule?.warningHours ?? "—"} ч`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.usage
                               ?.elapsedHours !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.usage.elapsedHours} ч`
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage?.elapsedHours ?? "—"} ч`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.usage
                               ?.remainingHours !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.usage.remainingHours} ч`
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage?.remainingHours ?? "—"} ч`
                               : "—"}
                           </td>
                         </tr>
@@ -1714,25 +1714,25 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.rule
                               ?.intervalDays !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.rule.intervalDays} дн`
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule?.intervalDays ?? "—"} дн`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.rule
                               ?.warningDays !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.rule.warningDays} дн`
+                              ? `${selectedStatusExplanationNode.statusExplanation.rule?.warningDays ?? "—"} дн`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.usage
                               ?.elapsedDays !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.usage.elapsedDays} дн`
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage?.elapsedDays ?? "—"} дн`
                               : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {selectedStatusExplanationNode.statusExplanation.usage
                               ?.remainingDays !== null
-                              ? `${selectedStatusExplanationNode.statusExplanation.usage.remainingDays} дн`
+                              ? `${selectedStatusExplanationNode.statusExplanation.usage?.remainingDays ?? "—"} дн`
                               : "—"}
                           </td>
                         </tr>
