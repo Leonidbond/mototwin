@@ -13,10 +13,13 @@ import {
   buildVehicleHeaderProps,
   buildVehicleStateViewModel,
   buildVehicleTechnicalInfoViewModel,
+  vehicleDetailFromApiRecord,
   createInitialAddServiceEventFormValues,
   createInitialEditVehicleProfileFormValues,
   createInitialVehicleStateFormValues,
+  createServiceLogNodeFilter,
   findNodePathById,
+  findNodeTreeItemById,
   formatIsoCalendarDateRu,
   getAvailableChildrenForSelectedPath,
   getNodeSelectLevels,
@@ -45,78 +48,18 @@ import type {
   ServiceEventsFilters,
   ServiceEventsSortDirection,
   ServiceEventsSortField,
-  VehicleDetail as SharedVehicleDetail,
-  VehicleRideProfile,
+  ServiceLogNodeFilter,
+  VehicleDetail,
+  VehicleDetailApiRecord,
 } from "@mototwin/types";
 
 const vehicleDetailApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
-
-type VehicleDetail = {
-  id: string;
-  nickname: string | null;
-  vin: string | null;
-  odometer: number;
-  engineHours: number | null;
-  brand: {
-    name: string;
-  };
-  model: {
-    name: string;
-  };
-  modelVariant: {
-    year: number;
-    versionName: string;
-    engineType: string | null;
-    coolingType: string | null;
-    wheelSizes: string | null;
-    brakeSystem: string | null;
-    chainPitch: string | null;
-    stockSprockets: string | null;
-  };
-  rideProfile: {
-    usageType: string;
-    ridingStyle: string;
-    loadType: string;
-    usageIntensity: string;
-  } | null;
-};
 
 type VehiclePageProps = {
   params: Promise<{
     id: string;
   }>;
 };
-
-function toSharedRideProfile(
-  rideProfile: VehicleDetail["rideProfile"]
-): VehicleRideProfile | null {
-  if (!rideProfile) {
-    return null;
-  }
-
-  return {
-    usageType: rideProfile.usageType as VehicleRideProfile["usageType"],
-    ridingStyle: rideProfile.ridingStyle as VehicleRideProfile["ridingStyle"],
-    loadType: rideProfile.loadType as VehicleRideProfile["loadType"],
-    usageIntensity: rideProfile.usageIntensity as VehicleRideProfile["usageIntensity"],
-  };
-}
-
-function toSharedVehicleDetail(vehicle: VehicleDetail): SharedVehicleDetail {
-  return {
-    id: vehicle.id,
-    nickname: vehicle.nickname,
-    brandName: vehicle.brand.name,
-    modelName: vehicle.model.name,
-    variantName: vehicle.modelVariant.versionName,
-    year: vehicle.modelVariant.year,
-    vin: vehicle.vin,
-    odometer: vehicle.odometer,
-    engineHours: vehicle.engineHours,
-    rideProfile: toSharedRideProfile(vehicle.rideProfile),
-    modelVariant: vehicle.modelVariant,
-  };
-}
 
 export default function VehiclePage({ params }: VehiclePageProps) {
   const [vehicleId, setVehicleId] = useState("");
@@ -144,6 +87,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [nodeTreeError, setNodeTreeError] = useState("");
   const [isServiceLogModalOpen, setIsServiceLogModalOpen] = useState(false);
+  const [serviceLogNodeFilter, setServiceLogNodeFilter] =
+    useState<ServiceLogNodeFilter | null>(null);
   const [isAddServiceEventModalOpen, setIsAddServiceEventModalOpen] = useState(false);
   const [isCreatingServiceEvent, setIsCreatingServiceEvent] = useState(false);
   const [serviceEventFormError, setServiceEventFormError] = useState("");
@@ -195,13 +140,19 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       serviceEvents,
       serviceEventsFilters,
       serviceEventsSort,
-      "default"
+      "default",
+      serviceLogNodeFilter?.nodeIds ?? null
     ).monthGroups;
-  }, [serviceEvents, serviceEventsFilters, serviceEventsSort]);
+  }, [serviceEvents, serviceEventsFilters, serviceEventsSort, serviceLogNodeFilter]);
 
   const isServiceLogQueryActive = useMemo(
-    () => isServiceLogTimelineQueryActive(serviceEventsFilters, serviceEventsSort),
-    [serviceEventsFilters, serviceEventsSort]
+    () =>
+      isServiceLogTimelineQueryActive(
+        serviceEventsFilters,
+        serviceEventsSort,
+        serviceLogNodeFilter
+      ),
+    [serviceEventsFilters, serviceEventsSort, serviceLogNodeFilter]
   );
 
   const { roots: nodeTreeViewModel } = useMemo(
@@ -254,6 +205,20 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       field: "eventDate",
       direction: "desc",
     });
+    setServiceLogNodeFilter(null);
+  };
+
+  const openServiceLogFilteredByNode = (node: NodeTreeItemViewModel) => {
+    const raw = findNodeTreeItemById(nodeTree, node.id);
+    if (!raw) {
+      return;
+    }
+    setServiceLogNodeFilter(createServiceLogNodeFilter(raw));
+    setIsServiceLogModalOpen(true);
+  };
+
+  const clearServiceLogNodeFilter = () => {
+    setServiceLogNodeFilter(null);
   };
 
   useEffect(() => {
@@ -265,7 +230,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         setError("");
 
         const data = await vehicleDetailApi.getVehicleDetail(resolvedParams.id);
-        setVehicle((data.vehicle ?? null) as unknown as VehicleDetail | null);
+        const raw = data.vehicle as unknown as VehicleDetailApiRecord | null;
+        setVehicle(raw ? vehicleDetailFromApiRecord(raw) : null);
       } catch (requestError) {
         console.error(requestError);
         setError(
@@ -395,12 +361,16 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
             <div className="flex shrink-0 items-center gap-2">
               {node.effectiveStatus ? (
-                <span
-                  className="inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium"
+                <button
+                  type="button"
+                  onClick={() => openServiceLogFilteredByNode(node)}
+                  className="inline-flex h-7 cursor-pointer items-center rounded-full border px-2.5 text-xs font-medium transition hover:ring-2 hover:ring-gray-300 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-400"
                   style={getStatusBadgeStyle(node.effectiveStatus)}
+                  title="Показать записи журнала по этому узлу"
+                  aria-label={`Открыть журнал обслуживания по узлу «${node.name}»`}
                 >
                   {node.statusLabel}
-                </span>
+                </button>
               ) : null}
               {node.canAddServiceEvent ? (
                 <button
@@ -507,7 +477,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         normalizeEditVehicleProfilePayload(profileForm)
       );
 
-      setVehicle(data.vehicle as unknown as VehicleDetail);
+      const updated = data.vehicle as unknown as VehicleDetailApiRecord;
+      setVehicle(vehicleDetailFromApiRecord(updated));
       setIsEditProfileModalOpen(false);
     } catch (saveError) {
       console.error(saveError);
@@ -644,9 +615,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
   };
 
-  const title = vehicle?.nickname || `${vehicle?.brand.name || ""} ${vehicle?.model.name || ""}`.trim() || "Карточка мотоцикла";
-  const sharedRideProfile = vehicle ? toSharedRideProfile(vehicle.rideProfile) : null;
-  const vehicleHeader = vehicle ? buildVehicleHeaderProps(toSharedVehicleDetail(vehicle)) : null;
+  const title =
+    vehicle?.nickname ||
+    `${vehicle?.brandName || ""} ${vehicle?.modelName || ""}`.trim() ||
+    "Карточка мотоцикла";
+  const vehicleHeader = vehicle ? buildVehicleHeaderProps(vehicle) : null;
   const detailViewModel = vehicleHeader?.detail ?? null;
   const vehicleStateViewModel = vehicle
     ? buildVehicleStateViewModel({
@@ -655,7 +628,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       })
     : null;
   const rideProfileViewModel = vehicle
-    ? buildRideProfileViewModel(sharedRideProfile)
+    ? buildRideProfileViewModel(vehicle.rideProfile)
     : null;
   const technicalInfoViewModel = vehicle
     ? buildVehicleTechnicalInfoViewModel({ modelVariant: vehicle.modelVariant })
@@ -714,7 +687,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
           <div className="space-y-7">
             <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="text-sm text-gray-500">
-                {vehicle.brand.name} | {vehicle.model.name}
+                {vehicle.brandName} | {vehicle.modelName}
               </div>
 
               <h1 className="mt-3 text-4xl font-semibold tracking-tight text-gray-950 sm:text-5xl">
@@ -722,7 +695,10 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               </h1>
 
               <p className="mt-3 text-base leading-7 text-gray-600">
-                {(detailViewModel?.yearVersionLine || `${vehicle.modelVariant.year} · ${vehicle.modelVariant.versionName}`).replace(" · ", " | ")}
+                {(
+                  detailViewModel?.yearVersionLine ||
+                  `${vehicle.year} · ${vehicle.variantName}`
+                ).replace(" · ", " | ")}
               </p>
 
               <div className="mt-7 grid gap-4 sm:grid-cols-2">
@@ -816,7 +792,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     </div>
 
                     {vehicleStateError ? (
-                      <p className="text-sm text-red-600">{vehicleStateError}</p>
+                      <p className="text-sm" style={{ color: productSemanticColors.error }}>
+                        {vehicleStateError}
+                      </p>
                     ) : null}
                   </div>
                 )}
@@ -902,7 +880,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               ) : null}
 
               {!isNodeTreeLoading && nodeTreeError ? (
-                <p className="mt-4 text-sm text-red-600">{nodeTreeError}</p>
+                <p className="mt-4 text-sm" style={{ color: productSemanticColors.error }}>
+                  {nodeTreeError}
+                </p>
               ) : null}
 
               {!isNodeTreeLoading && !nodeTreeError && nodeTree.length === 0 ? (
@@ -961,12 +941,16 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
                           <div className="flex shrink-0 items-center gap-2">
                             {rootNode.effectiveStatus ? (
-                              <span
-                                className="inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium"
+                              <button
+                                type="button"
+                                onClick={() => openServiceLogFilteredByNode(rootNode)}
+                                className="inline-flex h-7 cursor-pointer items-center rounded-full border px-2.5 text-xs font-medium transition hover:ring-2 hover:ring-gray-300 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-400"
                                 style={getStatusBadgeStyle(rootNode.effectiveStatus)}
+                                title="Показать записи журнала по этому узлу"
+                                aria-label={`Открыть журнал обслуживания по узлу «${rootNode.name}»`}
                               >
                                 {rootNode.statusLabel}
-                              </span>
+                              </button>
                             ) : null}
                             {rootNode.canAddServiceEvent ? (
                               <button
@@ -1041,8 +1025,31 @@ export default function VehiclePage({ params }: VehiclePageProps) {
             </div>
 
             <div className="max-h-[72vh] overflow-y-auto px-6 py-6">
+              {serviceLogNodeFilter ? (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+                  <p className="text-gray-900">
+                    <span className="font-medium text-gray-950">Фильтр по узлу: </span>
+                    {serviceLogNodeFilter.displayLabel}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearServiceLogNodeFilter}
+                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-white"
+                  >
+                    Сбросить фильтр
+                  </button>
+                </div>
+              ) : null}
+
               {serviceEventFormSuccess ? (
-                <p className="mb-4 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                <p
+                  className="mb-4 rounded-xl border px-3 py-2 text-sm"
+                  style={{
+                    borderColor: productSemanticColors.successBorder,
+                    backgroundColor: productSemanticColors.successSurface,
+                    color: productSemanticColors.successText,
+                  }}
+                >
                   {serviceEventFormSuccess}
                 </p>
               ) : null}
@@ -1052,7 +1059,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               ) : null}
 
               {!isServiceEventsLoading && serviceEventsError ? (
-                <p className="text-sm text-red-600">{serviceEventsError}</p>
+                <p className="text-sm" style={{ color: productSemanticColors.error }}>
+                  {serviceEventsError}
+                </p>
               ) : null}
 
               {!isServiceEventsLoading &&
@@ -1207,8 +1216,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
                         <p className="font-medium text-gray-900">Ничего не найдено</p>
                         <p className="mt-1">
-                          По текущим фильтрам нет записей. Измените условия или сбросьте
-                          фильтры.
+                          {serviceLogNodeFilter
+                            ? `Для узла «${serviceLogNodeFilter.displayLabel}» в журнале нет записей с учётом текущих фильтров. Сбросьте фильтр по узлу или измените условия.`
+                            : "По текущим фильтрам нет записей. Измените условия или сбросьте фильтры."}
                         </p>
                       </div>
                     ) : (
@@ -1537,7 +1547,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 ) : null}
 
                 {serviceEventFormError ? (
-                  <p className="mt-3 text-sm text-red-600">{serviceEventFormError}</p>
+                  <p className="mt-3 text-sm" style={{ color: productSemanticColors.error }}>
+                    {serviceEventFormError}
+                  </p>
                 ) : null}
               </div>
             </div>
@@ -1927,7 +1939,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 </button>
 
                 {profileFormError ? (
-                  <p className="mt-3 text-sm text-red-600">{profileFormError}</p>
+                  <p className="mt-3 text-sm" style={{ color: productSemanticColors.error }}>
+                    {profileFormError}
+                  </p>
                 ) : null}
               </div>
             </div>

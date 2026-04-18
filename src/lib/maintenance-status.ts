@@ -401,6 +401,11 @@ export function resolveNodeSelfEffectiveStatus(args: {
   return computedStatus ?? directStatus;
 }
 
+/**
+ * Rolls up child statuses with the node's own effective status.
+ * If there is no direct/computed/child evidence anywhere, the result stays `null`
+ * (do not substitute OK — callers must not treat null as “healthy”).
+ */
 export function aggregateEffectiveStatus(
   nodeSelfEffectiveStatus: string | null,
   childStatuses: Array<string | null>

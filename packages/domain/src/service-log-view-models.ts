@@ -123,8 +123,14 @@ export function buildServiceLogTimelineViewModel(
   serviceEvents: ServiceEventItem[],
   filters: ServiceEventsFilters,
   sort: ServiceLogSortState,
-  dateStyle: ServiceLogEntryDateStyle = "default"
+  dateStyle: ServiceLogEntryDateStyle = "default",
+  restrictToNodeIds?: string[] | null
 ): ServiceLogEntryViewModel[] {
-  const sorted = filterAndSortServiceEvents(serviceEvents, filters, sort);
+  const sorted = filterAndSortServiceEvents(
+    serviceEvents,
+    filters,
+    sort,
+    restrictToNodeIds
+  );
   return sorted.map((event) => buildServiceLogEntryViewModel(event, dateStyle));
 }

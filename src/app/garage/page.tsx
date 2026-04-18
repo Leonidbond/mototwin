@@ -43,7 +43,14 @@ export default function GaragePage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="inline-flex items-center rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600">
+            <div
+              className="inline-flex items-center rounded-full border px-3 py-1 text-sm"
+              style={{
+                borderColor: productSemanticColors.borderStrong,
+                backgroundColor: productSemanticColors.chipBackground,
+                color: productSemanticColors.textSecondary,
+              }}
+            >
               MotoTwin | Гараж
             </div>
             <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -85,7 +92,13 @@ export default function GaragePage() {
         ) : null}
 
         {!isLoading && !error && vehicles.length === 0 ? (
-          <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
+          <div
+            className="rounded-3xl border p-8 shadow-sm"
+            style={{
+              borderColor: productSemanticColors.border,
+              backgroundColor: productSemanticColors.card,
+            }}
+          >
             <h2 className="text-2xl font-semibold tracking-tight">
               В гараже пока нет мотоциклов
             </h2>
@@ -114,7 +127,11 @@ export default function GaragePage() {
               return (
                 <section
                   key={vehicle.id}
-                  className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm"
+                  className="rounded-3xl border p-8 shadow-sm"
+                  style={{
+                    borderColor: productSemanticColors.border,
+                    backgroundColor: productSemanticColors.card,
+                  }}
                 >
                 <div className="flex flex-col gap-8 lg:flex-row lg:justify-between">
                   <div className="max-w-3xl">
@@ -150,7 +167,13 @@ export default function GaragePage() {
 
                   </div>
 
-                  <div className="min-w-[280px] rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                  <div
+                    className="min-w-[280px] rounded-2xl border p-5"
+                    style={{
+                      borderColor: productSemanticColors.border,
+                      backgroundColor: productSemanticColors.cardMuted,
+                    }}
+                  >
                     <h3 className="text-base font-semibold text-gray-950">
                       Профиль эксплуатации
                     </h3>
@@ -209,7 +232,13 @@ export default function GaragePage() {
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+    <div
+      className="rounded-2xl border p-4"
+      style={{
+        borderColor: productSemanticColors.border,
+        backgroundColor: productSemanticColors.cardMuted,
+      }}
+    >
       <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
         {label}
       </div>
@@ -220,7 +249,13 @@ function InfoCard({ label, value }: { label: string; value: string }) {
 
 function SpecCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+    <div
+      className="rounded-2xl border p-4"
+      style={{
+        borderColor: productSemanticColors.border,
+        backgroundColor: productSemanticColors.card,
+      }}
+    >
       <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
         {label}
       </div>

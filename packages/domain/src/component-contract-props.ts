@@ -93,8 +93,14 @@ export function buildServiceLogTimelineProps(
   serviceEvents: ServiceEventItem[],
   filters: ServiceEventsFilters,
   sort: ServiceLogSortState,
-  dateStyle: ServiceLogEntryDateStyle = "default"
+  dateStyle: ServiceLogEntryDateStyle = "default",
+  restrictToNodeIds?: string[] | null
 ): { monthGroups: ReturnType<typeof groupServiceLogByMonth> } {
-  const filtered = filterAndSortServiceEvents(serviceEvents, filters, sort);
+  const filtered = filterAndSortServiceEvents(
+    serviceEvents,
+    filters,
+    sort,
+    restrictToNodeIds
+  );
   return { monthGroups: groupServiceLogByMonth(filtered, dateStyle) };
 }

@@ -20,6 +20,17 @@ export type ServiceEventsFilters = {
   node: string;
 };
 
+/** Client-side subtree filter: events whose `nodeId` is in `nodeIds`. */
+export type ServiceLogNodeFilter = {
+  nodeIds: string[];
+  displayLabel: string;
+};
+
+/** Payload when opening the service log from a node-tree status control. */
+export type NodeStatusClickTarget = {
+  treeNodeId: string;
+};
+
 export type MonthlyServiceLogSummary = {
   serviceCount: number;
   stateUpdateCount: number;

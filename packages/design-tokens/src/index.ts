@@ -91,6 +91,10 @@ export const productSemanticColors = {
   textInverse: "#FFFFFF",
   primaryAction: "#111827",
   successStrong: "#059669",
+  /** Inline success banner (e.g. service event saved) — aligns with soft green on web journal */
+  successSurface: "#F0FDF4",
+  successBorder: "#BBF7D0",
+  successText: "#15803D",
   error: "#B91C1C",
   errorSurface: "#FEF2F2",
   errorBorder: "#FECACA",

@@ -18,6 +18,7 @@ import type {
   ServiceEventsSortField,
   ServiceLogEntryViewModel,
   ServiceLogMonthGroupViewModel,
+  ServiceLogNodeFilter,
 } from "@mototwin/types";
 import {
   buildServiceLogTimelineProps,
@@ -27,6 +28,46 @@ import {
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
+
+function readSearchParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+}
+
+function parseServiceLogNodeFilterFromParams(
+  nodeIdsRaw: string | string[] | undefined,
+  nodeLabelRaw: string | string[] | undefined
+): ServiceLogNodeFilter | null {
+  const rawIds = readSearchParam(nodeIdsRaw);
+  if (typeof rawIds !== "string" || !rawIds.trim()) {
+    return null;
+  }
+  const nodeIds = rawIds
+    .split(",")
+    .map((id) => {
+      try {
+        return decodeURIComponent(id.trim());
+      } catch {
+        return id.trim();
+      }
+    })
+    .filter(Boolean);
+  if (!nodeIds.length) {
+    return null;
+  }
+  const labelRaw = readSearchParam(nodeLabelRaw);
+  let displayLabel = "Узел";
+  if (typeof labelRaw === "string" && labelRaw.trim()) {
+    try {
+      displayLabel = decodeURIComponent(labelRaw);
+    } catch {
+      displayLabel = labelRaw;
+    }
+  }
+  return { nodeIds, displayLabel };
+}
 
 // ─── Event cards ──────────────────────────────────────────────────────────────
 
@@ -212,7 +253,11 @@ function MonthGroup({
 
 export default function ServiceLogScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    nodeIds?: string;
+    nodeLabel?: string;
+  }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
 
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
@@ -231,6 +276,11 @@ export default function ServiceLogScreen() {
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
 
   const apiBaseUrl = getApiBaseUrl();
+
+  const nodeSubtreeFilter = useMemo(
+    () => parseServiceLogNodeFilterFromParams(params.nodeIds, params.nodeLabel),
+    [params.nodeIds, params.nodeLabel]
+  );
 
   const load = useCallback(async () => {
       if (!vehicleId) {
@@ -263,19 +313,29 @@ export default function ServiceLogScreen() {
 
   const visibleGroups = useMemo(
     () =>
-      buildServiceLogTimelineProps(events, filters, {
-        field: sortField,
-        direction: sortDirection,
-      }, "compact").monthGroups,
-    [events, filters, sortField, sortDirection]
+      buildServiceLogTimelineProps(
+        events,
+        filters,
+        {
+          field: sortField,
+          direction: sortDirection,
+        },
+        "compact",
+        nodeSubtreeFilter?.nodeIds ?? null
+      ).monthGroups,
+    [events, filters, sortField, sortDirection, nodeSubtreeFilter]
   );
   const hasActiveFilters = useMemo(
     () =>
-      isServiceLogTimelineQueryActive(filters, {
-        field: sortField,
-        direction: sortDirection,
-      }),
-    [filters, sortField, sortDirection]
+      isServiceLogTimelineQueryActive(
+        filters,
+        {
+          field: sortField,
+          direction: sortDirection,
+        },
+        nodeSubtreeFilter
+      ),
+    [filters, sortField, sortDirection, nodeSubtreeFilter]
   );
 
   const updateFilter = (field: keyof ServiceEventsFilters, value: string) => {
@@ -292,6 +352,11 @@ export default function ServiceLogScreen() {
     });
     setSortField("eventDate");
     setSortDirection("desc");
+    router.replace(`/vehicles/${vehicleId}/service-log`);
+  };
+
+  const clearNodeSubtreeFilter = () => {
+    router.replace(`/vehicles/${vehicleId}/service-log`);
   };
 
   if (isLoading) {
@@ -338,6 +403,24 @@ export default function ServiceLogScreen() {
         >
           <Text style={styles.addButtonText}>+ Добавить сервисное событие</Text>
         </Pressable>
+
+        {nodeSubtreeFilter ? (
+          <View style={styles.nodeFilterBanner}>
+            <Text style={styles.nodeFilterBannerText}>
+              <Text style={styles.nodeFilterBannerStrong}>Фильтр по узлу: </Text>
+              {nodeSubtreeFilter.displayLabel}
+            </Text>
+            <Pressable
+              onPress={clearNodeSubtreeFilter}
+              style={({ pressed }) => [
+                styles.nodeFilterClearButton,
+                pressed && styles.nodeFilterClearButtonPressed,
+              ]}
+            >
+              <Text style={styles.nodeFilterClearButtonText}>Сбросить фильтр</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={styles.filterCard}>
           <Pressable
@@ -484,7 +567,9 @@ export default function ServiceLogScreen() {
           <View style={styles.filteredEmptyCard}>
             <Text style={styles.filteredEmptyTitle}>Ничего не найдено</Text>
             <Text style={styles.filteredEmptyText}>
-              По текущим фильтрам нет записей. Измените условия или сбросьте фильтры.
+              {nodeSubtreeFilter
+                ? `Для узла «${nodeSubtreeFilter.displayLabel}» в журнале нет записей с учётом текущих фильтров. Сбросьте фильтр по узлу или измените условия.`
+                : "По текущим фильтрам нет записей. Измените условия или сбросьте фильтры."}
             </Text>
           </View>
         ) : null}
@@ -566,6 +651,44 @@ const styles = StyleSheet.create({
     color: c.textInverse,
     fontSize: 14,
     fontWeight: "700",
+  },
+  nodeFilterBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+  },
+  nodeFilterBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: c.textPrimary,
+  },
+  nodeFilterBannerStrong: {
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  nodeFilterClearButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.canvas,
+  },
+  nodeFilterClearButtonPressed: {
+    opacity: 0.92,
+  },
+  nodeFilterClearButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: c.textPrimary,
   },
   filterCard: {
     backgroundColor: c.card,

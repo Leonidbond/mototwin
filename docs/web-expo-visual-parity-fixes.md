@@ -5,7 +5,7 @@
 
 ## Общие токены (`packages/design-tokens`)
 
-Добавлен объект **`productSemanticColors`**: canvas, card, приглушённые поверхности, границы, иерархия текста, основная кнопка, ошибка, акценты журнала (timeline SERVICE / STATE_UPDATE), бейдж сервиса, тень, оверлей модалки (`overlayModal`).
+Добавлен объект **`productSemanticColors`**: canvas, card, приглушённые поверхности, границы, иерархия текста, основная кнопка, ошибка, **мягкий success** (`successSurface`, `successBorder`, `successText`), акценты журнала (timeline SERVICE / STATE_UPDATE), бейдж сервиса, тень, оверлей модалки (`overlayModal`).
 
 Уже существовали **`statusSemanticTokens`** и русские/английские подписи статусов — для цветов статусов по-прежнему используются они.
 
@@ -13,10 +13,11 @@
 
 ## Web
 
-- **Гараж** (`src/app/garage/page.tsx`): фон страницы — `productSemanticColors.canvas`; блок ошибки — `errorSurface` / `errorBorder` / `error`; основные CTA — `primaryAction`; пустое состояние: кнопка **«Добавить мотоцикл»** (как в основном CTA), без формулировки «Перейти к onboarding».
+- **Гараж** (`src/app/garage/page.tsx`): фон страницы — `canvas`; блок ошибки — `errorSurface` / `errorBorder` / `error`; основные CTA — `primaryAction`; карточки мотоциклов, загрузка/пустое состояние, блок профиля эксплуатации, метрики и спеки — `border` / `card` / `cardMuted`; чип «MotoTwin | Гараж» — `chipBackground`, `borderStrong`, `textSecondary`.
 - **Onboarding** (`src/app/onboarding/page.tsx`): фон — `canvas` для согласования с гаражом и Expo-оболочкой.
 - **Карточка мотоцикла** (`src/app/vehicles/[id]/page.tsx`): фон страницы — `canvas`; блок ошибки загрузки — те же error-токены.
-- **Журнал обслуживания (модалка на странице ТС):** оверлей — `overlayModal`; таймлайн (линия, точка, фон/бордер карточки, бейдж «Сервис» / «Обновление состояния») — те же поля `productSemanticColors`, что и в Expo `service-log.tsx` (`timelineService*` / `timelineState*`, `serviceBadge*`, `card` / `cardMuted`, `border`, и т.д.). Вёрстка и Tailwind-классы для layout не вычищались.
+- **Журнал обслуживания (модалка на странице ТС):** оверлей — `overlayModal`; таймлайн (линия, точка, фон/бордер карточки, бейдж «Сервис» / «Обновление состояния») — те же поля `productSemanticColors`, что и в Expo `service-log.tsx` (`timelineService*` / `timelineState*`, `serviceBadge*`, `card` / `cardMuted`, `border`, и т.д.); баннер «сервисное событие добавлено» — `successSurface` / `successBorder` / `successText`; тексты ошибок журнала/формы — `error`.
+- **Карточка ТС (прочее):** inline-ошибки состояния, дерева, профиля, формы сервиса — цвет `error` (вместо Tailwind `text-red-600`).
 
 ## Expo (`apps/app/app/**`)
 

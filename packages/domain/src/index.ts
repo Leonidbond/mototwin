@@ -8,6 +8,7 @@ export {
 export {
   flattenNodeTreeToSelectOptions,
   flattenNodeTreeForSelection,
+  findNodeTreeItemById,
   findNodePathById,
   getNodePathById,
   getNodeSelectLevels,
@@ -39,6 +40,12 @@ export {
   isServiceLogTimelineQueryActive,
 } from "./service-log";
 export {
+  getDescendantLeafNodeIds,
+  getNodeAndDescendantIds,
+  createServiceLogNodeFilter,
+  applyServiceLogNodeFilter,
+} from "./service-log-node-filter";
+export {
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
   buildServiceLogEntryViewModel,
   buildServiceLogMonthlySummary,
@@ -53,6 +60,7 @@ export {
   buildVehicleStateViewModel,
   buildRideProfileViewModel,
   buildVehicleTechnicalInfoViewModel,
+  vehicleDetailFromApiRecord,
 } from "./vehicle-view-models";
 export {
   RIDE_USAGE_TYPE_OPTIONS,

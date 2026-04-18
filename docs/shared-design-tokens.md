@@ -19,7 +19,7 @@ MotoTwin теперь поддерживает два клиента (Web + Expo
   - `OVERDUE`
   - `RECENTLY_REPLACED`
   - `UNKNOWN` (для `null`/unknown статуса)
-- `productSemanticColors` — нейтральные поверхности, текст, границы, ошибки/primary CTA, **семантика журнала** (точка таймлайна SERVICE vs STATE_UPDATE, фон/бордер карточки, бейдж типа записи, оверлей модалки и др.)
+- `productSemanticColors` — нейтральные поверхности, текст, границы, ошибки/primary CTA, **мягкий success** (`successSurface` / `successBorder` / `successText`, рядом с `successStrong`), **семантика журнала** (точка таймлайна SERVICE vs STATE_UPDATE, фон/бордер карточки, бейдж типа записи, оверлей модалки и др.)
 - `statusTextLabelsRu`
 - `statusBadgeLabelsEn`
 - `spacingScale` (минимальный scale)
@@ -58,6 +58,10 @@ MotoTwin теперь поддерживает два клиента (Web + Expo
 - Карточка записи: `border` + `card` (сервис) или `cardMuted` (обновление состояния).
 - Бейдж типа записи: `serviceBadgeBg` / `serviceBadgeText` / `indigoSoftBorder` (сервис); `divider` / `textMuted` / `borderStrong` (обновление состояния).
 - Бейджи статуса узла в дереве по-прежнему из `statusSemanticTokens` через `background` / `color` / `borderColor` в inline style.
+
+**Гараж (`src/app/garage/page.tsx`):** карточки списка, загрузка/пустое состояние, блок «Профиль эксплуатации», `InfoCard` / `SpecCard` — `border`, `card`, `cardMuted`, `chipBackground` / `borderStrong` / `textSecondary` для чипа «MotoTwin | Гараж» (layout-классы Tailwind сохранены).
+
+**Карточка ТС — сообщения:** тексты ошибок форм/журнала/дерева/состояния — `color: productSemanticColors.error` вместо `text-red-600`; баннер успеха после добавления сервиса — `successSurface` / `successBorder` / `successText`.
 
 Так web сохраняет Tailwind для отступов и скруглений, а **смысл цвета** совпадает с Expo.
 

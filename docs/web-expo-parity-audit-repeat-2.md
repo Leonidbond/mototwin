@@ -32,16 +32,16 @@
 | Garage screen | Practical parity + platform UX | `productSemanticColors` (canvas, ошибки, CTA); список через API-клиент |
 | Garage card | Practical parity | `buildGarageCardProps` + `filterMeaningfulGarageSpecHighlights` на **обоих** |
 | Add motorcycle flow | Practical parity | `createInitialAddMotorcycleFormValues`; маршруты `/onboarding` vs `/vehicles/new` — намеренно |
-| Vehicle detail screen | Practical parity | Общие VM; web держит **локальный** `VehicleDetail` + `toSharedVehicleDetail` |
+| Vehicle detail screen | Practical parity | Общие VM; web хранит **`VehicleDetail`** из types после **`vehicleDetailFromApiRecord`** (wire → канон) |
 | Vehicle profile data | Full parity (смысл) | Один API, `normalizeEditVehicleProfilePayload`; разные оболочки UI |
 | Vehicle current state update | Practical parity | `validateVehicleStateFormValues` web/mobile; Expo отдельный экран |
 | Edit vehicle profile | Partial parity | Нет вызова `validateEditVehicleProfileFormValues` в UI на обоих клиентах |
-| Node tree | Practical parity | `buildNodeTreeSectionProps`; Expo — отдельная загрузка/ошибка дерева |
-| Node status display | Full parity (смысл) | `statusSemanticTokens` + подписи из domain/tokens |
+| Node tree | Practical parity | `buildNodeTreeSectionProps`; Expo — отдельная загрузка/ошибка дерева; **интерактивный статус** → журнал с фильтром по узлу |
+| Node status display | Full parity (смысл) | `statusSemanticTokens` + подписи из domain/tokens; **null** = нет бейджа, не «OK по умолчанию» для пустого поддерева |
 | Status explanation | Full parity (смысл) | Модалки; `formatIsoCalendarDateRu`; `canOpenNodeStatusExplanationModal` |
 | Add service event from tree | Practical parity | Web — путь в модалке; Expo — `nodeId` в query + экран |
 | Add Service Event default currency | Full parity (код) | `DEFAULT_ADD_SERVICE_EVENT_CURRENCY` / `createInitialAddServiceEventFormValues` → **RUB**; web и Expo инициализируют валюту из хелпера |
-| Service log | Practical parity | `buildServiceLogTimelineProps` — `"default"` web / `"compact"` Expo |
+| Service log | Practical parity | `buildServiceLogTimelineProps` — `"default"` web / `"compact"` Expo; опционально **`restrictToNodeIds`** (фильтр из дерева) |
 | Service log timeline | Practical parity | Общая VM; web — токены `productSemanticColors` для точек/карточек/бейджей в модалке |
 | Service log grouping | Full parity (смысл) | Один domain pipeline |
 | Monthly summary | Full parity (смысл) | Те же VM и подписи |
@@ -53,7 +53,7 @@
 | Shared view models | High alignment | Garage, vehicle, node tree, service log — `@mototwin/domain` |
 | Shared form contracts | High alignment | Формы сервиса, состояния, мотоцикла, профиля (нормализация есть; см. профиль ниже) |
 | Shared component contracts | Partial | Типы в `@mototwin/types`; общий UI-kit не вводился |
-| Design tokens | Practical parity | Оба: `statusSemanticTokens`, `productSemanticColors`; web много **Tailwind** для нейтрали |
+| Design tokens | Practical parity | Оба: `statusSemanticTokens`, `productSemanticColors`; web — токены для гаража (карточки), журнала, ошибок/success на ТС; остальной нейтраль — **Tailwind** |
 | Empty / error states | Practical parity | Сообщения согласованы по смыслу; Expo не показывает URL API в prod-like сборке |
 
 **Легенда:** Full / Practical / Partial / N/A — как в [web-expo-parity-audit-repeat.md](./web-expo-parity-audit-repeat.md) §1.
@@ -71,6 +71,8 @@
 | Строка отладки API в Expo | **Gated** | `apps/app/app/index.tsx`: `{__DEV__ ? <Text>Текущий API: …` |
 | Структура parity-документации | **Done** | Индекс [web-expo-parity-audit.md](./web-expo-parity-audit.md); детали в repeat / fix-доках |
 | TopNodeState / кэш статусов | **Вне объёма клиентского кода в этом шаге** | Логика на backend; клиенты потребляют дерево/статусы; регрессии — [status-cache-frontend-qa.md](./status-cache-frontend-qa.md) |
+| Клик/тап по **статусу узла** → журнал с фильтром по узлу/поддереву | **Implemented** (2026-04-18) | Shared: `createServiceLogNodeFilter`, `restrictToNodeIds` в `buildServiceLogTimelineProps` / `filterServiceLogEntries`; web — state в модалке; Expo — query `nodeIds` / `nodeLabel`; см. [web-expo-node-tree-parity-fixes.md](./web-expo-node-tree-parity-fixes.md), [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md) |
+| **Пустой статус корня** (нет данных по поддереву) | **Implemented** (2026-04-18) | `node-tree` больше не подменяет `null` → `OK` для top-level; UI без бейджа; кэш `TopNodeState` может отличаться — см. [top-node-state-cache-plan.md](./top-node-state-cache-plan.md) |
 
 ---
 
@@ -80,14 +82,11 @@
 
 | Поле | Содержание |
 |------|------------|
-| **Статус паритета** | Partial parity |
-| **Web** | `type VehicleDetail` локально в `page.tsx`; `as unknown as VehicleDetail`; `toSharedVehicleDetail` для хелперов |
-| **Expo** | `VehicleDetail` из `@mototwin/types` |
-| **Ожидаемо** | Один тип ответа в UI или вывод из API types |
-| **Тип зазора** | Shared logic gap |
-| **Severity** | Low |
-| **Рекомендация** | Свести web к `VehicleDetail` из types или к типу ответа api-client |
-| **Файлы** | `src/app/vehicles/[id]/page.tsx`, при необходимости `packages/types` |
+| **Статус** | **Addressed** (2026-04-18, рефакторинг) |
+| **Было** | Локальный nested-тип в `page.tsx` + `toSharedVehicleDetail` |
+| **Стало** | Канонический `VehicleDetail` из `@mototwin/types`; wire JSON → **`vehicleDetailFromApiRecord`** (`VehicleDetailApiRecord` в types); `buildVehicleHeaderProps(vehicle)` без лишнего маппинга |
+| **Остаточный долг** | `VehicleDetailResponse.vehicle` в типах/api-client по-прежнему помечен как `VehicleDetail`, тогда как wire — nested; на границе web использует `as unknown as VehicleDetailApiRecord` (документировано в [shared-vehicle-view-models.md](./shared-vehicle-view-models.md)) |
+| **Файлы** | `src/app/vehicles/[id]/page.tsx`, `packages/types/src/vehicle.ts`, `packages/domain/src/vehicle-view-models.ts` |
 
 ---
 
@@ -125,14 +124,11 @@
 
 | Поле | Содержание |
 |------|------------|
-| **Статус паритета** | Practical parity (остаточный визуальный зазор) |
-| **Web** | Большая часть нейтральных цветов — утилиты `gray-*` Tailwind |
-| **Expo** | `productSemanticColors` в StyleSheet на ключевых экранах |
-| **Ожидаемо** | Дальнейшее точечное сближение по мере касания экранов (не блокер) |
-| **Тип зазора** | Visual parity gap (низкий приоритет) |
-| **Severity** | Low |
-| **Рекомендация** | Расширять токены на web при правках UI |
-| **Файлы** | По месту в `src/app/**` |
+| **Статус** | **Partially addressed** (2026-04-18, доп. батч) |
+| **Сделано** | Новые токены `successSurface` / `successBorder` / `successText`; web **гараж** — поверхности карточек через `card` / `cardMuted` / `border` / чип; web **ТС** — ошибки форм `error`, success после сервиса — success-триада; модалка журнала и бейджи узлов — как ранее (`statusSemanticTokens` / timeline) |
+| **Остаток** | Большая часть нейтрали и типографики на карточке ТС — по-прежнему `gray-*` Tailwind |
+| **Expo** | Без изменений; при желании позже подключить success-триаду к аналогичным баннерам |
+| **Файлы** | `packages/design-tokens/src/index.ts`, `src/app/garage/page.tsx`, `src/app/vehicles/[id]/page.tsx` |
 
 ---
 
@@ -155,9 +151,9 @@
 | Батч | Содержание |
 |------|------------|
 | **Batch 1** | *Нет пунктов высокого влияния* — высокоприоритетные темы первичного аудита закрыты в коде ранее |
-| **Batch 2** | По желанию: свести web `VehicleDetail` к shared-типу (§3.1) |
+| **Batch 2** | *§3.1 закрыт* — опционально позже: поправить тип `VehicleDetailResponse` / api-client под `VehicleDetailApiRecord` или union, чтобы убрать двойное приведение на web |
 | **Batch 3** | *Нет обязательных* — журнал/дерево на domain-хелперах |
-| **Batch 4** | Точечное расширение `productSemanticColors` на web (§3.4) |
+| **Batch 4** | §3.4 **частично закрыт**; дальше — точечно по экранам (нейтраль Tailwind → токены при касании) |
 | **Batch 5** | Обновить **документацию** про использование api-client на web (§3.3); при необходимости дополнить `shared-form-contracts` про профиль |
 
 ---
@@ -186,6 +182,6 @@
 
 ## 7. Итог
 
-После перечисленных фиксов **существенных функциональных разрывов** между web и Expo по core workflow **не обнаружено**. Остаются **низкоприоритетные** темы: технический долг типа `VehicleDetail` на web, отсутствие UI-валидации профиля, остаточное визуальное расхождение Tailwind vs токены, **устаревшие формулировки** в части docs про `fetch` на web.
+После перечисленных фиксов **существенных функциональных разрывов** между web и Expo по core workflow **не обнаружено**. Остаются **низкоприоритетные** темы: точность типа ответа `getVehicleDetail` (wire vs `VehicleDetail`, см. §3.1), отсутствие UI-валидации профиля, **остаточное** визуальное расхождение Tailwind vs токены на крупных блоках карточки ТС (§3.4 — частично снято), **устаревшие формулировки** в части docs про `fetch` на web.
 
 *Конец второго повторного аудита.*

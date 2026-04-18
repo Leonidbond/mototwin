@@ -4,8 +4,10 @@ import type {
   ServiceEventsFilters,
   ServiceEventsSortDirection,
   ServiceEventsSortField,
+  ServiceLogNodeFilter,
   ServiceLogSortState,
 } from "@mototwin/types";
+import { applyServiceLogNodeFilter } from "./service-log-node-filter";
 
 /** Default timeline query: newest first by event date (web + Expo). */
 export const DEFAULT_SERVICE_LOG_SORT_STATE: ServiceLogSortState = {
@@ -26,7 +28,8 @@ function trimServiceLogFilterFields(filters: ServiceEventsFilters) {
 /** True when any filter is set or sort differs from {@link DEFAULT_SERVICE_LOG_SORT_STATE}. */
 export function isServiceLogTimelineQueryActive(
   filters: ServiceEventsFilters,
-  sort: ServiceLogSortState
+  sort: ServiceLogSortState,
+  nodeSubtreeFilter?: ServiceLogNodeFilter | null
 ): boolean {
   const t = trimServiceLogFilterFields(filters);
   const hasFilter =
@@ -38,7 +41,8 @@ export function isServiceLogTimelineQueryActive(
   const sortNonDefault =
     sort.field !== DEFAULT_SERVICE_LOG_SORT_STATE.field ||
     sort.direction !== DEFAULT_SERVICE_LOG_SORT_STATE.direction;
-  return hasFilter || sortNonDefault;
+  const hasNodeSubtree = Boolean(nodeSubtreeFilter?.nodeIds.length);
+  return hasFilter || sortNonDefault || hasNodeSubtree;
 }
 
 function normalizeServiceLogFilters(serviceEventsFilters: ServiceEventsFilters) {
@@ -53,11 +57,16 @@ function normalizeServiceLogFilters(serviceEventsFilters: ServiceEventsFilters) 
 
 export function filterServiceLogEntries(
   serviceEvents: ServiceEventItem[],
-  serviceEventsFilters: ServiceEventsFilters
+  serviceEventsFilters: ServiceEventsFilters,
+  restrictToNodeIds?: string[] | null
 ): ServiceEventItem[] {
+  const scoped =
+    restrictToNodeIds && restrictToNodeIds.length > 0
+      ? applyServiceLogNodeFilter(serviceEvents, { nodeIds: restrictToNodeIds })
+      : serviceEvents;
   const normalizedFilters = normalizeServiceLogFilters(serviceEventsFilters);
 
-  return serviceEvents.filter((event) => {
+  return scoped.filter((event) => {
     const eventDateOnly = event.eventDate.slice(0, 10);
     const eventKindLabel =
       event.eventKind === "STATE_UPDATE" ? "обновление состояния" : "сервис";
@@ -144,9 +153,14 @@ export function filterAndSortServiceEvents(
   serviceEventsSort: {
     field: ServiceEventsSortField;
     direction: ServiceEventsSortDirection;
-  }
+  },
+  restrictToNodeIds?: string[] | null
 ) {
-  const filtered = filterServiceLogEntries(serviceEvents, serviceEventsFilters);
+  const filtered = filterServiceLogEntries(
+    serviceEvents,
+    serviceEventsFilters,
+    restrictToNodeIds
+  );
   return sortServiceLogEntries(filtered, serviceEventsSort);
 }
 

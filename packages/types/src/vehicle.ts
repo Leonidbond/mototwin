@@ -103,6 +103,32 @@ export type VehicleDetail = VehicleSummary & {
   } | null;
 };
 
+/**
+ * Wire shape returned by Next vehicle routes with Prisma `include` (`brand`, `model`, `modelVariant`).
+ * Canonical UI / domain shape is {@link VehicleDetail}; map with `vehicleDetailFromApiRecord` in `@mototwin/domain`.
+ */
+export type VehicleDetailApiRecord = {
+  id: string;
+  nickname: string | null;
+  vin: string | null;
+  odometer: number;
+  engineHours: number | null;
+  brand: { name: string };
+  model: { name: string };
+  modelVariant: {
+    year: number;
+    versionName: string;
+    market?: string | null;
+    engineType: string | null;
+    coolingType: string | null;
+    wheelSizes: string | null;
+    brakeSystem: string | null;
+    chainPitch: string | null;
+    stockSprockets: string | null;
+  } | null;
+  rideProfile: VehicleRideProfile | null;
+};
+
 export type UpdateVehicleStateInput = {
   odometer: number;
   engineHours: number | null;

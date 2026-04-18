@@ -18,6 +18,8 @@ import {
   buildVehicleStateViewModel,
   buildVehicleTechnicalInfoViewModel,
   canOpenNodeStatusExplanationModal,
+  createServiceLogNodeFilter,
+  findNodeTreeItemById,
   formatIsoCalendarDateRu,
   getStatusExplanationTriggeredByLabel,
 } from "@mototwin/domain";
@@ -50,6 +52,7 @@ type NodeRowProps = {
   onToggle: (id: string) => void;
   onAddFromLeaf: (leafNodeId: string) => void;
   onOpenStatusExplanation?: (node: NodeTreeItemViewModel) => void;
+  onOpenServiceLogForNode?: (node: NodeTreeItemViewModel) => void;
 };
 
 function NodeRow({
@@ -59,6 +62,7 @@ function NodeRow({
   onToggle,
   onAddFromLeaf,
   onOpenStatusExplanation,
+  onOpenServiceLogForNode,
 }: NodeRowProps) {
   const treeItemContract: NodeTreeItemProps = {
     item: node,
@@ -125,15 +129,36 @@ function NodeRow({
         </View>
 
         {label ? (
-          <View
-            style={[
-              styles.badge,
-              badgeStyle,
-              { backgroundColor: colors.bg, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.badgeText, badgeTextStyle, { color: colors.text }]}>{label}</Text>
-          </View>
+          onOpenServiceLogForNode ? (
+            <Pressable
+              onPress={() => onOpenServiceLogForNode(rowNode)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`Журнал обслуживания по узлу ${rowNode.name}`}
+              style={({ pressed }) => [
+                styles.badge,
+                badgeStyle,
+                { backgroundColor: colors.bg, borderColor: colors.border },
+                pressed && styles.badgePressed,
+              ]}
+            >
+              <Text style={[styles.badgeText, badgeTextStyle, { color: colors.text }]}>
+                {label}
+              </Text>
+            </Pressable>
+          ) : (
+            <View
+              style={[
+                styles.badge,
+                badgeStyle,
+                { backgroundColor: colors.bg, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.badgeText, badgeTextStyle, { color: colors.text }]}>
+                {label}
+              </Text>
+            </View>
+          )
         ) : (
           <View style={styles.badgeEmpty} />
         )}
@@ -159,6 +184,7 @@ function NodeRow({
               onToggle={onToggle}
               onAddFromLeaf={onAddFromLeaf}
               onOpenStatusExplanation={onOpenStatusExplanation}
+              onOpenServiceLogForNode={onOpenServiceLogForNode}
             />
           ))
         : null}
@@ -413,6 +439,21 @@ export default function VehicleDetailScreen() {
     });
   }
 
+  const openServiceLogForTreeNode = useCallback(
+    (vm: NodeTreeItemViewModel) => {
+      const raw = findNodeTreeItemById(nodeTree, vm.id);
+      if (!raw) {
+        return;
+      }
+      const filter = createServiceLogNodeFilter(raw);
+      const nodeIdsParam = filter.nodeIds.map(encodeURIComponent).join(",");
+      router.push(
+        `/vehicles/${vehicleId}/service-log?nodeIds=${nodeIdsParam}&nodeLabel=${encodeURIComponent(filter.displayLabel)}`
+      );
+    },
+    [nodeTree, router, vehicleId]
+  );
+
   const hasNickname = Boolean(vehicle?.nickname?.trim());
 
   if (isLoading) {
@@ -603,6 +644,7 @@ export default function VehicleDetailScreen() {
                       )
                     }
                     onOpenStatusExplanation={setStatusExplanationNode}
+                    onOpenServiceLogForNode={openServiceLogForTreeNode}
                   />
                 </View>
               ))}
@@ -1091,6 +1133,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     opacity: 0.92,
+  },
+  badgePressed: {
+    opacity: 0.88,
   },
   badgeEmpty: {
     width: 0,

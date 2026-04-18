@@ -7,6 +7,11 @@ import type {
 import { getNodePathById, getNodeTreeItemReasonShortLine } from "./node-tree";
 import { getNodeStatusLabel, getTopNodeStatusBadgeLabel } from "./status";
 
+/**
+ * `effectiveStatus === null` means no maintenance evidence for that node/subtree
+ * (API must not send a placeholder OK). UI omits the status badge and must not
+ * offer “open service log from status” for that row.
+ */
 export function buildNodeTreeItemViewModel(node: NodeTreeItem): NodeTreeItemViewModel {
   const hasChildren = node.children.length > 0;
   const effective = node.effectiveStatus;

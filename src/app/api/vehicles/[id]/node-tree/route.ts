@@ -334,19 +334,7 @@ export async function GET(_: NextRequest, context: RouteContext) {
         updatedAt: null,
         children: buildChildren(node.id),
       })
-    ).map((rootNode) => {
-      if (rootNode.effectiveStatus !== null) {
-        return rootNode;
-      }
-
-      // Keep child behavior unchanged: only top-level nodes normalize null -> OK
-      // to match cached summary semantics from /top-nodes.
-      return {
-        ...rootNode,
-        status: "OK",
-        effectiveStatus: "OK",
-      };
-    });
+    );
 
     return NextResponse.json({ nodeTree });
   } catch (error) {

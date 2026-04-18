@@ -27,6 +27,22 @@ export function flattenNodeTreeToSelectOptions(
   });
 }
 
+export function findNodeTreeItemById(
+  nodes: NodeTreeItem[],
+  targetNodeId: string
+): NodeTreeItem | null {
+  for (const node of nodes) {
+    if (node.id === targetNodeId) {
+      return node;
+    }
+    const found = findNodeTreeItemById(node.children, targetNodeId);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 export function findNodePathById(
   nodes: NodeTreeItem[],
   targetNodeId: string,

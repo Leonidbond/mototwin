@@ -2,6 +2,7 @@ import type {
   GarageVehicleItem,
   RideProfileViewModel,
   VehicleDetail,
+  VehicleDetailApiRecord,
   VehicleDetailViewModel,
   VehicleStateViewModel,
   VehicleSummaryViewModel,
@@ -158,4 +159,34 @@ export function buildVehicleTechnicalInfoViewModel(
     }));
 
   return { items };
+}
+
+/** Map Prisma/API nested vehicle JSON to shared {@link VehicleDetail} for view-model helpers. */
+export function vehicleDetailFromApiRecord(record: VehicleDetailApiRecord): VehicleDetail {
+  const mv = record.modelVariant;
+  return {
+    id: record.id,
+    nickname: record.nickname,
+    brandName: record.brand.name,
+    modelName: record.model.name,
+    variantName: mv?.versionName ?? "",
+    year: mv?.year ?? 0,
+    vin: record.vin,
+    odometer: record.odometer,
+    engineHours: record.engineHours,
+    rideProfile: record.rideProfile,
+    modelVariant: mv
+      ? {
+          year: mv.year,
+          versionName: mv.versionName,
+          market: mv.market ?? null,
+          engineType: mv.engineType,
+          coolingType: mv.coolingType,
+          wheelSizes: mv.wheelSizes,
+          brakeSystem: mv.brakeSystem,
+          chainPitch: mv.chainPitch,
+          stockSprockets: mv.stockSprockets,
+        }
+      : null,
+  };
 }

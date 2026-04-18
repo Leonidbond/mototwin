@@ -34,6 +34,11 @@
 
 - **`filterMeaningfulGarageSpecHighlights`** в `component-contract-props.ts` (экспорт из пакета).
 
+### Карточка ТС на web — канонический `VehicleDetail` (2026-04-18)
+
+- Ответы `getVehicleDetail` / обновление профиля с wire-формой Prisma (`brand`, `model`, `modelVariant`) маппятся в общий **`VehicleDetail`** через **`vehicleDetailFromApiRecord`** (`packages/domain`), тип wire — **`VehicleDetailApiRecord`** (`packages/types`).
+- Страница `src/app/vehicles/[id]/page.tsx` больше не держит отдельный локальный тип мотоцикла; заголовок и VM строятся так же по смыслу, как раньше (те же строки `brandName` / `modelName` / год / версия).
+
 ### Дефолт валюты — новое сервисное событие (2026-04-18)
 
 - Каноническое значение по умолчанию: **RUB** (ISO 4217), константа **`DEFAULT_ADD_SERVICE_EVENT_CURRENCY`** и **`createInitialAddServiceEventFormValues`** в `packages/domain/src/forms.ts`.
@@ -52,7 +57,9 @@
 | `src/app/onboarding/page.tsx` |
 | `packages/domain/src/component-contract-props.ts` |
 | `packages/domain/src/forms.ts` |
+| `packages/domain/src/vehicle-view-models.ts` |
 | `packages/domain/src/index.ts` |
+| `packages/types/src/vehicle.ts` |
 | `docs/web-expo-parity-audit.md` |
 | `docs/web-expo-data-parity-fixes.md` |
 | `docs/web-expo-parity-audit-repeat.md` |
