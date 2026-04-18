@@ -8,6 +8,8 @@ import type {
   PartWishlistStatusGroupViewModel,
   UpdatePartWishlistItemInput,
 } from "@mototwin/types";
+import { PART_WISHLIST_DEFAULT_CURRENCY } from "@mototwin/types";
+import { formatExpenseAmountRu } from "./expense-summary";
 
 export const PART_WISHLIST_STATUS_ORDER: PartWishlistItemStatus[] = [
   "NEEDED",
@@ -70,6 +72,8 @@ export function createInitialPartWishlistFormValues(
     status: preset?.status ?? "NEEDED",
     nodeId: preset?.nodeId ?? "",
     comment: "",
+    costAmount: "",
+    currency: PART_WISHLIST_DEFAULT_CURRENCY,
   };
 }
 
@@ -80,6 +84,11 @@ export function partWishlistFormValuesFromItem(item: PartWishlistItem): PartWish
     status: item.status,
     nodeId: item.nodeId ?? "",
     comment: item.comment ?? "",
+    costAmount:
+      item.costAmount != null && Number.isFinite(item.costAmount)
+        ? formatExpenseAmountRu(item.costAmount)
+        : "",
+    currency: item.currency?.trim() || PART_WISHLIST_DEFAULT_CURRENCY,
   };
 }
 
@@ -99,7 +108,51 @@ export function validatePartWishlistFormValues(values: PartWishlistFormValues): 
   if (!isPartWishlistItemStatus(values.status)) {
     errors.push("Недопустимый статус.");
   }
+
+  const trimmedCost = values.costAmount.trim();
+  if (trimmedCost !== "") {
+    const normalizedCost = trimmedCost.replace(/\s/g, "").replace(",", ".");
+    const parsedCost = Number.parseFloat(normalizedCost);
+    if (Number.isNaN(parsedCost) || parsedCost < 0) {
+      errors.push("Стоимость должна быть неотрицательным числом.");
+    } else if (!values.currency.trim()) {
+      errors.push("Укажите валюту, если заполнена стоимость.");
+    }
+  }
+
   return { errors };
+}
+
+/** Server/API: if there is no cost, currency is cleared; otherwise currency defaults to RUB when empty. */
+export function normalizePartWishlistCostMutationArgs(
+  costAmount: number | null | undefined,
+  currency: string | null | undefined
+): { costAmount: number | null; currency: string | null } {
+  const cost =
+    costAmount == null || Number.isNaN(costAmount) || costAmount === undefined
+      ? null
+      : costAmount;
+  if (cost == null) {
+    return { costAmount: null, currency: null };
+  }
+  const cur =
+    typeof currency === "string" && currency.trim()
+      ? currency.trim().toUpperCase()
+      : PART_WISHLIST_DEFAULT_CURRENCY;
+  return { costAmount: cost, currency: cur };
+}
+
+function parsedCostAmountFromWishlistForm(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  const normalized = trimmed.replace(/\s/g, "").replace(",", ".");
+  const parsed = Number.parseFloat(normalized);
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return null;
+  }
+  return parsed;
 }
 
 export function normalizeCreatePartWishlistPayload(
@@ -109,12 +162,19 @@ export function normalizeCreatePartWishlistPayload(
   const q = values.quantity.trim();
   const quantity = q ? Number.parseInt(q, 10) : 1;
   const nodeIdRaw = values.nodeId.trim();
+  const costParsed = parsedCostAmountFromWishlistForm(values.costAmount);
+  const { costAmount, currency } = normalizePartWishlistCostMutationArgs(
+    costParsed,
+    values.currency.trim() || null
+  );
   return {
     title,
     quantity: Number.isInteger(quantity) && quantity >= 1 ? quantity : 1,
     nodeId: nodeIdRaw ? nodeIdRaw : null,
     comment: values.comment.trim() ? values.comment.trim() : null,
     status: values.status,
+    costAmount,
+    currency,
   };
 }
 
@@ -125,11 +185,18 @@ export function normalizeUpdatePartWishlistPayload(
   const q = values.quantity.trim();
   const quantity = q ? Number.parseInt(q, 10) : undefined;
   const nodeIdRaw = values.nodeId.trim();
+  const costParsed = parsedCostAmountFromWishlistForm(values.costAmount);
+  const { costAmount, currency } = normalizePartWishlistCostMutationArgs(
+    costParsed,
+    values.currency.trim() || null
+  );
   const out: UpdatePartWishlistItemInput = {
     title,
     status: values.status,
     comment: values.comment.trim() ? values.comment.trim() : null,
     nodeId: nodeIdRaw ? nodeIdRaw : null,
+    costAmount,
+    currency,
   };
   if (quantity !== undefined && Number.isInteger(quantity) && quantity >= 1) {
     out.quantity = quantity;
@@ -138,10 +205,18 @@ export function normalizeUpdatePartWishlistPayload(
 }
 
 export function buildPartWishlistItemViewModel(item: PartWishlistItem): PartWishlistItemViewModel {
-  return {
+  const base: PartWishlistItemViewModel = {
     ...item,
     statusLabelRu: getPartWishlistStatusLabelRu(item.status),
   };
+  if (item.costAmount != null && Number.isFinite(item.costAmount)) {
+    const cur = item.currency?.trim() || PART_WISHLIST_DEFAULT_CURRENCY;
+    return {
+      ...base,
+      costLabelRu: `${formatExpenseAmountRu(item.costAmount)} ${cur.toUpperCase()}`,
+    };
+  }
+  return base;
 }
 
 export function groupPartWishlistItemsByStatus(

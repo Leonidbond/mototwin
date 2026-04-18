@@ -43,6 +43,8 @@ export default function NewServiceEventScreen() {
     wlQty?: string;
     wlId?: string;
     wlComment?: string;
+    wlCost?: string;
+    wlCurrency?: string;
   }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
   const initialNodeId = typeof params.nodeId === "string" ? params.nodeId : "";
@@ -53,6 +55,11 @@ export default function NewServiceEventScreen() {
   const wlComment =
     typeof params.wlComment === "string" && params.wlComment.trim()
       ? params.wlComment.trim()
+      : null;
+  const wlCostStr = typeof params.wlCost === "string" ? params.wlCost.trim() : "";
+  const wlCurrency =
+    typeof params.wlCurrency === "string" && params.wlCurrency.trim()
+      ? params.wlCurrency.trim()
       : null;
   const apiBaseUrl = getApiBaseUrl();
 
@@ -109,6 +116,16 @@ export default function NewServiceEventScreen() {
         const fromWishlist = source === "wishlist" && wlTitle.length > 0 && vehicleData.vehicle;
         if (fromWishlist) {
           const v = vehicleData.vehicle!;
+          const parsedWlCost =
+            wlCostStr !== ""
+              ? Number.parseFloat(wlCostStr.replace(",", "."))
+              : Number.NaN;
+          const wishlistCostAmount =
+            wlCostStr !== "" && Number.isFinite(parsedWlCost) && parsedWlCost >= 0
+              ? parsedWlCost
+              : null;
+          const wishlistCurrency =
+            wishlistCostAmount != null ? wlCurrency || "RUB" : null;
           const synthetic: PartWishlistItem = {
             id: wlId,
             vehicleId,
@@ -117,6 +134,8 @@ export default function NewServiceEventScreen() {
             quantity: wlQty ? Number.parseInt(wlQty, 10) || 1 : 1,
             status: "INSTALLED",
             comment: wlComment,
+            costAmount: wishlistCostAmount,
+            currency: wishlistCurrency,
             createdAt: "",
             updatedAt: "",
             node: null,
@@ -130,6 +149,8 @@ export default function NewServiceEventScreen() {
           setEventDate(prefill.eventDate);
           setOdometer(prefill.odometer);
           setEngineHours(prefill.engineHours);
+          setCostAmount(prefill.costAmount);
+          setCurrency(prefill.currency);
           setComment(prefill.comment);
           setInstalledPartsJson(prefill.installedPartsJson);
         } else {
@@ -144,7 +165,18 @@ export default function NewServiceEventScreen() {
     };
 
     load();
-  }, [apiBaseUrl, vehicleId, initialNodeId, source, wlTitle, wlQty, wlId, wlComment]);
+  }, [
+    apiBaseUrl,
+    vehicleId,
+    initialNodeId,
+    source,
+    wlTitle,
+    wlQty,
+    wlId,
+    wlComment,
+    wlCostStr,
+    wlCurrency,
+  ]);
 
   const levels = getNodeSelectLevels(nodeTree, selectedPath);
   const selectedNode = getSelectedNodeFromPath(nodeTree, selectedPath);

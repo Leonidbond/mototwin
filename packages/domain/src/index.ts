@@ -138,6 +138,7 @@ export {
   isPartWishlistItemStatus,
   isWishlistTransitionToInstalled,
   normalizeCreatePartWishlistPayload,
+  normalizePartWishlistCostMutationArgs,
   normalizeUpdatePartWishlistPayload,
   partWishlistFormValuesFromItem,
   partWishlistStatusLabelsRu,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PartWishlistItemStatus } from "@prisma/client";
 import { z } from "zod";
+import { normalizePartWishlistCostMutationArgs } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
 
@@ -26,6 +27,8 @@ const createWishlistSchema = z.object({
     }),
   comment: z.string().trim().nullable().optional(),
   status: statusEnum.optional(),
+  costAmount: z.union([z.number().min(0), z.null()]).optional(),
+  currency: z.union([z.string(), z.null()]).optional(),
 });
 
 function toWire(row: {
@@ -36,6 +39,8 @@ function toWire(row: {
   quantity: number;
   status: PartWishlistItemStatus;
   comment: string | null;
+  costAmount: number | null;
+  currency: string | null;
   createdAt: Date;
   updatedAt: Date;
   node: { id: string; name: string } | null;
@@ -48,6 +53,8 @@ function toWire(row: {
     quantity: row.quantity,
     status: row.status,
     comment: row.comment,
+    costAmount: row.costAmount,
+    currency: row.currency,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     node: row.node,
@@ -104,7 +111,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    let nodeId: string | null = data.nodeId ?? null;
+    const nodeId: string | null = data.nodeId ?? null;
     if (nodeId) {
       const node = await prisma.node.findUnique({
         where: { id: nodeId },
@@ -117,6 +124,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const quantity = data.quantity ?? 1;
 
+    const { costAmount, currency } = normalizePartWishlistCostMutationArgs(
+      data.costAmount === undefined ? null : data.costAmount,
+      data.currency === undefined ? null : data.currency
+    );
+
     const created = await prisma.partWishlistItem.create({
       data: {
         vehicleId,
@@ -125,6 +137,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         status: data.status ?? PartWishlistItemStatus.NEEDED,
         comment: data.comment?.trim() ? data.comment.trim() : null,
         nodeId,
+        costAmount,
+        currency,
       },
       include: {
         node: { select: { id: true, name: true } },

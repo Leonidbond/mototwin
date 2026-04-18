@@ -11,6 +11,7 @@ import type {
   UpdateVehicleStateFormValues,
   UpdateVehicleStatePayload,
 } from "@mototwin/types";
+import { formatExpenseAmountRu } from "./expense-summary";
 import { WISHLIST_INSTALL_SERVICE_TYPE_RU } from "./part-wishlist";
 
 /** Local calendar `YYYY-MM-DD` (same semantics as web `getTodayDateString` in vehicle page). */
@@ -73,6 +74,11 @@ export function createInitialAddServiceEventFromWishlistItem(
 ): AddServiceEventFormValues {
   const base = createInitialAddServiceEventFormValues();
   const eventDate = options?.todayDateYmd ?? getTodayDateYmdLocal();
+  const hasCost = item.costAmount != null && Number.isFinite(item.costAmount);
+  const costAmount = hasCost ? formatExpenseAmountRu(item.costAmount as number) : "";
+  const currency = hasCost
+    ? (item.currency?.trim() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY).toUpperCase()
+    : base.currency;
   return {
     ...base,
     nodeId: item.nodeId ?? "",
@@ -80,6 +86,8 @@ export function createInitialAddServiceEventFromWishlistItem(
     serviceType: WISHLIST_INSTALL_SERVICE_TYPE_RU,
     odometer: String(vehicle.odometer),
     engineHours: vehicle.engineHours != null ? String(vehicle.engineHours) : "",
+    costAmount,
+    currency,
     comment: buildAddServiceEventCommentFromWishlistItem(item),
     installedPartsJson: buildWishlistInstalledPartsJsonString(item),
   };

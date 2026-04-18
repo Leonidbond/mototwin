@@ -114,6 +114,7 @@ export type {
   UpdatePartWishlistItemInput,
   PartWishlistStatusGroupViewModel,
 } from "./part-wishlist";
+export { PART_WISHLIST_DEFAULT_CURRENCY } from "./part-wishlist";
 export type {
   GarageCardProps,
   VehicleHeaderProps,

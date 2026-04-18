@@ -232,6 +232,8 @@ model PartWishlistItem {
   quantity  Int                     @default(1)
   status    PartWishlistItemStatus  @default(NEEDED)
   comment   String?
+  costAmount Float?
+  currency   String?
   createdAt DateTime                @default(now())
   updatedAt DateTime                @updatedAt
 

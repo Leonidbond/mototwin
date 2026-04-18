@@ -209,6 +209,9 @@ export default function VehicleWishlistScreen() {
                         {item.node ? (
                           <Text style={styles.itemNode}>Узел: {item.node.name}</Text>
                         ) : null}
+                        {item.costLabelRu ? (
+                          <Text style={styles.itemCost}>Стоимость: {item.costLabelRu}</Text>
+                        ) : null}
                         <Text style={styles.itemMeta}>
                           Кол-во: {item.quantity}
                           {item.comment ? ` · ${item.comment}` : ""}
@@ -320,6 +323,7 @@ const styles = StyleSheet.create({
   },
   itemTitle: { fontSize: 16, fontWeight: "700", color: c.textPrimary },
   itemNode: { marginTop: 6, fontSize: 13, color: c.textSecondary },
+  itemCost: { marginTop: 4, fontSize: 13, color: c.textSecondary },
   itemMeta: { marginTop: 4, fontSize: 13, color: c.textMuted, lineHeight: 18 },
   cardActions: {
     marginTop: 12,

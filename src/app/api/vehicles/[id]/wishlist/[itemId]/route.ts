@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PartWishlistItemStatus } from "@prisma/client";
 import { z } from "zod";
+import { normalizePartWishlistCostMutationArgs } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
 
@@ -20,6 +21,8 @@ const patchWishlistSchema = z
     nodeId: z.union([z.string().trim().min(1), z.null()]).optional(),
     comment: z.string().trim().nullable().optional(),
     status: statusEnum.optional(),
+    costAmount: z.union([z.number().min(0), z.null()]).optional(),
+    currency: z.union([z.string(), z.null()]).optional(),
   })
   .strict();
 
@@ -31,6 +34,8 @@ function toWire(row: {
   quantity: number;
   status: PartWishlistItemStatus;
   comment: string | null;
+  costAmount: number | null;
+  currency: string | null;
   createdAt: Date;
   updatedAt: Date;
   node: { id: string; name: string } | null;
@@ -43,6 +48,8 @@ function toWire(row: {
     quantity: row.quantity,
     status: row.status,
     comment: row.comment,
+    costAmount: row.costAmount,
+    currency: row.currency,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     node: row.node,
@@ -61,7 +68,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const existing = await prisma.partWishlistItem.findFirst({
       where: { id: itemId, vehicleId },
-      select: { id: true },
+      select: { id: true, costAmount: true, currency: true },
     });
 
     if (!existing) {
@@ -78,6 +85,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
+    const costPatch =
+      data.costAmount !== undefined || data.currency !== undefined
+        ? normalizePartWishlistCostMutationArgs(
+            data.costAmount !== undefined ? data.costAmount : existing.costAmount,
+            data.currency !== undefined ? data.currency : existing.currency
+          )
+        : null;
+
     const updated = await prisma.partWishlistItem.update({
       where: { id: itemId },
       data: {
@@ -88,6 +103,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           ? { comment: data.comment?.trim() ? data.comment.trim() : null }
           : {}),
         ...(data.nodeId !== undefined ? { nodeId: data.nodeId } : {}),
+        ...(costPatch
+          ? { costAmount: costPatch.costAmount, currency: costPatch.currency }
+          : {}),
       },
       include: {
         node: { select: { id: true, name: true } },

@@ -27,5 +27,12 @@ export function buildServiceEventNewFromWishlistHref(
   if (item.comment?.trim()) {
     q.set("wlComment", item.comment.trim());
   }
+  if (item.costAmount != null && Number.isFinite(item.costAmount)) {
+    q.set("wlCost", String(item.costAmount));
+    q.set(
+      "wlCurrency",
+      (item.currency?.trim() ? item.currency.trim() : "RUB").toUpperCase()
+    );
+  }
   return `/vehicles/${vehicleId}/service-events/new?${q.toString()}`;
 }

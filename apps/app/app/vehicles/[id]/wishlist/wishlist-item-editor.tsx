@@ -256,6 +256,27 @@ export function WishlistItemEditor({
             style={styles.input}
           />
 
+          <Text style={styles.label}>Стоимость (необязательно)</Text>
+          <TextInput
+            value={form.costAmount}
+            onChangeText={(costAmount) => setForm((f) => ({ ...f, costAmount }))}
+            placeholder="Например: 1500"
+            placeholderTextColor={c.textMuted}
+            keyboardType="decimal-pad"
+            style={styles.input}
+          />
+
+          <Text style={styles.label}>Валюта</Text>
+          <TextInput
+            value={form.currency}
+            onChangeText={(currency) => setForm((f) => ({ ...f, currency }))}
+            placeholder="RUB"
+            placeholderTextColor={c.textMuted}
+            autoCapitalize="characters"
+            style={styles.input}
+            maxLength={8}
+          />
+
           <Text style={styles.label}>Статус</Text>
           <View style={styles.statusRow}>
             {PART_WISHLIST_STATUS_ORDER.map((status) => {

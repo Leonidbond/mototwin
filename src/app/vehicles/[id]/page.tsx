@@ -1436,6 +1436,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                   Кол-во: {it.quantity}
                                   {it.node ? ` · Узел: ${it.node.name}` : ""}
                                 </p>
+                                {it.costLabelRu ? (
+                                  <p className="mt-0.5 text-xs text-gray-600">
+                                    Стоимость: {it.costLabelRu}
+                                  </p>
+                                ) : null}
                                 {it.comment ? (
                                   <p className="mt-1 text-xs text-gray-600">{it.comment}</p>
                                 ) : null}
@@ -2287,6 +2292,37 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-[1fr_88px]">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600">
+                    Стоимость (необязательно)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={wishlistForm.costAmount}
+                    onChange={(e) =>
+                      setWishlistForm((f) => ({ ...f, costAmount: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                    placeholder="Например: 1500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600">Валюта</label>
+                  <input
+                    type="text"
+                    value={wishlistForm.currency}
+                    onChange={(e) =>
+                      setWishlistForm((f) => ({ ...f, currency: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                    placeholder="RUB"
+                    maxLength={8}
+                    autoCapitalize="off"
+                  />
                 </div>
               </div>
               <div>
