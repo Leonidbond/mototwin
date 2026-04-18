@@ -1378,7 +1378,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                Запчасти и расходники к покупке (без каталога и магазинов).
+                Запчасти и расходники к покупке (без каталога и магазинов). Активный список
+                без отдельной вкладки «Установленные»: установленные позиции сохраняются в журнале
+                обслуживания после создания сервисного события.
               </p>
               {isWishlistLoading ? (
                 <p className="mt-4 text-sm text-gray-600">Загрузка списка…</p>
@@ -1414,6 +1416,10 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 <div className="mt-4 space-y-1">
                   <p className="text-sm font-medium text-gray-900">Список покупок пуст</p>
                   <p className="text-sm text-gray-600">Все позиции установлены.</p>
+                  <p className="text-xs text-gray-500">
+                    Установленные позиции сохраняются в журнале обслуживания после создания
+                    сервисного события.
+                  </p>
                 </div>
               ) : null}
               {!isWishlistLoading && wishlistGroups.length > 0 ? (
@@ -1997,9 +2003,16 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                             </p>
                                           </>
                                         ) : (
-                                          <h3 className="text-base font-semibold text-gray-950">
-                                            {entry.mainTitle}
-                                          </h3>
+                                          <>
+                                            <h3 className="text-base font-semibold text-gray-950">
+                                              {entry.mainTitle}
+                                            </h3>
+                                            {entry.wishlistOriginLabelRu ? (
+                                              <p className="mt-0.5 text-xs text-gray-500">
+                                                {entry.wishlistOriginLabelRu}
+                                              </p>
+                                            ) : null}
+                                          </>
                                         )}
                                       </div>
 

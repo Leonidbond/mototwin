@@ -128,6 +128,7 @@ export {
 export {
   PART_WISHLIST_STATUS_ORDER,
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
+  WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU,
   WISHLIST_INSTALL_SERVICE_TYPE_RU,
   buildPartWishlistItemViewModel,
   createInitialPartWishlistFormValues,
@@ -136,6 +137,7 @@ export {
   groupPartWishlistItemsByStatus,
   isActiveWishlistItem,
   isPartWishlistItemStatus,
+  isLikelyWishlistInstallServiceEvent,
   isWishlistTransitionToInstalled,
   normalizeCreatePartWishlistPayload,
   normalizePartWishlistCostMutationArgs,

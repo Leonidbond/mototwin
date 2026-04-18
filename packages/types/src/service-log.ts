@@ -93,6 +93,11 @@ export type ServiceLogEntryViewModel = {
   costAmount: number | null;
   costCurrency: string | null;
   comment: string | null;
+  /**
+   * Short label when the row likely came from «установлено из списка покупок» (serviceType + comment prefix).
+   * `null` for other events.
+   */
+  wishlistOriginLabelRu: string | null;
 };
 
 export type ServiceLogMonthlySummaryViewModel = MonthlyServiceLogSummary & {

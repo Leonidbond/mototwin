@@ -20,6 +20,8 @@
 | `findNodeTreeItemById` | Поиск сырого `NodeTreeItem` по id для построения фильтра из клика по дереву. |
 | `getServiceLogEventKindBadgeLabel(kind)` | Подпись бейджа: «Сервис» / «Обновление состояния». |
 | `SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS` | Длина превью комментария (120), web и Expo. |
+| `isLikelyWishlistInstallServiceEvent` / `WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU` | Эвристика без нового `eventKind`: событие из сценария wishlist → «Установка запчасти» + префикс комментария. |
+| `ServiceLogEntryViewModel.wishlistOriginLabelRu` | Краткая подпись «Из списка покупок» на карточке журнала (web + Expo), иначе `null`. |
 
 ## Web (`src/app/vehicles/[id]/page.tsx`, модалка журнала)
 
@@ -33,6 +35,7 @@
 - «Сбросить»: отключён, если запрос совпадает с дефолтом (`isServiceLogTimelineQueryActive`).
 - Пустой журнал / пустой результат фильтра: те же формулировки, что на Expo («Журнал пуст» / «Ничего не найдено» + пояснение).
 - Комментарий: обрезка по `SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS`.
+- События, похожие на установку из списка покупок: под заголовком типа работы показывается `wishlistOriginLabelRu`, если сработала эвристика (см. таблицу выше).
 
 ## Expo (`apps/app/app/vehicles/[id]/service-log.tsx`)
 
@@ -42,6 +45,7 @@
 - Бейджи типа записи: `getServiceLogEventKindBadgeLabel`.
 - Карточка `STATE_UPDATE`: заголовок `mainTitle` и подзаголовок `stateUpdateSubtitle` отдельно (как в web-модалке).
 - Комментарий: свёртка и «Показать» / «Скрыть» для длинных текстов; то же ограничение длины, что на web.
+- Сервисные карточки: при непустом `wishlistOriginLabelRu` — строка под `mainTitle` (тот же смысл, что на web).
 
 ## Намеренные отличия платформ
 

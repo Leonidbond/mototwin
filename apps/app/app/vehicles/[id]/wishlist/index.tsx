@@ -174,6 +174,11 @@ export default function VehicleWishlistScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.sectionHint}>
+          Активный список: статусы «Нужно купить» — «Куплено». Установленные позиции сохраняются в
+          журнале обслуживания после создания сервисного события (отдельной вкладки «Установленные»
+          нет).
+        </Text>
         <Pressable
           onPress={() => router.push(buildVehicleWishlistNewHref(vehicleId))}
           style={({ pressed }) => [styles.addPrimary, pressed && styles.addPrimaryPressed]}
@@ -261,6 +266,12 @@ export default function VehicleWishlistScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.canvas },
   scroll: { padding: 16, paddingBottom: 32 },
+  sectionHint: {
+    fontSize: 12,
+    color: c.textMuted,
+    lineHeight: 17,
+    marginBottom: 14,
+  },
   centered: {
     flex: 1,
     alignItems: "center",

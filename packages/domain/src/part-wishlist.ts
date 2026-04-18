@@ -6,6 +6,7 @@ import type {
   PartWishlistItemStatus,
   PartWishlistItemViewModel,
   PartWishlistStatusGroupViewModel,
+  ServiceEventKind,
   UpdatePartWishlistItemInput,
 } from "@mototwin/types";
 import { PART_WISHLIST_DEFAULT_CURRENCY } from "@mototwin/types";
@@ -40,6 +41,26 @@ export function isPartWishlistItemStatus(value: string): value is PartWishlistIt
 
 /** Default service type when opening Add Service Event from a wishlist line marked INSTALLED. */
 export const WISHLIST_INSTALL_SERVICE_TYPE_RU = "Установка запчасти";
+
+/** First line of {@link buildAddServiceEventCommentFromWishlistItem} — used to recognize wishlist-origin rows in Service Log. */
+export const WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU =
+  "Установлена позиция из списка покупок:";
+
+/** Heuristic: SERVICE event with install type and wishlist comment prefix (no new `ServiceEvent` kind). */
+export function isLikelyWishlistInstallServiceEvent(event: {
+  eventKind?: ServiceEventKind;
+  serviceType: string;
+  comment: string | null;
+}): boolean {
+  if (event.eventKind === "STATE_UPDATE") {
+    return false;
+  }
+  if (event.serviceType !== WISHLIST_INSTALL_SERVICE_TYPE_RU) {
+    return false;
+  }
+  const c = event.comment?.trim() ?? "";
+  return c.startsWith(WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU);
+}
 
 /** Shown when status becomes INSTALLED but the line has no node link (no auto-open of Add Service Event). */
 export const WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT =

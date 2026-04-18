@@ -15,6 +15,7 @@ import {
   getStateUpdateSummary,
   groupServiceEventsByMonth,
 } from "./service-log";
+import { isLikelyWishlistInstallServiceEvent } from "./part-wishlist";
 
 /** Preview length for collapsed journal comments (web + Expo). */
 export const SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS = 120;
@@ -73,6 +74,9 @@ export function buildServiceLogEntryViewModel(
     event.costAmount > 0 &&
     Boolean(event.currency);
 
+  const wishlistOriginLabelRu =
+    !isState && isLikelyWishlistInstallServiceEvent(event) ? "Из списка покупок" : null;
+
   return {
     id: event.id,
     eventKind: kind,
@@ -91,6 +95,7 @@ export function buildServiceLogEntryViewModel(
     costAmount: hasCost ? event.costAmount : null,
     costCurrency: hasCost ? event.currency : null,
     comment: event.comment,
+    wishlistOriginLabelRu,
   };
 }
 

@@ -12,7 +12,10 @@ import type {
   UpdateVehicleStatePayload,
 } from "@mototwin/types";
 import { formatExpenseAmountRu } from "./expense-summary";
-import { WISHLIST_INSTALL_SERVICE_TYPE_RU } from "./part-wishlist";
+import {
+  WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU,
+  WISHLIST_INSTALL_SERVICE_TYPE_RU,
+} from "./part-wishlist";
 
 /** Local calendar `YYYY-MM-DD` (same semantics as web `getTodayDateString` in vehicle page). */
 export function getTodayDateYmdLocal(): string {
@@ -47,7 +50,7 @@ export type VehicleOdometerStateForServiceEvent = {
 
 export function buildAddServiceEventCommentFromWishlistItem(item: PartWishlistItem): string {
   const lines = [
-    `Установлена позиция из списка покупок: ${item.title}`,
+    `${WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU} ${item.title}`,
     `Количество: ${item.quantity}`,
   ];
   const w = item.comment?.trim();

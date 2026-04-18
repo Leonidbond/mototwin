@@ -117,6 +117,9 @@ function ServiceCard({
         </Text>
       </View>
       <Text style={styles.eventTitle}>{entry.mainTitle}</Text>
+      {entry.wishlistOriginLabelRu ? (
+        <Text style={styles.wishlistOriginLabel}>{entry.wishlistOriginLabelRu}</Text>
+      ) : null}
       <Text style={styles.eventNode}>{entry.secondaryTitle}</Text>
       <View style={styles.eventMeta}>
         <Text style={styles.eventMetaText}>{entry.dateLabel}</Text>
@@ -1040,6 +1043,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: c.textPrimary,
     lineHeight: 20,
+  },
+  wishlistOriginLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textMuted,
   },
   stateUpdateMainTitle: {
     fontSize: 14,
