@@ -82,9 +82,13 @@ export {
   RIDE_LOAD_TYPE_OPTIONS,
   RIDE_USAGE_INTENSITY_OPTIONS,
 } from "./ride-profile-form-options";
+export type { VehicleOdometerStateForServiceEvent } from "./forms";
 export {
   getTodayDateYmdLocal,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
+  buildAddServiceEventCommentFromWishlistItem,
+  buildWishlistInstalledPartsJsonString,
+  createInitialAddServiceEventFromWishlistItem,
   createInitialAddServiceEventFormValues,
   normalizeAddServiceEventPayload,
   validateAddServiceEventFormValues,
@@ -121,3 +125,21 @@ export {
   buildGarageAttentionIndicatorViewModel,
   getAttentionSeverityFromStatuses,
 } from "./garage-attention";
+export {
+  PART_WISHLIST_STATUS_ORDER,
+  WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
+  WISHLIST_INSTALL_SERVICE_TYPE_RU,
+  buildPartWishlistItemViewModel,
+  createInitialPartWishlistFormValues,
+  filterActiveWishlistItems,
+  getPartWishlistStatusLabelRu,
+  groupPartWishlistItemsByStatus,
+  isActiveWishlistItem,
+  isPartWishlistItemStatus,
+  isWishlistTransitionToInstalled,
+  normalizeCreatePartWishlistPayload,
+  normalizeUpdatePartWishlistPayload,
+  partWishlistFormValuesFromItem,
+  partWishlistStatusLabelsRu,
+  validatePartWishlistFormValues,
+} from "./part-wishlist";

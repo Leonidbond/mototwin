@@ -1,19 +1,24 @@
 import type {
   BrandsResponse,
+  CreatePartWishlistItemInput,
   CreateServiceEventInput,
   CreateServiceEventResponse,
   CreateVehicleInput,
   CreateVehicleResponse,
+  CreateWishlistItemResponse,
   GarageVehiclesResponse,
   ModelVariantsResponse,
   ModelsResponse,
   ServiceEventsResponse,
+  UpdatePartWishlistItemInput,
   UpdateVehicleProfileInput,
   UpdateVehicleProfileResponse,
   UpdateVehicleStateInput,
   UpdateVehicleStateResponse,
+  UpdateWishlistItemResponse,
   VehicleDetailResponse,
   VehicleNodeTreeResponse,
+  VehicleWishlistResponse,
 } from "@mototwin/types";
 import type { ApiClient } from "./fetcher";
 
@@ -40,6 +45,43 @@ export function createMotoTwinEndpoints(client: ApiClient) {
     getServiceEvents(vehicleId: string) {
       return client.request<ServiceEventsResponse>(
         `/api/vehicles/${vehicleId}/service-events`
+      );
+    },
+
+    getVehicleWishlist(vehicleId: string) {
+      return client.request<VehicleWishlistResponse>(
+        `/api/vehicles/${vehicleId}/wishlist`
+      );
+    },
+
+    createWishlistItem(vehicleId: string, input: CreatePartWishlistItemInput) {
+      return client.request<CreateWishlistItemResponse>(
+        `/api/vehicles/${vehicleId}/wishlist`,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        }
+      );
+    },
+
+    updateWishlistItem(
+      vehicleId: string,
+      itemId: string,
+      input: UpdatePartWishlistItemInput
+    ) {
+      return client.request<UpdateWishlistItemResponse>(
+        `/api/vehicles/${vehicleId}/wishlist/${itemId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(input),
+        }
+      );
+    },
+
+    deleteWishlistItem(vehicleId: string, itemId: string) {
+      return client.request<{ ok: boolean }>(
+        `/api/vehicles/${vehicleId}/wishlist/${itemId}`,
+        { method: "DELETE" }
       );
     },
 

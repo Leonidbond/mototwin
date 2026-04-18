@@ -36,6 +36,7 @@ import type {
 import { productSemanticColors as c, statusSemanticTokens } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { buildVehicleServiceLogHref } from "./service-log";
+import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 
 function getStatusColors(status: NodeStatus | null) {
@@ -56,6 +57,7 @@ type NodeRowProps = {
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
   onAddFromLeaf: (leafNodeId: string) => void;
+  onAddToWishlist?: (nodeId: string) => void;
   onOpenStatusExplanation?: (node: NodeTreeItemViewModel) => void;
   onOpenServiceLogForNode?: (node: NodeTreeItemViewModel) => void;
 };
@@ -66,6 +68,7 @@ function NodeRow({
   expandedIds,
   onToggle,
   onAddFromLeaf,
+  onAddToWishlist,
   onOpenStatusExplanation,
   onOpenServiceLogForNode,
 }: NodeRowProps) {
@@ -168,15 +171,29 @@ function NodeRow({
           <View style={styles.badgeEmpty} />
         )}
 
-        {rowNode.canAddServiceEvent ? (
-          <Pressable
-            onPress={() => treeItemContract.onRequestAddServiceEvent?.()}
-            style={({ pressed }) => [styles.addLeafButton, pressed && styles.addLeafButtonPressed]}
-            hitSlop={8}
-          >
-            <Text style={styles.addLeafButtonText}>+</Text>
-          </Pressable>
-        ) : null}
+        <View style={styles.nodeRowActions}>
+          {onAddToWishlist ? (
+            <Pressable
+              onPress={() => onAddToWishlist(rowNode.id)}
+              style={({ pressed }) => [
+                styles.wishlistTreeButton,
+                pressed && styles.wishlistTreeButtonPressed,
+              ]}
+              hitSlop={6}
+            >
+              <Text style={styles.wishlistTreeButtonText}>В список</Text>
+            </Pressable>
+          ) : null}
+          {rowNode.canAddServiceEvent ? (
+            <Pressable
+              onPress={() => treeItemContract.onRequestAddServiceEvent?.()}
+              style={({ pressed }) => [styles.addLeafButton, pressed && styles.addLeafButtonPressed]}
+              hitSlop={8}
+            >
+              <Text style={styles.addLeafButtonText}>+</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </Pressable>
 
       {hasChildren && isExpanded
@@ -188,6 +205,7 @@ function NodeRow({
               expandedIds={expandedIds}
               onToggle={onToggle}
               onAddFromLeaf={onAddFromLeaf}
+              onAddToWishlist={onAddToWishlist}
               onOpenStatusExplanation={onOpenStatusExplanation}
               onOpenServiceLogForNode={onOpenServiceLogForNode}
             />
@@ -332,6 +350,13 @@ export default function VehicleDetailScreen() {
       router.push(buildVehicleServiceLogHref(vehicleId, filter, false));
     },
     [nodeTree, router, vehicleId]
+  );
+
+  const openWishlistForTreeNode = useCallback(
+    (nodeId: string) => {
+      router.push(buildVehicleWishlistNewHref(vehicleId, nodeId));
+    },
+    [router, vehicleId]
   );
 
   const hasNickname = Boolean(vehicle?.nickname?.trim());
@@ -628,6 +653,23 @@ export default function VehicleDetailScreen() {
           ) : null}
         </View>
 
+        <View style={styles.secondarySectionCard}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.sectionHeaderRow,
+              pressed && styles.sectionHeaderRowPressed,
+            ]}
+            onPress={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
+          >
+            <Text style={styles.secondarySectionTitle}>Что нужно купить</Text>
+            <Text style={styles.sectionChevron}>›</Text>
+          </Pressable>
+          <Text style={styles.secondaryEmptyText}>
+            Запчасти и расходники к покупке. В дереве ниже можно нажать «В список» у узла — узел
+            подставится в форме.
+          </Text>
+        </View>
+
         {/* Node tree */}
         <View>
           <Text style={styles.sectionHeader}>Состояние узлов</Text>
@@ -672,6 +714,7 @@ export default function VehicleDetailScreen() {
                         `/vehicles/${vehicleId}/service-events/new?source=tree&nodeId=${leafNodeId}`
                       )
                     }
+                    onAddToWishlist={openWishlistForTreeNode}
                     onOpenStatusExplanation={setStatusExplanationNode}
                     onOpenServiceLogForNode={openServiceLogForTreeNode}
                   />
@@ -1291,8 +1334,33 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
   },
+  nodeRowActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 0,
+    marginLeft: 6,
+  },
+  wishlistTreeButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.chipBackground,
+  },
+  wishlistTreeButtonPressed: {
+    opacity: 0.88,
+    backgroundColor: c.indigoSoftBg,
+    borderColor: c.indigoSoftBorder,
+  },
+  wishlistTreeButtonText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textSecondary,
+  },
   addLeafButton: {
-    marginLeft: 10,
+    marginLeft: 0,
     width: 28,
     height: 28,
     borderRadius: 14,

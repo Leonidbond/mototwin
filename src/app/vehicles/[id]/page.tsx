@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   buildNodeTreeSectionProps,
@@ -15,6 +15,7 @@ import {
   buildVehicleTechnicalInfoViewModel,
   vehicleDetailFromApiRecord,
   createInitialAddServiceEventFormValues,
+  createInitialAddServiceEventFromWishlistItem,
   createInitialEditVehicleProfileFormValues,
   createInitialVehicleStateFormValues,
   createServiceLogNodeFilter,
@@ -41,6 +42,19 @@ import {
   buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
   buildNodeTreeItemViewModel,
+  buildPartWishlistItemViewModel,
+  createInitialPartWishlistFormValues,
+  flattenNodeTreeToSelectOptions,
+  groupPartWishlistItemsByStatus,
+  filterActiveWishlistItems,
+  normalizeCreatePartWishlistPayload,
+  normalizeUpdatePartWishlistPayload,
+  partWishlistFormValuesFromItem,
+  partWishlistStatusLabelsRu,
+  PART_WISHLIST_STATUS_ORDER,
+  validatePartWishlistFormValues,
+  isWishlistTransitionToInstalled,
+  WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
 } from "@mototwin/domain";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
@@ -58,6 +72,9 @@ import type {
   ServiceLogNodeFilter,
   VehicleDetail,
   VehicleDetailApiRecord,
+  AddServiceEventFormValues,
+  PartWishlistFormValues,
+  PartWishlistItem,
 } from "@mototwin/types";
 
 const vehicleDetailApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
@@ -107,6 +124,17 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [isExpenseSectionExpanded, setIsExpenseSectionExpanded] = useState(false);
   const [isAttentionModalOpen, setIsAttentionModalOpen] = useState(false);
+  const [wishlistItems, setWishlistItems] = useState<PartWishlistItem[]>([]);
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
+  const [wishlistError, setWishlistError] = useState("");
+  const [isWishlistModalOpen, setIsWishlistModalOpen] = useState(false);
+  const [wishlistEditingId, setWishlistEditingId] = useState<string | null>(null);
+  const [wishlistForm, setWishlistForm] = useState<PartWishlistFormValues>(() =>
+    createInitialPartWishlistFormValues()
+  );
+  const [wishlistFormError, setWishlistFormError] = useState("");
+  const [wishlistNotice, setWishlistNotice] = useState("");
+  const [isWishlistSaving, setIsWishlistSaving] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileFormError, setProfileFormError] = useState("");
@@ -127,6 +155,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     () => createInitialAddServiceEventFormValues().currency
   );
   const [comment, setComment] = useState("");
+  const [installedPartsJson, setInstalledPartsJson] = useState("");
   const todayDate = getTodayDateString();
   const nodeSelectLevels = useMemo(() => {
     return getNodeSelectLevels(nodeTree, selectedNodePath);
@@ -188,6 +217,23 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     attentionAction.totalCount > 0 && attentionTok.accent !== "transparent"
       ? attentionTok.accent
       : productSemanticColors.divider;
+
+  const wishlistViewModels = useMemo(
+    () => wishlistItems.map(buildPartWishlistItemViewModel),
+    [wishlistItems]
+  );
+  const wishlistActiveViewModels = useMemo(
+    () => filterActiveWishlistItems(wishlistViewModels),
+    [wishlistViewModels]
+  );
+  const wishlistGroups = useMemo(
+    () => groupPartWishlistItemsByStatus(wishlistActiveViewModels),
+    [wishlistActiveViewModels]
+  );
+  const wishlistNodeOptions = useMemo(
+    () => flattenNodeTreeToSelectOptions(nodeTree),
+    [nodeTree]
+  );
 
   const hasAnyPaidServiceEventsInDataset = useMemo(
     () => filterPaidServiceEvents(serviceEvents).length > 0,
@@ -303,33 +349,36 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     loadVehicle();
   }, [params]);
 
-  useEffect(() => {
+  const loadServiceEvents = useCallback(async () => {
     if (!vehicleId) {
       return;
     }
 
-    const loadServiceEvents = async () => {
-      try {
-        setIsServiceEventsLoading(true);
-        setServiceEventsError("");
-        const data = await vehicleDetailApi.getServiceEvents(vehicleId);
-        setServiceEvents(data.serviceEvents ?? []);
-      } catch (serviceError) {
-        console.error(serviceError);
-        setServiceEventsError(
-          serviceError instanceof Error
-            ? serviceError.message
-            : "Произошла ошибка при загрузке журнала."
-        );
-      } finally {
-        setIsServiceEventsLoading(false);
-      }
-    };
-
-    loadServiceEvents();
+    try {
+      setIsServiceEventsLoading(true);
+      setServiceEventsError("");
+      const data = await vehicleDetailApi.getServiceEvents(vehicleId);
+      setServiceEvents(data.serviceEvents ?? []);
+    } catch (serviceError) {
+      console.error(serviceError);
+      setServiceEventsError(
+        serviceError instanceof Error
+          ? serviceError.message
+          : "Произошла ошибка при загрузке журнала."
+      );
+    } finally {
+      setIsServiceEventsLoading(false);
+    }
   }, [vehicleId]);
 
-  const loadNodeTree = async () => {
+  useEffect(() => {
+    if (!vehicleId) {
+      return;
+    }
+    void loadServiceEvents();
+  }, [vehicleId, loadServiceEvents]);
+
+  const loadNodeTree = useCallback(async () => {
     if (!vehicleId) {
       return;
     }
@@ -349,13 +398,44 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     } finally {
       setIsNodeTreeLoading(false);
     }
-  };
+  }, [vehicleId]);
+
+  const loadWishlist = useCallback(async () => {
+    if (!vehicleId) {
+      return;
+    }
+
+    try {
+      setIsWishlistLoading(true);
+      setWishlistError("");
+      const data = await vehicleDetailApi.getVehicleWishlist(vehicleId);
+      setWishlistItems(data.items ?? []);
+    } catch (e) {
+      console.error(e);
+      setWishlistError(
+        e instanceof Error ? e.message : "Не удалось загрузить список покупок."
+      );
+    } finally {
+      setIsWishlistLoading(false);
+    }
+  }, [vehicleId]);
 
   const toggleNodeExpansion = (nodeId: string) => {
     setExpandedNodes((prev) => ({
       ...prev,
       [nodeId]: !prev[nodeId],
     }));
+  };
+
+  const applyAddServiceEventFormValues = (values: AddServiceEventFormValues) => {
+    setServiceType(values.serviceType);
+    setEventDate(values.eventDate);
+    setOdometer(values.odometer);
+    setEngineHours(values.engineHours);
+    setCostAmount(values.costAmount);
+    setCurrency(values.currency);
+    setComment(values.comment);
+    setInstalledPartsJson(values.installedPartsJson);
   };
 
   const openAddServiceEventFromLeafNode = (leafNodeId: string) => {
@@ -368,6 +448,32 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
     setServiceEventFormError("");
     setServiceEventFormSuccess("");
+    setInstalledPartsJson("");
+    setSelectedNodePath(nodePath);
+    setIsAddServiceEventModalOpen(true);
+  };
+
+  const openAddServiceEventPrefilledFromWishlist = (item: PartWishlistItem) => {
+    if (!vehicle) {
+      setServiceEventFormError("Не удалось загрузить данные мотоцикла.");
+      return;
+    }
+    if (!item.nodeId) {
+      return;
+    }
+    const nodePath = findNodePathById(nodeTree, item.nodeId);
+    if (!nodePath) {
+      setServiceEventFormError("Не удалось определить путь узла для позиции списка.");
+      return;
+    }
+    setServiceEventFormError("");
+    setServiceEventFormSuccess("");
+    const values = createInitialAddServiceEventFromWishlistItem(
+      item,
+      { odometer: vehicle.odometer, engineHours: vehicle.engineHours },
+      { todayDateYmd: todayDate }
+    );
+    applyAddServiceEventFormValues(values);
     setSelectedNodePath(nodePath);
     setIsAddServiceEventModalOpen(true);
   };
@@ -405,6 +511,137 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
     setIsAttentionModalOpen(false);
     setSelectedStatusExplanationNode(vm);
+  };
+
+  const openWishlistModalForCreate = (presetNodeId?: string) => {
+    setWishlistNotice("");
+    setWishlistEditingId(null);
+    setWishlistForm(
+      createInitialPartWishlistFormValues({
+        nodeId: presetNodeId ?? "",
+        status: "NEEDED",
+      })
+    );
+    setWishlistFormError("");
+    setIsWishlistModalOpen(true);
+  };
+
+  const openWishlistModalForEdit = (item: PartWishlistItem) => {
+    setWishlistNotice("");
+    setWishlistEditingId(item.id);
+    setWishlistForm(partWishlistFormValuesFromItem(item));
+    setWishlistFormError("");
+    setIsWishlistModalOpen(true);
+  };
+
+  const closeWishlistModal = () => {
+    setIsWishlistModalOpen(false);
+    setWishlistEditingId(null);
+    setWishlistFormError("");
+  };
+
+  const submitWishlistForm = async () => {
+    if (!vehicleId) {
+      return;
+    }
+    const validation = validatePartWishlistFormValues(wishlistForm);
+    if (validation.errors.length > 0) {
+      setWishlistFormError(validation.errors.join(" "));
+      return;
+    }
+    setIsWishlistSaving(true);
+    setWishlistFormError("");
+    try {
+      const prevForTransition = wishlistEditingId
+        ? wishlistItems.find((w) => w.id === wishlistEditingId)?.status ?? "NEEDED"
+        : "NEEDED";
+      let savedItem: PartWishlistItem | null = null;
+
+      if (wishlistEditingId) {
+        const res = await vehicleDetailApi.updateWishlistItem(
+          vehicleId,
+          wishlistEditingId,
+          normalizeUpdatePartWishlistPayload(wishlistForm)
+        );
+        savedItem = res.item;
+      } else {
+        const res = await vehicleDetailApi.createWishlistItem(
+          vehicleId,
+          normalizeCreatePartWishlistPayload(wishlistForm)
+        );
+        savedItem = res.item;
+      }
+
+      await Promise.all([loadWishlist(), loadServiceEvents(), loadNodeTree()]);
+      closeWishlistModal();
+
+      if (
+        savedItem &&
+        vehicle &&
+        isWishlistTransitionToInstalled(prevForTransition, savedItem.status)
+      ) {
+        if (savedItem.nodeId) {
+          openAddServiceEventPrefilledFromWishlist(savedItem);
+        } else {
+          setWishlistNotice(WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT);
+        }
+      }
+    } catch (e) {
+      setWishlistFormError(
+        e instanceof Error ? e.message : "Не удалось сохранить позицию."
+      );
+    } finally {
+      setIsWishlistSaving(false);
+    }
+  };
+
+  const deleteWishlistItemById = async (itemId: string) => {
+    if (!vehicleId) {
+      return;
+    }
+    if (!window.confirm("Удалить позицию из списка покупок?")) {
+      return;
+    }
+    try {
+      await vehicleDetailApi.deleteWishlistItem(vehicleId, itemId);
+      await loadWishlist();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const patchWishlistItemStatus = async (
+    itemId: string,
+    status: PartWishlistItem["status"],
+    previousStatus: PartWishlistItem["status"]
+  ) => {
+    if (!vehicleId) {
+      return;
+    }
+    try {
+      setWishlistNotice("");
+      const res = await vehicleDetailApi.updateWishlistItem(vehicleId, itemId, { status });
+      await Promise.all([loadWishlist(), loadServiceEvents(), loadNodeTree()]);
+      const becameInstalled =
+        res.item.status === "INSTALLED" &&
+        isWishlistTransitionToInstalled(previousStatus, res.item.status);
+      if (becameInstalled && vehicle) {
+        if (res.item.nodeId) {
+          openAddServiceEventPrefilledFromWishlist(res.item);
+        } else {
+          setWishlistNotice(WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : "Не удалось обновить статус.";
+      setWishlistNotice(`Ошибка: ${msg}`);
+    }
+  };
+
+  const openWishlistFromAttentionItem = (item: AttentionItemViewModel) => {
+    setIsAttentionModalOpen(false);
+    openWishlistModalForCreate(item.nodeId);
   };
 
   const renderChildTreeNode = (node: NodeTreeItemViewModel, depth: number): ReactNode => {
@@ -474,6 +711,14 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   +
                 </button>
               ) : null}
+              <button
+                type="button"
+                onClick={() => openWishlistModalForCreate(node.id)}
+                className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
+                title="Добавить в список покупок"
+              >
+                В список
+              </button>
             </div>
           </div>
         </div>
@@ -492,30 +737,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       return;
     }
 
-    loadNodeTree();
-  }, [vehicleId]);
-
-  const loadServiceEvents = async () => {
-    if (!vehicleId) {
-      return;
-    }
-
-    try {
-      setIsServiceEventsLoading(true);
-      setServiceEventsError("");
-      const data = await vehicleDetailApi.getServiceEvents(vehicleId);
-      setServiceEvents(data.serviceEvents ?? []);
-    } catch (serviceError) {
-      console.error(serviceError);
-      setServiceEventsError(
-        serviceError instanceof Error
-          ? serviceError.message
-          : "Произошла ошибка при загрузке журнала."
-      );
-    } finally {
-      setIsServiceEventsLoading(false);
-    }
-  };
+    void loadNodeTree();
+    void loadWishlist();
+  }, [vehicleId, loadNodeTree, loadWishlist]);
 
   const openVehicleStateEditor = () => {
     if (!vehicle) {
@@ -626,7 +850,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
           : currentVehicle
       );
       setIsEditingVehicleState(false);
-      await Promise.all([loadNodeTree(), loadServiceEvents()]);
+      await Promise.all([loadNodeTree(), loadServiceEvents(), loadWishlist()]);
     } catch (saveError) {
       console.error(saveError);
       setVehicleStateError(
@@ -642,13 +866,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const resetServiceEventForm = () => {
     setSelectedNodePath([]);
     const empty = createInitialAddServiceEventFormValues();
-    setServiceType(empty.serviceType);
-    setEventDate(empty.eventDate);
-    setOdometer(empty.odometer);
-    setEngineHours(empty.engineHours);
-    setCostAmount(empty.costAmount);
-    setCurrency(empty.currency);
-    setComment(empty.comment);
+    applyAddServiceEventFormValues(empty);
   };
 
   const handleCreateServiceEvent = async () => {
@@ -661,7 +879,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         return;
       }
 
-      const serviceFormValues = {
+      const serviceFormValues: AddServiceEventFormValues = {
         nodeId: selectedFinalNode?.id ?? "",
         serviceType,
         eventDate,
@@ -670,6 +888,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         costAmount,
         currency,
         comment,
+        installedPartsJson,
       };
 
       const validation = validateAddServiceEventFormValues(serviceFormValues, {
@@ -692,7 +911,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
       setServiceEventFormSuccess("Сервисное событие добавлено.");
       resetServiceEventForm();
-      await Promise.all([loadServiceEvents(), loadNodeTree()]);
+      await Promise.all([loadServiceEvents(), loadNodeTree(), loadWishlist()]);
       setIsAddServiceEventModalOpen(false);
     } catch (createError) {
       console.error(createError);
@@ -1148,6 +1367,131 @@ export default function VehiclePage({ params }: VehiclePageProps) {
             <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
+                  Что нужно купить
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => openWishlistModalForCreate()}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                >
+                  Добавить
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Запчасти и расходники к покупке (без каталога и магазинов).
+              </p>
+              {isWishlistLoading ? (
+                <p className="mt-4 text-sm text-gray-600">Загрузка списка…</p>
+              ) : null}
+              {wishlistError ? (
+                <p className="mt-4 text-sm" style={{ color: productSemanticColors.error }}>
+                  {wishlistError}
+                </p>
+              ) : null}
+              {wishlistNotice ? (
+                <p
+                  className={`mt-3 text-sm ${
+                    wishlistNotice.startsWith("Ошибка:")
+                      ? "text-red-700"
+                      : wishlistNotice.includes("не открыто")
+                        ? "text-amber-800"
+                        : "text-emerald-800"
+                  }`}
+                  role="status"
+                >
+                  {wishlistNotice}
+                </p>
+              ) : null}
+              {!isWishlistLoading &&
+              !wishlistError &&
+              wishlistItems.length === 0 ? (
+                <p className="mt-4 text-sm text-gray-600">Пока нет позиций.</p>
+              ) : null}
+              {!isWishlistLoading &&
+              !wishlistError &&
+              wishlistItems.length > 0 &&
+              wishlistActiveViewModels.length === 0 ? (
+                <div className="mt-4 space-y-1">
+                  <p className="text-sm font-medium text-gray-900">Список покупок пуст</p>
+                  <p className="text-sm text-gray-600">Все позиции установлены.</p>
+                </div>
+              ) : null}
+              {!isWishlistLoading && wishlistGroups.length > 0 ? (
+                <div className="mt-5 space-y-6">
+                  {wishlistGroups.map((group) => (
+                    <div key={group.status}>
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        {group.sectionTitleRu}
+                      </h3>
+                      <ul className="mt-2 space-y-2">
+                        {group.items.map((it) => (
+                          <li
+                            key={it.id}
+                            className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-3 text-sm"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="font-medium text-gray-950">{it.title}</p>
+                                <p className="mt-0.5 text-xs text-gray-600">
+                                  Кол-во: {it.quantity}
+                                  {it.node ? ` · Узел: ${it.node.name}` : ""}
+                                </p>
+                                {it.comment ? (
+                                  <p className="mt-1 text-xs text-gray-600">{it.comment}</p>
+                                ) : null}
+                              </div>
+                              <div className="flex shrink-0 flex-wrap items-center gap-1">
+                                <select
+                                  value={it.status}
+                                  onChange={(e) =>
+                                    patchWishlistItemStatus(
+                                      it.id,
+                                      e.target.value as PartWishlistItem["status"],
+                                      it.status
+                                    )
+                                  }
+                                  className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs"
+                                  aria-label="Статус позиции"
+                                >
+                                  {PART_WISHLIST_STATUS_ORDER.map((s) => (
+                                    <option key={s} value={s}>
+                                      {partWishlistStatusLabelsRu[s]}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const raw = wishlistItems.find((w) => w.id === it.id);
+                                    if (raw) {
+                                      openWishlistModalForEdit(raw);
+                                    }
+                                  }}
+                                  className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-800 transition hover:bg-white"
+                                >
+                                  Изменить
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteWishlistItemById(it.id)}
+                                  className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-white"
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+
+            <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
                   Дерево узлов
                 </h2>
                 <button
@@ -1249,6 +1593,14 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                 +
                               </button>
                             ) : null}
+                            <button
+                              type="button"
+                              onClick={() => openWishlistModalForCreate(rootNode.id)}
+                              className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
+                              title="Добавить в список покупок"
+                            >
+                              В список
+                            </button>
                           </div>
                         </div>
 
@@ -1873,6 +2225,119 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         </div>
       ) : null}
 
+      {isWishlistModalOpen ? (
+        <div
+          className="fixed inset-0 z-[64] flex items-start justify-center px-4 py-6 sm:items-center"
+          style={{ backgroundColor: productSemanticColors.overlayModal }}
+        >
+          <div className="w-full max-w-lg rounded-3xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                {wishlistEditingId ? "Позиция списка" : "Новая позиция"}
+              </h2>
+              <button
+                type="button"
+                onClick={closeWishlistModal}
+                className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="max-h-[75vh] space-y-4 overflow-y-auto px-6 py-5 text-sm">
+              <div>
+                <label className="block text-xs font-medium text-gray-600">Название</label>
+                <input
+                  type="text"
+                  value={wishlistForm.title}
+                  onChange={(e) =>
+                    setWishlistForm((f) => ({ ...f, title: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                  placeholder="Например: масло моторное"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600">Количество</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={wishlistForm.quantity}
+                    onChange={(e) =>
+                      setWishlistForm((f) => ({ ...f, quantity: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600">Статус</label>
+                  <select
+                    value={wishlistForm.status}
+                    onChange={(e) =>
+                      setWishlistForm((f) => ({
+                        ...f,
+                        status: e.target.value as PartWishlistItem["status"],
+                      }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"
+                  >
+                    {PART_WISHLIST_STATUS_ORDER.map((s) => (
+                      <option key={s} value={s}>
+                        {partWishlistStatusLabelsRu[s]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600">
+                  Узел (необязательно)
+                </label>
+                <select
+                  value={wishlistForm.nodeId}
+                  onChange={(e) =>
+                    setWishlistForm((f) => ({ ...f, nodeId: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"
+                >
+                  <option value="">— не привязано —</option>
+                  {wishlistNodeOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {"\u00A0".repeat(Math.max(0, opt.level - 1) * 2)}
+                      {opt.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600">Комментарий</label>
+                <textarea
+                  value={wishlistForm.comment}
+                  onChange={(e) =>
+                    setWishlistForm((f) => ({ ...f, comment: e.target.value }))
+                  }
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
+                />
+              </div>
+              {wishlistFormError ? (
+                <p style={{ color: productSemanticColors.error }}>{wishlistFormError}</p>
+              ) : null}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => void submitWishlistForm()}
+                  disabled={isWishlistSaving}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-gray-950 px-5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-60"
+                >
+                  {isWishlistSaving ? "Сохранение…" : "Сохранить"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {isAttentionModalOpen ? (
         <div
           className="fixed inset-0 z-[65] flex items-start justify-center px-4 py-6 sm:items-center"
@@ -1997,6 +2462,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                     Добавить сервис
                                   </button>
                                 ) : null}
+                                <button
+                                  type="button"
+                                  onClick={() => openWishlistFromAttentionItem(item)}
+                                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
+                                >
+                                  В список покупок
+                                </button>
                               </div>
                             </li>
                           );
@@ -2462,4 +2934,3 @@ function getTodayDateString() {
 
   return `${year}-${month}-${day}`;
 }
-

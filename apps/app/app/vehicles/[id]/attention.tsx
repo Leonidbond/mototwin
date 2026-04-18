@@ -21,6 +21,7 @@ import type { AttentionItemViewModel, NodeTreeItem, NodeTreeItemViewModel } from
 import { productSemanticColors as c, statusSemanticTokens } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { buildVehicleServiceLogHref } from "./service-log";
+import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 
 export default function AttentionScreen() {
@@ -85,6 +86,10 @@ export default function AttentionScreen() {
     router.push(
       `/vehicles/${vehicleId}/service-events/new?nodeId=${encodeURIComponent(item.nodeId)}&source=attention`
     );
+  };
+
+  const openWishlistForItem = (item: AttentionItemViewModel) => {
+    router.push(buildVehicleWishlistNewHref(vehicleId, item.nodeId));
   };
 
   const openStatusExplanationForItem = (item: AttentionItemViewModel) => {
@@ -210,6 +215,15 @@ export default function AttentionScreen() {
                             <Text style={styles.actionBtnTextSecondary}>Добавить сервис</Text>
                           </Pressable>
                         ) : null}
+                        <Pressable
+                          onPress={() => openWishlistForItem(item)}
+                          style={({ pressed }) => [
+                            styles.actionBtnSecondary,
+                            pressed && styles.actionBtnPressed,
+                          ]}
+                        >
+                          <Text style={styles.actionBtnTextSecondary}>В список покупок</Text>
+                        </Pressable>
                       </View>
                     </View>
                   );

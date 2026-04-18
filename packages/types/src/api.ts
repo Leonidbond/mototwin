@@ -1,3 +1,4 @@
+import type { PartWishlistItem } from "./part-wishlist";
 import type { ServiceEventItem } from "./service-event";
 import type {
   BrandItem,
@@ -60,4 +61,16 @@ export type ModelVariantsResponse = {
 
 export type CreateVehicleResponse = {
   vehicle: GarageVehicleItem;
+};
+
+export type VehicleWishlistResponse = {
+  items: PartWishlistItem[];
+};
+
+export type CreateWishlistItemResponse = {
+  item: PartWishlistItem;
+};
+
+export type UpdateWishlistItemResponse = {
+  item: PartWishlistItem;
 };

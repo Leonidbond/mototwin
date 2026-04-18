@@ -69,6 +69,13 @@ enum ServiceEventKind {
   STATE_UPDATE
 }
 
+enum PartWishlistItemStatus {
+  NEEDED
+  ORDERED
+  BOUGHT
+  INSTALLED
+}
+
 model User {
   id            String        @id @default(cuid())
   email         String        @unique
@@ -161,10 +168,11 @@ model Vehicle {
   brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Restrict)
   model          Model        @relation(fields: [modelId], references: [id], onDelete: Restrict)
   modelVariant   ModelVariant @relation(fields: [modelVariantId], references: [id], onDelete: Restrict)
-  rideProfile    RideProfile?
-  serviceEvents  ServiceEvent[]
-  topNodeStates  TopNodeState[]
-  nodeStates     NodeState[]
+  rideProfile         RideProfile?
+  serviceEvents       ServiceEvent[]
+  topNodeStates       TopNodeState[]
+  nodeStates          NodeState[]
+  partWishlistItems   PartWishlistItem[]
 
   @@index([userId])
   @@index([brandId, modelId, modelVariantId])
@@ -206,13 +214,34 @@ model Node {
 
   parent        Node?          @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children      Node[]         @relation("NodeHierarchy")
-  serviceEvents ServiceEvent[]
-  topNodeStates TopNodeState[]
-  nodeStates    NodeState[]
-  maintenanceRule NodeMaintenanceRule?
+  serviceEvents       ServiceEvent[]
+  topNodeStates       TopNodeState[]
+  nodeStates          NodeState[]
+  maintenanceRule   NodeMaintenanceRule?
+  partWishlistItems   PartWishlistItem[]
 
   @@index([parentId])
   @@map("nodes")
+}
+
+model PartWishlistItem {
+  id        String                  @id @default(cuid())
+  vehicleId String
+  nodeId    String?
+  title     String
+  quantity  Int                     @default(1)
+  status    PartWishlistItemStatus  @default(NEEDED)
+  comment   String?
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  vehicle   Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node      Node?                   @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId])
+  @@index([nodeId])
+  @@index([status])
+  @@map("part_wishlist_items")
 }
 
 model TopNodeState {

@@ -7,9 +7,11 @@ import type {
   EditVehicleProfileFormValues,
   EditVehicleProfilePayload,
   FormValidationResult,
+  PartWishlistItem,
   UpdateVehicleStateFormValues,
   UpdateVehicleStatePayload,
 } from "@mototwin/types";
+import { WISHLIST_INSTALL_SERVICE_TYPE_RU } from "./part-wishlist";
 
 /** Local calendar `YYYY-MM-DD` (same semantics as web `getTodayDateString` in vehicle page). */
 export function getTodayDateYmdLocal(): string {
@@ -33,6 +35,53 @@ export function createInitialAddServiceEventFormValues(): AddServiceEventFormVal
     costAmount: "",
     currency: DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
     comment: "",
+    installedPartsJson: "",
+  };
+}
+
+export type VehicleOdometerStateForServiceEvent = {
+  odometer: number;
+  engineHours: number | null;
+};
+
+export function buildAddServiceEventCommentFromWishlistItem(item: PartWishlistItem): string {
+  const lines = [
+    `Установлена позиция из списка покупок: ${item.title}`,
+    `Количество: ${item.quantity}`,
+  ];
+  const w = item.comment?.trim();
+  if (w) {
+    lines.push(w);
+  }
+  return lines.join("\n");
+}
+
+export function buildWishlistInstalledPartsJsonString(item: PartWishlistItem): string {
+  return JSON.stringify({
+    source: "wishlist",
+    wishlistItemId: item.id,
+    title: item.title,
+    quantity: item.quantity,
+  });
+}
+
+/** Prefills {@link AddServiceEventFormValues} after marking a wishlist line as INSTALLED (client opens Add Service Event). */
+export function createInitialAddServiceEventFromWishlistItem(
+  item: PartWishlistItem,
+  vehicle: VehicleOdometerStateForServiceEvent,
+  options?: { todayDateYmd?: string }
+): AddServiceEventFormValues {
+  const base = createInitialAddServiceEventFormValues();
+  const eventDate = options?.todayDateYmd ?? getTodayDateYmdLocal();
+  return {
+    ...base,
+    nodeId: item.nodeId ?? "",
+    eventDate,
+    serviceType: WISHLIST_INSTALL_SERVICE_TYPE_RU,
+    odometer: String(vehicle.odometer),
+    engineHours: vehicle.engineHours != null ? String(vehicle.engineHours) : "",
+    comment: buildAddServiceEventCommentFromWishlistItem(item),
+    installedPartsJson: buildWishlistInstalledPartsJsonString(item),
   };
 }
 
@@ -60,6 +109,16 @@ export function normalizeAddServiceEventPayload(
     }
   }
 
+  const rawParts = values.installedPartsJson?.trim() ?? "";
+  let installedPartsJson: unknown | null = null;
+  if (rawParts !== "") {
+    try {
+      installedPartsJson = JSON.parse(rawParts) as unknown;
+    } catch {
+      installedPartsJson = null;
+    }
+  }
+
   return {
     nodeId: values.nodeId.trim(),
     eventDate: eventDateIso,
@@ -69,7 +128,7 @@ export function normalizeAddServiceEventPayload(
     costAmount,
     currency: costAmount !== null && trimmedCurrency ? trimmedCurrency.toUpperCase() : null,
     comment: values.comment.trim() || null,
-    installedPartsJson: null,
+    installedPartsJson,
   };
 }
 
@@ -119,6 +178,17 @@ export function validateAddServiceEventFormValues(
     const parsedEngine = Number(trimmedEngine);
     if (!Number.isInteger(parsedEngine) || parsedEngine < 0) {
       return { errors: ["Моточасы должны быть целым числом не меньше 0."] };
+    }
+  }
+
+  const rawParts = values.installedPartsJson?.trim() ?? "";
+  if (rawParts !== "") {
+    try {
+      JSON.parse(rawParts);
+    } catch {
+      return {
+        errors: ["Поле установленных запчастей должно быть пустым или корректным JSON."],
+      };
     }
   }
 

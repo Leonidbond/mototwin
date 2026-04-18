@@ -20,6 +20,11 @@ export type AddServiceEventFormValues = {
   /** ISO 4217; default for new forms is `RUB` via `createInitialAddServiceEventFormValues`. */
   currency: string;
   comment: string;
+  /**
+   * JSON string for API `installedPartsJson`; empty after trim → null on submit.
+   * Used e.g. when prefilling from a wishlist item.
+   */
+  installedPartsJson: string;
 };
 
 /** API-ready shape; alias of existing contract. */

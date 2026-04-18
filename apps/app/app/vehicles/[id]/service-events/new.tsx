@@ -14,6 +14,7 @@ import {
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   createInitialAddServiceEventFormValues,
+  createInitialAddServiceEventFromWishlistItem,
   getNodePathById,
   getNodeSelectLevels,
   getNodeShortExplanationLabel,
@@ -24,15 +25,35 @@ import {
   validateAddServiceEventFormValuesMobile,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import type { AddServiceEventFormValues, NodeTreeItem, SelectedNodePath } from "@mototwin/types";
+import type {
+  AddServiceEventFormValues,
+  NodeTreeItem,
+  PartWishlistItem,
+  SelectedNodePath,
+} from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 
 export default function NewServiceEventScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; nodeId?: string; source?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    nodeId?: string;
+    source?: string;
+    wlTitle?: string;
+    wlQty?: string;
+    wlId?: string;
+    wlComment?: string;
+  }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
   const initialNodeId = typeof params.nodeId === "string" ? params.nodeId : "";
   const source = typeof params.source === "string" ? params.source : "service-log";
+  const wlTitle = typeof params.wlTitle === "string" ? params.wlTitle.trim() : "";
+  const wlQty = typeof params.wlQty === "string" ? params.wlQty : "";
+  const wlId = typeof params.wlId === "string" ? params.wlId : "";
+  const wlComment =
+    typeof params.wlComment === "string" && params.wlComment.trim()
+      ? params.wlComment.trim()
+      : null;
   const apiBaseUrl = getApiBaseUrl();
 
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
@@ -50,6 +71,7 @@ export default function NewServiceEventScreen() {
     () => createInitialAddServiceEventFormValues().currency
   );
   const [comment, setComment] = useState("");
+  const [installedPartsJson, setInstalledPartsJson] = useState("");
   const [currentVehicleOdometer, setCurrentVehicleOdometer] = useState<number | null>(null);
 
   useEffect(() => {
@@ -83,6 +105,36 @@ export default function NewServiceEventScreen() {
         setEngineHours(
           vehicleData.vehicle?.engineHours != null ? String(vehicleData.vehicle.engineHours) : ""
         );
+
+        const fromWishlist = source === "wishlist" && wlTitle.length > 0 && vehicleData.vehicle;
+        if (fromWishlist) {
+          const v = vehicleData.vehicle!;
+          const synthetic: PartWishlistItem = {
+            id: wlId,
+            vehicleId,
+            nodeId: initialNodeId || null,
+            title: wlTitle,
+            quantity: wlQty ? Number.parseInt(wlQty, 10) || 1 : 1,
+            status: "INSTALLED",
+            comment: wlComment,
+            createdAt: "",
+            updatedAt: "",
+            node: null,
+          };
+          const prefill = createInitialAddServiceEventFromWishlistItem(
+            synthetic,
+            { odometer: v.odometer, engineHours: v.engineHours ?? null },
+            { todayDateYmd: getTodayDateYmdLocal() }
+          );
+          setServiceType(prefill.serviceType);
+          setEventDate(prefill.eventDate);
+          setOdometer(prefill.odometer);
+          setEngineHours(prefill.engineHours);
+          setComment(prefill.comment);
+          setInstalledPartsJson(prefill.installedPartsJson);
+        } else {
+          setInstalledPartsJson("");
+        }
       } catch (requestError) {
         console.error(requestError);
         setError("Не удалось загрузить данные для формы.");
@@ -92,7 +144,7 @@ export default function NewServiceEventScreen() {
     };
 
     load();
-  }, [apiBaseUrl, vehicleId, initialNodeId]);
+  }, [apiBaseUrl, vehicleId, initialNodeId, source, wlTitle, wlQty, wlId, wlComment]);
 
   const levels = getNodeSelectLevels(nodeTree, selectedPath);
   const selectedNode = getSelectedNodeFromPath(nodeTree, selectedPath);
@@ -118,6 +170,7 @@ export default function NewServiceEventScreen() {
       costAmount,
       currency,
       comment,
+      installedPartsJson,
     };
 
     const validation = validateAddServiceEventFormValuesMobile(serviceFormValues, {
@@ -140,6 +193,8 @@ export default function NewServiceEventScreen() {
       await endpoints.createServiceEvent(vehicleId, input);
       if (source === "tree") {
         router.replace(`/vehicles/${vehicleId}`);
+      } else if (source === "wishlist") {
+        router.replace(`/vehicles/${vehicleId}/wishlist`);
       } else {
         router.replace(`/vehicles/${vehicleId}/service-log`);
       }

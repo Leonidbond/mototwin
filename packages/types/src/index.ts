@@ -101,7 +101,19 @@ export type {
   ModelsResponse,
   ModelVariantsResponse,
   CreateVehicleResponse,
+  VehicleWishlistResponse,
+  CreateWishlistItemResponse,
+  UpdateWishlistItemResponse,
 } from "./api";
+export type {
+  PartWishlistItem,
+  PartWishlistItemStatus,
+  PartWishlistItemViewModel,
+  PartWishlistFormValues,
+  CreatePartWishlistItemInput,
+  UpdatePartWishlistItemInput,
+  PartWishlistStatusGroupViewModel,
+} from "./part-wishlist";
 export type {
   GarageCardProps,
   VehicleHeaderProps,

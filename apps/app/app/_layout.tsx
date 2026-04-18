@@ -40,6 +40,24 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="vehicles/[id]/wishlist/index"
+        options={{
+          title: "Что нужно купить",
+        }}
+      />
+      <Stack.Screen
+        name="vehicles/[id]/wishlist/new"
+        options={{
+          title: "Новая позиция",
+        }}
+      />
+      <Stack.Screen
+        name="vehicles/[id]/wishlist/[itemId]"
+        options={{
+          title: "Редактирование",
+        }}
+      />
+      <Stack.Screen
         name="vehicles/[id]/service-events/new"
         options={{
           title: "Новое обслуживание",
