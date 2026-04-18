@@ -1,4 +1,5 @@
 import type { PartWishlistItem } from "./part-wishlist";
+import type { PartSkuViewModel } from "./part-catalog";
 import type { ServiceEventItem } from "./service-event";
 import type {
   BrandItem,
@@ -73,4 +74,12 @@ export type CreateWishlistItemResponse = {
 
 export type UpdateWishlistItemResponse = {
   item: PartWishlistItem;
+};
+
+export type PartSkusResponse = {
+  skus: PartSkuViewModel[];
+};
+
+export type PartSkuDetailResponse = {
+  sku: PartSkuViewModel;
 };

@@ -9,6 +9,9 @@ import type {
   GarageVehiclesResponse,
   ModelVariantsResponse,
   ModelsResponse,
+  PartSkuDetailResponse,
+  PartSkusResponse,
+  PartSkuSearchFilters,
   ServiceEventsResponse,
   UpdatePartWishlistItemInput,
   UpdateVehicleProfileInput,
@@ -39,6 +42,27 @@ export function createMotoTwinEndpoints(client: ApiClient) {
     getNodeTree(vehicleId: string) {
       return client.request<VehicleNodeTreeResponse>(
         `/api/vehicles/${vehicleId}/node-tree`
+      );
+    },
+
+    getPartSkus(filters: PartSkuSearchFilters = {}) {
+      const q = new URLSearchParams();
+      if (filters.nodeId) {
+        q.set("nodeId", filters.nodeId);
+      }
+      if (filters.search) {
+        q.set("search", filters.search);
+      }
+      if (filters.activeOnly === false) {
+        q.set("isActive", "false");
+      }
+      const qs = q.toString();
+      return client.request<PartSkusResponse>(`/api/parts/skus${qs ? `?${qs}` : ""}`);
+    },
+
+    getPartSku(skuId: string) {
+      return client.request<PartSkuDetailResponse>(
+        `/api/parts/skus/${encodeURIComponent(skuId)}`
       );
     },
 

@@ -1,6 +1,7 @@
 import type {
   CreatePartWishlistItemInput,
   FormValidationResult,
+  PartSkuViewModel,
   PartWishlistFormValues,
   PartWishlistItem,
   PartWishlistItemStatus,
@@ -10,6 +11,7 @@ import type {
   UpdatePartWishlistItemInput,
 } from "@mototwin/types";
 import { PART_WISHLIST_DEFAULT_CURRENCY } from "@mototwin/types";
+import { getSkuDisplayPrice } from "./part-catalog";
 import { formatExpenseAmountRu } from "./expense-summary";
 
 export const PART_WISHLIST_STATUS_ORDER: PartWishlistItemStatus[] = [
@@ -88,6 +90,7 @@ export function createInitialPartWishlistFormValues(
   preset?: Partial<Pick<PartWishlistFormValues, "nodeId" | "status">>
 ): PartWishlistFormValues {
   return {
+    skuId: "",
     title: "",
     quantity: "1",
     status: preset?.status ?? "NEEDED",
@@ -100,6 +103,7 @@ export function createInitialPartWishlistFormValues(
 
 export function partWishlistFormValuesFromItem(item: PartWishlistItem): PartWishlistFormValues {
   return {
+    skuId: item.skuId?.trim() ?? "",
     title: item.title,
     quantity: String(item.quantity),
     status: item.status,
@@ -113,11 +117,44 @@ export function partWishlistFormValuesFromItem(item: PartWishlistItem): PartWish
   };
 }
 
+/** Подставляет поля каталога в форму wishlist (title/cost/node при пустых значениях). */
+export function applyPartSkuViewModelToPartWishlistFormValues(
+  form: PartWishlistFormValues,
+  sku: PartSkuViewModel
+): PartWishlistFormValues {
+  const title = form.title.trim() ? form.title : sku.canonicalName;
+  const costEmpty = !form.costAmount.trim();
+  let costAmount = form.costAmount;
+  let currency = form.currency;
+  const { priceAmount, currency: skuCur } = getSkuDisplayPrice({
+    priceAmount: sku.priceAmount,
+    currency: sku.currency,
+  });
+  if (costEmpty && priceAmount != null && Number.isFinite(priceAmount)) {
+    costAmount = formatExpenseAmountRu(priceAmount);
+    currency = (skuCur?.trim() || PART_WISHLIST_DEFAULT_CURRENCY).toUpperCase();
+  }
+  const nodeId = form.nodeId.trim() ? form.nodeId : (sku.primaryNodeId ?? "");
+  return {
+    ...form,
+    skuId: sku.id,
+    title,
+    costAmount,
+    currency,
+    nodeId,
+  };
+}
+
+export function clearPartWishlistFormSkuSelection(form: PartWishlistFormValues): PartWishlistFormValues {
+  return { ...form, skuId: "" };
+}
+
 export function validatePartWishlistFormValues(values: PartWishlistFormValues): FormValidationResult {
   const errors: string[] = [];
   const title = values.title.trim();
-  if (!title) {
-    errors.push("Укажите название запчасти или расходника.");
+  const skuId = values.skuId.trim();
+  if (!title && !skuId) {
+    errors.push("Укажите название или выберите SKU из каталога.");
   }
   const q = values.quantity.trim();
   if (q) {
@@ -180,6 +217,7 @@ export function normalizeCreatePartWishlistPayload(
   values: PartWishlistFormValues
 ): CreatePartWishlistItemInput {
   const title = values.title.trim();
+  const skuIdRaw = values.skuId.trim();
   const q = values.quantity.trim();
   const quantity = q ? Number.parseInt(q, 10) : 1;
   const nodeIdRaw = values.nodeId.trim();
@@ -189,7 +227,8 @@ export function normalizeCreatePartWishlistPayload(
     values.currency.trim() || null
   );
   return {
-    title,
+    title: title || undefined,
+    skuId: skuIdRaw ? skuIdRaw : null,
     quantity: Number.isInteger(quantity) && quantity >= 1 ? quantity : 1,
     nodeId: nodeIdRaw ? nodeIdRaw : null,
     comment: values.comment.trim() ? values.comment.trim() : null,
@@ -211,8 +250,10 @@ export function normalizeUpdatePartWishlistPayload(
     costParsed,
     values.currency.trim() || null
   );
+  const skuIdRaw = values.skuId.trim();
   const out: UpdatePartWishlistItemInput = {
     title,
+    skuId: skuIdRaw ? skuIdRaw : null,
     status: values.status,
     comment: values.comment.trim() ? values.comment.trim() : null,
     nodeId: nodeIdRaw ? nodeIdRaw : null,

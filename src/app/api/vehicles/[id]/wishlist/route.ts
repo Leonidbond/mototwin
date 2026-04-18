@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PartWishlistItemStatus } from "@prisma/client";
 import { z } from "zod";
-import { normalizePartWishlistCostMutationArgs } from "@mototwin/domain";
+import {
+  applySkuDefaultsToWishlistDraft,
+  buildWishlistItemSkuInfo,
+  normalizePartWishlistCostMutationArgs,
+} from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
+
+type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 
 type RouteContext = {
   params: Promise<{
@@ -13,28 +19,64 @@ type RouteContext = {
 
 const statusEnum = z.enum(["NEEDED", "ORDERED", "BOUGHT", "INSTALLED"]);
 
-const createWishlistSchema = z.object({
-  title: z.string().trim().min(1, "Название обязательно"),
-  quantity: z.number().int().min(1, "Количество должно быть не меньше 1").optional(),
-  nodeId: z
-    .union([z.string(), z.null(), z.undefined()])
-    .transform((v) => {
-      if (v == null) {
-        return null;
-      }
-      const t = String(v).trim();
-      return t.length > 0 ? t : null;
-    }),
-  comment: z.string().trim().nullable().optional(),
-  status: statusEnum.optional(),
-  costAmount: z.union([z.number().min(0), z.null()]).optional(),
-  currency: z.union([z.string(), z.null()]).optional(),
-});
+const wishlistSkuSelect = {
+  id: true,
+  canonicalName: true,
+  brandName: true,
+  partType: true,
+  priceAmount: true,
+  currency: true,
+  partNumbers: {
+    orderBy: { createdAt: "asc" as const },
+    take: 1,
+    select: { number: true },
+  },
+} as const;
+
+const createWishlistSchema = z
+  .object({
+    skuId: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((v) => {
+        if (v == null) {
+          return null;
+        }
+        const t = String(v).trim();
+        return t.length > 0 ? t : null;
+      }),
+    title: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((v) => (v == null ? "" : String(v).trim())),
+    quantity: z.number().int().min(1, "Количество должно быть не меньше 1").optional(),
+    nodeId: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((v) => {
+        if (v == null) {
+          return null;
+        }
+        const t = String(v).trim();
+        return t.length > 0 ? t : null;
+      }),
+    comment: z.string().trim().nullable().optional(),
+    status: statusEnum.optional(),
+    costAmount: z.union([z.number().min(0), z.null()]).optional(),
+    currency: z.union([z.string(), z.null()]).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.skuId && !data.title) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Название обязательно",
+        path: ["title"],
+      });
+    }
+  });
 
 function toWire(row: {
   id: string;
   vehicleId: string;
   nodeId: string | null;
+  skuId: string | null;
   title: string;
   quantity: number;
   status: PartWishlistItemStatus;
@@ -44,11 +86,13 @@ function toWire(row: {
   createdAt: Date;
   updatedAt: Date;
   node: { id: string; name: string } | null;
+  sku: WishlistSkuRow | null;
 }): PartWishlistItem {
   return {
     id: row.id,
     vehicleId: row.vehicleId,
     nodeId: row.nodeId,
+    skuId: row.skuId,
     title: row.title,
     quantity: row.quantity,
     status: row.status,
@@ -58,6 +102,7 @@ function toWire(row: {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     node: row.node,
+    sku: row.sku ? buildWishlistItemSkuInfo(row.sku) : null,
   };
 }
 
@@ -71,7 +116,7 @@ export async function GET(_: NextRequest, context: RouteContext) {
     });
 
     if (!vehicle) {
-      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+      return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
     }
 
     const rows = await prisma.partWishlistItem.findMany({
@@ -79,20 +124,16 @@ export async function GET(_: NextRequest, context: RouteContext) {
       orderBy: [{ updatedAt: "desc" }],
       include: {
         node: { select: { id: true, name: true } },
+        sku: { select: wishlistSkuSelect },
       },
     });
 
-    const items = rows.map((r) =>
-      toWire({
-        ...r,
-        node: r.node,
-      })
-    );
+    const items = rows.map((r) => toWire(r));
 
     return NextResponse.json({ items });
   } catch (error) {
     console.error("Failed to fetch wishlist:", error);
-    return NextResponse.json({ error: "Failed to fetch wishlist" }, { status: 500 });
+    return NextResponse.json({ error: "Не удалось загрузить список покупок." }, { status: 500 });
   }
 }
 
@@ -108,31 +149,77 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
 
     if (!vehicle) {
-      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+      return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
     }
 
-    const nodeId: string | null = data.nodeId ?? null;
+    let skuRow: {
+      id: string;
+      canonicalName: string;
+      primaryNodeId: string | null;
+      priceAmount: WishlistSkuRow["priceAmount"];
+      currency: string | null;
+    } | null = null;
+
+    if (data.skuId) {
+      const found = await prisma.partSku.findFirst({
+        where: { id: data.skuId, isActive: true },
+        select: {
+          id: true,
+          canonicalName: true,
+          primaryNodeId: true,
+          priceAmount: true,
+          currency: true,
+        },
+      });
+      if (!found) {
+        return NextResponse.json(
+          { error: "Позиция каталога не найдена или неактивна." },
+          { status: 404 }
+        );
+      }
+      skuRow = found;
+    }
+
+    const draft = applySkuDefaultsToWishlistDraft(
+      {
+        titleTrimmed: data.title,
+        nodeId: data.nodeId ?? null,
+        costAmount: data.costAmount,
+        currency: data.currency,
+      },
+      skuRow
+        ? {
+            canonicalName: skuRow.canonicalName,
+            primaryNodeId: skuRow.primaryNodeId,
+            priceAmount: skuRow.priceAmount == null ? null : Number(skuRow.priceAmount),
+            currency: skuRow.currency,
+          }
+        : null
+    );
+
+    const nodeId = draft.nodeId;
     if (nodeId) {
       const node = await prisma.node.findUnique({
         where: { id: nodeId },
         select: { id: true },
       });
       if (!node) {
-        return NextResponse.json({ error: "Node not found" }, { status: 404 });
+        return NextResponse.json({ error: "Узел не найден." }, { status: 404 });
       }
     }
 
-    const quantity = data.quantity ?? 1;
-
     const { costAmount, currency } = normalizePartWishlistCostMutationArgs(
-      data.costAmount === undefined ? null : data.costAmount,
-      data.currency === undefined ? null : data.currency
+      draft.costAmount === undefined ? null : draft.costAmount,
+      draft.currency === undefined ? null : draft.currency
     );
+
+    const quantity = data.quantity ?? 1;
 
     const created = await prisma.partWishlistItem.create({
       data: {
         vehicleId,
-        title: data.title,
+        skuId: data.skuId,
+        title: draft.title,
         quantity,
         status: data.status ?? PartWishlistItemStatus.NEEDED,
         comment: data.comment?.trim() ? data.comment.trim() : null,
@@ -142,6 +229,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
       include: {
         node: { select: { id: true, name: true } },
+        sku: { select: wishlistSkuSelect },
       },
     });
 

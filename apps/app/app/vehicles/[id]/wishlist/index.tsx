@@ -15,6 +15,7 @@ import {
   PART_WISHLIST_STATUS_ORDER,
   buildPartWishlistItemViewModel,
   getPartWishlistStatusLabelRu,
+  getWishlistItemSkuDisplayLines,
   groupPartWishlistItemsByStatus,
   filterActiveWishlistItems,
   isWishlistTransitionToInstalled,
@@ -211,6 +212,16 @@ export default function VehicleWishlistScreen() {
                         disabled={isBusy}
                       >
                         <Text style={styles.itemTitle}>{item.title}</Text>
+                        {item.sku ? (
+                          <View style={styles.skuBlock}>
+                            <Text style={styles.skuPrimary}>
+                              {getWishlistItemSkuDisplayLines(item.sku).primaryLine}
+                            </Text>
+                            <Text style={styles.skuSecondary}>
+                              {getWishlistItemSkuDisplayLines(item.sku).secondaryLine}
+                            </Text>
+                          </View>
+                        ) : null}
                         {item.node ? (
                           <Text style={styles.itemNode}>Узел: {item.node.name}</Text>
                         ) : null}
@@ -333,6 +344,16 @@ const styles = StyleSheet.create({
     backgroundColor: c.card,
   },
   itemTitle: { fontSize: 16, fontWeight: "700", color: c.textPrimary },
+  skuBlock: {
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+  },
+  skuPrimary: { fontSize: 12, fontWeight: "600", color: c.textPrimary },
+  skuSecondary: { marginTop: 2, fontSize: 11, color: c.textMuted, lineHeight: 15 },
   itemNode: { marginTop: 6, fontSize: 13, color: c.textSecondary },
   itemCost: { marginTop: 4, fontSize: 13, color: c.textSecondary },
   itemMeta: { marginTop: 4, fontSize: 13, color: c.textMuted, lineHeight: 18 },

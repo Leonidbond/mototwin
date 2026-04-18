@@ -12,6 +12,7 @@ import type {
   UpdateVehicleStatePayload,
 } from "@mototwin/types";
 import { formatExpenseAmountRu } from "./expense-summary";
+import { buildPartSkuLabel } from "./part-catalog";
 import {
   WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU,
   WISHLIST_INSTALL_SERVICE_TYPE_RU,
@@ -53,6 +54,19 @@ export function buildAddServiceEventCommentFromWishlistItem(item: PartWishlistIt
     `${WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU} ${item.title}`,
     `Количество: ${item.quantity}`,
   ];
+  if (item.sku) {
+    lines.push(
+      `Каталог: ${buildPartSkuLabel({
+        brandName: item.sku.brandName,
+        canonicalName: item.sku.canonicalName,
+      })}`
+    );
+    const art = item.sku.primaryPartNumber?.trim();
+    if (art) {
+      lines.push(`Артикул: ${art}`);
+    }
+    lines.push(`Тип SKU: ${item.sku.partType}`);
+  }
   const w = item.comment?.trim();
   if (w) {
     lines.push(w);
@@ -66,6 +80,13 @@ export function buildWishlistInstalledPartsJsonString(item: PartWishlistItem): s
     wishlistItemId: item.id,
     title: item.title,
     quantity: item.quantity,
+    skuId: item.skuId ?? null,
+    skuLabel: item.sku
+      ? buildPartSkuLabel({
+          brandName: item.sku.brandName,
+          canonicalName: item.sku.canonicalName,
+        })
+      : null,
   });
 }
 

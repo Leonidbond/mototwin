@@ -1,6 +1,9 @@
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { normalizePartNumber } from "@mototwin/domain";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -259,6 +262,198 @@ const maintenanceRuleSeed = [
   },
 ] as const;
 
+type PartSkuSeedRow = {
+  seedKey: string;
+  canonicalName: string;
+  brandName: string;
+  partType: string;
+  primaryNodeCode: string;
+  isOem?: boolean;
+  description?: string | null;
+  category?: string | null;
+  priceAmount?: number | null;
+  currency?: string | null;
+  sourceUrl?: string | null;
+  partNumbers?: Array<{ number: string; numberType: string; brandName?: string | null }>;
+  nodeLinks?: Array<{ nodeCode: string; relationType: string; confidence?: number }>;
+  fitments?: Array<{
+    brandId?: string | null;
+    modelId?: string | null;
+    modelVariantId?: string | null;
+    yearFrom?: number | null;
+    yearTo?: number | null;
+    market?: string | null;
+    engineCode?: string | null;
+    vinFrom?: string | null;
+    vinTo?: string | null;
+    fitmentType?: string | null;
+    confidence?: number;
+    note?: string | null;
+  }>;
+  offers?: Array<{
+    sourceName: string;
+    externalOfferId?: string | null;
+    title: string;
+    url?: string | null;
+    priceAmount?: number | null;
+    currency?: string | null;
+    availability?: string | null;
+    sellerName?: string | null;
+    rawBrand?: string | null;
+    rawArticle?: string | null;
+  }>;
+};
+
+async function seedPartCatalogFromJson(nodeIdByCode: Map<string, string>): Promise<{
+  partCatalogSkusUpserted: number;
+  partCatalogSkusSkipped: number;
+}> {
+  const filePath = path.join(process.cwd(), "prisma", "seed-data", "parts-skus.json");
+  const raw = await readFile(filePath, "utf8");
+  const rows = JSON.parse(raw) as PartSkuSeedRow[];
+  let partCatalogSkusUpserted = 0;
+  let partCatalogSkusSkipped = 0;
+
+  for (const row of rows) {
+    const primaryNodeId = nodeIdByCode.get(row.primaryNodeCode) ?? null;
+    if (!primaryNodeId) {
+      console.warn(
+        `[seed] PartSku skipped (unknown primaryNodeCode): ${row.primaryNodeCode} (${row.seedKey})`
+      );
+      partCatalogSkusSkipped += 1;
+      continue;
+    }
+
+    const priceAmount =
+      row.priceAmount != null && Number.isFinite(row.priceAmount)
+        ? new Prisma.Decimal(row.priceAmount)
+        : null;
+
+    const sku = await prisma.partSku.upsert({
+      where: { seedKey: row.seedKey },
+      create: {
+        seedKey: row.seedKey,
+        primaryNodeId,
+        brandName: row.brandName,
+        canonicalName: row.canonicalName,
+        partType: row.partType,
+        description: row.description ?? null,
+        category: row.category ?? null,
+        priceAmount,
+        currency: row.currency?.trim() || null,
+        sourceUrl: row.sourceUrl ?? null,
+        isOem: row.isOem ?? false,
+        isActive: true,
+      },
+      update: {
+        primaryNodeId,
+        brandName: row.brandName,
+        canonicalName: row.canonicalName,
+        partType: row.partType,
+        description: row.description ?? null,
+        category: row.category ?? null,
+        priceAmount,
+        currency: row.currency?.trim() || null,
+        sourceUrl: row.sourceUrl ?? null,
+        isOem: row.isOem ?? false,
+        isActive: true,
+      },
+    });
+
+    await prisma.partNumber.deleteMany({ where: { skuId: sku.id } });
+    await prisma.partSkuNodeLink.deleteMany({ where: { skuId: sku.id } });
+    await prisma.partFitment.deleteMany({ where: { skuId: sku.id } });
+    await prisma.partOffer.deleteMany({ where: { skuId: sku.id } });
+
+    const nums = row.partNumbers ?? [];
+    if (nums.length > 0) {
+      await prisma.partNumber.createMany({
+        data: nums.map((p) => ({
+          skuId: sku.id,
+          number: p.number.trim(),
+          normalizedNumber: normalizePartNumber(p.number),
+          numberType: p.numberType,
+          brandName: p.brandName?.trim() || null,
+        })),
+      });
+    }
+
+    const links = row.nodeLinks ?? [];
+    const linkCreates: Array<{
+      skuId: string;
+      nodeId: string;
+      relationType: string;
+      confidence: number;
+    }> = [];
+    for (const link of links) {
+      const nid = nodeIdByCode.get(link.nodeCode);
+      if (!nid) {
+        console.warn(
+          `[seed] PartSkuNodeLink skip (unknown nodeCode): ${link.nodeCode} for ${row.seedKey}`
+        );
+        continue;
+      }
+      linkCreates.push({
+        skuId: sku.id,
+        nodeId: nid,
+        relationType: link.relationType,
+        confidence: link.confidence ?? 80,
+      });
+    }
+    if (linkCreates.length > 0) {
+      await prisma.partSkuNodeLink.createMany({ data: linkCreates });
+    }
+
+    const fits = row.fitments ?? [];
+    if (fits.length > 0) {
+      await prisma.partFitment.createMany({
+        data: fits.map((f) => ({
+          skuId: sku.id,
+          brandId: f.brandId ?? null,
+          modelId: f.modelId ?? null,
+          modelVariantId: f.modelVariantId ?? null,
+          yearFrom: f.yearFrom ?? null,
+          yearTo: f.yearTo ?? null,
+          market: f.market ?? null,
+          engineCode: f.engineCode ?? null,
+          vinFrom: f.vinFrom ?? null,
+          vinTo: f.vinTo ?? null,
+          fitmentType: f.fitmentType ?? null,
+          confidence: f.confidence ?? 80,
+          note: f.note ?? null,
+        })),
+      });
+    }
+
+    const offs = row.offers ?? [];
+    for (const o of offs) {
+      const oPrice =
+        o.priceAmount != null && Number.isFinite(o.priceAmount)
+          ? new Prisma.Decimal(o.priceAmount)
+          : null;
+      await prisma.partOffer.create({
+        data: {
+          skuId: sku.id,
+          sourceName: o.sourceName,
+          externalOfferId: o.externalOfferId ?? null,
+          title: o.title,
+          url: o.url ?? null,
+          priceAmount: oPrice,
+          currency: o.currency?.trim() || null,
+          availability: o.availability ?? null,
+          sellerName: o.sellerName ?? null,
+          rawBrand: o.rawBrand ?? null,
+          rawArticle: o.rawArticle ?? null,
+        },
+      });
+    }
+
+    partCatalogSkusUpserted += 1;
+  }
+
+  return { partCatalogSkusUpserted, partCatalogSkusSkipped };
+}
+
 async function main() {
   const testUser = await prisma.user.upsert({
     where: { email: "demo@mototwin.local" },
@@ -472,6 +667,8 @@ async function main() {
     )
   );
 
+  const partCatalogStats = await seedPartCatalogFromJson(nodeIdByCode);
+
   const validNodeCodes = new Set(nodesForSeed.map((node) => node.code));
   const legacyNodes = await prisma.node.findMany({
     where: {
@@ -631,6 +828,7 @@ async function main() {
     maintenanceRulesSkipped,
     legacyNodesFound: legacyNodes.length,
     legacyNodesDeleted: removableLegacyNodes.length,
+    ...partCatalogStats,
   });
 }
 

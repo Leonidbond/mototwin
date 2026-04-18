@@ -129,6 +129,7 @@ export default function NewServiceEventScreen() {
           const synthetic: PartWishlistItem = {
             id: wlId,
             vehicleId,
+            skuId: null,
             nodeId: initialNodeId || null,
             title: wlTitle,
             quantity: wlQty ? Number.parseInt(wlQty, 10) || 1 : 1,
@@ -139,6 +140,7 @@ export default function NewServiceEventScreen() {
             createdAt: "",
             updatedAt: "",
             node: null,
+            sku: null,
           };
           const prefill = createInitialAddServiceEventFromWishlistItem(
             synthetic,

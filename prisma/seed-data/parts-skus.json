@@ -1,0 +1,402 @@
+[
+  {
+    "seedKey": "MVP_CATALOG_ENGINE_OIL_MOTUL",
+    "canonicalName": "Масло Motul 7100 4T 10W-50, 1 л (MVP)",
+    "brandName": "Motul",
+    "partType": "ENGINE_OIL",
+    "primaryNodeCode": "ENGINE.LUBE.OIL",
+    "isOem": false,
+    "description": "MVP-пример: синтетическое моторное масло 10W-50 для 4T.",
+    "category": "Масло двигателя",
+    "priceAmount": 1890,
+    "currency": "RUB",
+    "sourceUrl": null,
+    "partNumbers": [
+      { "number": "104092", "numberType": "MANUFACTURER", "brandName": "Motul" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "ENGINE.LUBE.OIL", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 40,
+        "note": "MVP: универсально при соответствии вязкости и спецификации"
+      }
+    ],
+    "offers": [
+      {
+        "sourceName": "MVP_DEMO_RETAIL",
+        "title": "Motul 7100 10W-50 — демо-цена",
+        "priceAmount": 1850,
+        "currency": "RUB",
+        "url": null
+      }
+    ]
+  },
+  {
+    "seedKey": "MVP_CATALOG_OIL_FILTER_HIFLO",
+    "canonicalName": "Масляный фильтр Hiflofiltro HF155 (MVP)",
+    "brandName": "Hiflofiltro",
+    "partType": "OIL_FILTER",
+    "primaryNodeCode": "ENGINE.LUBE.FILTER",
+    "isOem": false,
+    "description": "MVP-пример: типовой масляный фильтр (артикул условный).",
+    "category": "Фильтр масляный",
+    "priceAmount": 890,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "HF155", "numberType": "MANUFACTURER", "brandName": "Hiflofiltro" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "ENGINE.LUBE.FILTER", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 40,
+        "note": "MVP: проверьте совместимость по модели"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_AIR_FILTER_KN",
+    "canonicalName": "Воздушный фильтр K&N High-Flow (MVP)",
+    "brandName": "K&N",
+    "partType": "AIR_FILTER",
+    "primaryNodeCode": "INTAKE.FILTER",
+    "isOem": false,
+    "description": "MVP-пример: спортивный воздушный фильтр.",
+    "category": "Фильтр воздушный",
+    "priceAmount": 3200,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "KN-AIR-MVP", "numberType": "MANUFACTURER", "brandName": "K&N" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "INTAKE.FILTER", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 35,
+        "note": "MVP: универсальная позиция для узла впуска"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_SPARK_NGK",
+    "canonicalName": "Свеча зажигания NGK CR8E (MVP)",
+    "brandName": "NGK",
+    "partType": "SPARK_PLUG",
+    "primaryNodeCode": "ELECTRICS.IGNITION.SPARK",
+    "isOem": false,
+    "description": "MVP-пример: типовая свеча (код условный).",
+    "category": "Свеча",
+    "priceAmount": 450,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "CR8E", "numberType": "MANUFACTURER", "brandName": "NGK" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "ELECTRICS.IGNITION.SPARK", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 40,
+        "note": "MVP: проверьте калильность и резьбу"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_BRAKE_PADS_FRONT",
+    "canonicalName": "Передние тормозные колодки Brembo Sinter (MVP)",
+    "brandName": "Brembo",
+    "partType": "BRAKE_PADS_FRONT",
+    "primaryNodeCode": "BRAKES.FRONT.PADS",
+    "isOem": false,
+    "description": "MVP-пример: передние колодки (тип/крепление условные).",
+    "category": "Колодки передние",
+    "priceAmount": 4200,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "07BB37SA", "numberType": "MANUFACTURER", "brandName": "Brembo" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "BRAKES.FRONT.PADS", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 35,
+        "note": "MVP: подбор по суппорту обязателен"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_BRAKE_PADS_REAR",
+    "canonicalName": "Задние тормозные колодки Brembo Organic (MVP)",
+    "brandName": "Brembo",
+    "partType": "BRAKE_PADS_REAR",
+    "primaryNodeCode": "BRAKES.REAR.PADS",
+    "isOem": false,
+    "description": "MVP-пример: задние колодки.",
+    "category": "Колодки задние",
+    "priceAmount": 3100,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "07BB04CC", "numberType": "MANUFACTURER", "brandName": "Brembo" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "BRAKES.REAR.PADS", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 35,
+        "note": "MVP: подбор по суппорту обязателен"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_BRAKE_FLUID_DOT4",
+    "canonicalName": "Тормозная жидкость DOT 4, 0.5 л (MVP)",
+    "brandName": "GenericLab",
+    "partType": "BRAKE_FLUID",
+    "primaryNodeCode": "BRAKES.FLUID",
+    "isOem": false,
+    "description": "MVP-пример: DOT4 для прокачки.",
+    "category": "Тормозная жидкость",
+    "priceAmount": 650,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "GL-DOT4-500", "numberType": "MANUFACTURER", "brandName": "GenericLab" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "BRAKES.FLUID", "relationType": "PRIMARY", "confidence": 90 },
+      { "nodeCode": "BRAKES.FRONT.PADS", "relationType": "RELATED_CONSUMABLE", "confidence": 60 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 45,
+        "note": "MVP: универсально для гидравлических тормозов DOT4"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_CHAIN_DID_520",
+    "canonicalName": "Цепь привода DID 520VX3 118 звеньев (MVP)",
+    "brandName": "DID",
+    "partType": "CHAIN",
+    "primaryNodeCode": "DRIVETRAIN.CHAIN",
+    "isOem": false,
+    "description": "MVP-пример: цепь 520 (шаг/длина условные).",
+    "category": "Цепь",
+    "priceAmount": 7800,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "520VX3-118-MVP", "numberType": "MANUFACTURER", "brandName": "DID" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "DRIVETRAIN.CHAIN", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 30,
+        "note": "MVP: проверьте шаг, длину и тип замка"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_FRONT_SPROCKET_15",
+    "canonicalName": "Ведущая звезда JT 15T 520 (MVP)",
+    "brandName": "JT Sprockets",
+    "partType": "FRONT_SPROCKET",
+    "primaryNodeCode": "DRIVETRAIN.FRONT_SPROCKET",
+    "isOem": false,
+    "description": "MVP-пример: передняя звезда 15 зубьев.",
+    "category": "Звезда ведущая",
+    "priceAmount": 1200,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "JTF-MVP-15", "numberType": "MANUFACTURER", "brandName": "JT" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "DRIVETRAIN.FRONT_SPROCKET", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 35,
+        "note": "MVP: подбор по модели и шагу"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_REAR_SPROCKET_45",
+    "canonicalName": "Ведомая звезда JT 45T 520 (MVP)",
+    "brandName": "JT Sprockets",
+    "partType": "REAR_SPROCKET",
+    "primaryNodeCode": "DRIVETRAIN.REAR_SPROCKET",
+    "isOem": false,
+    "description": "MVP-пример: задняя звезда 45 зубьев.",
+    "category": "Звезда ведомая",
+    "priceAmount": 2100,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "JTR-MVP-45", "numberType": "MANUFACTURER", "brandName": "JT" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "DRIVETRAIN.REAR_SPROCKET", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 35,
+        "note": "MVP: подбор по модели и шагу"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_TIRE_FRONT_909021",
+    "canonicalName": "Передняя шина 90/90-21 Mitas E-13 (MVP)",
+    "brandName": "Mitas",
+    "partType": "TIRE_FRONT",
+    "primaryNodeCode": "TIRES.FRONT",
+    "isOem": false,
+    "description": "MVP-пример: эндуро перед 90/90-21.",
+    "category": "Шина передняя",
+    "priceAmount": 9200,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "MIT-909021-MVP", "numberType": "MANUFACTURER", "brandName": "Mitas" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "TIRES.FRONT", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 35,
+        "note": "MVP: проверьте размер обода и допуски"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_TIRE_REAR_1408018",
+    "canonicalName": "Задняя шина 140/80-18 Mitas E-13 (MVP)",
+    "brandName": "Mitas",
+    "partType": "TIRE_REAR",
+    "primaryNodeCode": "TIRES.REAR",
+    "isOem": false,
+    "description": "MVP-пример: эндуро зад 140/80-18.",
+    "category": "Шина задняя",
+    "priceAmount": 10100,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "MIT-1408018-MVP", "numberType": "MANUFACTURER", "brandName": "Mitas" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "TIRES.REAR", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 35,
+        "note": "MVP: проверьте размер обода и допуски"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_COOLANT_READY",
+    "canonicalName": "Охлаждающая жидкость готовая -35°C, 1 л (MVP)",
+    "brandName": "CoolMax",
+    "partType": "COOLANT",
+    "primaryNodeCode": "COOLING.LIQUID",
+    "isOem": false,
+    "description": "MVP-пример: готовый антифриз для СОЖ.",
+    "category": "Охлаждающая жидкость",
+    "priceAmount": 480,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "CM-READY-1L", "numberType": "MANUFACTURER", "brandName": "CoolMax" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "COOLING.LIQUID", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 45,
+        "note": "MVP: универсально при соответствии спецификации"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_FORK_OIL_5W",
+    "canonicalName": "Масло для вилки 5W, 1 л (MVP)",
+    "brandName": "SuspOil",
+    "partType": "FORK_OIL",
+    "primaryNodeCode": "SUSPENSION.FRONT.OIL",
+    "isOem": false,
+    "description": "MVP-пример: вилочное масло.",
+    "category": "Масло вилки",
+    "priceAmount": 1400,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "SO-FORK-5W-1L", "numberType": "MANUFACTURER", "brandName": "SuspOil" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "SUSPENSION.FRONT.OIL", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 40,
+        "note": "MVP: проверьте вязкость по мануалу"
+      }
+    ],
+    "offers": []
+  },
+  {
+    "seedKey": "MVP_CATALOG_BATTERY_YTX12",
+    "canonicalName": "Аккумулятор YTX12-BS 12V (MVP)",
+    "brandName": "PowerCell",
+    "partType": "BATTERY",
+    "primaryNodeCode": "ELECTRICS.BATTERY",
+    "isOem": false,
+    "description": "MVP-пример: типовой AGM мотоаккумулятор.",
+    "category": "АКБ",
+    "priceAmount": 5600,
+    "currency": "RUB",
+    "partNumbers": [
+      { "number": "YTX12-BS", "numberType": "MANUFACTURER", "brandName": "PowerCell" }
+    ],
+    "nodeLinks": [
+      { "nodeCode": "ELECTRICS.BATTERY", "relationType": "PRIMARY", "confidence": 90 }
+    ],
+    "fitments": [
+      {
+        "fitmentType": "GENERIC_NODE",
+        "confidence": 35,
+        "note": "MVP: проверьте габариты и полярность"
+      }
+    ],
+    "offers": []
+  }
+]

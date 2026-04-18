@@ -17,8 +17,13 @@ import {
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   PART_WISHLIST_STATUS_ORDER,
+  applyPartSkuViewModelToPartWishlistFormValues,
+  clearPartWishlistFormSkuSelection,
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
+  formatPartSkuSearchResultMetaLineRu,
+  getPartSkuViewModelDisplayLines,
+  getWishlistItemSkuDisplayLines,
   normalizeCreatePartWishlistPayload,
   normalizeUpdatePartWishlistPayload,
   partWishlistFormValuesFromItem,
@@ -29,7 +34,9 @@ import {
 } from "@mototwin/domain";
 import type {
   FlattenedNodeSelectOption,
+  PartSkuViewModel,
   PartWishlistFormValues,
+  PartWishlistItem,
   PartWishlistItemStatus,
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
@@ -69,6 +76,16 @@ export function WishlistItemEditor({
   );
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const statusWhenLoadedRef = useRef<PartWishlistItemStatus | null>(null);
+  const [wishlistSkuQuery, setWishlistSkuQuery] = useState("");
+  const [wishlistSkuDebouncedQuery, setWishlistSkuDebouncedQuery] = useState("");
+  const [wishlistSkuResults, setWishlistSkuResults] = useState<PartSkuViewModel[]>([]);
+  const [wishlistSkuLoading, setWishlistSkuLoading] = useState(false);
+  const [wishlistSkuFetchError, setWishlistSkuFetchError] = useState("");
+  const [wishlistSkuPickedPreview, setWishlistSkuPickedPreview] = useState<PartSkuViewModel | null>(
+    null
+  );
+  const wishlistSkuSearchGen = useRef(0);
+  const [loadedWishlistItem, setLoadedWishlistItem] = useState<PartWishlistItem | null>(null);
 
   const selectedNodeLabel = useMemo(() => {
     const raw = form.nodeId.trim();
@@ -99,6 +116,7 @@ export function WishlistItemEditor({
         const initial = createInitialPartWishlistFormValues({ nodeId: presetNodeId });
         setForm(initial);
         statusWhenLoadedRef.current = initial.status;
+        setLoadedWishlistItem(null);
       } else {
         const itemIdSafe = itemId?.trim();
         if (!itemIdSafe) {
@@ -115,9 +133,11 @@ export function WishlistItemEditor({
         const row = wishlist.items.find((i) => i.id === itemIdSafe);
         if (!row) {
           setLoadError("Позиция не найдена.");
+          setLoadedWishlistItem(null);
         } else {
           setForm(partWishlistFormValuesFromItem(row));
           statusWhenLoadedRef.current = row.status;
+          setLoadedWishlistItem(row);
         }
       }
     } catch (e) {
@@ -131,6 +151,58 @@ export function WishlistItemEditor({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setWishlistSkuDebouncedQuery(wishlistSkuQuery.trim());
+    }, 350);
+    return () => clearTimeout(id);
+  }, [wishlistSkuQuery]);
+
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+    const q = wishlistSkuDebouncedQuery;
+    const nodeFilter = form.nodeId.trim();
+    const canFetch = q.length >= 2 || (q.length === 0 && nodeFilter.length > 0);
+    if (!canFetch) {
+      setWishlistSkuResults([]);
+      setWishlistSkuFetchError("");
+      setWishlistSkuLoading(false);
+      return;
+    }
+    const gen = wishlistSkuSearchGen.current + 1;
+    wishlistSkuSearchGen.current = gen;
+    setWishlistSkuLoading(true);
+    setWishlistSkuFetchError("");
+    const client = createApiClient({ baseUrl: apiBaseUrl });
+    const endpoints = createMotoTwinEndpoints(client);
+    void endpoints
+      .getPartSkus({
+        search: q.length >= 2 ? q : undefined,
+        nodeId: nodeFilter || undefined,
+      })
+      .then((res) => {
+        if (wishlistSkuSearchGen.current !== gen) {
+          return;
+        }
+        setWishlistSkuResults(res.skus ?? []);
+      })
+      .catch(() => {
+        if (wishlistSkuSearchGen.current !== gen) {
+          return;
+        }
+        setWishlistSkuResults([]);
+        setWishlistSkuFetchError("Не удалось выполнить поиск в каталоге.");
+      })
+      .finally(() => {
+        if (wishlistSkuSearchGen.current !== gen) {
+          return;
+        }
+        setWishlistSkuLoading(false);
+      });
+  }, [apiBaseUrl, isLoading, wishlistSkuDebouncedQuery, form.nodeId]);
 
   async function save() {
     if (!vehicleId) {
@@ -245,6 +317,83 @@ export function WishlistItemEditor({
             placeholderTextColor={c.textMuted}
             style={styles.input}
           />
+
+          <View style={styles.skuBox}>
+            <Text style={styles.skuBoxTitle}>SKU из каталога</Text>
+            <Text style={styles.skuBoxHint}>
+              Необязательно. От 2 символов в поиске; если выбран узел — можно искать без текста.
+            </Text>
+            <Text style={styles.labelCompact}>Найти в каталоге</Text>
+            <TextInput
+              value={wishlistSkuQuery}
+              onChangeText={setWishlistSkuQuery}
+              placeholder="Бренд, название, артикул…"
+              placeholderTextColor={c.textMuted}
+              style={styles.input}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {wishlistSkuFetchError ? (
+              <Text style={styles.inlineError}>{wishlistSkuFetchError}</Text>
+            ) : null}
+            {wishlistSkuLoading ? <Text style={styles.mutedSmall}>Поиск…</Text> : null}
+            {wishlistSkuResults.length > 0 ? (
+              <View style={styles.skuResults}>
+                {wishlistSkuResults.map((sku) => (
+                  <Pressable
+                    key={sku.id}
+                    onPress={() => {
+                      setWishlistSkuPickedPreview(sku);
+                      setForm((f) => applyPartSkuViewModelToPartWishlistFormValues(f, sku));
+                    }}
+                    style={({ pressed }) => [styles.skuResultRow, pressed && styles.skuResultPressed]}
+                  >
+                    <Text style={styles.skuResultPrimary}>
+                      {getPartSkuViewModelDisplayLines(sku).primaryLine}
+                    </Text>
+                    <Text style={styles.skuResultMeta}>
+                      {formatPartSkuSearchResultMetaLineRu(sku)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            {form.skuId.trim() ? (
+              <View style={styles.skuSelected}>
+                <Text style={styles.labelCompact}>Выбранный SKU</Text>
+                {wishlistSkuPickedPreview?.id === form.skuId.trim() ? (
+                  <>
+                    <Text style={styles.skuSelectedPrimary}>
+                      {getPartSkuViewModelDisplayLines(wishlistSkuPickedPreview).primaryLine}
+                    </Text>
+                    <Text style={styles.skuSelectedMeta}>
+                      {getPartSkuViewModelDisplayLines(wishlistSkuPickedPreview).secondaryLine}
+                    </Text>
+                  </>
+                ) : loadedWishlistItem?.sku?.id === form.skuId.trim() ? (
+                  <>
+                    <Text style={styles.skuSelectedPrimary}>
+                      {getWishlistItemSkuDisplayLines(loadedWishlistItem.sku).primaryLine}
+                    </Text>
+                    <Text style={styles.skuSelectedMeta}>
+                      {getWishlistItemSkuDisplayLines(loadedWishlistItem.sku).secondaryLine}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.mutedSmall}>SKU привязан</Text>
+                )}
+                <Pressable
+                  onPress={() => {
+                    setWishlistSkuPickedPreview(null);
+                    setForm((f) => clearPartWishlistFormSkuSelection(f));
+                  }}
+                  style={({ pressed }) => [styles.clearSkuBtn, pressed && styles.clearSkuBtnPressed]}
+                >
+                  <Text style={styles.clearSkuBtnText}>Очистить SKU</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
 
           <Text style={styles.label}>Количество</Text>
           <TextInput
@@ -423,6 +572,59 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 14,
   },
+  labelCompact: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textMuted,
+    marginBottom: 4,
+    marginTop: 10,
+  },
+  skuBox: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+  },
+  skuBoxTitle: { fontSize: 12, fontWeight: "700", color: c.textPrimary },
+  skuBoxHint: { marginTop: 4, fontSize: 11, color: c.textMuted, lineHeight: 15 },
+  skuResults: {
+    marginTop: 8,
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 10,
+    backgroundColor: c.card,
+    overflow: "hidden",
+  },
+  skuResultRow: { paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.divider },
+  skuResultPressed: { backgroundColor: c.divider },
+  skuResultPrimary: { fontSize: 13, fontWeight: "600", color: c.textPrimary },
+  skuResultMeta: { marginTop: 2, fontSize: 11, color: c.textMuted },
+  skuSelected: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+  },
+  skuSelectedPrimary: { marginTop: 4, fontSize: 13, fontWeight: "600", color: c.textPrimary },
+  skuSelectedMeta: { marginTop: 2, fontSize: 11, color: c.textMuted },
+  clearSkuBtn: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+  },
+  clearSkuBtnPressed: { opacity: 0.9 },
+  clearSkuBtnText: { fontSize: 12, fontWeight: "600", color: c.textPrimary },
+  mutedSmall: { marginTop: 6, fontSize: 12, color: c.textMuted },
   input: {
     borderWidth: 1,
     borderColor: c.border,

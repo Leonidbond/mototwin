@@ -104,7 +104,20 @@ export type {
   VehicleWishlistResponse,
   CreateWishlistItemResponse,
   UpdateWishlistItemResponse,
+  PartSkusResponse,
+  PartSkuDetailResponse,
 } from "./api";
+export type {
+  PartSkuSearchFilters,
+  PartSkuNodeSummary,
+  PartNumber,
+  PartSkuNodeLink,
+  PartFitment,
+  PartOffer,
+  PartSku,
+  PartSkuViewModel,
+  WishlistItemSkuInfo,
+} from "./part-catalog";
 export type {
   PartWishlistItem,
   PartWishlistItemStatus,

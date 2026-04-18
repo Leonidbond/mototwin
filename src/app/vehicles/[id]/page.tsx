@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   buildNodeTreeSectionProps,
@@ -55,6 +55,11 @@ import {
   validatePartWishlistFormValues,
   isWishlistTransitionToInstalled,
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
+  applyPartSkuViewModelToPartWishlistFormValues,
+  clearPartWishlistFormSkuSelection,
+  formatPartSkuSearchResultMetaLineRu,
+  getPartSkuViewModelDisplayLines,
+  getWishlistItemSkuDisplayLines,
 } from "@mototwin/domain";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
@@ -75,6 +80,7 @@ import type {
   AddServiceEventFormValues,
   PartWishlistFormValues,
   PartWishlistItem,
+  PartSkuViewModel,
 } from "@mototwin/types";
 
 const vehicleDetailApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
@@ -135,6 +141,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [wishlistFormError, setWishlistFormError] = useState("");
   const [wishlistNotice, setWishlistNotice] = useState("");
   const [isWishlistSaving, setIsWishlistSaving] = useState(false);
+  const [wishlistSkuQuery, setWishlistSkuQuery] = useState("");
+  const [wishlistSkuDebouncedQuery, setWishlistSkuDebouncedQuery] = useState("");
+  const [wishlistSkuResults, setWishlistSkuResults] = useState<PartSkuViewModel[]>([]);
+  const [wishlistSkuLoading, setWishlistSkuLoading] = useState(false);
+  const [wishlistSkuFetchError, setWishlistSkuFetchError] = useState("");
+  const [wishlistSkuPickedPreview, setWishlistSkuPickedPreview] = useState<PartSkuViewModel | null>(
+    null
+  );
+  const wishlistSkuSearchGen = useRef(0);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileFormError, setProfileFormError] = useState("");
@@ -234,6 +249,61 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     () => flattenNodeTreeToSelectOptions(nodeTree),
     [nodeTree]
   );
+
+  const wishlistEditingSourceItem = useMemo(
+    () => (wishlistEditingId ? wishlistItems.find((w) => w.id === wishlistEditingId) : undefined),
+    [wishlistEditingId, wishlistItems]
+  );
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setWishlistSkuDebouncedQuery(wishlistSkuQuery.trim());
+    }, 350);
+    return () => window.clearTimeout(id);
+  }, [wishlistSkuQuery]);
+
+  useEffect(() => {
+    if (!isWishlistModalOpen) {
+      return;
+    }
+    const q = wishlistSkuDebouncedQuery;
+    const nodeFilter = wishlistForm.nodeId.trim();
+    const canFetch = q.length >= 2 || (q.length === 0 && nodeFilter.length > 0);
+    if (!canFetch) {
+      setWishlistSkuResults([]);
+      setWishlistSkuFetchError("");
+      setWishlistSkuLoading(false);
+      return;
+    }
+    const gen = wishlistSkuSearchGen.current + 1;
+    wishlistSkuSearchGen.current = gen;
+    setWishlistSkuLoading(true);
+    setWishlistSkuFetchError("");
+    void vehicleDetailApi
+      .getPartSkus({
+        search: q.length >= 2 ? q : undefined,
+        nodeId: nodeFilter || undefined,
+      })
+      .then((res) => {
+        if (wishlistSkuSearchGen.current !== gen) {
+          return;
+        }
+        setWishlistSkuResults(res.skus ?? []);
+      })
+      .catch(() => {
+        if (wishlistSkuSearchGen.current !== gen) {
+          return;
+        }
+        setWishlistSkuResults([]);
+        setWishlistSkuFetchError("Не удалось выполнить поиск в каталоге.");
+      })
+      .finally(() => {
+        if (wishlistSkuSearchGen.current !== gen) {
+          return;
+        }
+        setWishlistSkuLoading(false);
+      });
+  }, [isWishlistModalOpen, wishlistSkuDebouncedQuery, wishlistForm.nodeId]);
 
   const hasAnyPaidServiceEventsInDataset = useMemo(
     () => filterPaidServiceEvents(serviceEvents).length > 0,
@@ -516,6 +586,12 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const openWishlistModalForCreate = (presetNodeId?: string) => {
     setWishlistNotice("");
     setWishlistEditingId(null);
+    wishlistSkuSearchGen.current += 1;
+    setWishlistSkuQuery("");
+    setWishlistSkuDebouncedQuery("");
+    setWishlistSkuResults([]);
+    setWishlistSkuFetchError("");
+    setWishlistSkuPickedPreview(null);
     setWishlistForm(
       createInitialPartWishlistFormValues({
         nodeId: presetNodeId ?? "",
@@ -529,6 +605,12 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const openWishlistModalForEdit = (item: PartWishlistItem) => {
     setWishlistNotice("");
     setWishlistEditingId(item.id);
+    wishlistSkuSearchGen.current += 1;
+    setWishlistSkuQuery("");
+    setWishlistSkuDebouncedQuery("");
+    setWishlistSkuResults([]);
+    setWishlistSkuFetchError("");
+    setWishlistSkuPickedPreview(null);
     setWishlistForm(partWishlistFormValuesFromItem(item));
     setWishlistFormError("");
     setIsWishlistModalOpen(true);
@@ -538,6 +620,12 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setIsWishlistModalOpen(false);
     setWishlistEditingId(null);
     setWishlistFormError("");
+    wishlistSkuSearchGen.current += 1;
+    setWishlistSkuQuery("");
+    setWishlistSkuDebouncedQuery("");
+    setWishlistSkuResults([]);
+    setWishlistSkuFetchError("");
+    setWishlistSkuPickedPreview(null);
   };
 
   const submitWishlistForm = async () => {
@@ -1438,6 +1526,16 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="font-medium text-gray-950">{it.title}</p>
+                                {it.sku ? (
+                                  <div className="mt-1 rounded-lg border border-gray-100 bg-white/80 px-2 py-1.5">
+                                    <p className="text-xs font-medium text-gray-800">
+                                      {getWishlistItemSkuDisplayLines(it.sku).primaryLine}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {getWishlistItemSkuDisplayLines(it.sku).secondaryLine}
+                                    </p>
+                                  </div>
+                                ) : null}
                                 <p className="mt-0.5 text-xs text-gray-600">
                                   Кол-во: {it.quantity}
                                   {it.node ? ` · Узел: ${it.node.name}` : ""}
@@ -2274,6 +2372,109 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   placeholder="Например: масло моторное"
                 />
               </div>
+
+              <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
+                <p className="text-xs font-medium text-gray-700">SKU из каталога</p>
+                <p className="mt-0.5 text-[11px] text-gray-500">
+                  Необязательно. Поиск по названию, бренду или артикулу
+                  {wishlistForm.nodeId.trim()
+                    ? " (учтён выбранный узел)."
+                    : " (от 2 символов). С узлом — можно открыть подбор по узлу без текста."}
+                </p>
+                <label className="mt-2 block text-[11px] font-medium text-gray-600">
+                  Найти в каталоге
+                </label>
+                <input
+                  type="search"
+                  value={wishlistSkuQuery}
+                  onChange={(e) => setWishlistSkuQuery(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"
+                  placeholder="Motul, Brembo, HF155…"
+                  autoComplete="off"
+                />
+                {wishlistSkuFetchError ? (
+                  <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
+                    {wishlistSkuFetchError}
+                  </p>
+                ) : null}
+                {wishlistSkuLoading ? (
+                  <p className="mt-2 text-xs text-gray-500">Поиск…</p>
+                ) : null}
+                {!wishlistSkuLoading && wishlistSkuResults.length > 0 ? (
+                  <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1">
+                    {wishlistSkuResults.map((sku) => (
+                      <li key={sku.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWishlistSkuPickedPreview(sku);
+                            setWishlistForm((f) =>
+                              applyPartSkuViewModelToPartWishlistFormValues(f, sku)
+                            );
+                          }}
+                          className="w-full rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-gray-50"
+                        >
+                          <span className="font-medium text-gray-900">
+                            {getPartSkuViewModelDisplayLines(sku).primaryLine}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] text-gray-500">
+                            {formatPartSkuSearchResultMetaLineRu(sku)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {wishlistForm.skuId.trim() ? (
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-white px-2 py-2">
+                    <p className="text-[11px] font-medium text-gray-600">Выбранный SKU</p>
+                    {wishlistSkuPickedPreview?.id === wishlistForm.skuId.trim() ? (
+                      <>
+                        <p className="mt-0.5 text-xs font-medium text-gray-900">
+                          {
+                            getPartSkuViewModelDisplayLines(wishlistSkuPickedPreview)
+                              .primaryLine
+                          }
+                        </p>
+                        <p className="text-[11px] text-gray-500">
+                          {
+                            getPartSkuViewModelDisplayLines(wishlistSkuPickedPreview)
+                              .secondaryLine
+                          }
+                        </p>
+                      </>
+                    ) : wishlistEditingSourceItem?.sku?.id === wishlistForm.skuId.trim() ? (
+                      <>
+                        <p className="mt-0.5 text-xs font-medium text-gray-900">
+                          {
+                            getWishlistItemSkuDisplayLines(wishlistEditingSourceItem.sku)
+                              .primaryLine
+                          }
+                        </p>
+                        <p className="text-[11px] text-gray-500">
+                          {
+                            getWishlistItemSkuDisplayLines(wishlistEditingSourceItem.sku)
+                              .secondaryLine
+                          }
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-0.5 text-xs text-gray-600">SKU привязан</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWishlistSkuPickedPreview(null);
+                        setWishlistForm((f) => clearPartWishlistFormSkuSelection(f));
+                      }}
+                      className="mt-2 inline-flex rounded-lg border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-800 hover:bg-gray-50"
+                    >
+                      Очистить SKU
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-600">Количество</label>

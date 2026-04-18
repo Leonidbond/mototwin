@@ -1,3 +1,5 @@
+import type { WishlistItemSkuInfo } from "./part-catalog";
+
 /** Matches Prisma `PartWishlistItemStatus`. */
 export type PartWishlistItemStatus = "NEEDED" | "ORDERED" | "BOUGHT" | "INSTALLED";
 
@@ -9,6 +11,8 @@ export type PartWishlistItem = {
   id: string;
   vehicleId: string;
   nodeId: string | null;
+  /** С сервера всегда приходит; в клиентских фикстурах может отсутствовать до обновления. */
+  skuId?: string | null;
   title: string;
   quantity: number;
   status: PartWishlistItemStatus;
@@ -18,6 +22,8 @@ export type PartWishlistItem = {
   createdAt: string;
   updatedAt: string;
   node: { id: string; name: string } | null;
+  /** С сервера приходит при `skuId`; в клиентских фикстурах может отсутствовать. */
+  sku?: WishlistItemSkuInfo | null;
 };
 
 export type PartWishlistItemViewModel = PartWishlistItem & {
@@ -28,6 +34,8 @@ export type PartWishlistItemViewModel = PartWishlistItem & {
 
 /** Form fields as edited in UI (web / Expo). */
 export type PartWishlistFormValues = {
+  /** Пустая строка — позиция без привязки к каталогу. */
+  skuId: string;
   title: string;
   quantity: string;
   status: PartWishlistItemStatus;
@@ -38,9 +46,11 @@ export type PartWishlistFormValues = {
 };
 
 export type CreatePartWishlistItemInput = {
-  title: string;
+  /** Required unless `skuId` is sent (server fills from SKU). */
+  title?: string;
   quantity?: number;
   nodeId?: string | null;
+  skuId?: string | null;
   comment?: string | null;
   status?: PartWishlistItemStatus;
   costAmount?: number | null;
@@ -51,6 +61,7 @@ export type UpdatePartWishlistItemInput = {
   title?: string;
   quantity?: number;
   nodeId?: string | null;
+  skuId?: string | null;
   comment?: string | null;
   status?: PartWishlistItemStatus;
   costAmount?: number | null;

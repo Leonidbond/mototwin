@@ -145,4 +145,18 @@ export {
   partWishlistFormValuesFromItem,
   partWishlistStatusLabelsRu,
   validatePartWishlistFormValues,
+  applyPartSkuViewModelToPartWishlistFormValues,
+  clearPartWishlistFormSkuSelection,
 } from "./part-wishlist";
+export {
+  normalizePartNumber,
+  getSkuDisplayPrice,
+  buildPartSkuLabel,
+  buildWishlistItemSkuInfo,
+  buildPartSkuViewModel,
+  applySkuDefaultsToWishlistDraft,
+  formatWishlistItemSkuSecondaryLineRu,
+  formatPartSkuSearchResultMetaLineRu,
+  getWishlistItemSkuDisplayLines,
+  getPartSkuViewModelDisplayLines,
+} from "./part-catalog";
