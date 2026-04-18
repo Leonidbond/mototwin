@@ -106,6 +106,7 @@ export type {
   UpdateWishlistItemResponse,
   PartSkusResponse,
   PartSkuDetailResponse,
+  PartRecommendationsResponse,
 } from "./api";
 export type {
   PartSkuSearchFilters,
@@ -118,6 +119,11 @@ export type {
   PartSkuViewModel,
   WishlistItemSkuInfo,
 } from "./part-catalog";
+export type {
+  PartRecommendationType,
+  PartRecommendationViewModel,
+  PartRecommendationFilters,
+} from "./part-recommendation";
 export type {
   PartWishlistItem,
   PartWishlistItemStatus,

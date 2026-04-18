@@ -160,3 +160,9 @@ export {
   getWishlistItemSkuDisplayLines,
   getPartSkuViewModelDisplayLines,
 } from "./part-catalog";
+export {
+  buildPartRecommendationViewModel,
+  classifyPartRecommendation,
+  sortPartRecommendations,
+  getPartRecommendationLabel,
+} from "./part-recommendation";

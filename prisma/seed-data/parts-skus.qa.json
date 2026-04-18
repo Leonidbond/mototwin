@@ -1,0 +1,927 @@
+[
+    {
+      "canonicalName": "K&N Oil Filter KN-160",
+      "brandName": "K&N",
+      "partType": "OIL_FILTER",
+      "primaryNodeCode": "ENGINE.LUBE.FILTER",
+      "isOem": false,
+      "category": "Масляный фильтр",
+      "description": "QA seed: масляный фильтр KN-160. Для BMW R 1250 GS 2023 указан как stock fitment в источнике; для других BMW использовать только после проверки.",
+      "priceAmount": 1900,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "KN-160", "numberType": "MANUFACTURER", "brandName": "K&N" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "ENGINE.LUBE.FILTER", "relationType": "PRIMARY", "confidence": 90 }
+      ],
+      "fitments": [
+        {
+          "brandName": "BMW",
+          "modelName": "R 1250 GS",
+          "modelVariantName": "2023 | R 1250 GS Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 85,
+          "note": "Источник указывает KN-160 для 2023 BMW R1250GS; проверить по VIN/мануалу перед реальной покупкой."
+        },
+        {
+          "brandName": "BMW",
+          "modelName": "F 850 GS",
+          "modelVariantName": "2022 | F 850 GS Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "VERIFY_REQUIRED",
+          "confidence": 45,
+          "note": "QA candidate для проверки поиска/рекомендаций; точную применимость подтвердить по каталогу/мануалу."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "K&N Oil Filter KN-160",
+          "priceAmount": 1900,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "K&N Air Filter BM-1113",
+      "brandName": "K&N",
+      "partType": "AIR_FILTER",
+      "primaryNodeCode": "INTAKE.FILTER",
+      "isOem": false,
+      "category": "Воздушный фильтр",
+      "description": "QA seed: воздушный фильтр BM-1113 для BMW R 1250 GS family.",
+      "priceAmount": 8500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "BM-1113", "numberType": "MANUFACTURER", "brandName": "K&N" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "INTAKE.FILTER", "relationType": "PRIMARY", "confidence": 90 }
+      ],
+      "fitments": [
+        {
+          "brandName": "BMW",
+          "modelName": "R 1250 GS",
+          "modelVariantName": "2023 | R 1250 GS Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 85,
+          "note": "Источник указывает BM-1113 для 2023 BMW R1250GS; проверить по VIN/мануалу перед реальной покупкой."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "K&N Air Filter BM-1113",
+          "priceAmount": 8500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "NGK LMAR8AI Spark Plug",
+      "brandName": "NGK",
+      "partType": "SPARK_PLUG",
+      "primaryNodeCode": "ELECTRICS.IGNITION.SPARK",
+      "isOem": false,
+      "category": "Свеча зажигания",
+      "description": "QA seed: свеча NGK LMAR8AI для BMW R 1250 GS 2023 по source fitment.",
+      "priceAmount": 2200,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "LMAR8AI", "numberType": "MANUFACTURER", "brandName": "NGK" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "ELECTRICS.IGNITION.SPARK", "relationType": "PRIMARY", "confidence": 90 }
+      ],
+      "fitments": [
+        {
+          "brandName": "BMW",
+          "modelName": "R 1250 GS",
+          "modelVariantName": "2023 | R 1250 GS Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 85,
+          "note": "Источник указывает LMAR8AI для 2023 BMW R1250GS."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "NGK LMAR8AI Spark Plug",
+          "priceAmount": 2200,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Yuasa YTX14-BS Battery",
+      "brandName": "Yuasa",
+      "partType": "BATTERY",
+      "primaryNodeCode": "ELECTRICS.BATTERY",
+      "isOem": false,
+      "category": "Аккумулятор",
+      "description": "QA seed: аккумулятор YTX14-BS для BMW R 1250 GS 2023 по source fitment.",
+      "priceAmount": 14500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "YTX14-BS", "numberType": "MANUFACTURER", "brandName": "Yuasa" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "ELECTRICS.BATTERY", "relationType": "PRIMARY", "confidence": 85 }
+      ],
+      "fitments": [
+        {
+          "brandName": "BMW",
+          "modelName": "R 1250 GS",
+          "modelVariantName": "2023 | R 1250 GS Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 80,
+          "note": "Источник указывает YTX14-BS для 2023 BMW R1250GS; проверить размеры/полярность перед покупкой."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Yuasa YTX14-BS Battery",
+          "priceAmount": 14500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Michelin Anakee Adventure 120/70R19 Front",
+      "brandName": "Michelin",
+      "partType": "TIRE_FRONT",
+      "primaryNodeCode": "TIRES.FRONT",
+      "isOem": false,
+      "category": "Передняя шина",
+      "description": "QA seed: передняя adventure-шина размера 120/70R19 для BMW R 1250 GS.",
+      "priceAmount": 16500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "120/70R19", "numberType": "INTERNAL", "brandName": "Michelin" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "TIRES.FRONT", "relationType": "PRIMARY", "confidence": 80 }
+      ],
+      "fitments": [
+        {
+          "brandName": "BMW",
+          "modelName": "R 1250 GS",
+          "modelVariantName": "2023 | R 1250 GS Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 80,
+          "note": "Размер front tire для 2023 BMW R1250GS: 120/70R19; проверить индекс нагрузки/скорости."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Michelin Anakee Adventure 120/70R19 Front",
+          "priceAmount": 16500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Michelin Anakee Adventure 170/60R17 Rear",
+      "brandName": "Michelin",
+      "partType": "TIRE_REAR",
+      "primaryNodeCode": "TIRES.REAR",
+      "isOem": false,
+      "category": "Задняя шина",
+      "description": "QA seed: задняя adventure-шина размера 170/60R17 для BMW R 1250 GS.",
+      "priceAmount": 20500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "170/60R17", "numberType": "INTERNAL", "brandName": "Michelin" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "TIRES.REAR", "relationType": "PRIMARY", "confidence": 80 }
+      ],
+      "fitments": [
+        {
+          "brandName": "BMW",
+          "modelName": "R 1250 GS",
+          "modelVariantName": "2023 | R 1250 GS Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 80,
+          "note": "Размер rear tire для 2023 BMW R1250GS: 170/60R17; проверить индекс нагрузки/скорости."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Michelin Anakee Adventure 170/60R17 Rear",
+          "priceAmount": 20500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Michelin Anakee Adventure 90/90B21 Front",
+      "brandName": "Michelin",
+      "partType": "TIRE_FRONT",
+      "primaryNodeCode": "TIRES.FRONT",
+      "isOem": false,
+      "category": "Передняя шина",
+      "description": "QA seed: передняя adventure-шина размера 90/90B21 для BMW F 850 GS.",
+      "priceAmount": 15000,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "90/90B21", "numberType": "INTERNAL", "brandName": "Michelin" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "TIRES.FRONT", "relationType": "PRIMARY", "confidence": 80 }
+      ],
+      "fitments": [
+        {
+          "brandName": "BMW",
+          "modelName": "F 850 GS",
+          "modelVariantName": "2022 | F 850 GS Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 75,
+          "note": "Размер front tire для 2022 BMW F850GS: 90/90B21; проверить индекс нагрузки/скорости."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Michelin Anakee Adventure 90/90B21 Front",
+          "priceAmount": 15000,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Michelin Anakee Adventure 150/70R17 Rear",
+      "brandName": "Michelin",
+      "partType": "TIRE_REAR",
+      "primaryNodeCode": "TIRES.REAR",
+      "isOem": false,
+      "category": "Задняя шина",
+      "description": "QA seed: задняя adventure-шина размера 150/70R17 для BMW F 850 GS.",
+      "priceAmount": 19000,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "150/70R17", "numberType": "INTERNAL", "brandName": "Michelin" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "TIRES.REAR", "relationType": "PRIMARY", "confidence": 80 }
+      ],
+      "fitments": [
+        {
+          "brandName": "BMW",
+          "modelName": "F 850 GS",
+          "modelVariantName": "2022 | F 850 GS Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 75,
+          "note": "Размер rear tire для 2022 BMW F850GS: 150/70R17; проверить индекс нагрузки/скорости."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Michelin Anakee Adventure 150/70R17 Rear",
+          "priceAmount": 19000,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "DID 525VX3 X-Ring Chain 122 Links",
+      "brandName": "DID",
+      "partType": "CHAIN",
+      "primaryNodeCode": "DRIVETRAIN.CHAIN",
+      "isOem": false,
+      "category": "Цепь",
+      "description": "QA seed: цепь 525, 122 links для BMW F 850 GS по stock fitment данным; проверить длину/звезды перед покупкой.",
+      "priceAmount": 16500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "525VX3-122", "numberType": "INTERNAL", "brandName": "DID" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "DRIVETRAIN.CHAIN", "relationType": "PRIMARY", "confidence": 75 }
+      ],
+      "fitments": [
+        {
+          "brandName": "BMW",
+          "modelName": "F 850 GS",
+          "modelVariantName": "2022 | F 850 GS Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 70,
+          "note": "Stock data: 525 chain, 122 links; проверить фактические звезды/комплектацию."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "DID 525VX3 X-Ring Chain 122 Links",
+          "priceAmount": 16500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Hiflofiltro HF155 Oil Filter",
+      "brandName": "Hiflofiltro",
+      "partType": "OIL_FILTER",
+      "primaryNodeCode": "ENGINE.LUBE.FILTER",
+      "isOem": false,
+      "category": "Масляный фильтр",
+      "description": "QA seed: HF155; заменяет ряд OEM KTM oil-filter номеров. Для KTM 690 Enduro R 2022 использовать как кандидат с проверкой совместимости.",
+      "priceAmount": 900,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "HF155", "numberType": "MANUFACTURER", "brandName": "Hiflofiltro" },
+        { "number": "580.38.005.000", "numberType": "OEM", "brandName": "KTM" },
+        { "number": "580.38.005.100", "numberType": "OEM", "brandName": "KTM" },
+        { "number": "580.38.005.101", "numberType": "OEM", "brandName": "KTM" },
+        { "number": "901.38.015.000", "numberType": "OEM", "brandName": "KTM" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "ENGINE.LUBE.FILTER", "relationType": "PRIMARY", "confidence": 85 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "690 Enduro R",
+          "modelVariantName": "2022 | 690 Enduro R Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "VERIFY_REQUIRED",
+          "confidence": 70,
+          "note": "HF155 указан как replacement для OEM KTM номеров; проверить по конкретной модификации/первичный-вторичный фильтр."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Hiflofiltro HF155 Oil Filter",
+          "priceAmount": 900,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Twin Air 155510P Air Filter with Cage",
+      "brandName": "Twin Air",
+      "partType": "AIR_FILTER",
+      "primaryNodeCode": "INTAKE.FILTER",
+      "isOem": false,
+      "category": "Воздушный фильтр",
+      "description": "QA seed: Twin Air 155510P для KTM 690 Enduro R 2016–2024.",
+      "priceAmount": 6500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "155510P", "numberType": "MANUFACTURER", "brandName": "Twin Air" },
+        { "number": "76506015100", "numberType": "OEM", "brandName": "KTM" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "INTAKE.FILTER", "relationType": "PRIMARY", "confidence": 90 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "690 Enduro R",
+          "modelVariantName": "2022 | 690 Enduro R Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 90,
+          "note": "Twin Air application data: KTM 690 Enduro R 2016–2024."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Twin Air 155510P Air Filter with Cage",
+          "priceAmount": 6500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "NGK LKAR9BI-10 Laser Iridium Spark Plug",
+      "brandName": "NGK",
+      "partType": "SPARK_PLUG",
+      "primaryNodeCode": "ELECTRICS.IGNITION.SPARK",
+      "isOem": false,
+      "category": "Свеча зажигания",
+      "description": "QA seed: свеча LKAR9BI-10 для KTM 690 Enduro R 2022 по source fitment.",
+      "priceAmount": 2600,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "LKAR9BI-10", "numberType": "MANUFACTURER", "brandName": "NGK" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "ELECTRICS.IGNITION.SPARK", "relationType": "PRIMARY", "confidence": 90 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "690 Enduro R",
+          "modelVariantName": "2022 | 690 Enduro R Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 85,
+          "note": "Источник указывает LKAR9BI-10 для 2022 KTM 690 Enduro R."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "NGK LKAR9BI-10 Laser Iridium Spark Plug",
+          "priceAmount": 2600,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Yuasa YTZ10S Battery",
+      "brandName": "Yuasa",
+      "partType": "BATTERY",
+      "primaryNodeCode": "ELECTRICS.BATTERY",
+      "isOem": false,
+      "category": "Аккумулятор",
+      "description": "QA seed: аккумулятор YTZ10S для KTM 690 Enduro R 2022 по source fitment.",
+      "priceAmount": 12000,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "YTZ10S", "numberType": "MANUFACTURER", "brandName": "Yuasa" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "ELECTRICS.BATTERY", "relationType": "PRIMARY", "confidence": 85 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "690 Enduro R",
+          "modelVariantName": "2022 | 690 Enduro R Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 80,
+          "note": "Источник указывает YTZ10S для 2022 KTM 690 Enduro R; проверить размеры/полярность."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Yuasa YTZ10S Battery",
+          "priceAmount": 12000,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "DID 520VX3 X-Ring Chain 116 Links",
+      "brandName": "DID",
+      "partType": "CHAIN",
+      "primaryNodeCode": "DRIVETRAIN.CHAIN",
+      "isOem": false,
+      "category": "Цепь",
+      "description": "QA seed: цепь 520, 116 links для KTM 690 Enduro R; проверить фактическую длину/звезды.",
+      "priceAmount": 12500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "520VX3-116", "numberType": "INTERNAL", "brandName": "DID" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "DRIVETRAIN.CHAIN", "relationType": "PRIMARY", "confidence": 80 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "690 Enduro R",
+          "modelVariantName": "2022 | 690 Enduro R Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 75,
+          "note": "Источник указывает chain type 520 и 116 links; встречаются разные данные по звездам, проверить перед покупкой."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "DID 520VX3 X-Ring Chain 116 Links",
+          "priceAmount": 12500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Michelin Enduro Medium 2 90/90-21 Front",
+      "brandName": "Michelin",
+      "partType": "TIRE_FRONT",
+      "primaryNodeCode": "TIRES.FRONT",
+      "isOem": false,
+      "category": "Передняя шина",
+      "description": "QA seed: передняя enduro-шина 90/90-21 для KTM 690 Enduro R.",
+      "priceAmount": 13500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "90/90-21", "numberType": "INTERNAL", "brandName": "Michelin" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "TIRES.FRONT", "relationType": "PRIMARY", "confidence": 85 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "690 Enduro R",
+          "modelVariantName": "2022 | 690 Enduro R Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 80,
+          "note": "Размер front tire для 2022 KTM 690 Enduro R: 90/90-21; проверить индекс/тип камеры."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Michelin Enduro Medium 2 90/90-21 Front",
+          "priceAmount": 13500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Michelin Enduro Medium 2 140/80-18 Rear",
+      "brandName": "Michelin",
+      "partType": "TIRE_REAR",
+      "primaryNodeCode": "TIRES.REAR",
+      "isOem": false,
+      "category": "Задняя шина",
+      "description": "QA seed: задняя enduro-шина 140/80-18 для KTM 690 Enduro R.",
+      "priceAmount": 16500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "140/80-18", "numberType": "INTERNAL", "brandName": "Michelin" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "TIRES.REAR", "relationType": "PRIMARY", "confidence": 85 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "690 Enduro R",
+          "modelVariantName": "2022 | 690 Enduro R Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 80,
+          "note": "Размер rear tire для 2022 KTM 690 Enduro R: 140/80-18; проверить индекс/тип камеры."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Michelin Enduro Medium 2 140/80-18 Rear",
+          "priceAmount": 16500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Motorex Power Synth 4T SAE 10W-50 1L",
+      "brandName": "Motorex",
+      "partType": "ENGINE_OIL",
+      "primaryNodeCode": "ENGINE.LUBE.OIL",
+      "isOem": false,
+      "category": "Масло двигателя",
+      "description": "QA seed: Motorex Power Synth SAE 10W-50; KTM 890 Adventure 2023 official spec указывает это масло.",
+      "priceAmount": 2200,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "10W-50", "numberType": "INTERNAL", "brandName": "Motorex" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "ENGINE.LUBE.OIL", "relationType": "PRIMARY", "confidence": 90 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "890 Adventure",
+          "modelVariantName": "2023 | 890 Adventure Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 85,
+          "note": "KTM official spec указывает Motorex Power Synth SAE 10W-50; проверить объем и спецификацию по мануалу."
+        },
+        {
+          "brandName": "KTM",
+          "modelName": "690 Enduro R",
+          "modelVariantName": "2022 | 690 Enduro R Standard",
+          "yearFrom": 2022,
+          "yearTo": 2022,
+          "fitmentType": "GENERIC_NODE",
+          "confidence": 50,
+          "note": "Универсальный QA-кандидат 10W-50; проверить спецификацию по мануалу."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Motorex Power Synth 4T SAE 10W-50 1L",
+          "priceAmount": 2200,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Hiflofiltro HF650 Oil Filter",
+      "brandName": "Hiflofiltro",
+      "partType": "OIL_FILTER",
+      "primaryNodeCode": "ENGINE.LUBE.FILTER",
+      "isOem": false,
+      "category": "Масляный фильтр",
+      "description": "QA seed: HF650 для KTM 890 Adventure family; для 890 Adventure Standard помечено как требует проверки.",
+      "priceAmount": 1200,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "HF650", "numberType": "MANUFACTURER", "brandName": "Hiflofiltro" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "ENGINE.LUBE.FILTER", "relationType": "PRIMARY", "confidence": 80 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "890 Adventure",
+          "modelVariantName": "2023 | 890 Adventure Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "VERIFY_REQUIRED",
+          "confidence": 60,
+          "note": "Hiflo catalogue указывает HF650 для близкой 890 Adventure R/Rally; для Standard проверить по OEM/мануалу."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Hiflofiltro HF650 Oil Filter",
+          "priceAmount": 1200,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Twin Air 154524FRX Pre-Oiled Air Filter",
+      "brandName": "Twin Air",
+      "partType": "AIR_FILTER",
+      "primaryNodeCode": "INTAKE.FILTER",
+      "isOem": false,
+      "category": "Воздушный фильтр",
+      "description": "QA seed: Twin Air 154524FRX для KTM 790/890 Adventure family.",
+      "priceAmount": 5200,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "154524FRX", "numberType": "MANUFACTURER", "brandName": "Twin Air" },
+        { "number": "60306015100", "numberType": "OEM", "brandName": "KTM" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "INTAKE.FILTER", "relationType": "PRIMARY", "confidence": 85 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "890 Adventure",
+          "modelVariantName": "2023 | 890 Adventure Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "VERIFY_REQUIRED",
+          "confidence": 70,
+          "note": "Twin Air application data покрывает KTM 790/890 family; проверить exact standard variant."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Twin Air 154524FRX Pre-Oiled Air Filter",
+          "priceAmount": 5200,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "DID 520VX3 X-Ring Chain",
+      "brandName": "DID",
+      "partType": "CHAIN",
+      "primaryNodeCode": "DRIVETRAIN.CHAIN",
+      "isOem": false,
+      "category": "Цепь",
+      "description": "QA seed: 520 X-Ring chain для KTM 890 Adventure; official KTM spec указывает chain 520 X-Ring.",
+      "priceAmount": 13500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "520VX3", "numberType": "MANUFACTURER", "brandName": "DID" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "DRIVETRAIN.CHAIN", "relationType": "PRIMARY", "confidence": 85 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "890 Adventure",
+          "modelVariantName": "2023 | 890 Adventure Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 80,
+          "note": "KTM official spec указывает 520 X-Ring; длину цепи проверить по комплектации."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "DID 520VX3 X-Ring Chain",
+          "priceAmount": 13500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "EBC FA181R R-Series Sintered Rear Brake Pads",
+      "brandName": "EBC",
+      "partType": "BRAKE_PADS_REAR",
+      "primaryNodeCode": "BRAKES.REAR.PADS",
+      "isOem": false,
+      "category": "Задние тормозные колодки",
+      "description": "QA seed: EBC FA181R rear pads shown as fitting KTM 890 Adventure 2023 in retailer source.",
+      "priceAmount": 4500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "FA181R", "numberType": "MANUFACTURER", "brandName": "EBC" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "BRAKES.REAR.PADS", "relationType": "PRIMARY", "confidence": 80 }
+      ],
+      "fitments": [
+        {
+          "brandName": "KTM",
+          "modelName": "890 Adventure",
+          "modelVariantName": "2023 | 890 Adventure Standard",
+          "yearFrom": 2023,
+          "yearTo": 2023,
+          "fitmentType": "MODEL_FIT",
+          "confidence": 75,
+          "note": "Retailer source shows EBC FA181R fitting 2023 KTM 890 Adventure; verify before purchase."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "EBC FA181R R-Series Sintered Rear Brake Pads",
+          "priceAmount": 4500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Motul RBF 600 DOT 4 Brake Fluid 500ml",
+      "brandName": "Motul",
+      "partType": "BRAKE_FLUID",
+      "primaryNodeCode": "BRAKES.FLUID",
+      "isOem": false,
+      "category": "Тормозная жидкость",
+      "description": "QA seed: универсальная DOT 4 тормозная жидкость для проверки рекомендаций и wishlist.",
+      "priceAmount": 1600,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "RBF600", "numberType": "MANUFACTURER", "brandName": "Motul" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "BRAKES.FLUID", "relationType": "PRIMARY", "confidence": 70 },
+        { "nodeCode": "BRAKES.FRONT.PADS", "relationType": "RELATED_CONSUMABLE", "confidence": 55 },
+        { "nodeCode": "BRAKES.REAR.PADS", "relationType": "RELATED_CONSUMABLE", "confidence": 55 }
+      ],
+      "fitments": [
+        {
+          "fitmentType": "GENERIC_NODE",
+          "confidence": 40,
+          "note": "Универсальный расходник; проверить требования тормозной системы."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Motul RBF 600 DOT 4 Brake Fluid 500ml",
+          "priceAmount": 1600,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Motul Motocool Expert Coolant 1L",
+      "brandName": "Motul",
+      "partType": "COOLANT",
+      "primaryNodeCode": "COOLING.LIQUID",
+      "isOem": false,
+      "category": "Охлаждающая жидкость",
+      "description": "QA seed: универсальная охлаждающая жидкость для жидкостных систем охлаждения.",
+      "priceAmount": 1500,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "MOTOCOOL-EXPERT", "numberType": "INTERNAL", "brandName": "Motul" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "COOLING.LIQUID", "relationType": "PRIMARY", "confidence": 60 }
+      ],
+      "fitments": [
+        {
+          "fitmentType": "GENERIC_NODE",
+          "confidence": 40,
+          "note": "Универсальный расходник; проверить спецификацию охлаждающей жидкости по мануалу."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Motul Motocool Expert Coolant 1L",
+          "priceAmount": 1500,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    },
+    {
+      "canonicalName": "Motul Fork Oil Expert 5W 1L",
+      "brandName": "Motul",
+      "partType": "FORK_OIL",
+      "primaryNodeCode": "SUSPENSION.FRONT.OIL",
+      "isOem": false,
+      "category": "Масло вилки",
+      "description": "QA seed: универсальное масло вилки 5W для проверки рекомендаций по подвеске.",
+      "priceAmount": 2200,
+      "currency": "RUB",
+      "partNumbers": [
+        { "number": "FORK-OIL-5W", "numberType": "INTERNAL", "brandName": "Motul" }
+      ],
+      "nodeLinks": [
+        { "nodeCode": "SUSPENSION.FRONT.OIL", "relationType": "PRIMARY", "confidence": 60 }
+      ],
+      "fitments": [
+        {
+          "fitmentType": "GENERIC_NODE",
+          "confidence": 40,
+          "note": "Универсальный расходник; вязкость/объем проверить по сервисному мануалу."
+        }
+      ],
+      "offers": [
+        {
+          "sourceName": "QA Seed",
+          "title": "Motul Fork Oil Expert 5W 1L",
+          "priceAmount": 2200,
+          "currency": "RUB",
+          "availability": "QA_SAMPLE"
+        }
+      ]
+    }
+  ]

@@ -829,6 +829,8 @@ KTM 500 EXC-F 2022
 prisma/seed-data/parts-skus.json
 ```
 
+Дополнительно для QA на текущих демо-моделях (BMW / KTM из основного сида) используется **`prisma/seed-data/parts-skus.qa.json`**: загружается тем же `prisma/seed.ts` после MVP JSON, идемпотентно, с резолвом fitment по именам бренда/модели/модификации. Подробности: [parts-catalog-qa-seed.md](./parts-catalog-qa-seed.md).
+
 Формат:
 
 ```json
@@ -981,6 +983,17 @@ VERIFY_REQUIRED
    - `Универсальная позиция для узла`;
    - `Сопутствующий расходник`;
    - `Проверьте совместимость`.
+
+### 11.4. MVP endpoint рекомендаций (реализовано)
+
+В текущем MVP рекомендации отдаются через `GET /api/parts/recommended-skus?vehicleId=...&nodeId=...`.
+Маршрут использует:
+- `PartSkuNodeLink` как основной источник кандидатов для узла;
+- `PartFitment` для повышения уверенности и выбора честного типа рекомендации;
+- консервативную маркировку (`VERIFY_REQUIRED`, `RELATED_CONSUMABLE`) там, где точной совместимости недостаточно.
+
+В ответе возвращаются `PartRecommendationViewModel` с полями:
+`skuId`, `canonicalName`, `brandName`, `partType`, `partNumbers`, `priceAmount`, `currency`, `primaryNode`, `relationType`, `confidence`, `recommendationType`, `recommendationLabel`, `compatibilityWarning`.
 5. Отсортировать:
    - exact fit выше;
    - primary выше;

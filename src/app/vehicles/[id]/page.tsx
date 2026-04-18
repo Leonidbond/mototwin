@@ -78,6 +78,7 @@ import type {
   VehicleDetail,
   VehicleDetailApiRecord,
   AddServiceEventFormValues,
+  PartRecommendationViewModel,
   PartWishlistFormValues,
   PartWishlistItem,
   PartSkuViewModel,
@@ -149,6 +150,12 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [wishlistSkuPickedPreview, setWishlistSkuPickedPreview] = useState<PartSkuViewModel | null>(
     null
   );
+  const [wishlistRecommendations, setWishlistRecommendations] = useState<
+    PartRecommendationViewModel[]
+  >([]);
+  const [wishlistRecommendationsLoading, setWishlistRecommendationsLoading] = useState(false);
+  const [wishlistRecommendationsError, setWishlistRecommendationsError] = useState("");
+  const [wishlistAddingRecommendedSkuId, setWishlistAddingRecommendedSkuId] = useState("");
   const wishlistSkuSearchGen = useRef(0);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -304,6 +311,33 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         setWishlistSkuLoading(false);
       });
   }, [isWishlistModalOpen, wishlistSkuDebouncedQuery, wishlistForm.nodeId]);
+
+  useEffect(() => {
+    if (!isWishlistModalOpen || !vehicleId) {
+      return;
+    }
+    const nodeId = wishlistForm.nodeId.trim();
+    if (!nodeId) {
+      setWishlistRecommendations([]);
+      setWishlistRecommendationsError("");
+      setWishlistRecommendationsLoading(false);
+      return;
+    }
+    setWishlistRecommendationsLoading(true);
+    setWishlistRecommendationsError("");
+    void vehicleDetailApi
+      .getRecommendedSkusForNode(vehicleId, nodeId)
+      .then((res) => {
+        setWishlistRecommendations(res.recommendations ?? []);
+      })
+      .catch(() => {
+        setWishlistRecommendations([]);
+        setWishlistRecommendationsError("Не удалось загрузить рекомендации по узлу.");
+      })
+      .finally(() => {
+        setWishlistRecommendationsLoading(false);
+      });
+  }, [isWishlistModalOpen, vehicleId, wishlistForm.nodeId]);
 
   const hasAnyPaidServiceEventsInDataset = useMemo(
     () => filterPaidServiceEvents(serviceEvents).length > 0,
@@ -592,6 +626,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setWishlistSkuResults([]);
     setWishlistSkuFetchError("");
     setWishlistSkuPickedPreview(null);
+    setWishlistRecommendations([]);
+    setWishlistRecommendationsError("");
+    setWishlistAddingRecommendedSkuId("");
     setWishlistForm(
       createInitialPartWishlistFormValues({
         nodeId: presetNodeId ?? "",
@@ -611,6 +648,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setWishlistSkuResults([]);
     setWishlistSkuFetchError("");
     setWishlistSkuPickedPreview(null);
+    setWishlistRecommendations([]);
+    setWishlistRecommendationsError("");
+    setWishlistAddingRecommendedSkuId("");
     setWishlistForm(partWishlistFormValuesFromItem(item));
     setWishlistFormError("");
     setIsWishlistModalOpen(true);
@@ -626,6 +666,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setWishlistSkuResults([]);
     setWishlistSkuFetchError("");
     setWishlistSkuPickedPreview(null);
+    setWishlistRecommendations([]);
+    setWishlistRecommendationsError("");
+    setWishlistAddingRecommendedSkuId("");
   };
 
   const submitWishlistForm = async () => {
@@ -680,6 +723,64 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       );
     } finally {
       setIsWishlistSaving(false);
+    }
+  };
+
+  const addRecommendedSkuToWishlist = async (rec: PartRecommendationViewModel) => {
+    if (!vehicleId || wishlistEditingId) {
+      const skuFromRecommendation: PartSkuViewModel = {
+        id: rec.skuId,
+        seedKey: null,
+        primaryNodeId: rec.primaryNode?.id ?? null,
+        brandName: rec.brandName,
+        canonicalName: rec.canonicalName,
+        partType: rec.partType,
+        description: null,
+        category: null,
+        priceAmount: rec.priceAmount,
+        currency: rec.currency,
+        sourceUrl: null,
+        isOem: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        primaryNode: rec.primaryNode,
+        nodeLinks: [],
+        fitments: [],
+        offers: [],
+        partNumbers: rec.partNumbers.map((number, idx) => ({
+          id: `${rec.skuId}-${idx}`,
+          skuId: rec.skuId,
+          number,
+          normalizedNumber: number,
+          numberType: "MANUFACTURER",
+          brandName: rec.brandName,
+          createdAt: new Date().toISOString(),
+        })),
+      };
+      setWishlistSkuPickedPreview(null);
+      setWishlistForm((f) => applyPartSkuViewModelToPartWishlistFormValues(f, skuFromRecommendation));
+      return;
+    }
+    try {
+      setWishlistAddingRecommendedSkuId(rec.skuId);
+      const payload = normalizeCreatePartWishlistPayload({
+        ...createInitialPartWishlistFormValues({
+          nodeId: wishlistForm.nodeId,
+          status: "NEEDED",
+        }),
+        skuId: rec.skuId,
+      });
+      await vehicleDetailApi.createWishlistItem(vehicleId, payload);
+      await Promise.all([loadWishlist(), loadNodeTree()]);
+      setWishlistNotice("Рекомендованный SKU добавлен в список покупок.");
+      closeWishlistModal();
+    } catch (e) {
+      setWishlistFormError(
+        e instanceof Error ? e.message : "Не удалось добавить рекомендованный SKU."
+      );
+    } finally {
+      setWishlistAddingRecommendedSkuId("");
     }
   };
 
@@ -2381,6 +2482,69 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     ? " (учтён выбранный узел)."
                     : " (от 2 символов). С узлом — можно открыть подбор по узлу без текста."}
                 </p>
+                {wishlistForm.nodeId.trim() ? (
+                  <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2">
+                    <p className="text-[11px] font-medium text-gray-700">Рекомендации по узлу</p>
+                    {wishlistRecommendationsError ? (
+                      <p className="mt-1 text-[11px]" style={{ color: productSemanticColors.error }}>
+                        {wishlistRecommendationsError}
+                      </p>
+                    ) : null}
+                    {wishlistRecommendationsLoading ? (
+                      <p className="mt-1 text-[11px] text-gray-500">Загружаем рекомендации…</p>
+                    ) : null}
+                    {!wishlistRecommendationsLoading && wishlistRecommendations.length === 0 ? (
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        Для этого узла пока нет рекомендаций.
+                      </p>
+                    ) : null}
+                    {!wishlistRecommendationsLoading && wishlistRecommendations.length > 0 ? (
+                      <ul className="mt-2 space-y-1">
+                        {wishlistRecommendations.slice(0, 6).map((rec) => (
+                          <li
+                            key={rec.skuId}
+                            className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5"
+                          >
+                            <p className="text-xs font-medium text-gray-900">
+                              {rec.brandName} — {rec.canonicalName}
+                            </p>
+                            <p className="text-[11px] text-gray-500">
+                              {[
+                                rec.partNumbers.slice(0, 2).join(", "),
+                                rec.partType,
+                                rec.priceAmount != null
+                                  ? `${formatExpenseAmountRu(rec.priceAmount)} ${
+                                      rec.currency?.trim() || ""
+                                    }`.trim()
+                                  : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                            <p className="text-[11px] text-gray-700">{rec.recommendationLabel}</p>
+                            {rec.compatibilityWarning ? (
+                              <p className="text-[11px] text-amber-700">
+                                {rec.compatibilityWarning}
+                              </p>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => void addRecommendedSkuToWishlist(rec)}
+                              disabled={wishlistAddingRecommendedSkuId === rec.skuId}
+                              className="mt-1 inline-flex rounded-lg border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {wishlistEditingId
+                                ? "Применить SKU"
+                                : wishlistAddingRecommendedSkuId === rec.skuId
+                                  ? "Добавление…"
+                                  : "Добавить в список покупок"}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
                 <label className="mt-2 block text-[11px] font-medium text-gray-600">
                   Найти в каталоге
                 </label>

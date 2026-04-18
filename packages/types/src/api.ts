@@ -1,5 +1,6 @@
 import type { PartWishlistItem } from "./part-wishlist";
 import type { PartSkuViewModel } from "./part-catalog";
+import type { PartRecommendationViewModel } from "./part-recommendation";
 import type { ServiceEventItem } from "./service-event";
 import type {
   BrandItem,
@@ -82,4 +83,8 @@ export type PartSkusResponse = {
 
 export type PartSkuDetailResponse = {
   sku: PartSkuViewModel;
+};
+
+export type PartRecommendationsResponse = {
+  recommendations: PartRecommendationViewModel[];
 };

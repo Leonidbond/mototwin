@@ -34,6 +34,7 @@ import {
 } from "@mototwin/domain";
 import type {
   FlattenedNodeSelectOption,
+  PartRecommendationViewModel,
   PartSkuViewModel,
   PartWishlistFormValues,
   PartWishlistItem,
@@ -84,6 +85,10 @@ export function WishlistItemEditor({
   const [wishlistSkuPickedPreview, setWishlistSkuPickedPreview] = useState<PartSkuViewModel | null>(
     null
   );
+  const [recommendations, setRecommendations] = useState<PartRecommendationViewModel[]>([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState("");
+  const [addingRecommendedSkuId, setAddingRecommendedSkuId] = useState("");
   const wishlistSkuSearchGen = useRef(0);
   const [loadedWishlistItem, setLoadedWishlistItem] = useState<PartWishlistItem | null>(null);
 
@@ -204,6 +209,95 @@ export function WishlistItemEditor({
       });
   }, [apiBaseUrl, isLoading, wishlistSkuDebouncedQuery, form.nodeId]);
 
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+    const nodeId = form.nodeId.trim();
+    if (!nodeId) {
+      setRecommendations([]);
+      setRecommendationsError("");
+      setRecommendationsLoading(false);
+      return;
+    }
+    setRecommendationsLoading(true);
+    setRecommendationsError("");
+    const client = createApiClient({ baseUrl: apiBaseUrl });
+    const endpoints = createMotoTwinEndpoints(client);
+    void endpoints
+      .getRecommendedSkusForNode(vehicleId, nodeId)
+      .then((res) => {
+        setRecommendations(res.recommendations ?? []);
+      })
+      .catch(() => {
+        setRecommendations([]);
+        setRecommendationsError("Не удалось загрузить рекомендации по узлу.");
+      })
+      .finally(() => {
+        setRecommendationsLoading(false);
+      });
+  }, [apiBaseUrl, form.nodeId, isLoading, vehicleId]);
+
+  const applyRecommendedSkuToForm = (rec: PartRecommendationViewModel) => {
+    const skuFromRecommendation: PartSkuViewModel = {
+      id: rec.skuId,
+      seedKey: null,
+      primaryNodeId: rec.primaryNode?.id ?? null,
+      brandName: rec.brandName,
+      canonicalName: rec.canonicalName,
+      partType: rec.partType,
+      description: null,
+      category: null,
+      priceAmount: rec.priceAmount,
+      currency: rec.currency,
+      sourceUrl: null,
+      isOem: false,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      primaryNode: rec.primaryNode,
+      nodeLinks: [],
+      fitments: [],
+      offers: [],
+      partNumbers: rec.partNumbers.map((number, idx) => ({
+        id: `${rec.skuId}-${idx}`,
+        skuId: rec.skuId,
+        number,
+        normalizedNumber: number,
+        numberType: "MANUFACTURER",
+        brandName: rec.brandName,
+        createdAt: new Date().toISOString(),
+      })),
+    };
+    setWishlistSkuPickedPreview(skuFromRecommendation);
+    setForm((f) => applyPartSkuViewModelToPartWishlistFormValues(f, skuFromRecommendation));
+  };
+
+  async function addRecommendedSku(rec: PartRecommendationViewModel) {
+    if (mode === "edit") {
+      applyRecommendedSkuToForm(rec);
+      return;
+    }
+    try {
+      setAddingRecommendedSkuId(rec.skuId);
+      const client = createApiClient({ baseUrl: apiBaseUrl });
+      const endpoints = createMotoTwinEndpoints(client);
+      const payload = normalizeCreatePartWishlistPayload({
+        ...createInitialPartWishlistFormValues({ nodeId: form.nodeId, status: "NEEDED" }),
+        skuId: rec.skuId,
+      });
+      await endpoints.createWishlistItem(vehicleId, payload);
+      router.replace(`/vehicles/${vehicleId}/wishlist`);
+    } catch (e) {
+      console.error(e);
+      setSaveError(
+        e instanceof Error ? e.message : "Не удалось добавить рекомендованный SKU."
+      );
+    } finally {
+      setAddingRecommendedSkuId("");
+    }
+  }
+
   async function save() {
     if (!vehicleId) {
       setSaveError("Не удалось определить ID мотоцикла.");
@@ -323,6 +417,51 @@ export function WishlistItemEditor({
             <Text style={styles.skuBoxHint}>
               Необязательно. От 2 символов в поиске; если выбран узел — можно искать без текста.
             </Text>
+            {form.nodeId.trim() ? (
+              <View style={styles.recommendationsBox}>
+                <Text style={styles.labelCompact}>Рекомендации по узлу</Text>
+                {recommendationsError ? <Text style={styles.inlineError}>{recommendationsError}</Text> : null}
+                {recommendationsLoading ? <Text style={styles.mutedSmall}>Загружаем рекомендации…</Text> : null}
+                {!recommendationsLoading && recommendations.length === 0 ? (
+                  <Text style={styles.mutedSmall}>Для этого узла пока нет рекомендаций.</Text>
+                ) : null}
+                {!recommendationsLoading
+                  ? recommendations.slice(0, 6).map((rec) => (
+                      <View key={rec.skuId} style={styles.recommendationCard}>
+                        <Text style={styles.skuResultPrimary}>
+                          {rec.brandName} — {rec.canonicalName}
+                        </Text>
+                        <Text style={styles.skuResultMeta}>
+                          {[rec.partNumbers.slice(0, 2).join(", "), rec.partType]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </Text>
+                        <Text style={styles.recommendationLabel}>{rec.recommendationLabel}</Text>
+                        {rec.compatibilityWarning ? (
+                          <Text style={styles.recommendationWarning}>{rec.compatibilityWarning}</Text>
+                        ) : null}
+                        <Pressable
+                          onPress={() => void addRecommendedSku(rec)}
+                          disabled={addingRecommendedSkuId === rec.skuId}
+                          style={({ pressed }) => [
+                            styles.recommendationBtn,
+                            pressed && styles.recommendationBtnPressed,
+                            addingRecommendedSkuId === rec.skuId && styles.recommendationBtnDisabled,
+                          ]}
+                        >
+                          <Text style={styles.recommendationBtnText}>
+                            {mode === "edit"
+                              ? "Применить SKU"
+                              : addingRecommendedSkuId === rec.skuId
+                                ? "Добавление…"
+                                : "Добавить в список покупок"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))
+                  : null}
+              </View>
+            ) : null}
             <Text style={styles.labelCompact}>Найти в каталоге</Text>
             <TextInput
               value={wishlistSkuQuery}
@@ -589,6 +728,37 @@ const styles = StyleSheet.create({
   },
   skuBoxTitle: { fontSize: 12, fontWeight: "700", color: c.textPrimary },
   skuBoxHint: { marginTop: 4, fontSize: 11, color: c.textMuted, lineHeight: 15 },
+  recommendationsBox: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 10,
+    backgroundColor: c.card,
+    padding: 10,
+  },
+  recommendationCard: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 10,
+    padding: 8,
+    backgroundColor: c.cardMuted,
+  },
+  recommendationLabel: { marginTop: 4, fontSize: 11, color: c.textSecondary, fontWeight: "600" },
+  recommendationWarning: { marginTop: 2, fontSize: 11, color: "#92400e" },
+  recommendationBtn: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: c.card,
+  },
+  recommendationBtnPressed: { opacity: 0.9 },
+  recommendationBtnDisabled: { opacity: 0.65 },
+  recommendationBtnText: { fontSize: 12, fontWeight: "600", color: c.textPrimary },
   skuResults: {
     marginTop: 8,
     maxHeight: 200,

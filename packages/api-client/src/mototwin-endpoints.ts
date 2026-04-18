@@ -9,6 +9,7 @@ import type {
   GarageVehiclesResponse,
   ModelVariantsResponse,
   ModelsResponse,
+  PartRecommendationsResponse,
   PartSkuDetailResponse,
   PartSkusResponse,
   PartSkuSearchFilters,
@@ -63,6 +64,16 @@ export function createMotoTwinEndpoints(client: ApiClient) {
     getPartSku(skuId: string) {
       return client.request<PartSkuDetailResponse>(
         `/api/parts/skus/${encodeURIComponent(skuId)}`
+      );
+    },
+
+    getRecommendedSkusForNode(vehicleId: string, nodeId: string) {
+      const q = new URLSearchParams({
+        vehicleId: vehicleId.trim(),
+        nodeId: nodeId.trim(),
+      });
+      return client.request<PartRecommendationsResponse>(
+        `/api/parts/recommended-skus?${q.toString()}`
       );
     },
 
