@@ -55,7 +55,7 @@ This ensures newly created service events are reflected in:
 
 - `@mototwin/types`: `CreateServiceEventInput`, `NodeTreeItem`, `SelectedNodePath`
 - `@mototwin/domain`: `getNodeSelectLevels`, `getSelectedNodeFromPath`, `getLeafStatusReasonShort`
-- `@mototwin/api-client`: `createVehicleServiceEvent`
+- `@mototwin/api-client`: `createServiceEvent`
 
 ## What is intentionally deferred
 

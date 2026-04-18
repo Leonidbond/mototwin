@@ -42,7 +42,7 @@ Defined in `apps/app/app/_layout.tsx`:
 ### 3.3 Vehicle Detail (`vehicles/[id]/index.tsx`)
 - Loads:
   - `getVehicleDetail()`
-  - `getVehicleNodeTree()`
+  - `getNodeTree()`
 - Shows:
   - identity/state card
   - collapsible ride profile section
@@ -52,7 +52,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - Action to open service log under node-tree header
 
 ### 3.4 Service Log (`vehicles/[id]/service-log.tsx`)
-- Loads `getVehicleServiceEvents()`
+- Loads `getServiceEvents()`
 - Uses shared domain helpers:
   - `filterAndSortServiceEvents`
   - `groupServiceEventsByMonth`
@@ -82,6 +82,12 @@ Defined in `apps/app/app/_layout.tsx`:
 - API base URL is resolved dynamically from Expo host (`apps/app/src/api-base-url.ts`).
 - Expo uses shared packages for API contracts and core domain formatting helpers.
 - UI and navigation remain mobile-specific (React Native + Expo Router).
+
+### 4.1 API / debug line policy (product UI)
+
+- **Production-like builds** (`__DEV__ === false`, e.g. release): the app **must not** show raw API base URLs or other developer-only diagnostics in normal screens.
+- **Development** (`__DEV__ === true`): the garage **error** state may show **«Текущий API: …»** so engineers can confirm which host `getApiBaseUrl()` resolved to. User-facing copy (title, explanation, «Повторить») is unchanged.
+- **Behavior:** gating is display-only; `getApiBaseUrl()` and `createApiClient` are unaffected.
 
 ## 5. Current parity status
 

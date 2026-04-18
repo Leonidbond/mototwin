@@ -11,7 +11,18 @@ import {
   View,
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import {
+  createInitialAddMotorcycleFormValues,
+  normalizeAddMotorcyclePayload,
+  RIDE_LOAD_TYPE_OPTIONS,
+  RIDE_RIDING_STYLE_OPTIONS,
+  RIDE_USAGE_INTENSITY_OPTIONS,
+  RIDE_USAGE_TYPE_OPTIONS,
+  validateAddMotorcycleFormValues,
+} from "@mototwin/domain";
+import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
+  AddMotorcycleFormValues,
   BrandItem,
   ModelItem,
   ModelVariantItem,
@@ -35,31 +46,10 @@ type FormErrors = {
   engineHours?: string;
 };
 
-const USAGE_TYPE_OPTIONS: RideOption<RideUsageType>[] = [
-  { value: "CITY", label: "Город" },
-  { value: "HIGHWAY", label: "Трасса" },
-  { value: "MIXED", label: "Смешанный" },
-  { value: "OFFROAD", label: "Off-road" },
-];
-
-const RIDING_STYLE_OPTIONS: RideOption<RideStyle>[] = [
-  { value: "CALM", label: "Спокойный" },
-  { value: "ACTIVE", label: "Активный" },
-  { value: "AGGRESSIVE", label: "Агрессивный" },
-];
-
-const LOAD_TYPE_OPTIONS: RideOption<RideLoadType>[] = [
-  { value: "SOLO", label: "Соло" },
-  { value: "PASSENGER", label: "Пассажир" },
-  { value: "LUGGAGE", label: "Багаж" },
-  { value: "PASSENGER_LUGGAGE", label: "Пассажир + багаж" },
-];
-
-const USAGE_INTENSITY_OPTIONS: RideOption<RideUsageIntensity>[] = [
-  { value: "LOW", label: "Низкая" },
-  { value: "MEDIUM", label: "Средняя" },
-  { value: "HIGH", label: "Высокая" },
-];
+const USAGE_TYPE_OPTIONS = RIDE_USAGE_TYPE_OPTIONS as RideOption<RideUsageType>[];
+const RIDING_STYLE_OPTIONS = RIDE_RIDING_STYLE_OPTIONS as RideOption<RideStyle>[];
+const LOAD_TYPE_OPTIONS = RIDE_LOAD_TYPE_OPTIONS as RideOption<RideLoadType>[];
+const USAGE_INTENSITY_OPTIONS = RIDE_USAGE_INTENSITY_OPTIONS as RideOption<RideUsageIntensity>[];
 
 function getVariantLabel(variant: ModelVariantItem): string {
   const yearPart = String(variant.year);
@@ -96,6 +86,8 @@ function SelectChips<T extends string>({
   );
 }
 
+const defaultNewMotorcycleForm = createInitialAddMotorcycleFormValues();
+
 export default function NewVehicleScreen() {
   const router = useRouter();
   const apiBaseUrl = getApiBaseUrl();
@@ -121,10 +113,12 @@ export default function NewVehicleScreen() {
   const [odometer, setOdometer] = useState("");
   const [engineHours, setEngineHours] = useState("");
 
-  const [usageType, setUsageType] = useState<RideUsageType>("MIXED");
-  const [ridingStyle, setRidingStyle] = useState<RideStyle>("CALM");
-  const [loadType, setLoadType] = useState<RideLoadType>("SOLO");
-  const [usageIntensity, setUsageIntensity] = useState<RideUsageIntensity>("MEDIUM");
+  const [usageType, setUsageType] = useState<RideUsageType>(defaultNewMotorcycleForm.usageType);
+  const [ridingStyle, setRidingStyle] = useState<RideStyle>(defaultNewMotorcycleForm.ridingStyle);
+  const [loadType, setLoadType] = useState<RideLoadType>(defaultNewMotorcycleForm.loadType);
+  const [usageIntensity, setUsageIntensity] = useState<RideUsageIntensity>(
+    defaultNewMotorcycleForm.usageIntensity
+  );
 
   useEffect(() => {
     const loadBrands = async () => {
@@ -205,38 +199,24 @@ export default function NewVehicleScreen() {
   }, [apiBaseUrl, modelId]);
 
   const submitCreateVehicle = async () => {
-    const nextErrors: FormErrors = {};
+    const motorcycleForm: AddMotorcycleFormValues = {
+      brandId,
+      modelId,
+      modelVariantId,
+      nickname,
+      vin,
+      odometer,
+      engineHours,
+      usageType,
+      ridingStyle,
+      loadType,
+      usageIntensity,
+    };
 
-    if (!brandId) {
-      nextErrors.brandId = "Выберите марку.";
-    }
-
-    if (!modelId) {
-      nextErrors.modelId = "Выберите модель.";
-    }
-
-    if (!modelVariantId) {
-      nextErrors.modelVariantId = "Выберите модификацию.";
-    }
-
-    const odometerNumber = Number(odometer);
-    if (!Number.isFinite(odometerNumber) || !Number.isInteger(odometerNumber) || odometerNumber < 0) {
-      nextErrors.odometer = "Пробег обязателен и должен быть целым числом >= 0.";
-    }
-
-    const trimmedEngineHours = engineHours.trim();
-    let engineHoursValue: number | null = null;
-    if (trimmedEngineHours.length > 0) {
-      const parsed = Number(trimmedEngineHours);
-      if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 0) {
-        nextErrors.engineHours = "Моточасы должны быть целым числом >= 0.";
-      }
-      engineHoursValue = parsed;
-    }
-
-    if (Object.keys(nextErrors).length > 0) {
-      setFormErrors(nextErrors);
-      setScreenError("Проверьте обязательные поля формы.");
+    const validation = validateAddMotorcycleFormValues(motorcycleForm, "mobile");
+    if (validation.errors.length > 0) {
+      setFormErrors(validation.fieldErrors ?? {});
+      setScreenError(validation.errors[0]);
       return;
     }
 
@@ -248,21 +228,7 @@ export default function NewVehicleScreen() {
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
 
-      await endpoints.createVehicle({
-        brandId,
-        modelId,
-        modelVariantId,
-        nickname: nickname.trim() ? nickname.trim() : null,
-        vin: vin.trim() ? vin.trim() : null,
-        odometer: odometerNumber,
-        engineHours: engineHoursValue,
-        rideProfile: {
-          usageType,
-          ridingStyle,
-          loadType,
-          usageIntensity,
-        },
-      });
+      await endpoints.createVehicle(normalizeAddMotorcyclePayload(motorcycleForm));
 
       router.replace("/");
     } catch (error) {
@@ -276,7 +242,7 @@ export default function NewVehicleScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Добавить мотоцикл</Text>
+        <Text style={styles.title}>Добавление мотоцикла</Text>
         <Text style={styles.description}>
           Заполните базовые данные. Сначала выберите марку, затем модель и модификацию.
         </Text>
@@ -287,7 +253,7 @@ export default function NewVehicleScreen() {
           <Text style={styles.sectionTitle}>Марка *</Text>
           {isLoadingBrands ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color="#111827" />
+              <ActivityIndicator size="small" color={c.textPrimary} />
               <Text style={styles.loadingText}>Загрузка марок...</Text>
             </View>
           ) : (
@@ -319,7 +285,7 @@ export default function NewVehicleScreen() {
           {!brandId ? <Text style={styles.hintText}>Сначала выберите марку.</Text> : null}
           {brandId && isLoadingModels ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color="#111827" />
+              <ActivityIndicator size="small" color={c.textPrimary} />
               <Text style={styles.loadingText}>Загрузка моделей...</Text>
             </View>
           ) : null}
@@ -352,7 +318,7 @@ export default function NewVehicleScreen() {
           {!modelId ? <Text style={styles.hintText}>Сначала выберите модель.</Text> : null}
           {modelId && isLoadingVariants ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color="#111827" />
+              <ActivityIndicator size="small" color={c.textPrimary} />
               <Text style={styles.loadingText}>Загрузка модификаций...</Text>
             </View>
           ) : null}
@@ -389,14 +355,14 @@ export default function NewVehicleScreen() {
             value={nickname}
             onChangeText={setNickname}
             placeholder="Никнейм (опционально)"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={c.textTertiary}
           />
           <TextInput
             style={styles.input}
             value={vin}
             onChangeText={setVin}
             placeholder="VIN (опционально)"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={c.textTertiary}
             autoCapitalize="characters"
           />
           <TextInput
@@ -407,7 +373,7 @@ export default function NewVehicleScreen() {
               setFormErrors((prev) => ({ ...prev, odometer: undefined }));
             }}
             placeholder="Пробег, км *"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={c.textTertiary}
             keyboardType="number-pad"
           />
           {formErrors.odometer ? <Text style={styles.inlineErrorText}>{formErrors.odometer}</Text> : null}
@@ -419,7 +385,7 @@ export default function NewVehicleScreen() {
               setFormErrors((prev) => ({ ...prev, engineHours: undefined }));
             }}
             placeholder="Моточасы (опционально)"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={c.textTertiary}
             keyboardType="number-pad"
           />
           {formErrors.engineHours ? (
@@ -463,7 +429,7 @@ export default function NewVehicleScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: c.canvas,
   },
   content: {
     padding: 16,
@@ -472,37 +438,37 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   description: {
     marginTop: 8,
     fontSize: 14,
     lineHeight: 20,
-    color: "#4B5563",
+    color: c.textSecondary,
   },
   errorText: {
     marginTop: 12,
     fontSize: 14,
     lineHeight: 20,
-    color: "#B91C1C",
+    color: c.error,
   },
   section: {
     marginTop: 18,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: c.border,
     padding: 12,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   hintText: {
     marginTop: 8,
     fontSize: 13,
-    color: "#6B7280",
+    color: c.textMuted,
   },
   loadingRow: {
     marginTop: 10,
@@ -512,7 +478,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 13,
-    color: "#4B5563",
+    color: c.textSecondary,
   },
   chipsWrap: {
     marginTop: 10,
@@ -523,53 +489,53 @@ const styles = StyleSheet.create({
   chip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    backgroundColor: "#FFFFFF",
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
   chipActive: {
-    backgroundColor: "#111827",
-    borderColor: "#111827",
+    backgroundColor: c.primaryAction,
+    borderColor: c.primaryAction,
   },
   chipLabel: {
     fontSize: 13,
-    color: "#374151",
+    color: c.textMeta,
     fontWeight: "500",
   },
   chipLabelActive: {
-    color: "#FFFFFF",
+    color: c.textInverse,
   },
   input: {
     marginTop: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    backgroundColor: "#FFFFFF",
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: "#111827",
+    color: c.textPrimary,
   },
   inputError: {
-    borderColor: "#DC2626",
+    borderColor: c.validationErrorBorder,
   },
   inlineErrorText: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 18,
-    color: "#B91C1C",
+    color: c.error,
   },
   fieldLabel: {
     marginTop: 12,
     fontSize: 13,
     fontWeight: "600",
-    color: "#374151",
+    color: c.textMeta,
   },
   submitButton: {
     marginTop: 18,
     borderRadius: 10,
-    backgroundColor: "#111827",
+    backgroundColor: c.primaryAction,
     paddingHorizontal: 16,
     paddingVertical: 12,
     alignItems: "center",
@@ -580,6 +546,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: c.textInverse,
   },
 });

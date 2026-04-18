@@ -1,86 +1,49 @@
 import type {
-  BrandItem,
-  CreateVehicleInput,
+  BrandsResponse,
   CreateServiceEventInput,
-  GarageVehicleItem,
-  ModelItem,
-  ModelVariantItem,
-  NodeTreeItem,
-  ServiceEventItem,
-  VehicleDetail,
+  CreateServiceEventResponse,
+  CreateVehicleInput,
+  CreateVehicleResponse,
+  GarageVehiclesResponse,
+  ModelVariantsResponse,
+  ModelsResponse,
+  ServiceEventsResponse,
   UpdateVehicleProfileInput,
+  UpdateVehicleProfileResponse,
   UpdateVehicleStateInput,
+  UpdateVehicleStateResponse,
+  VehicleDetailResponse,
+  VehicleNodeTreeResponse,
 } from "@mototwin/types";
 import type { ApiClient } from "./fetcher";
 
-type GarageResponse = {
-  vehicles: GarageVehicleItem[];
-};
-
-type VehicleDetailResponse = {
-  vehicle: VehicleDetail | null;
-};
-
-type VehicleNodeTreeResponse = {
-  nodeTree: NodeTreeItem[];
-};
-
-type ServiceEventsResponse = {
-  serviceEvents: ServiceEventItem[];
-};
-
-type CreateServiceEventResponse = {
-  serviceEvent: ServiceEventItem;
-};
-
-type UpdateVehicleStateResponse = {
-  vehicle: {
-    id: string;
-    odometer: number;
-    engineHours: number | null;
-    updatedAt: string;
-  };
-};
-
-type UpdateVehicleProfileResponse = {
-  vehicle: VehicleDetail;
-};
-
-type BrandsResponse = {
-  brands: BrandItem[];
-};
-
-type ModelsResponse = {
-  models: ModelItem[];
-};
-
-type ModelVariantsResponse = {
-  variants: ModelVariantItem[];
-};
-
-type CreateVehicleResponse = {
-  vehicle: GarageVehicleItem;
-};
-
+/**
+ * Typed MotoTwin HTTP API (paths match Next route handlers under `/api/*`).
+ * Use {@link createApiClient} with `baseUrl: ""` on web (same origin) or full origin in Expo.
+ */
 export function createMotoTwinEndpoints(client: ApiClient) {
   return {
-    getGarage() {
-      return client.request<GarageResponse>("/api/garage");
+    getGarageVehicles() {
+      return client.request<GarageVehiclesResponse>("/api/garage");
     },
+
     getVehicleDetail(vehicleId: string) {
       return client.request<VehicleDetailResponse>(`/api/vehicles/${vehicleId}`);
     },
-    getVehicleNodeTree(vehicleId: string) {
+
+    getNodeTree(vehicleId: string) {
       return client.request<VehicleNodeTreeResponse>(
         `/api/vehicles/${vehicleId}/node-tree`
       );
     },
-    getVehicleServiceEvents(vehicleId: string) {
+
+    getServiceEvents(vehicleId: string) {
       return client.request<ServiceEventsResponse>(
         `/api/vehicles/${vehicleId}/service-events`
       );
     },
-    createVehicleServiceEvent(vehicleId: string, input: CreateServiceEventInput) {
+
+    createServiceEvent(vehicleId: string, input: CreateServiceEventInput) {
       return client.request<CreateServiceEventResponse>(
         `/api/vehicles/${vehicleId}/service-events`,
         {
@@ -89,6 +52,7 @@ export function createMotoTwinEndpoints(client: ApiClient) {
         }
       );
     },
+
     updateVehicleState(vehicleId: string, input: UpdateVehicleStateInput) {
       return client.request<UpdateVehicleStateResponse>(
         `/api/vehicles/${vehicleId}/state`,
@@ -98,6 +62,7 @@ export function createMotoTwinEndpoints(client: ApiClient) {
         }
       );
     },
+
     updateVehicleProfile(vehicleId: string, input: UpdateVehicleProfileInput) {
       return client.request<UpdateVehicleProfileResponse>(
         `/api/vehicles/${vehicleId}/profile`,
@@ -107,17 +72,23 @@ export function createMotoTwinEndpoints(client: ApiClient) {
         }
       );
     },
+
     getBrands() {
       return client.request<BrandsResponse>("/api/brands");
     },
+
     getModels(brandId: string) {
       const search = new URLSearchParams({ brandId });
       return client.request<ModelsResponse>(`/api/models?${search.toString()}`);
     },
+
     getModelVariants(modelId: string) {
       const search = new URLSearchParams({ modelId });
-      return client.request<ModelVariantsResponse>(`/api/model-variants?${search.toString()}`);
+      return client.request<ModelVariantsResponse>(
+        `/api/model-variants?${search.toString()}`
+      );
     },
+
     createVehicle(input: CreateVehicleInput) {
       return client.request<CreateVehicleResponse>("/api/vehicles", {
         method: "POST",

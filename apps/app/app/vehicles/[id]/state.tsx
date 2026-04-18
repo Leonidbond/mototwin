@@ -11,6 +11,8 @@ import {
   View,
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { normalizeVehicleStatePayload, validateVehicleStateFormValues } from "@mototwin/domain";
+import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 
 export default function UpdateVehicleStateScreen() {
@@ -64,19 +66,10 @@ export default function UpdateVehicleStateScreen() {
       return;
     }
 
-    const nextOdometer = Number.parseInt(odometer, 10);
-    if (Number.isNaN(nextOdometer) || nextOdometer < 0) {
-      setError("Пробег обязателен и должен быть >= 0.");
-      return;
-    }
-
-    const nextEngineHours =
-      engineHours.trim() === "" ? null : Number.parseInt(engineHours, 10);
-    if (
-      nextEngineHours !== null &&
-      (Number.isNaN(nextEngineHours) || nextEngineHours < 0)
-    ) {
-      setError("Моточасы должны быть пустыми или >= 0.");
+    const stateValues = { odometer, engineHours };
+    const validation = validateVehicleStateFormValues(stateValues, "mobile");
+    if (validation.errors.length > 0) {
+      setError(validation.errors[0]);
       return;
     }
 
@@ -85,10 +78,10 @@ export default function UpdateVehicleStateScreen() {
       setError("");
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
-      await endpoints.updateVehicleState(vehicleId, {
-        odometer: nextOdometer,
-        engineHours: nextEngineHours,
-      });
+      await endpoints.updateVehicleState(
+        vehicleId,
+        normalizeVehicleStatePayload(stateValues)
+      );
       // Return to vehicle detail; detail and downstream screens reload on focus.
       router.replace(`/vehicles/${vehicleId}`);
     } catch (requestError) {
@@ -107,7 +100,7 @@ export default function UpdateVehicleStateScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.stateContainer}>
-          <ActivityIndicator size="large" color="#111827" />
+          <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка текущего состояния...</Text>
         </View>
       </SafeAreaView>
@@ -157,7 +150,7 @@ export default function UpdateVehicleStateScreen() {
             ]}
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={c.textInverse} />
             ) : (
               <Text style={styles.saveButtonText}>Сохранить состояние</Text>
             )}
@@ -171,7 +164,7 @@ export default function UpdateVehicleStateScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: c.canvas,
   },
   content: {
     paddingHorizontal: 16,
@@ -187,12 +180,12 @@ const styles = StyleSheet.create({
   stateText: {
     marginTop: 12,
     fontSize: 14,
-    color: "#4B5563",
+    color: c.textSecondary,
     textAlign: "center",
   },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E7EB",
+    backgroundColor: c.card,
+    borderColor: c.border,
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,
@@ -200,12 +193,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   cardSubtitle: {
     marginTop: 6,
     fontSize: 13,
-    color: "#6B7280",
+    color: c.textMuted,
     lineHeight: 18,
   },
   field: {
@@ -213,27 +206,27 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: "#6B7280",
+    color: c.textMuted,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#D1D5DB",
+    backgroundColor: c.card,
+    borderColor: c.borderStrong,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: "#111827",
+    color: c.textPrimary,
   },
   errorText: {
     marginTop: 10,
-    color: "#B91C1C",
+    color: c.error,
     fontSize: 13,
   },
   saveButton: {
     marginTop: 14,
-    backgroundColor: "#111827",
+    backgroundColor: c.primaryAction,
     borderRadius: 12,
     minHeight: 44,
     alignItems: "center",
@@ -246,7 +239,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   saveButtonText: {
-    color: "#FFFFFF",
+    color: c.textInverse,
     fontSize: 14,
     fontWeight: "700",
   },

@@ -1,0 +1,63 @@
+import type { ServiceEventItem } from "./service-event";
+import type {
+  BrandItem,
+  GarageVehicleItem,
+  ModelItem,
+  ModelVariantItem,
+  VehicleDetail,
+} from "./vehicle";
+import type { NodeTreeItem } from "./node";
+
+/** Backend often returns `{ error: string }` on 4xx/5xx. */
+export type MotoTwinApiErrorBody = {
+  error?: string;
+};
+
+export type GarageVehiclesResponse = {
+  vehicles: GarageVehicleItem[];
+};
+
+export type VehicleDetailResponse = {
+  vehicle: VehicleDetail | null;
+};
+
+export type VehicleNodeTreeResponse = {
+  nodeTree: NodeTreeItem[];
+};
+
+export type ServiceEventsResponse = {
+  serviceEvents: ServiceEventItem[];
+};
+
+export type CreateServiceEventResponse = {
+  serviceEvent: ServiceEventItem;
+};
+
+export type UpdateVehicleStateResponse = {
+  vehicle: {
+    id: string;
+    odometer: number;
+    engineHours: number | null;
+    updatedAt: string;
+  };
+};
+
+export type UpdateVehicleProfileResponse = {
+  vehicle: VehicleDetail;
+};
+
+export type BrandsResponse = {
+  brands: BrandItem[];
+};
+
+export type ModelsResponse = {
+  models: ModelItem[];
+};
+
+export type ModelVariantsResponse = {
+  variants: ModelVariantItem[];
+};
+
+export type CreateVehicleResponse = {
+  vehicle: GarageVehicleItem;
+};

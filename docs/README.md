@@ -15,6 +15,14 @@
 - `cross-platform-parity.md` — статус выравнивания web/expo и зафиксированные gaps.
 - `documentation-gap-analysis.md` — последний gap analysis по документации и план обновления.
 
+## Web + Expo parity (текущий срез)
+
+- `web-expo-parity-audit.md` — **индекс**: краткий статус, ссылки, карта файлов (без длинных таблиц находок).
+- `web-expo-parity-audit-repeat.md` — **детали**: матрица областей, остаточные зазоры, батчи, QA после батчей.
+- `web-mobile-parity-workflow.md` — процесс планирования фич на двух клиентах, Definition of Done.
+- `parity-task-template.md` — копируемый шаблон промпта (impact / parity / QA / docs).
+- Документы `web-expo-*-fixes.md` — пошаговые записи выравниваний по темам (журнал, дерево, данные, визуал и т.д.).
+
 ## Governance and process docs
 
 - `coding-rules.md` — правила разработки и quality constraints.

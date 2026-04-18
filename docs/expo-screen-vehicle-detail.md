@@ -28,7 +28,7 @@ Two backend requests are made in parallel via `Promise.all`:
 | Request | Backend route | Purpose |
 |---|---|---|
 | `getVehicleDetail(id)` | `GET /api/vehicles/:id` | Nickname, brand, model, year, VIN, odometer, engine hours |
-| `getVehicleNodeTree(id)` | `GET /api/vehicles/:id/node-tree` | Full node tree with computed `effectiveStatus` per node |
+| `getNodeTree(id)` | `GET /api/vehicles/:id/node-tree` | Full node tree with computed `effectiveStatus` per node |
 
 Both methods are defined in `packages/api-client/src/mototwin-endpoints.ts`.
 

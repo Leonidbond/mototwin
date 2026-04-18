@@ -1,6 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import {
+  createInitialAddMotorcycleFormValues,
+  normalizeAddMotorcyclePayload,
+  RIDE_LOAD_TYPE_OPTIONS,
+  RIDE_RIDING_STYLE_OPTIONS,
+  RIDE_USAGE_INTENSITY_OPTIONS,
+  RIDE_USAGE_TYPE_OPTIONS,
+  validateAddMotorcycleFormValues,
+} from "@mototwin/domain";
+import { productSemanticColors } from "@mototwin/design-tokens";
+import type {
+  AddMotorcycleFormValues,
+  RideLoadType,
+  RideStyle,
+  RideUsageIntensity,
+  RideUsageType,
+} from "@mototwin/types";
+
+const onboardingApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
 type Brand = {
   id: string;
@@ -30,12 +50,21 @@ type ModelVariant = {
   stockSprockets: string | null;
 };
 
-type RideProfileForm = {
-  usageType: string;
-  ridingStyle: string;
-  loadType: string;
-  usageIntensity: string;
-};
+/** Ride profile slice aligned with `AddMotorcycleFormProps["values"]` (see `docs/shared-component-contracts.md`). */
+type RideProfileForm = Pick<
+  AddMotorcycleFormValues,
+  "usageType" | "ridingStyle" | "loadType" | "usageIntensity"
+>;
+
+function initialRideProfileForm(): RideProfileForm {
+  const m = createInitialAddMotorcycleFormValues();
+  return {
+    usageType: m.usageType,
+    ridingStyle: m.ridingStyle,
+    loadType: m.loadType,
+    usageIntensity: m.usageIntensity,
+  };
+}
 
 export default function OnboardingPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -51,12 +80,7 @@ export default function OnboardingPage() {
   const [odometer, setOdometer] = useState("");
   const [engineHours, setEngineHours] = useState("");
 
-  const [rideProfile, setRideProfile] = useState<RideProfileForm>({
-    usageType: "MIXED",
-    ridingStyle: "ACTIVE",
-    loadType: "SOLO",
-    usageIntensity: "MEDIUM",
-  });
+  const [rideProfile, setRideProfile] = useState<RideProfileForm>(initialRideProfileForm);
 
   const [isLoadingBrands, setIsLoadingBrands] = useState(true);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -70,8 +94,7 @@ export default function OnboardingPage() {
     const loadBrands = async () => {
       try {
         setIsLoadingBrands(true);
-        const response = await fetch("/api/brands");
-        const data = await response.json();
+        const data = await onboardingApi.getBrands();
         setBrands(data.brands ?? []);
       } catch (error) {
         console.error("Failed to load brands", error);
@@ -99,8 +122,7 @@ export default function OnboardingPage() {
         setVariants([]);
         setSelectedVariantId("");
 
-        const response = await fetch(`/api/models?brandId=${selectedBrandId}`);
-        const data = await response.json();
+        const data = await onboardingApi.getModels(selectedBrandId);
         setModels(data.models ?? []);
       } catch (error) {
         console.error("Failed to load models", error);
@@ -124,10 +146,7 @@ export default function OnboardingPage() {
         setIsLoadingVariants(true);
         setSelectedVariantId("");
 
-        const response = await fetch(
-          `/api/model-variants?modelId=${selectedModelId}`
-        );
-        const data = await response.json();
+        const data = await onboardingApi.getModelVariants(selectedModelId);
         setVariants(data.variants ?? []);
       } catch (error) {
         console.error("Failed to load variants", error);
@@ -159,70 +178,51 @@ export default function OnboardingPage() {
       setSubmitError("");
       setSubmitSuccess("");
 
-      if (!selectedBrandId || !selectedModelId || !selectedVariantId) {
-        setSubmitError("Выберите бренд, модель и модификацию.");
-        return;
-      }
+      const motorcycleForm: AddMotorcycleFormValues = {
+        brandId: selectedBrandId,
+        modelId: selectedModelId,
+        modelVariantId: selectedVariantId,
+        nickname,
+        vin,
+        odometer,
+        engineHours,
+        usageType: rideProfile.usageType,
+        ridingStyle: rideProfile.ridingStyle,
+        loadType: rideProfile.loadType,
+        usageIntensity: rideProfile.usageIntensity,
+      };
 
-      if (!odometer.trim()) {
-        setSubmitError("Укажите пробег.");
+      const validation = validateAddMotorcycleFormValues(motorcycleForm, "web");
+      if (validation.errors.length > 0) {
+        setSubmitError(validation.errors[0]);
         return;
       }
 
       setIsSubmitting(true);
 
-      const response = await fetch("/api/vehicles", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          brandId: selectedBrandId,
-          modelId: selectedModelId,
-          modelVariantId: selectedVariantId,
-          nickname,
-          vin,
-          odometer: Number(odometer),
-          engineHours: engineHours.trim() ? Number(engineHours) : null,
-          rideProfile: {
-            usageType: rideProfile.usageType,
-            ridingStyle: rideProfile.ridingStyle,
-            loadType: rideProfile.loadType,
-            usageIntensity: rideProfile.usageIntensity,
-          },
-        }),
-      });
-
-      const raw = await response.text();
-      let data: any = null;
-
-      try {
-        data = raw ? JSON.parse(raw) : null;
-      } catch {
-        console.error("Non-JSON response:", raw);
-        setSubmitError(
-          "Сервер вернул не JSON. Проверь /api/vehicles и консоль сервера."
-        );
-        return;
-      }
-
-      if (!response.ok) {
-        setSubmitError(data?.error || "Не удалось сохранить мотоцикл.");
-        return;
-      }
+      const data = await onboardingApi.createVehicle(
+        normalizeAddMotorcyclePayload(motorcycleForm)
+      );
 
       setSubmitSuccess("Мотоцикл успешно сохранен в гараж.");
-      console.log("Created vehicle:", data?.vehicle);
+      console.log("Created vehicle:", data.vehicle);
     } catch (error) {
       console.error(error);
-      setSubmitError("Произошла ошибка при сохранении.");
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Произошла ошибка при сохранении."
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-white px-6 py-16 text-gray-950">
+    <main
+      className="min-h-screen px-6 py-16 text-gray-950"
+      style={{ backgroundColor: productSemanticColors.canvas }}
+    >
       <div className="mx-auto max-w-6xl">
         <div className="mb-10 max-w-3xl">
           <div className="inline-flex items-center rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600">
@@ -375,15 +375,16 @@ export default function OnboardingPage() {
                     onChange={(e) =>
                       setRideProfile((prev) => ({
                         ...prev,
-                        usageType: e.target.value,
+                        usageType: e.target.value as RideUsageType,
                       }))
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                   >
-                    <option value="CITY">Город</option>
-                    <option value="HIGHWAY">Трасса</option>
-                    <option value="MIXED">Смешанный</option>
-                    <option value="OFFROAD">Off-road</option>
+                    {RIDE_USAGE_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -396,14 +397,16 @@ export default function OnboardingPage() {
                     onChange={(e) =>
                       setRideProfile((prev) => ({
                         ...prev,
-                        ridingStyle: e.target.value,
+                        ridingStyle: e.target.value as RideStyle,
                       }))
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                   >
-                    <option value="CALM">Спокойный</option>
-                    <option value="ACTIVE">Активный</option>
-                    <option value="AGGRESSIVE">Агрессивный</option>
+                    {RIDE_RIDING_STYLE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -416,17 +419,16 @@ export default function OnboardingPage() {
                     onChange={(e) =>
                       setRideProfile((prev) => ({
                         ...prev,
-                        loadType: e.target.value,
+                        loadType: e.target.value as RideLoadType,
                       }))
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                   >
-                    <option value="SOLO">Один</option>
-                    <option value="PASSENGER">С пассажиром</option>
-                    <option value="LUGGAGE">С багажом</option>
-                    <option value="PASSENGER_LUGGAGE">
-                      Пассажир и багаж
-                    </option>
+                    {RIDE_LOAD_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -439,14 +441,16 @@ export default function OnboardingPage() {
                     onChange={(e) =>
                       setRideProfile((prev) => ({
                         ...prev,
-                        usageIntensity: e.target.value,
+                        usageIntensity: e.target.value as RideUsageIntensity,
                       }))
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                   >
-                    <option value="LOW">Низкая</option>
-                    <option value="MEDIUM">Средняя</option>
-                    <option value="HIGH">Высокая</option>
+                    {RIDE_USAGE_INTENSITY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

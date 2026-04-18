@@ -50,9 +50,10 @@ Core:
 Current endpoint methods:
 - `getGarage`
 - `getVehicleDetail`
-- `getVehicleNodeTree`
-- `getVehicleServiceEvents`
-- `createVehicleServiceEvent`
+- `getNodeTree`
+- `getServiceEvents`
+- `createServiceEvent`
+- `getGarageVehicles`
 - `updateVehicleState`
 - `updateVehicleProfile`
 - `getBrands`

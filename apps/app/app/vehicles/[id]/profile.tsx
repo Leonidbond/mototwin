@@ -12,47 +12,41 @@ import {
   View,
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import {
+  createInitialEditVehicleProfileFormValues,
+  normalizeEditVehicleProfilePayload,
+  RIDE_LOAD_TYPE_OPTIONS,
+  RIDE_RIDING_STYLE_OPTIONS,
+  RIDE_USAGE_INTENSITY_OPTIONS,
+  RIDE_USAGE_TYPE_OPTIONS,
+} from "@mototwin/domain";
+import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
+  EditVehicleProfileFormValues,
   RideLoadType,
   RideStyle,
   RideUsageIntensity,
   RideUsageType,
-  UpdateVehicleProfileInput,
   VehicleRideProfile,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 
-const USAGE_TYPES: Array<{ value: RideUsageType; label: string }> = [
-  { value: "CITY", label: "Город" },
-  { value: "HIGHWAY", label: "Трасса" },
-  { value: "MIXED", label: "Смешанный" },
-  { value: "OFFROAD", label: "Бездорожье" },
-];
+const USAGE_TYPES = RIDE_USAGE_TYPE_OPTIONS as Array<{ value: RideUsageType; label: string }>;
+const RIDING_STYLES = RIDE_RIDING_STYLE_OPTIONS as Array<{ value: RideStyle; label: string }>;
+const LOAD_TYPES = RIDE_LOAD_TYPE_OPTIONS as Array<{ value: RideLoadType; label: string }>;
+const USAGE_INTENSITIES = RIDE_USAGE_INTENSITY_OPTIONS as Array<{
+  value: RideUsageIntensity;
+  label: string;
+}>;
 
-const RIDING_STYLES: Array<{ value: RideStyle; label: string }> = [
-  { value: "CALM", label: "Спокойный" },
-  { value: "ACTIVE", label: "Активный" },
-  { value: "AGGRESSIVE", label: "Агрессивный" },
-];
-
-const LOAD_TYPES: Array<{ value: RideLoadType; label: string }> = [
-  { value: "SOLO", label: "Соло" },
-  { value: "PASSENGER", label: "Пассажир" },
-  { value: "LUGGAGE", label: "Багаж" },
-  { value: "PASSENGER_LUGGAGE", label: "Пассажир + багаж" },
-];
-
-const USAGE_INTENSITIES: Array<{ value: RideUsageIntensity; label: string }> = [
-  { value: "LOW", label: "Низкая" },
-  { value: "MEDIUM", label: "Средняя" },
-  { value: "HIGH", label: "Высокая" },
-];
-
-const DEFAULT_RIDE_PROFILE: VehicleRideProfile = {
-  usageType: "MIXED",
+const profileDefaults = createInitialEditVehicleProfileFormValues({
   ridingStyle: "CALM",
-  loadType: "SOLO",
-  usageIntensity: "MEDIUM",
+});
+const DEFAULT_RIDE_PROFILE: VehicleRideProfile = {
+  usageType: profileDefaults.usageType,
+  ridingStyle: profileDefaults.ridingStyle,
+  loadType: profileDefaults.loadType,
+  usageIntensity: profileDefaults.usageIntensity,
 };
 
 export default function EditVehicleProfileScreen() {
@@ -118,16 +112,15 @@ export default function EditVehicleProfileScreen() {
       return;
     }
 
-    const input: UpdateVehicleProfileInput = {
-      nickname: nickname.trim() || null,
-      vin: vin.trim() || null,
-      rideProfile: {
-        usageType,
-        ridingStyle,
-        loadType,
-        usageIntensity,
-      },
+    const profileValues: EditVehicleProfileFormValues = {
+      nickname,
+      vin,
+      usageType,
+      ridingStyle,
+      loadType,
+      usageIntensity,
     };
+    const input = normalizeEditVehicleProfilePayload(profileValues);
 
     try {
       setIsSaving(true);
@@ -152,7 +145,7 @@ export default function EditVehicleProfileScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.stateContainer}>
-          <ActivityIndicator size="large" color="#111827" />
+          <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка профиля...</Text>
         </View>
       </SafeAreaView>
@@ -165,10 +158,10 @@ export default function EditVehicleProfileScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Профиль мотоцикла</Text>
           <Text style={styles.cardSubtitle}>
-            Можно изменить только nickname, VIN и riding profile.
+            Можно изменить никнейм, VIN и профиль эксплуатации.
           </Text>
 
-          <Field label="Nickname">
+          <Field label="Никнейм">
             <TextInput
               value={nickname}
               onChangeText={setNickname}
@@ -188,25 +181,25 @@ export default function EditVehicleProfileScreen() {
           </Field>
 
           <PickerRow
-            label="Usage type"
+            label="Сценарий эксплуатации"
             options={USAGE_TYPES}
             value={usageType}
             onSelect={setUsageType}
           />
           <PickerRow
-            label="Riding style"
+            label="Стиль езды"
             options={RIDING_STYLES}
             value={ridingStyle}
             onSelect={setRidingStyle}
           />
           <PickerRow
-            label="Load type"
+            label="Нагрузка"
             options={LOAD_TYPES}
             value={loadType}
             onSelect={setLoadType}
           />
           <PickerRow
-            label="Usage intensity"
+            label="Интенсивность"
             options={USAGE_INTENSITIES}
             value={usageIntensity}
             onSelect={setUsageIntensity}
@@ -224,7 +217,7 @@ export default function EditVehicleProfileScreen() {
             ]}
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={c.textInverse} />
             ) : (
               <Text style={styles.saveButtonText}>Сохранить профиль</Text>
             )}
@@ -287,7 +280,7 @@ function PickerRow<T extends string>({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: c.canvas,
   },
   content: {
     paddingHorizontal: 16,
@@ -303,12 +296,12 @@ const styles = StyleSheet.create({
   stateText: {
     marginTop: 12,
     fontSize: 14,
-    color: "#4B5563",
+    color: c.textSecondary,
     textAlign: "center",
   },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E7EB",
+    backgroundColor: c.card,
+    borderColor: c.border,
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,
@@ -316,12 +309,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   cardSubtitle: {
     marginTop: 6,
     fontSize: 13,
-    color: "#6B7280",
+    color: c.textMuted,
     lineHeight: 18,
   },
   field: {
@@ -329,18 +322,18 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: "#6B7280",
+    color: c.textMuted,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#D1D5DB",
+    backgroundColor: c.card,
+    borderColor: c.borderStrong,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: "#111827",
+    color: c.textPrimary,
   },
   optionWrap: {
     flexDirection: "row",
@@ -349,32 +342,32 @@ const styles = StyleSheet.create({
   },
   optionChip: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    backgroundColor: "#FFFFFF",
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   optionChipActive: {
-    borderColor: "#111827",
-    backgroundColor: "#111827",
+    borderColor: c.primaryAction,
+    backgroundColor: c.primaryAction,
   },
   optionChipText: {
     fontSize: 13,
-    color: "#374151",
+    color: c.textMeta,
   },
   optionChipTextActive: {
-    color: "#FFFFFF",
+    color: c.textInverse,
     fontWeight: "600",
   },
   errorText: {
     marginTop: 10,
-    color: "#B91C1C",
+    color: c.error,
     fontSize: 13,
   },
   saveButton: {
     marginTop: 14,
-    backgroundColor: "#111827",
+    backgroundColor: c.primaryAction,
     borderRadius: 12,
     minHeight: 44,
     alignItems: "center",
@@ -387,7 +380,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   saveButtonText: {
-    color: "#FFFFFF",
+    color: c.textInverse,
     fontSize: 14,
     fontWeight: "700",
   },

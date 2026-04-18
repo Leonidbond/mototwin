@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mototwin/api-client": "file:../../packages/api-client",
+    "@mototwin/design-tokens": "file:../../packages/design-tokens",
     "@mototwin/domain": "file:../../packages/domain",
     "@mototwin/types": "file:../../packages/types",
     "expo": "~54.0.0",

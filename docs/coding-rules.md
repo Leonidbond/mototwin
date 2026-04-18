@@ -461,6 +461,8 @@ MotoTwin code must feel like:
 
 ## 25. Cross-Platform Parity Rules (Web + Mobile)
 
+**Процесс планирования, DoD и шаблон задачи для Cursor:** [web-mobile-parity-workflow.md](./web-mobile-parity-workflow.md), [parity-task-template.md](./parity-task-template.md), [cursor-workflow.md](./cursor-workflow.md).
+
 MotoTwin has two active clients:
 - web client
 - mobile client (Expo)
@@ -484,8 +486,10 @@ MotoTwin has two active clients:
 13. UI components may stay platform-specific, but business meaning and data handling must stay aligned.
 14. Every implementation task must explicitly state:
     - web impact
-    - mobile impact
-    - parity status
+    - mobile (Expo) impact
+    - shared packages impact (types, domain, api-client, etc.) when relevant
+    - backend / API contract impact when relevant
+    - parity status or parity expectation (see [web-mobile-parity-workflow.md](./web-mobile-parity-workflow.md))
 15. If a step changes only one client, explicitly identify the next parity step.
 16. Avoid cross-platform drift in terminology, statuses, and core flow behavior.
 17. Definition of done for user-facing features:

@@ -1,4 +1,5 @@
 import type { NodeStatus } from "@mototwin/types";
+import { statusBadgeLabelsEn, statusTextLabelsRu } from "@mototwin/design-tokens";
 
 const STATUS_PRIORITY: Record<NodeStatus, number> = {
   OVERDUE: 4,
@@ -19,33 +20,11 @@ export function compareNodeStatuses(
 }
 
 export function getNodeStatusLabel(status: NodeStatus): string {
-  switch (status) {
-    case "OVERDUE":
-      return "Просрочено";
-    case "SOON":
-      return "Скоро";
-    case "OK":
-      return "ОК";
-    case "RECENTLY_REPLACED":
-      return "Недавно заменено";
-    default:
-      return status;
-  }
+  return statusTextLabelsRu[status] ?? status;
 }
 
 export function getTopNodeStatusBadgeLabel(status: NodeStatus): string {
-  switch (status) {
-    case "OK":
-      return "OK";
-    case "SOON":
-      return "Soon";
-    case "OVERDUE":
-      return "Overdue";
-    case "RECENTLY_REPLACED":
-      return "Recently replaced";
-    default:
-      return status;
-  }
+  return statusBadgeLabelsEn[status] ?? status;
 }
 
 export function getStatusExplanationTriggeredByLabel(

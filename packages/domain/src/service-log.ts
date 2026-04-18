@@ -4,25 +4,60 @@ import type {
   ServiceEventsFilters,
   ServiceEventsSortDirection,
   ServiceEventsSortField,
+  ServiceLogSortState,
 } from "@mototwin/types";
 
-export function filterAndSortServiceEvents(
-  serviceEvents: ServiceEventItem[],
-  serviceEventsFilters: ServiceEventsFilters,
-  serviceEventsSort: {
-    field: ServiceEventsSortField;
-    direction: ServiceEventsSortDirection;
-  }
-) {
-  const normalizedFilters = {
+/** Default timeline query: newest first by event date (web + Expo). */
+export const DEFAULT_SERVICE_LOG_SORT_STATE: ServiceLogSortState = {
+  field: "eventDate",
+  direction: "desc",
+};
+
+function trimServiceLogFilterFields(filters: ServiceEventsFilters) {
+  return {
+    dateFrom: filters.dateFrom.trim(),
+    dateTo: filters.dateTo.trim(),
+    eventKind: filters.eventKind.trim(),
+    serviceType: filters.serviceType.trim(),
+    node: filters.node.trim(),
+  };
+}
+
+/** True when any filter is set or sort differs from {@link DEFAULT_SERVICE_LOG_SORT_STATE}. */
+export function isServiceLogTimelineQueryActive(
+  filters: ServiceEventsFilters,
+  sort: ServiceLogSortState
+): boolean {
+  const t = trimServiceLogFilterFields(filters);
+  const hasFilter =
+    Boolean(t.dateFrom) ||
+    Boolean(t.dateTo) ||
+    Boolean(t.eventKind) ||
+    Boolean(t.serviceType) ||
+    Boolean(t.node);
+  const sortNonDefault =
+    sort.field !== DEFAULT_SERVICE_LOG_SORT_STATE.field ||
+    sort.direction !== DEFAULT_SERVICE_LOG_SORT_STATE.direction;
+  return hasFilter || sortNonDefault;
+}
+
+function normalizeServiceLogFilters(serviceEventsFilters: ServiceEventsFilters) {
+  return {
     dateFrom: serviceEventsFilters.dateFrom.trim(),
     dateTo: serviceEventsFilters.dateTo.trim(),
     eventKind: serviceEventsFilters.eventKind.trim().toLowerCase(),
     serviceType: serviceEventsFilters.serviceType.trim().toLowerCase(),
     node: serviceEventsFilters.node.trim().toLowerCase(),
   };
+}
 
-  const filtered = serviceEvents.filter((event) => {
+export function filterServiceLogEntries(
+  serviceEvents: ServiceEventItem[],
+  serviceEventsFilters: ServiceEventsFilters
+): ServiceEventItem[] {
+  const normalizedFilters = normalizeServiceLogFilters(serviceEventsFilters);
+
+  return serviceEvents.filter((event) => {
     const eventDateOnly = event.eventDate.slice(0, 10);
     const eventKindLabel =
       event.eventKind === "STATE_UPDATE" ? "обновление состояния" : "сервис";
@@ -42,8 +77,13 @@ export function filterAndSortServiceEvents(
       (!normalizedFilters.node || nodeStartsWith || nodeIncludes)
     );
   });
+}
 
-  return [...filtered].sort((left, right) => {
+export function sortServiceLogEntries(
+  serviceEvents: ServiceEventItem[],
+  serviceEventsSort: ServiceLogSortState
+): ServiceEventItem[] {
+  return [...serviceEvents].sort((left, right) => {
     const directionMultiplier = serviceEventsSort.direction === "asc" ? 1 : -1;
 
     const compareStrings = (a: string, b: string) =>
@@ -96,6 +136,18 @@ export function filterAndSortServiceEvents(
         return 0;
     }
   });
+}
+
+export function filterAndSortServiceEvents(
+  serviceEvents: ServiceEventItem[],
+  serviceEventsFilters: ServiceEventsFilters,
+  serviceEventsSort: {
+    field: ServiceEventsSortField;
+    direction: ServiceEventsSortDirection;
+  }
+) {
+  const filtered = filterServiceLogEntries(serviceEvents, serviceEventsFilters);
+  return sortServiceLogEntries(filtered, serviceEventsSort);
 }
 
 export function groupServiceEventsByMonth(

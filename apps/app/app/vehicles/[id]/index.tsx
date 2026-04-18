@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -10,94 +11,45 @@ import {
   View,
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
-import type { NodeTreeItem, VehicleDetail } from "@mototwin/types";
-import { getNodeStatusLabel } from "@mototwin/domain";
+import {
+  buildNodeTreeSectionProps,
+  buildRideProfileViewModel,
+  buildVehicleDetailViewModel,
+  buildVehicleStateViewModel,
+  buildVehicleTechnicalInfoViewModel,
+  canOpenNodeStatusExplanationModal,
+  formatIsoCalendarDateRu,
+  getStatusExplanationTriggeredByLabel,
+} from "@mototwin/domain";
+import type {
+  NodeStatus,
+  NodeTreeItem,
+  NodeTreeItemProps,
+  NodeTreeItemViewModel,
+  VehicleDetail,
+} from "@mototwin/types";
+import { productSemanticColors as c, statusSemanticTokens } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 
-type NodeStatus = "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED";
-
-const STATUS_COLORS: Record<NodeStatus, { bg: string; text: string }> = {
-  OK: { bg: "#D1FAE5", text: "#065F46" },
-  SOON: { bg: "#FEF3C7", text: "#92400E" },
-  OVERDUE: { bg: "#FEE2E2", text: "#991B1B" },
-  RECENTLY_REPLACED: { bg: "#DBEAFE", text: "#1E40AF" },
-};
-
 function getStatusColors(status: NodeStatus | null) {
-  if (!status) return { bg: "#F3F4F6", text: "#9CA3AF" };
-  return STATUS_COLORS[status] ?? { bg: "#F3F4F6", text: "#9CA3AF" };
+  const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
+  return { bg: tokens.background, text: tokens.foreground, border: tokens.border };
 }
 
 function getNodeAccentColor(status: NodeStatus | null) {
-  if (status === "OVERDUE") return "#FECACA";
-  if (status === "SOON") return "#FDE68A";
-  return "transparent";
-}
-
-function formatUsageType(value: string) {
-  switch (value) {
-    case "CITY":
-      return "Город";
-    case "HIGHWAY":
-      return "Трасса";
-    case "MIXED":
-      return "Смешанный";
-    case "OFFROAD":
-      return "Off-road";
-    default:
-      return value;
-  }
-}
-
-function formatRidingStyle(value: string) {
-  switch (value) {
-    case "CALM":
-      return "Спокойный";
-    case "ACTIVE":
-      return "Активный";
-    case "AGGRESSIVE":
-      return "Агрессивный";
-    default:
-      return value;
-  }
-}
-
-function formatLoadType(value: string) {
-  switch (value) {
-    case "SOLO":
-      return "Один";
-    case "PASSENGER":
-      return "С пассажиром";
-    case "LUGGAGE":
-      return "С багажом";
-    case "PASSENGER_LUGGAGE":
-      return "Пассажир и багаж";
-    default:
-      return value;
-  }
-}
-
-function formatUsageIntensity(value: string) {
-  switch (value) {
-    case "LOW":
-      return "Низкая";
-    case "MEDIUM":
-      return "Средняя";
-    case "HIGH":
-      return "Высокая";
-    default:
-      return value;
-  }
+  const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
+  return tokens.accent;
 }
 
 // ─── Expandable node row ──────────────────────────────────────────────────────
 
 type NodeRowProps = {
-  node: NodeTreeItem;
+  node: NodeTreeItemViewModel;
   depth: number;
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
   onAddFromLeaf: (leafNodeId: string) => void;
+  onOpenStatusExplanation?: (node: NodeTreeItemViewModel) => void;
 };
 
 function NodeRow({
@@ -106,14 +58,24 @@ function NodeRow({
   expandedIds,
   onToggle,
   onAddFromLeaf,
+  onOpenStatusExplanation,
 }: NodeRowProps) {
-  const hasChildren = node.children.length > 0;
-  const isExpanded = expandedIds.has(node.id);
-  const isLeaf = !hasChildren;
-  const status = node.effectiveStatus as NodeStatus | null;
+  const treeItemContract: NodeTreeItemProps = {
+    item: node,
+    depth,
+    isExpanded: expandedIds.has(node.id),
+    onToggleExpand: () => onToggle(node.id),
+    onRequestAddServiceEvent: node.canAddServiceEvent
+      ? () => onAddFromLeaf(node.id)
+      : undefined,
+  };
+  const rowNode = treeItemContract.item;
+  const hasChildren = rowNode.hasChildren;
+  const isExpanded = treeItemContract.isExpanded;
+  const status = rowNode.effectiveStatus as NodeStatus | null;
   const colors = getStatusColors(status);
-  const label = status ? getNodeStatusLabel(status) : null;
-  const reasonShort = isLeaf ? (node.statusExplanation?.reasonShort ?? null) : null;
+  const label = rowNode.statusLabel;
+  const reasonShort = rowNode.shortExplanationLabel;
   const indent = 12 + depth * 14;
   const accentColor = getNodeAccentColor(status);
   const isTopLevel = depth === 0;
@@ -123,7 +85,7 @@ function NodeRow({
   return (
     <View style={styles.nodeContainer}>
       <Pressable
-        onPress={() => hasChildren && onToggle(node.id)}
+        onPress={() => hasChildren && treeItemContract.onToggleExpand()}
         style={({ pressed }) => [
           styles.nodeRow,
           { paddingLeft: indent },
@@ -143,25 +105,42 @@ function NodeRow({
           </View>
           <View style={styles.nodeNameBlock}>
             <Text style={[styles.nodeName, depth === 0 && styles.nodeNameTop]}>
-              {node.name}
+              {rowNode.name}
             </Text>
-            {reasonShort ? (
+            {reasonShort &&
+            canOpenNodeStatusExplanationModal(rowNode) &&
+            onOpenStatusExplanation ? (
+              <Pressable
+                onPress={() => onOpenStatusExplanation(rowNode)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="Пояснение расчёта статуса"
+              >
+                <Text style={[styles.reasonShort, styles.reasonShortLink]}>{reasonShort}</Text>
+              </Pressable>
+            ) : reasonShort ? (
               <Text style={styles.reasonShort}>{reasonShort}</Text>
             ) : null}
           </View>
         </View>
 
         {label ? (
-          <View style={[styles.badge, badgeStyle, { backgroundColor: colors.bg }]}>
+          <View
+            style={[
+              styles.badge,
+              badgeStyle,
+              { backgroundColor: colors.bg, borderColor: colors.border },
+            ]}
+          >
             <Text style={[styles.badgeText, badgeTextStyle, { color: colors.text }]}>{label}</Text>
           </View>
         ) : (
           <View style={styles.badgeEmpty} />
         )}
 
-        {!hasChildren ? (
+        {rowNode.canAddServiceEvent ? (
           <Pressable
-            onPress={() => onAddFromLeaf(node.id)}
+            onPress={() => treeItemContract.onRequestAddServiceEvent?.()}
             style={({ pressed }) => [styles.addLeafButton, pressed && styles.addLeafButtonPressed]}
             hitSlop={8}
           >
@@ -171,7 +150,7 @@ function NodeRow({
       </Pressable>
 
       {hasChildren && isExpanded
-        ? node.children.map((child) => (
+        ? rowNode.children.map((child) => (
             <NodeRow
               key={child.id}
               node={child}
@@ -179,10 +158,172 @@ function NodeRow({
               expandedIds={expandedIds}
               onToggle={onToggle}
               onAddFromLeaf={onAddFromLeaf}
+              onOpenStatusExplanation={onOpenStatusExplanation}
             />
           ))
         : null}
     </View>
+  );
+}
+
+function StatusExplanationModal(props: {
+  visible: boolean;
+  node: NodeTreeItemViewModel | null;
+  onClose: () => void;
+}) {
+  const { visible, node, onClose } = props;
+  if (!visible) {
+    return null;
+  }
+  const ex = node?.statusExplanation;
+  if (!node || !ex) {
+    return null;
+  }
+
+  const showKmRow =
+    ex.current.odometer !== null ||
+    ex.lastService?.odometer !== null ||
+    ex.rule?.intervalKm !== null ||
+    ex.rule?.warningKm !== null ||
+    ex.usage?.elapsedKm !== null ||
+    ex.usage?.remainingKm !== null;
+
+  const showHoursRow =
+    ex.current.engineHours !== null ||
+    ex.lastService?.engineHours !== null ||
+    ex.rule?.intervalHours !== null ||
+    ex.rule?.warningHours !== null ||
+    ex.usage?.elapsedHours !== null ||
+    ex.usage?.remainingHours !== null;
+
+  const showDaysRow =
+    ex.rule?.intervalDays !== null ||
+    ex.rule?.warningDays !== null ||
+    ex.usage?.elapsedDays !== null ||
+    ex.usage?.remainingDays !== null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <Pressable style={styles.modalBackdrop} onPress={onClose} accessibilityLabel="Закрыть" />
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Пояснение расчета: {node.name}</Text>
+          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+            {ex.reasonShort ? (
+              <View style={styles.modalBlock}>
+                <Text style={styles.modalKicker}>Кратко</Text>
+                <Text style={styles.modalEmphasis}>{ex.reasonShort}</Text>
+              </View>
+            ) : null}
+            {ex.reasonDetailed ? (
+              <View style={styles.modalBlock}>
+                <Text style={styles.modalKicker}>Подробно</Text>
+                <Text style={styles.modalBody}>{ex.reasonDetailed}</Text>
+              </View>
+            ) : null}
+            {ex.triggeredBy ? (
+              <View style={styles.modalBlock}>
+                <Text style={styles.modalKicker}>Сработавшее измерение</Text>
+                <Text style={styles.modalBody}>
+                  {getStatusExplanationTriggeredByLabel(ex.triggeredBy)}
+                </Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.modalKicker}>Детали расчета</Text>
+            {showKmRow ? (
+              <View style={styles.modalTableBlock}>
+                <Text style={styles.modalTableTitle}>Пробег</Text>
+                <Text style={styles.modalMono}>
+                  Текущее:{" "}
+                  {ex.current.odometer !== null ? `${ex.current.odometer} км` : "—"}
+                  {"\n"}
+                  Последний сервис:{" "}
+                  {ex.lastService?.odometer != null
+                    ? `${ex.lastService.odometer} км`
+                    : "—"}
+                  {"\n"}
+                  Интервал:{" "}
+                  {ex.rule?.intervalKm != null ? `${ex.rule.intervalKm} км` : "—"}
+                  {"\n"}
+                  Warning:{" "}
+                  {ex.rule?.warningKm != null ? `${ex.rule.warningKm} км` : "—"}
+                  {"\n"}
+                  Использовано:{" "}
+                  {ex.usage?.elapsedKm != null ? `${ex.usage.elapsedKm} км` : "—"}
+                  {"\n"}
+                  Осталось:{" "}
+                  {ex.usage?.remainingKm != null ? `${ex.usage.remainingKm} км` : "—"}
+                </Text>
+              </View>
+            ) : null}
+            {showHoursRow ? (
+              <View style={styles.modalTableBlock}>
+                <Text style={styles.modalTableTitle}>Моточасы</Text>
+                <Text style={styles.modalMono}>
+                  Текущее:{" "}
+                  {ex.current.engineHours !== null ? `${ex.current.engineHours} ч` : "—"}
+                  {"\n"}
+                  Последний сервис:{" "}
+                  {ex.lastService?.engineHours != null
+                    ? `${ex.lastService.engineHours} ч`
+                    : "—"}
+                  {"\n"}
+                  Интервал:{" "}
+                  {ex.rule?.intervalHours != null ? `${ex.rule.intervalHours} ч` : "—"}
+                  {"\n"}
+                  Warning:{" "}
+                  {ex.rule?.warningHours != null ? `${ex.rule.warningHours} ч` : "—"}
+                  {"\n"}
+                  Использовано:{" "}
+                  {ex.usage?.elapsedHours != null ? `${ex.usage.elapsedHours} ч` : "—"}
+                  {"\n"}
+                  Осталось:{" "}
+                  {ex.usage?.remainingHours != null ? `${ex.usage.remainingHours} ч` : "—"}
+                </Text>
+              </View>
+            ) : null}
+            {showDaysRow ? (
+              <View style={styles.modalTableBlock}>
+                <Text style={styles.modalTableTitle}>Время</Text>
+                <Text style={styles.modalMono}>
+                  Интервал:{" "}
+                  {ex.rule?.intervalDays != null ? `${ex.rule.intervalDays} дн` : "—"}
+                  {"\n"}
+                  Warning:{" "}
+                  {ex.rule?.warningDays != null ? `${ex.rule.warningDays} дн` : "—"}
+                  {"\n"}
+                  Использовано:{" "}
+                  {ex.usage?.elapsedDays != null ? `${ex.usage.elapsedDays} дн` : "—"}
+                  {"\n"}
+                  Осталось:{" "}
+                  {ex.usage?.remainingDays != null ? `${ex.usage.remainingDays} дн` : "—"}
+                </Text>
+              </View>
+            ) : null}
+            <View style={styles.modalTableBlock}>
+              <Text style={styles.modalTableTitle}>Дата расчета</Text>
+              <Text style={styles.modalMono}>
+                {formatIsoCalendarDateRu(ex.current.date)}
+                {"\n"}
+                Последний сервис:{" "}
+                {ex.lastService?.eventDate
+                  ? formatIsoCalendarDateRu(ex.lastService.eventDate)
+                  : "—"}
+                {"\n"}
+                Trigger mode: {ex.triggerMode || "—"}
+              </Text>
+            </View>
+          </ScrollView>
+          <Pressable
+            onPress={onClose}
+            style={({ pressed }) => [styles.modalCloseButton, pressed && styles.modalCloseButtonPressed]}
+          >
+            <Text style={styles.modalCloseButtonText}>Закрыть</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -197,44 +338,67 @@ export default function VehicleDetailScreen() {
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [nodeTreeError, setNodeTreeError] = useState("");
+  const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isRideProfileExpanded, setIsRideProfileExpanded] = useState(false);
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(false);
+  const [statusExplanationNode, setStatusExplanationNode] =
+    useState<NodeTreeItemViewModel | null>(null);
 
   const apiBaseUrl = getApiBaseUrl();
 
   const load = useCallback(async () => {
-      if (!vehicleId) {
-        setError("Не удалось определить ID мотоцикла.");
-        setIsLoading(false);
-        return;
-      }
+    if (!vehicleId) {
+      setError("Не удалось определить ID мотоцикла.");
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        setIsLoading(true);
-        setError("");
-        const client = createApiClient({ baseUrl: apiBaseUrl });
-        const endpoints = createMotoTwinEndpoints(client);
+    const client = createApiClient({ baseUrl: apiBaseUrl });
+    const endpoints = createMotoTwinEndpoints(client);
 
-        const [detailData, nodesData] = await Promise.all([
-          endpoints.getVehicleDetail(vehicleId),
-          endpoints.getVehicleNodeTree(vehicleId),
-        ]);
+    setIsLoading(true);
+    setError("");
+    setNodeTreeError("");
 
-        setVehicle(detailData.vehicle ?? null);
-        setNodeTree(nodesData.nodeTree ?? []);
-      } catch (err) {
-        console.error(err);
-        setError("Не удалось загрузить данные мотоцикла.");
-      } finally {
-        setIsLoading(false);
-      }
-    }, [apiBaseUrl, vehicleId]);
+    try {
+      const detailData = await endpoints.getVehicleDetail(vehicleId);
+      setVehicle(detailData.vehicle ?? null);
+    } catch (err) {
+      console.error(err);
+      setError("Не удалось загрузить данные мотоцикла.");
+      setVehicle(null);
+      setNodeTree([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(false);
+
+    setIsNodeTreeLoading(true);
+    try {
+      const nodesData = await endpoints.getNodeTree(vehicleId);
+      setNodeTree(nodesData.nodeTree ?? []);
+      setNodeTreeError("");
+    } catch (err) {
+      console.error(err);
+      setNodeTreeError("Не удалось загрузить дерево узлов.");
+      setNodeTree([]);
+    } finally {
+      setIsNodeTreeLoading(false);
+    }
+  }, [apiBaseUrl, vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
       load();
     }, [load])
+  );
+
+  const { roots: nodeTreeViewModel } = useMemo(
+    () => buildNodeTreeSectionProps(nodeTree),
+    [nodeTree]
   );
 
   function toggleNode(id: string) {
@@ -250,15 +414,12 @@ export default function VehicleDetailScreen() {
   }
 
   const hasNickname = Boolean(vehicle?.nickname?.trim());
-  const title =
-    vehicle?.nickname?.trim() ||
-    `${vehicle?.brandName ?? ""} ${vehicle?.modelName ?? ""}`.trim();
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.stateContainer}>
-          <ActivityIndicator size="large" color="#111827" />
+          <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка мотоцикла...</Text>
         </View>
       </SafeAreaView>
@@ -286,20 +447,24 @@ export default function VehicleDetailScreen() {
     );
   }
 
-  const rideProfile = vehicle.rideProfile;
-  const technicalInfo = [
-    { label: "Рынок", value: vehicle.modelVariant?.market || null },
-    { label: "Двигатель", value: vehicle.modelVariant?.engineType || null },
-    { label: "Охлаждение", value: vehicle.modelVariant?.coolingType || null },
-    { label: "Колеса", value: vehicle.modelVariant?.wheelSizes || null },
-    { label: "Тормоза", value: vehicle.modelVariant?.brakeSystem || null },
-    { label: "Шаг цепи", value: vehicle.modelVariant?.chainPitch || null },
-    { label: "Стоковые звезды", value: vehicle.modelVariant?.stockSprockets || null },
-  ].filter((item) => Boolean(item.value));
-  const hasTechnicalInfo = technicalInfo.length > 0;
+  const detailViewModel = buildVehicleDetailViewModel(vehicle);
+  const stateViewModel = buildVehicleStateViewModel({
+    odometer: vehicle.odometer,
+    engineHours: vehicle.engineHours,
+  });
+  const rideProfileViewModel = buildRideProfileViewModel(vehicle.rideProfile);
+  const technicalInfoViewModel = buildVehicleTechnicalInfoViewModel({
+    modelVariant: vehicle.modelVariant,
+  });
+  const hasTechnicalInfo = technicalInfoViewModel.items.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusExplanationModal
+        visible={Boolean(statusExplanationNode?.statusExplanation)}
+        node={statusExplanationNode}
+        onClose={() => setStatusExplanationNode(null)}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Identity + state card */}
         <View style={styles.infoCard}>
@@ -308,14 +473,11 @@ export default function VehicleDetailScreen() {
           ) : (
             <Text style={styles.eyebrow}>Мотоцикл</Text>
           )}
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title}>{detailViewModel.displayName}</Text>
           <Text style={styles.brandModel}>
-            {vehicle.brandName} · {vehicle.modelName}
+            {detailViewModel.brandModelLine}
           </Text>
-          <Text style={styles.variantText}>
-            {(vehicle.modelVariant?.year ?? vehicle.year) || "—"} ·{" "}
-            {vehicle.modelVariant?.versionName || vehicle.variantName || "—"}
-          </Text>
+          <Text style={styles.variantText}>{detailViewModel.yearVersionLine}</Text>
 
           <View style={styles.divider} />
 
@@ -331,16 +493,14 @@ export default function VehicleDetailScreen() {
           <View style={styles.stateMetricsRow}>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Пробег</Text>
-              <Text style={styles.metricValue}>{vehicle.odometer} км</Text>
+              <Text style={styles.metricValue}>{stateViewModel.odometerValue}</Text>
             </View>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Моточасы</Text>
-              <Text style={styles.metricValue}>
-                {vehicle.engineHours != null ? `${vehicle.engineHours} ч` : "—"}
-              </Text>
+              <Text style={styles.metricValue}>{stateViewModel.engineHoursValue}</Text>
             </View>
           </View>
-          <Row label="VIN" value={vehicle.vin ?? "—"} />
+          <Row label="VIN" value={detailViewModel.vinLine} />
         </View>
 
         <View style={styles.secondarySectionCard}>
@@ -363,14 +523,14 @@ export default function VehicleDetailScreen() {
             </View>
           </Pressable>
           {isRideProfileExpanded ? (
-            rideProfile ? (
+            rideProfileViewModel ? (
               <View style={styles.secondarySectionGrid}>
-                <SpecRow label="Сценарий" value={formatUsageType(rideProfile.usageType)} />
-                <SpecRow label="Стиль" value={formatRidingStyle(rideProfile.ridingStyle)} />
-                <SpecRow label="Нагрузка" value={formatLoadType(rideProfile.loadType)} />
+                <SpecRow label="Сценарий" value={rideProfileViewModel.usageType} />
+                <SpecRow label="Стиль" value={rideProfileViewModel.ridingStyle} />
+                <SpecRow label="Нагрузка" value={rideProfileViewModel.loadType} />
                 <SpecRow
                   label="Интенсивность"
-                  value={formatUsageIntensity(rideProfile.usageIntensity)}
+                  value={rideProfileViewModel.usageIntensity}
                 />
               </View>
             ) : (
@@ -390,7 +550,7 @@ export default function VehicleDetailScreen() {
             </Pressable>
             {isTechnicalExpanded ? (
               <View style={styles.secondarySectionGrid}>
-                {technicalInfo.map((item) => (
+                {technicalInfoViewModel.items.map((item) => (
                   <SpecRow key={item.label} label={item.label} value={item.value || "—"} />
                 ))}
               </View>
@@ -399,21 +559,37 @@ export default function VehicleDetailScreen() {
         ) : null}
 
         {/* Node tree */}
-        {nodeTree.length > 0 ? (
-          <View>
-            <Text style={styles.sectionHeader}>Состояние узлов</Text>
-            <Pressable
-              style={({ pressed }) => [styles.sectionJournalButton, pressed && styles.sectionJournalButtonPressed]}
-              onPress={() => router.push(`/vehicles/${vehicleId}/service-log`)}
-            >
-              <Text style={styles.sectionJournalButtonText}>Журнал обслуживания</Text>
-            </Pressable>
-            <Text style={styles.sectionSubheader}>
-              Разверните нужный узел, чтобы проверить статус и быстро добавить обслуживание для
-              leaf-элемента.
-            </Text>
+        <View>
+          <Text style={styles.sectionHeader}>Состояние узлов</Text>
+          <Pressable
+            style={({ pressed }) => [styles.sectionJournalButton, pressed && styles.sectionJournalButtonPressed]}
+            onPress={() => router.push(`/vehicles/${vehicleId}/service-log`)}
+          >
+            <Text style={styles.sectionJournalButtonText}>Журнал обслуживания</Text>
+          </Pressable>
+          <Text style={styles.sectionSubheader}>
+            Разверните нужный узел, чтобы проверить статус и быстро добавить обслуживание для
+            leaf-элемента.
+          </Text>
+          {isNodeTreeLoading ? (
+            <Text style={styles.treeLoadingText}>Загрузка дерева узлов...</Text>
+          ) : null}
+          {nodeTreeError ? (
+            <View style={styles.treeErrorBox}>
+              <Text style={styles.treeErrorText}>{nodeTreeError}</Text>
+              <Pressable
+                style={({ pressed }) => [styles.treeRetryButton, pressed && styles.treeRetryButtonPressed]}
+                onPress={() => {
+                  void load();
+                }}
+              >
+                <Text style={styles.treeRetryButtonText}>Повторить</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
             <View style={styles.treeCard}>
-              {nodeTree.map((node, index) => (
+              {nodeTreeViewModel.map((node, index) => (
                 <View key={node.id}>
                   {index > 0 ? <View style={styles.treeDivider} /> : null}
                   <NodeRow
@@ -426,16 +602,18 @@ export default function VehicleDetailScreen() {
                         `/vehicles/${vehicleId}/service-events/new?source=tree&nodeId=${leafNodeId}`
                       )
                     }
+                    onOpenStatusExplanation={setStatusExplanationNode}
                   />
                 </View>
               ))}
             </View>
-          </View>
-        ) : (
-          <View style={styles.emptyNodes}>
-            <Text style={styles.emptyNodesText}>Данные о состоянии узлов отсутствуют</Text>
-          </View>
-        )}
+          ) : null}
+          {!isNodeTreeLoading && !nodeTreeError && nodeTree.length === 0 ? (
+            <View style={styles.emptyNodes}>
+              <Text style={styles.emptyNodesText}>Данные о состоянии узлов отсутствуют</Text>
+            </View>
+          ) : null}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -462,7 +640,7 @@ function SpecRow({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: c.canvas,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -478,25 +656,25 @@ const styles = StyleSheet.create({
   stateText: {
     marginTop: 12,
     fontSize: 14,
-    color: "#4B5563",
+    color: c.textSecondary,
   },
   errorTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
     textAlign: "center",
   },
   errorText: {
     marginTop: 8,
-    color: "#B91C1C",
+    color: c.error,
     textAlign: "center",
     fontSize: 14,
   },
 
   // Info card
   infoCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E7EB",
+    backgroundColor: c.card,
+    borderColor: c.border,
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,
@@ -507,32 +685,32 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 0.3,
     textTransform: "uppercase",
-    color: "#6B7280",
+    color: c.textMuted,
   },
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   brandModel: {
     marginTop: 4,
     fontSize: 14,
-    color: "#6B7280",
+    color: c.textMuted,
   },
   variantText: {
     marginTop: 4,
     fontSize: 13,
-    color: "#4B5563",
+    color: c.textSecondary,
   },
   divider: {
     height: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: c.divider,
     marginVertical: 12,
   },
   stateHeading: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#374151",
+    color: c.textMeta,
     marginBottom: 8,
   },
   stateHeaderRow: {
@@ -543,18 +721,18 @@ const styles = StyleSheet.create({
   },
   inlineActionButton: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: c.borderStrong,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.card,
   },
   inlineActionButtonPressed: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: c.divider,
   },
   inlineActionButtonText: {
     fontSize: 12,
-    color: "#374151",
+    color: c.textMeta,
     fontWeight: "600",
   },
   stateMetricsRow: {
@@ -565,21 +743,21 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FAFAFA",
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 10,
   },
   metricLabel: {
     fontSize: 12,
-    color: "#6B7280",
+    color: c.textMuted,
   },
   metricValue: {
     marginTop: 4,
     fontSize: 16,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   row: {
     flexDirection: "row",
@@ -589,20 +767,20 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontSize: 14,
-    color: "#6B7280",
+    color: c.textMuted,
     flex: 1,
   },
   rowValue: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#111827",
+    color: c.textPrimary,
     flex: 1,
     textAlign: "right",
   },
 
   secondarySectionCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E7EB",
+    backgroundColor: c.card,
+    borderColor: c.border,
     borderWidth: 1,
     borderRadius: 16,
     padding: 14,
@@ -611,7 +789,7 @@ const styles = StyleSheet.create({
   secondarySectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   sectionHeaderRow: {
     flexDirection: "row",
@@ -629,7 +807,7 @@ const styles = StyleSheet.create({
   },
   sectionChevron: {
     fontSize: 16,
-    color: "#6B7280",
+    color: c.textMuted,
     width: 16,
     textAlign: "center",
   },
@@ -639,36 +817,36 @@ const styles = StyleSheet.create({
   secondaryEmptyText: {
     fontSize: 13,
     lineHeight: 18,
-    color: "#6B7280",
+    color: c.textMuted,
   },
   specRow: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: c.border,
     borderRadius: 10,
-    backgroundColor: "#FCFCFD",
+    backgroundColor: c.chipBackground,
     paddingHorizontal: 10,
     paddingVertical: 9,
   },
   specLabel: {
     fontSize: 12,
-    color: "#6B7280",
+    color: c.textMuted,
   },
   specValue: {
     marginTop: 3,
     fontSize: 14,
     fontWeight: "600",
-    color: "#111827",
+    color: c.textPrimary,
   },
   // Section
   sectionHeader: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#374151",
+    color: c.textMeta,
   },
   sectionJournalButton: {
     marginTop: 8,
     alignSelf: "flex-start",
-    backgroundColor: "#111827",
+    backgroundColor: c.primaryAction,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 9,
@@ -679,20 +857,57 @@ const styles = StyleSheet.create({
   sectionJournalButtonText: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: c.textInverse,
   },
   sectionSubheader: {
     marginTop: 4,
     marginBottom: 10,
     fontSize: 13,
     lineHeight: 18,
-    color: "#6B7280",
+    color: c.textMuted,
+  },
+  treeLoadingText: {
+    marginBottom: 10,
+    fontSize: 14,
+    color: c.textMuted,
+  },
+  treeErrorBox: {
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: c.errorBorder,
+    borderRadius: 12,
+    backgroundColor: c.errorSurface,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  treeErrorText: {
+    fontSize: 14,
+    color: c.error,
+    lineHeight: 20,
+  },
+  treeRetryButton: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: c.card,
+  },
+  treeRetryButtonPressed: {
+    backgroundColor: c.divider,
+  },
+  treeRetryButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: c.textMeta,
   },
 
   // Tree card
   treeCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E7EB",
+    backgroundColor: c.card,
+    borderColor: c.border,
     borderWidth: 1,
     borderRadius: 16,
     overflow: "hidden",
@@ -700,7 +915,7 @@ const styles = StyleSheet.create({
   },
   treeDivider: {
     height: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: c.divider,
     marginLeft: 14,
   },
 
@@ -717,15 +932,15 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   nodeRowTopLevel: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: c.divider,
   },
   nodeRowNested: {
-    backgroundColor: "#FCFCFD",
+    backgroundColor: c.chipBackground,
   },
   nodeRowPressed: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: c.divider,
   },
   nodeRowLeft: {
     flexDirection: "row",
@@ -742,7 +957,7 @@ const styles = StyleSheet.create({
   },
   chevron: {
     fontSize: 15,
-    color: "#6B7280",
+    color: c.textMuted,
     width: 16,
     textAlign: "center",
   },
@@ -754,19 +969,114 @@ const styles = StyleSheet.create({
   },
   nodeName: {
     fontSize: 14,
-    color: "#374151",
+    color: c.textMeta,
     lineHeight: 20,
   },
   nodeNameTop: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
+    color: c.textPrimary,
   },
   reasonShort: {
     marginTop: 3,
     fontSize: 12,
-    color: "#9CA3AF",
+    color: c.textTertiary,
     lineHeight: 16,
+  },
+  reasonShortLink: {
+    color: c.textSecondary,
+    textDecorationLine: "underline",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    backgroundColor: c.overlayModal,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalCard: {
+    maxHeight: 560,
+    backgroundColor: c.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.border,
+    overflow: "hidden",
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: c.textPrimary,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  modalScroll: {
+    maxHeight: 420,
+  },
+  modalScrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  modalBlock: {
+    marginBottom: 14,
+  },
+  modalKicker: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  modalEmphasis: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: c.textPrimary,
+  },
+  modalBody: {
+    fontSize: 14,
+    color: c.textMeta,
+    lineHeight: 20,
+  },
+  modalTableBlock: {
+    marginBottom: 12,
+    padding: 10,
+    backgroundColor: c.cardSubtle,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  modalTableTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: c.textPrimary,
+    marginBottom: 6,
+  },
+  modalMono: {
+    fontSize: 12,
+    color: c.textMeta,
+    lineHeight: 18,
+  },
+  modalCloseButton: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    marginTop: 4,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    alignItems: "center",
+  },
+  modalCloseButtonPressed: {
+    backgroundColor: c.divider,
+  },
+  modalCloseButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: c.textPrimary,
   },
 
   // Badge
@@ -798,19 +1108,19 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: c.borderStrong,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   addLeafButtonPressed: {
-    backgroundColor: "#EEF2FF",
-    borderColor: "#A5B4FC",
+    backgroundColor: c.indigoSoftBg,
+    borderColor: c.indigoSoftBorder,
   },
   addLeafButtonText: {
-    color: "#4B5563",
+    color: c.textSecondary,
     fontSize: 16,
     lineHeight: 16,
     fontWeight: "700",
@@ -824,6 +1134,6 @@ const styles = StyleSheet.create({
   },
   emptyNodesText: {
     fontSize: 14,
-    color: "#9CA3AF",
+    color: c.textTertiary,
   },
 });

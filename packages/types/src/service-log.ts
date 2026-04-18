@@ -1,4 +1,4 @@
-import type { ServiceEventItem } from "./service-event";
+import type { ServiceEventItem, ServiceEventKind } from "./service-event";
 
 export type ServiceEventsSortField =
   | "eventDate"
@@ -32,4 +32,62 @@ export type MonthlyServiceLogGroup = {
   label: string;
   events: ServiceEventItem[];
   summary: MonthlyServiceLogSummary;
+};
+
+/** Alias for filters shared by web and Expo service log UIs. */
+export type ServiceLogFilters = ServiceEventsFilters;
+
+export type ServiceLogSortState = {
+  field: ServiceEventsSortField;
+  direction: ServiceEventsSortDirection;
+};
+
+export type ServiceLogEntryVisualKind = "primary" | "secondary";
+
+/**
+ * Service log **entry** row date label (`dateLabel` in the shared VM).
+ * - `default`: `toLocaleDateString("ru-RU")` — web journal modal (`buildServiceLogTimelineProps`, …, `"default"`).
+ * - `compact`: numeric day + short month + year — Expo journal (`…, "compact"`).
+ * **Month/year group headers** use a separate shared formatter (long month + year, `ru-RU`) for both clients.
+ * Status explanation dates use the same full locale string as `default` (see `formatIsoCalendarDateRu` in `@mototwin/domain`).
+ */
+export type ServiceLogEntryDateStyle = "default" | "compact";
+
+export type ServiceLogEntryViewModel = {
+  id: string;
+  eventKind: ServiceEventKind;
+  visualKind: ServiceLogEntryVisualKind;
+  mainTitle: string;
+  /** Node or `nodeId` (web-style). */
+  secondaryTitle: string;
+  /**
+   * Expo service cards historically used an em dash when the nested `node`
+   * object was absent (`node?.name ?? "—"`), even if `nodeId` exists.
+   */
+  expoServiceNodeLabel: string | null;
+  stateUpdateSubtitle: string | null;
+  dateLabel: string;
+  odometerLabel: string;
+  odometerValue: string;
+  engineHoursLabel: string | null;
+  engineHoursValue: string | null;
+  /** Single line for compact mobile meta (e.g. "12 345 км · 100 ч"). */
+  compactMetricsLine: string;
+  costLabel: string | null;
+  costAmount: number | null;
+  costCurrency: string | null;
+  comment: string | null;
+};
+
+export type ServiceLogMonthlySummaryViewModel = MonthlyServiceLogSummary & {
+  /** Preformatted multi-currency label, empty when no costs. */
+  costLabel: string;
+};
+
+export type ServiceLogMonthGroupViewModel = {
+  monthKey: string;
+  monthStart: number;
+  label: string;
+  summary: ServiceLogMonthlySummaryViewModel;
+  entries: ServiceLogEntryViewModel[];
 };

@@ -4,26 +4,52 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  filterAndSortServiceEvents,
+  buildNodeTreeSectionProps,
+  canOpenNodeStatusExplanationModal,
+  buildRideProfileViewModel,
+  buildServiceLogTimelineProps,
+  getServiceLogEventKindBadgeLabel,
+  SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
+  buildVehicleHeaderProps,
+  buildVehicleStateViewModel,
+  buildVehicleTechnicalInfoViewModel,
+  createInitialAddServiceEventFormValues,
+  createInitialEditVehicleProfileFormValues,
+  createInitialVehicleStateFormValues,
   findNodePathById,
+  formatIsoCalendarDateRu,
   getAvailableChildrenForSelectedPath,
-  getLeafStatusReasonShort,
-  getMonthlyCostLabel,
   getNodeSelectLevels,
   getSelectedNodeFromPath,
   getStatusExplanationTriggeredByLabel,
-  getStateUpdateSummary,
-  getTopNodeStatusBadgeLabel,
-  groupServiceEventsByMonth,
+  normalizeAddServiceEventPayload,
+  normalizeEditVehicleProfilePayload,
+  normalizeVehicleStatePayload,
+  RIDE_LOAD_TYPE_OPTIONS,
+  RIDE_RIDING_STYLE_OPTIONS,
+  RIDE_USAGE_INTENSITY_OPTIONS,
+  RIDE_USAGE_TYPE_OPTIONS,
+  validateAddServiceEventFormValues,
+  validateVehicleStateFormValues,
+  isServiceLogTimelineQueryActive,
 } from "@mototwin/domain";
+import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
 import type {
+  EditVehicleProfileFormValues,
+  NodeStatus,
   NodeTreeItem,
+  NodeTreeItemViewModel,
   SelectedNodePath,
   ServiceEventItem,
   ServiceEventsFilters,
   ServiceEventsSortDirection,
   ServiceEventsSortField,
+  VehicleDetail as SharedVehicleDetail,
+  VehicleRideProfile,
 } from "@mototwin/types";
+
+const vehicleDetailApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
 type VehicleDetail = {
   id: string;
@@ -61,14 +87,36 @@ type VehiclePageProps = {
   }>;
 };
 
-type VehicleProfileForm = {
-  nickname: string;
-  vin: string;
-  usageType: "CITY" | "HIGHWAY" | "MIXED" | "OFFROAD";
-  ridingStyle: "CALM" | "ACTIVE" | "AGGRESSIVE";
-  loadType: "SOLO" | "PASSENGER" | "LUGGAGE" | "PASSENGER_LUGGAGE";
-  usageIntensity: "LOW" | "MEDIUM" | "HIGH";
-};
+function toSharedRideProfile(
+  rideProfile: VehicleDetail["rideProfile"]
+): VehicleRideProfile | null {
+  if (!rideProfile) {
+    return null;
+  }
+
+  return {
+    usageType: rideProfile.usageType as VehicleRideProfile["usageType"],
+    ridingStyle: rideProfile.ridingStyle as VehicleRideProfile["ridingStyle"],
+    loadType: rideProfile.loadType as VehicleRideProfile["loadType"],
+    usageIntensity: rideProfile.usageIntensity as VehicleRideProfile["usageIntensity"],
+  };
+}
+
+function toSharedVehicleDetail(vehicle: VehicleDetail): SharedVehicleDetail {
+  return {
+    id: vehicle.id,
+    nickname: vehicle.nickname,
+    brandName: vehicle.brand.name,
+    modelName: vehicle.model.name,
+    variantName: vehicle.modelVariant.versionName,
+    year: vehicle.modelVariant.year,
+    vin: vehicle.vin,
+    odometer: vehicle.odometer,
+    engineHours: vehicle.engineHours,
+    rideProfile: toSharedRideProfile(vehicle.rideProfile),
+    modelVariant: vehicle.modelVariant,
+  };
+}
 
 export default function VehiclePage({ params }: VehiclePageProps) {
   const [vehicleId, setVehicleId] = useState("");
@@ -103,19 +151,14 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [selectedNodePath, setSelectedNodePath] = useState<SelectedNodePath>([]);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
-    useState<NodeTreeItem | null>(null);
+    useState<NodeTreeItemViewModel | null>(null);
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileFormError, setProfileFormError] = useState("");
-  const [profileForm, setProfileForm] = useState<VehicleProfileForm>({
-    nickname: "",
-    vin: "",
-    usageType: "MIXED",
-    ridingStyle: "ACTIVE",
-    loadType: "SOLO",
-    usageIntensity: "MEDIUM",
-  });
+  const [profileForm, setProfileForm] = useState<EditVehicleProfileFormValues>(() =>
+    createInitialEditVehicleProfileFormValues()
+  );
   const [isEditingVehicleState, setIsEditingVehicleState] = useState(false);
   const [vehicleStateOdometer, setVehicleStateOdometer] = useState("");
   const [vehicleStateEngineHours, setVehicleStateEngineHours] = useState("");
@@ -126,7 +169,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [odometer, setOdometer] = useState("");
   const [engineHours, setEngineHours] = useState("");
   const [costAmount, setCostAmount] = useState("");
-  const [currency, setCurrency] = useState("");
+  const [currency, setCurrency] = useState(
+    () => createInitialAddServiceEventFormValues().currency
+  );
   const [comment, setComment] = useState("");
   const todayDate = getTodayDateString();
   const nodeSelectLevels = useMemo(() => {
@@ -145,17 +190,24 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     selectedFinalNode && selectedPathChildren.length === 0
   );
 
-  const filteredAndSortedServiceEvents = useMemo(() => {
-    return filterAndSortServiceEvents(
+  const serviceEventsByMonth = useMemo(() => {
+    return buildServiceLogTimelineProps(
       serviceEvents,
       serviceEventsFilters,
-      serviceEventsSort
-    );
+      serviceEventsSort,
+      "default"
+    ).monthGroups;
   }, [serviceEvents, serviceEventsFilters, serviceEventsSort]);
 
-  const serviceEventsByMonth = useMemo(() => {
-    return groupServiceEventsByMonth(filteredAndSortedServiceEvents);
-  }, [filteredAndSortedServiceEvents]);
+  const isServiceLogQueryActive = useMemo(
+    () => isServiceLogTimelineQueryActive(serviceEventsFilters, serviceEventsSort),
+    [serviceEventsFilters, serviceEventsSort]
+  );
+
+  const { roots: nodeTreeViewModel } = useMemo(
+    () => buildNodeTreeSectionProps(nodeTree),
+    [nodeTree]
+  );
 
   const updateServiceEventsFilter = (
     field: keyof ServiceEventsFilters,
@@ -212,18 +264,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         setIsLoading(true);
         setError("");
 
-        const response = await fetch(`/api/vehicles/${resolvedParams.id}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.error || "Не удалось загрузить мотоцикл.");
-          return;
-        }
-
-        setVehicle(data.vehicle ?? null);
+        const data = await vehicleDetailApi.getVehicleDetail(resolvedParams.id);
+        setVehicle((data.vehicle ?? null) as unknown as VehicleDetail | null);
       } catch (requestError) {
         console.error(requestError);
-        setError("Произошла ошибка при загрузке мотоцикла.");
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Произошла ошибка при загрузке мотоцикла."
+        );
       } finally {
         setIsLoading(false);
       }
@@ -241,20 +290,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       try {
         setIsServiceEventsLoading(true);
         setServiceEventsError("");
-        const response = await fetch(`/api/vehicles/${vehicleId}/service-events`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          setServiceEventsError(
-            data.error || "Не удалось загрузить журнал обслуживания."
-          );
-          return;
-        }
-
+        const data = await vehicleDetailApi.getServiceEvents(vehicleId);
         setServiceEvents(data.serviceEvents ?? []);
       } catch (serviceError) {
         console.error(serviceError);
-        setServiceEventsError("Произошла ошибка при загрузке журнала.");
+        setServiceEventsError(
+          serviceError instanceof Error
+            ? serviceError.message
+            : "Произошла ошибка при загрузке журнала."
+        );
       } finally {
         setIsServiceEventsLoading(false);
       }
@@ -271,18 +315,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     try {
       setIsNodeTreeLoading(true);
       setNodeTreeError("");
-      const response = await fetch(`/api/vehicles/${vehicleId}/node-tree`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        setNodeTreeError(data.error || "Не удалось загрузить дерево узлов.");
-        return;
-      }
-
+      const data = await vehicleDetailApi.getNodeTree(vehicleId);
       setNodeTree(data.nodeTree ?? []);
     } catch (nodeTreeLoadError) {
       console.error(nodeTreeLoadError);
-      setNodeTreeError("Произошла ошибка при загрузке дерева узлов.");
+      setNodeTreeError(
+        nodeTreeLoadError instanceof Error
+          ? nodeTreeLoadError.message
+          : "Произошла ошибка при загрузке дерева узлов."
+      );
     } finally {
       setIsNodeTreeLoading(false);
     }
@@ -309,12 +350,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setIsAddServiceEventModalOpen(true);
   };
 
-  const getLeafStatusExplanation = (node: NodeTreeItem): string | null => {
-    return getLeafStatusReasonShort(node);
-  };
-
-  const renderChildTreeNode = (node: NodeTreeItem, depth: number): ReactNode => {
-    const hasChildren = node.children.length > 0;
+  const renderChildTreeNode = (node: NodeTreeItemViewModel, depth: number): ReactNode => {
+    const hasChildren = node.hasChildren;
     const isExpanded = Boolean(expandedNodes[node.id]);
 
     return (
@@ -344,13 +381,14 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   {node.name}
                 </span>
               </div>
-              {getLeafStatusExplanation(node) ? (
+              {node.shortExplanationLabel &&
+              canOpenNodeStatusExplanationModal(node) ? (
                 <button
                   type="button"
                   onClick={() => setSelectedStatusExplanationNode(node)}
                   className="mt-1.5 pl-8 text-left text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-gray-700"
                 >
-                  {getLeafStatusExplanation(node)}
+                  {node.shortExplanationLabel}
                 </button>
               ) : null}
             </div>
@@ -358,12 +396,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
             <div className="flex shrink-0 items-center gap-2">
               {node.effectiveStatus ? (
                 <span
-                  className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium ${getStatusBadgeClassName(node.effectiveStatus)}`}
+                  className="inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium"
+                  style={getStatusBadgeStyle(node.effectiveStatus)}
                 >
-                  {getTopNodeStatusBadgeLabel(node.effectiveStatus)}
+                  {node.statusLabel}
                 </span>
               ) : null}
-              {!hasChildren ? (
+              {node.canAddServiceEvent ? (
                 <button
                   type="button"
                   onClick={() => openAddServiceEventFromLeafNode(node.id)}
@@ -403,20 +442,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     try {
       setIsServiceEventsLoading(true);
       setServiceEventsError("");
-      const response = await fetch(`/api/vehicles/${vehicleId}/service-events`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        setServiceEventsError(
-          data.error || "Не удалось загрузить журнал обслуживания."
-        );
-        return;
-      }
-
+      const data = await vehicleDetailApi.getServiceEvents(vehicleId);
       setServiceEvents(data.serviceEvents ?? []);
     } catch (serviceError) {
       console.error(serviceError);
-      setServiceEventsError("Произошла ошибка при загрузке журнала.");
+      setServiceEventsError(
+        serviceError instanceof Error
+          ? serviceError.message
+          : "Произошла ошибка при загрузке журнала."
+      );
     } finally {
       setIsServiceEventsLoading(false);
     }
@@ -427,10 +461,12 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       return;
     }
 
-    setVehicleStateOdometer(String(vehicle.odometer));
-    setVehicleStateEngineHours(
-      vehicle.engineHours !== null ? String(vehicle.engineHours) : ""
+    const initial = createInitialVehicleStateFormValues(
+      vehicle.odometer,
+      vehicle.engineHours
     );
+    setVehicleStateOdometer(initial.odometer);
+    setVehicleStateEngineHours(initial.engineHours);
     setVehicleStateError("");
     setIsEditingVehicleState(true);
   };
@@ -440,16 +476,18 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       return;
     }
 
-    setProfileForm({
-      nickname: vehicle.nickname || "",
-      vin: vehicle.vin || "",
-      usageType: (vehicle.rideProfile?.usageType || "MIXED") as VehicleProfileForm["usageType"],
-      ridingStyle: (vehicle.rideProfile?.ridingStyle ||
-        "ACTIVE") as VehicleProfileForm["ridingStyle"],
-      loadType: (vehicle.rideProfile?.loadType || "SOLO") as VehicleProfileForm["loadType"],
-      usageIntensity: (vehicle.rideProfile?.usageIntensity ||
-        "MEDIUM") as VehicleProfileForm["usageIntensity"],
-    });
+    setProfileForm(
+      createInitialEditVehicleProfileFormValues({
+        nickname: vehicle.nickname || "",
+        vin: vehicle.vin || "",
+        usageType: (vehicle.rideProfile?.usageType || "MIXED") as EditVehicleProfileFormValues["usageType"],
+        ridingStyle: (vehicle.rideProfile?.ridingStyle ||
+          "ACTIVE") as EditVehicleProfileFormValues["ridingStyle"],
+        loadType: (vehicle.rideProfile?.loadType || "SOLO") as EditVehicleProfileFormValues["loadType"],
+        usageIntensity: (vehicle.rideProfile?.usageIntensity ||
+          "MEDIUM") as EditVehicleProfileFormValues["usageIntensity"],
+      })
+    );
     setProfileFormError("");
     setIsEditProfileModalOpen(true);
   };
@@ -464,35 +502,20 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       setIsSavingProfile(true);
       setProfileFormError("");
 
-      const response = await fetch(`/api/vehicles/${vehicleId}/profile`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          nickname: profileForm.nickname.trim() || null,
-          vin: profileForm.vin.trim() || null,
-          rideProfile: {
-            usageType: profileForm.usageType,
-            ridingStyle: profileForm.ridingStyle,
-            loadType: profileForm.loadType,
-            usageIntensity: profileForm.usageIntensity,
-          },
-        }),
-      });
+      const data = await vehicleDetailApi.updateVehicleProfile(
+        vehicleId,
+        normalizeEditVehicleProfilePayload(profileForm)
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setProfileFormError(data.error || "Не удалось обновить профиль мотоцикла.");
-        return;
-      }
-
-      setVehicle(data.vehicle ?? null);
+      setVehicle(data.vehicle as unknown as VehicleDetail);
       setIsEditProfileModalOpen(false);
     } catch (saveError) {
       console.error(saveError);
-      setProfileFormError("Произошла ошибка при сохранении профиля.");
+      setProfileFormError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Произошла ошибка при сохранении профиля."
+      );
     } finally {
       setIsSavingProfile(false);
     }
@@ -509,52 +532,24 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       return;
     }
 
-    if (!vehicleStateOdometer.trim()) {
-      setVehicleStateError("Укажите пробег.");
+    const stateValues = {
+      odometer: vehicleStateOdometer,
+      engineHours: vehicleStateEngineHours,
+    };
+    const validation = validateVehicleStateFormValues(stateValues, "web");
+    if (validation.errors.length > 0) {
+      setVehicleStateError(validation.errors[0]);
       return;
-    }
-
-    const parsedOdometer = Number(vehicleStateOdometer);
-    if (!Number.isInteger(parsedOdometer) || parsedOdometer < 0) {
-      setVehicleStateError("Пробег должен быть целым числом не меньше 0.");
-      return;
-    }
-
-    const trimmedEngineHours = vehicleStateEngineHours.trim();
-    let parsedEngineHours: number | null = null;
-
-    if (trimmedEngineHours) {
-      const parsed = Number(trimmedEngineHours);
-      if (!Number.isInteger(parsed) || parsed < 0) {
-        setVehicleStateError("Моточасы должны быть целым числом не меньше 0.");
-        return;
-      }
-      parsedEngineHours = parsed;
     }
 
     try {
       setIsSavingVehicleState(true);
       setVehicleStateError("");
 
-      const response = await fetch(`/api/vehicles/${vehicleId}/state`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          odometer: parsedOdometer,
-          engineHours: parsedEngineHours,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setVehicleStateError(
-          data.error || "Не удалось обновить текущее состояние мотоцикла."
-        );
-        return;
-      }
+      const data = await vehicleDetailApi.updateVehicleState(
+        vehicleId,
+        normalizeVehicleStatePayload(stateValues)
+      );
 
       setVehicle((currentVehicle) =>
         currentVehicle
@@ -572,7 +567,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       await Promise.all([loadNodeTree(), loadServiceEvents()]);
     } catch (saveError) {
       console.error(saveError);
-      setVehicleStateError("Произошла ошибка при сохранении состояния.");
+      setVehicleStateError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Произошла ошибка при сохранении состояния."
+      );
     } finally {
       setIsSavingVehicleState(false);
     }
@@ -580,13 +579,14 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
   const resetServiceEventForm = () => {
     setSelectedNodePath([]);
-    setServiceType("");
-    setEventDate("");
-    setOdometer("");
-    setEngineHours("");
-    setCostAmount("");
-    setCurrency("");
-    setComment("");
+    const empty = createInitialAddServiceEventFormValues();
+    setServiceType(empty.serviceType);
+    setEventDate(empty.eventDate);
+    setOdometer(empty.odometer);
+    setEngineHours(empty.engineHours);
+    setCostAmount(empty.costAmount);
+    setCurrency(empty.currency);
+    setComment(empty.comment);
   };
 
   const handleCreateServiceEvent = async () => {
@@ -599,66 +599,34 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         return;
       }
 
-      if (!selectedFinalNode) {
-        setServiceEventFormError("Выберите узел.");
-        return;
-      }
+      const serviceFormValues = {
+        nodeId: selectedFinalNode?.id ?? "",
+        serviceType,
+        eventDate,
+        odometer,
+        engineHours,
+        costAmount,
+        currency,
+        comment,
+      };
 
-      if (!isLeafNodeSelected) {
-        setServiceEventFormError("Выберите узел последнего уровня.");
-        return;
-      }
+      const validation = validateAddServiceEventFormValues(serviceFormValues, {
+        todayDateYmd: todayDate,
+        currentVehicleOdometer: vehicle?.odometer ?? null,
+        isLeafNode: selectedFinalNode ? isLeafNodeSelected : undefined,
+      });
 
-      if (!serviceType.trim() || !eventDate.trim()) {
-        setServiceEventFormError("Заполните тип сервиса и дату.");
-        return;
-      }
-
-      if (!odometer.trim()) {
-        setServiceEventFormError("Укажите пробег.");
-        return;
-      }
-
-      if (eventDate > todayDate) {
-        setServiceEventFormError("Дата события не может быть в будущем.");
-        return;
-      }
-
-      if (vehicle && Number(odometer) > vehicle.odometer) {
-        setServiceEventFormError(
-          `Пробег события не может быть больше текущего (${vehicle.odometer} км).`
-        );
+      if (validation.errors.length > 0) {
+        setServiceEventFormError(validation.errors[0]);
         return;
       }
 
       setIsCreatingServiceEvent(true);
 
-      const response = await fetch(`/api/vehicles/${vehicleId}/service-events`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          nodeId: selectedFinalNode.id,
-          serviceType: serviceType.trim(),
-          eventDate,
-          odometer: Number(odometer),
-          engineHours: engineHours.trim() ? Number(engineHours) : null,
-          costAmount: costAmount.trim() ? Number(costAmount) : null,
-          currency: currency.trim() || null,
-          comment: comment.trim() || null,
-          installedPartsJson: null,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setServiceEventFormError(
-          data.error || "Не удалось создать сервисное событие."
-        );
-        return;
-      }
+      await vehicleDetailApi.createServiceEvent(
+        vehicleId,
+        normalizeAddServiceEventPayload(serviceFormValues)
+      );
 
       setServiceEventFormSuccess("Сервисное событие добавлено.");
       resetServiceEventForm();
@@ -666,16 +634,38 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       setIsAddServiceEventModalOpen(false);
     } catch (createError) {
       console.error(createError);
-      setServiceEventFormError("Произошла ошибка при создании события.");
+      setServiceEventFormError(
+        createError instanceof Error
+          ? createError.message
+          : "Произошла ошибка при создании события."
+      );
     } finally {
       setIsCreatingServiceEvent(false);
     }
   };
 
   const title = vehicle?.nickname || `${vehicle?.brand.name || ""} ${vehicle?.model.name || ""}`.trim() || "Карточка мотоцикла";
+  const sharedRideProfile = vehicle ? toSharedRideProfile(vehicle.rideProfile) : null;
+  const vehicleHeader = vehicle ? buildVehicleHeaderProps(toSharedVehicleDetail(vehicle)) : null;
+  const detailViewModel = vehicleHeader?.detail ?? null;
+  const vehicleStateViewModel = vehicle
+    ? buildVehicleStateViewModel({
+        odometer: vehicle.odometer,
+        engineHours: vehicle.engineHours,
+      })
+    : null;
+  const rideProfileViewModel = vehicle
+    ? buildRideProfileViewModel(sharedRideProfile)
+    : null;
+  const technicalInfoViewModel = vehicle
+    ? buildVehicleTechnicalInfoViewModel({ modelVariant: vehicle.modelVariant })
+    : { items: [] };
 
   return (
-    <main className="min-h-screen bg-white px-6 py-14 text-gray-950 lg:py-16">
+    <main
+      className="min-h-screen px-6 py-14 text-gray-950 lg:py-16"
+      style={{ backgroundColor: productSemanticColors.canvas }}
+    >
       <div className="mx-auto max-w-6xl">
         <nav className="mb-3 text-sm text-gray-600">
           <Link href="/garage" className="transition hover:text-gray-950">
@@ -701,12 +691,22 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         ) : null}
 
         {!isLoading && error ? (
-          <div className="rounded-3xl border border-red-200 bg-red-50 p-7">
+          <div
+            className="rounded-3xl border p-7"
+            style={{
+              borderColor: productSemanticColors.errorBorder,
+              backgroundColor: productSemanticColors.errorSurface,
+            }}
+          >
             <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
               Не удалось открыть мотоцикл
             </h1>
-            <p className="mt-3 text-sm text-red-700">{error}</p>
-            <p className="mt-2 text-xs text-red-600">ID: {vehicleId}</p>
+            <p className="mt-3 text-sm" style={{ color: productSemanticColors.error }}>
+              {error}
+            </p>
+            <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
+              ID: {vehicleId}
+            </p>
           </div>
         ) : null}
 
@@ -718,11 +718,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               </div>
 
               <h1 className="mt-3 text-4xl font-semibold tracking-tight text-gray-950 sm:text-5xl">
-                {title}
+                {detailViewModel?.displayName || title}
               </h1>
 
               <p className="mt-3 text-base leading-7 text-gray-600">
-                {vehicle.modelVariant.year} | {vehicle.modelVariant.versionName}
+                {(detailViewModel?.yearVersionLine || `${vehicle.modelVariant.year} · ${vehicle.modelVariant.versionName}`).replace(" · ", " | ")}
               </p>
 
               <div className="mt-7 grid gap-4 sm:grid-cols-2">
@@ -749,12 +749,17 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 {!isEditingVehicleState ? (
                   <div className="mt-4 grid gap-2.5 text-sm text-gray-700 sm:grid-cols-2">
                     <div>
-                      <span className="font-medium text-gray-950">Пробег:</span>{" "}
-                      {vehicle.odometer} км
+                      <span className="font-medium text-gray-950">
+                        {vehicleStateViewModel?.odometerLabel || "Пробег"}:
+                      </span>{" "}
+                      {vehicleStateViewModel?.odometerValue || `${vehicle.odometer} км`}
                     </div>
                     <div>
-                      <span className="font-medium text-gray-950">Моточасы:</span>{" "}
-                      {vehicle.engineHours !== null ? vehicle.engineHours : "Не указаны"}
+                      <span className="font-medium text-gray-950">
+                        {vehicleStateViewModel?.engineHoursLabel || "Моточасы"}:
+                      </span>{" "}
+                      {vehicleStateViewModel?.engineHoursValue ||
+                        (vehicle.engineHours !== null ? `${vehicle.engineHours} ч` : "Не указаны")}
                     </div>
                   </div>
                 ) : (
@@ -832,29 +837,29 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     </button>
                   </div>
 
-                  {vehicle.rideProfile ? (
+                  {rideProfileViewModel ? (
                     <div className="mt-4 space-y-2.5 text-sm leading-6 text-gray-700">
                       <div>
                         <span className="font-medium text-gray-950">
                           Сценарий:
                         </span>{" "}
-                        {formatUsageType(vehicle.rideProfile.usageType)}
+                        {rideProfileViewModel.usageType}
                       </div>
                       <div>
                         <span className="font-medium text-gray-950">Стиль:</span>{" "}
-                        {formatRidingStyle(vehicle.rideProfile.ridingStyle)}
+                        {rideProfileViewModel.ridingStyle}
                       </div>
                       <div>
                         <span className="font-medium text-gray-950">
                           Нагрузка:
                         </span>{" "}
-                        {formatLoadType(vehicle.rideProfile.loadType)}
+                        {rideProfileViewModel.loadType}
                       </div>
                       <div>
                         <span className="font-medium text-gray-950">
                           Интенсивность:
                         </span>{" "}
-                        {formatUsageIntensity(vehicle.rideProfile.usageIntensity)}
+                        {rideProfileViewModel.usageIntensity}
                       </div>
                     </div>
                   ) : (
@@ -870,30 +875,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   </h2>
 
                   <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
-                    <SpecCard
-                      label="Двигатель"
-                      value={vehicle.modelVariant.engineType || "Не указан"}
-                    />
-                    <SpecCard
-                      label="Охлаждение"
-                      value={vehicle.modelVariant.coolingType || "Не указано"}
-                    />
-                    <SpecCard
-                      label="Колеса"
-                      value={vehicle.modelVariant.wheelSizes || "Не указаны"}
-                    />
-                    <SpecCard
-                      label="Тормоза"
-                      value={vehicle.modelVariant.brakeSystem || "Не указаны"}
-                    />
-                    <SpecCard
-                      label="Шаг цепи"
-                      value={vehicle.modelVariant.chainPitch || "Не указан"}
-                    />
-                    <SpecCard
-                      label="Стоковые звезды"
-                      value={vehicle.modelVariant.stockSprockets || "Не указаны"}
-                    />
+                    {technicalInfoViewModel.items.map((item) => (
+                      <SpecCard key={item.key} label={item.label} value={item.value} />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -929,8 +913,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
               {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
                 <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {nodeTree.map((rootNode) => {
-                    const hasChildren = rootNode.children.length > 0;
+                  {nodeTreeViewModel.map((rootNode) => {
+                    const hasChildren = rootNode.hasChildren;
                     const isExpanded = Boolean(expandedNodes[rootNode.id]);
 
                     return (
@@ -961,7 +945,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                 {rootNode.name}
                               </h3>
                             </div>
-                            {getLeafStatusExplanation(rootNode) ? (
+                            {rootNode.shortExplanationLabel &&
+                            canOpenNodeStatusExplanationModal(rootNode) ? (
                               <button
                                 type="button"
                                 onClick={() =>
@@ -969,7 +954,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                 }
                                 className="mt-1.5 pl-8 text-left text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-gray-700"
                               >
-                                {getLeafStatusExplanation(rootNode)}
+                                {rootNode.shortExplanationLabel}
                               </button>
                             ) : null}
                           </div>
@@ -977,12 +962,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                           <div className="flex shrink-0 items-center gap-2">
                             {rootNode.effectiveStatus ? (
                               <span
-                                className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium ${getStatusBadgeClassName(rootNode.effectiveStatus)}`}
+                                className="inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium"
+                                style={getStatusBadgeStyle(rootNode.effectiveStatus)}
                               >
-                                {getTopNodeStatusBadgeLabel(rootNode.effectiveStatus)}
+                                {rootNode.statusLabel}
                               </span>
                             ) : null}
-                            {!hasChildren ? (
+                            {rootNode.canAddServiceEvent ? (
                               <button
                                 type="button"
                                 onClick={() =>
@@ -1017,7 +1003,10 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       </div>
 
       {isServiceLogModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 px-4 py-6 sm:items-center">
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center px-4 py-6 sm:items-center"
+          style={{ backgroundColor: productSemanticColors.overlayModal }}
+        >
           <div className="w-full max-w-6xl rounded-3xl border border-gray-200 bg-white shadow-xl">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
               <div>
@@ -1070,7 +1059,10 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               !serviceEventsError &&
               serviceEvents.length === 0 ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                  Сервисных событий пока нет.
+                  <p className="font-medium text-gray-900">Журнал пуст</p>
+                  <p className="mt-1">
+                    Сервисные записи появятся здесь после первого обслуживания.
+                  </p>
                 </div>
               ) : null}
 
@@ -1123,8 +1115,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                         className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
                       >
                         <option value="">Все</option>
-                        <option value="SERVICE">SERVICE - Обслуживание</option>
-                        <option value="STATE_UPDATE">STATE_UPDATE - Обновление состояния</option>
+                        <option value="SERVICE">Сервис</option>
+                        <option value="STATE_UPDATE">Обновление состояния</option>
                       </select>
                     </label>
                     <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-2">
@@ -1142,7 +1134,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                       <button
                         type="button"
                         onClick={resetServiceEventsFilters}
-                        className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                        disabled={!isServiceLogQueryActive}
+                        className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Сбросить
                       </button>
@@ -1210,68 +1203,96 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                       </button>
                     </div>
 
-                    {filteredAndSortedServiceEvents.length === 0 ? (
+                    {serviceEventsByMonth.length === 0 ? (
                       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
-                        Нет событий по текущим фильтрам.
+                        <p className="font-medium text-gray-900">Ничего не найдено</p>
+                        <p className="mt-1">
+                          По текущим фильтрам нет записей. Измените условия или сбросьте
+                          фильтры.
+                        </p>
                       </div>
                     ) : (
                       <div className="space-y-6">
                         {serviceEventsByMonth.map((group) => (
-                          <section key={`${group.label}-${group.monthStart}`} className="space-y-3">
+                          <section key={group.monthKey} className="space-y-3">
                             <div className="sticky top-0 z-[1] -mx-1 px-1 py-1">
-                              <div className="inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-700">
+                              <div className="inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold capitalize tracking-tight text-gray-700">
                                 {group.label}
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-2 text-xs">
-                              <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
-                                Обслуживание: {group.summary.serviceCount}
-                              </span>
-                              <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
-                                Обновления состояния: {group.summary.stateUpdateCount}
-                              </span>
-                              {getMonthlyCostLabel(group.summary.costByCurrency) ? (
+                              {group.summary.serviceCount > 0 ? (
                                 <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
-                                  Расходы: {getMonthlyCostLabel(group.summary.costByCurrency)}
+                                  Обслуживание: {group.summary.serviceCount}
+                                </span>
+                              ) : null}
+                              {group.summary.stateUpdateCount > 0 ? (
+                                <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
+                                  Обновления состояния: {group.summary.stateUpdateCount}
+                                </span>
+                              ) : null}
+                              {group.summary.costLabel ? (
+                                <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
+                                  Расходы: {group.summary.costLabel}
                                 </span>
                               ) : null}
                             </div>
 
                             <div className="space-y-4">
-                              {group.events.map((serviceEvent) => {
-                                const isStateUpdate = serviceEvent.eventKind === "STATE_UPDATE";
+                              {group.entries.map((entry) => {
+                                const isStateUpdate = entry.eventKind === "STATE_UPDATE";
 
                                 return (
-                                  <article key={serviceEvent.id} className="relative pl-10">
-                                    <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
+                                  <article key={entry.id} className="relative pl-10">
                                     <div
-                                      className={`absolute left-[9px] top-6 h-3 w-3 rounded-full border-2 ${
-                                        isStateUpdate
-                                          ? "border-gray-300 bg-white"
-                                          : "border-blue-500 bg-blue-100"
-                                      }`}
+                                      className="absolute left-4 top-0 bottom-0 w-px"
+                                      style={{ backgroundColor: productSemanticColors.border }}
+                                    />
+                                    <div
+                                      className="absolute left-[9px] top-6 h-3 w-3 rounded-full border-2"
+                                      style={{
+                                        borderColor: isStateUpdate
+                                          ? productSemanticColors.timelineStateBorder
+                                          : productSemanticColors.timelineServiceBorder,
+                                        backgroundColor: isStateUpdate
+                                          ? productSemanticColors.timelineStateFill
+                                          : productSemanticColors.timelineServiceFill,
+                                      }}
                                     />
 
                                     <div
                                       className={`rounded-2xl border px-4 py-3 sm:px-5 ${
-                                        isStateUpdate
-                                          ? "border-gray-200 bg-gray-50/70"
-                                          : "border-gray-200 bg-white shadow-sm"
+                                        isStateUpdate ? "" : "shadow-sm"
                                       }`}
+                                      style={{
+                                        borderColor: productSemanticColors.border,
+                                        backgroundColor: isStateUpdate
+                                          ? productSemanticColors.cardMuted
+                                          : productSemanticColors.card,
+                                      }}
                                     >
                                       <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div className="flex items-center gap-2">
                                           <span
-                                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                                            className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-tight"
+                                            style={
                                               isStateUpdate
-                                                ? "border-gray-300 bg-gray-100 text-gray-600"
-                                                : "border-blue-200 bg-blue-50 text-blue-700"
-                                            }`}
+                                                ? {
+                                                    borderColor: productSemanticColors.borderStrong,
+                                                    backgroundColor: productSemanticColors.divider,
+                                                    color: productSemanticColors.textMuted,
+                                                  }
+                                                : {
+                                                    borderColor: productSemanticColors.indigoSoftBorder,
+                                                    backgroundColor: productSemanticColors.serviceBadgeBg,
+                                                    color: productSemanticColors.serviceBadgeText,
+                                                  }
+                                            }
                                           >
-                                            {isStateUpdate ? "STATE_UPDATE" : "SERVICE"}
+                                            {getServiceLogEventKindBadgeLabel(entry.eventKind)}
                                           </span>
                                           <span className="text-xs text-gray-500">
-                                            {formatDate(serviceEvent.eventDate)}
+                                            {entry.dateLabel}
                                           </span>
                                         </div>
                                         <span
@@ -1279,7 +1300,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                             isStateUpdate ? "text-gray-500" : "text-gray-600"
                                           }`}
                                         >
-                                          {serviceEvent.node?.name || serviceEvent.nodeId}
+                                          {entry.secondaryTitle}
                                         </span>
                                       </div>
 
@@ -1287,58 +1308,60 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                         {isStateUpdate ? (
                                           <>
                                             <h3 className="text-sm font-medium text-gray-700">
-                                              Обновление состояния
+                                              {entry.mainTitle}
                                             </h3>
                                             <p className="mt-1 text-xs text-gray-500">
-                                              {getStateUpdateSummary(serviceEvent)}
+                                              {entry.stateUpdateSubtitle}
                                             </p>
                                           </>
                                         ) : (
                                           <h3 className="text-base font-semibold text-gray-950">
-                                            {serviceEvent.serviceType}
+                                            {entry.mainTitle}
                                           </h3>
                                         )}
                                       </div>
 
                                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
                                         <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">
-                                          Пробег: {serviceEvent.odometer} км
+                                          {entry.odometerLabel}: {entry.odometerValue}
                                         </span>
-                                        {serviceEvent.engineHours !== null ? (
+                                        {entry.engineHoursValue !== null ? (
                                           <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">
-                                            Моточасы: {serviceEvent.engineHours}
+                                            {entry.engineHoursLabel}: {entry.engineHoursValue}
                                           </span>
                                         ) : null}
                                         {!isStateUpdate &&
-                                        serviceEvent.costAmount !== null &&
-                                        serviceEvent.currency ? (
+                                        entry.costAmount !== null &&
+                                        entry.costCurrency ? (
                                           <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">
-                                            Стоимость: {serviceEvent.costAmount} {serviceEvent.currency}
+                                            {entry.costLabel}: {entry.costAmount}{" "}
+                                            {entry.costCurrency}
                                           </span>
                                         ) : null}
                                       </div>
 
-                                      {serviceEvent.comment ? (
+                                      {entry.comment ? (
                                         <div className="mt-3 border-t border-gray-100 pt-3">
                                           <p
                                             className={`text-sm ${isStateUpdate ? "text-gray-500" : "text-gray-700"}`}
                                           >
-                                            {expandedComments[serviceEvent.id]
-                                              ? serviceEvent.comment
-                                              : `${serviceEvent.comment.slice(0, 120)}${serviceEvent.comment.length > 120 ? "..." : ""}`}
+                                            {expandedComments[entry.id]
+                                              ? entry.comment
+                                              : `${entry.comment.slice(0, SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS)}${entry.comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS ? "..." : ""}`}
                                           </p>
-                                          {serviceEvent.comment.length > 120 ? (
+                                          {entry.comment.length >
+                                          SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS ? (
                                             <button
                                               type="button"
                                               onClick={() =>
                                                 setExpandedComments((prev) => ({
                                                   ...prev,
-                                                  [serviceEvent.id]: !prev[serviceEvent.id],
+                                                  [entry.id]: !prev[entry.id],
                                                 }))
                                               }
                                               className="mt-1 text-xs font-medium text-gray-600 underline decoration-dotted underline-offset-2 transition hover:text-gray-900"
                                             >
-                                              {expandedComments[serviceEvent.id]
+                                              {expandedComments[entry.id]
                                                 ? "Скрыть"
                                                 : "Показать"}
                                             </button>
@@ -1741,12 +1764,14 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                       <tr className="border-t border-gray-200">
                         <td className="px-3 py-2 font-medium text-gray-900">Дата расчета</td>
                         <td className="px-3 py-2">
-                          {formatDate(selectedStatusExplanationNode.statusExplanation.current.date)}
+                          {formatIsoCalendarDateRu(
+                            selectedStatusExplanationNode.statusExplanation.current.date
+                          )}
                         </td>
                         <td className="px-3 py-2">
                           {selectedStatusExplanationNode.statusExplanation.lastService
                             ?.eventDate
-                            ? formatDate(
+                            ? formatIsoCalendarDateRu(
                                 selectedStatusExplanationNode.statusExplanation.lastService.eventDate
                               )
                             : "—"}
@@ -1815,16 +1840,17 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     onChange={(event) =>
                       setProfileForm((prev) => ({
                         ...prev,
-                        usageType: event.target.value as VehicleProfileForm["usageType"],
+                        usageType: event.target.value as EditVehicleProfileFormValues["usageType"],
                       }))
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                     disabled={isSavingProfile}
                   >
-                    <option value="CITY">Город</option>
-                    <option value="HIGHWAY">Трасса</option>
-                    <option value="MIXED">Смешанный</option>
-                    <option value="OFFROAD">Off-road</option>
+                    {RIDE_USAGE_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </InputField>
 
@@ -1834,15 +1860,17 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     onChange={(event) =>
                       setProfileForm((prev) => ({
                         ...prev,
-                        ridingStyle: event.target.value as VehicleProfileForm["ridingStyle"],
+                        ridingStyle: event.target.value as EditVehicleProfileFormValues["ridingStyle"],
                       }))
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                     disabled={isSavingProfile}
                   >
-                    <option value="CALM">Спокойный</option>
-                    <option value="ACTIVE">Активный</option>
-                    <option value="AGGRESSIVE">Агрессивный</option>
+                    {RIDE_RIDING_STYLE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </InputField>
 
@@ -1852,16 +1880,17 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     onChange={(event) =>
                       setProfileForm((prev) => ({
                         ...prev,
-                        loadType: event.target.value as VehicleProfileForm["loadType"],
+                        loadType: event.target.value as EditVehicleProfileFormValues["loadType"],
                       }))
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                     disabled={isSavingProfile}
                   >
-                    <option value="SOLO">Один</option>
-                    <option value="PASSENGER">С пассажиром</option>
-                    <option value="LUGGAGE">С багажом</option>
-                    <option value="PASSENGER_LUGGAGE">Пассажир и багаж</option>
+                    {RIDE_LOAD_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </InputField>
 
@@ -1871,15 +1900,18 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     onChange={(event) =>
                       setProfileForm((prev) => ({
                         ...prev,
-                        usageIntensity: event.target.value as VehicleProfileForm["usageIntensity"],
+                        usageIntensity: event.target
+                          .value as EditVehicleProfileFormValues["usageIntensity"],
                       }))
                     }
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
                     disabled={isSavingProfile}
                   >
-                    <option value="LOW">Низкая</option>
-                    <option value="MEDIUM">Средняя</option>
-                    <option value="HIGH">Высокая</option>
+                    {RIDE_USAGE_INTENSITY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </InputField>
               </div>
@@ -1945,87 +1977,14 @@ function SpecCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatUsageType(value: string) {
-  switch (value) {
-    case "CITY":
-      return "Город";
-    case "HIGHWAY":
-      return "Трасса";
-    case "MIXED":
-      return "Смешанный";
-    case "OFFROAD":
-      return "Off-road";
-    default:
-      return value;
-  }
-}
 
-function formatRidingStyle(value: string) {
-  switch (value) {
-    case "CALM":
-      return "Спокойный";
-    case "ACTIVE":
-      return "Активный";
-    case "AGGRESSIVE":
-      return "Агрессивный";
-    default:
-      return value;
-  }
-}
-
-function formatLoadType(value: string) {
-  switch (value) {
-    case "SOLO":
-      return "Один";
-    case "PASSENGER":
-      return "С пассажиром";
-    case "LUGGAGE":
-      return "С багажом";
-    case "PASSENGER_LUGGAGE":
-      return "Пассажир и багаж";
-    default:
-      return value;
-  }
-}
-
-function formatUsageIntensity(value: string) {
-  switch (value) {
-    case "LOW":
-      return "Низкая";
-    case "MEDIUM":
-      return "Средняя";
-    case "HIGH":
-      return "Высокая";
-    default:
-      return value;
-  }
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString("ru-RU");
-}
-
-function getStatusBadgeClassName(
-  status: "OK" | "SOON" | "OVERDUE" | "RECENTLY_REPLACED"
-) {
-  switch (status) {
-    case "OVERDUE":
-      return "border-red-600 bg-red-100 text-red-800";
-    case "SOON":
-      return "border-amber-500 bg-amber-100 text-amber-800";
-    case "RECENTLY_REPLACED":
-      return "border-emerald-600 bg-emerald-100 text-emerald-800";
-    case "OK":
-      return "border-green-600 bg-green-100 text-green-800";
-    default:
-      return "border-gray-300 bg-gray-100 text-gray-700";
-  }
+function getStatusBadgeStyle(status: NodeStatus | null) {
+  const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
+  return {
+    borderColor: tokens.border,
+    backgroundColor: tokens.background,
+    color: tokens.foreground,
+  };
 }
 
 function getTodayDateString() {

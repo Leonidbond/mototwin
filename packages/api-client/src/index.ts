@@ -1,2 +1,2 @@
-export { ApiClient, createApiClient } from "./fetcher";
+export { ApiClient, createApiClient, readHttpErrorMessage } from "./fetcher";
 export { createMotoTwinEndpoints } from "./mototwin-endpoints";

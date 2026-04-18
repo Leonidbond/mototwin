@@ -13,17 +13,19 @@ import {
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
-  findNodePathById,
+  createInitialAddServiceEventFormValues,
+  getNodePathById,
   getNodeSelectLevels,
+  getNodeShortExplanationLabel,
   getSelectedNodeFromPath,
-  getLeafStatusReasonShort,
+  getTodayDateYmdLocal,
+  isLeafNode,
+  normalizeAddServiceEventPayload,
+  validateAddServiceEventFormValuesMobile,
 } from "@mototwin/domain";
-import type { CreateServiceEventInput, NodeTreeItem, SelectedNodePath } from "@mototwin/types";
+import { productSemanticColors as c } from "@mototwin/design-tokens";
+import type { AddServiceEventFormValues, NodeTreeItem, SelectedNodePath } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
-
-function toDateInputValue(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
 
 export default function NewServiceEventScreen() {
   const router = useRouter();
@@ -39,13 +41,16 @@ export default function NewServiceEventScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const [eventDate, setEventDate] = useState(toDateInputValue(new Date()));
+  const [eventDate, setEventDate] = useState(() => getTodayDateYmdLocal());
   const [odometer, setOdometer] = useState("");
   const [engineHours, setEngineHours] = useState("");
   const [serviceType, setServiceType] = useState("");
   const [costAmount, setCostAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState(
+    () => createInitialAddServiceEventFormValues().currency
+  );
   const [comment, setComment] = useState("");
+  const [currentVehicleOdometer, setCurrentVehicleOdometer] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -62,19 +67,19 @@ export default function NewServiceEventScreen() {
         const endpoints = createMotoTwinEndpoints(client);
         const [vehicleData, treeData] = await Promise.all([
           endpoints.getVehicleDetail(vehicleId),
-          endpoints.getVehicleNodeTree(vehicleId),
+          endpoints.getNodeTree(vehicleId),
         ]);
         const nextTree = treeData.nodeTree ?? [];
         setNodeTree(nextTree);
         if (initialNodeId) {
-          const initialPath = findNodePathById(nextTree, initialNodeId);
+          const initialPath = getNodePathById(nextTree, initialNodeId);
           if (initialPath) {
             setSelectedPath(initialPath);
           }
         }
-        setOdometer(
-          vehicleData.vehicle?.odometer != null ? String(vehicleData.vehicle.odometer) : ""
-        );
+        const vehicleOdometer = vehicleData.vehicle?.odometer;
+        setCurrentVehicleOdometer(vehicleOdometer != null ? vehicleOdometer : null);
+        setOdometer(vehicleOdometer != null ? String(vehicleOdometer) : "");
         setEngineHours(
           vehicleData.vehicle?.engineHours != null ? String(vehicleData.vehicle.engineHours) : ""
         );
@@ -91,7 +96,7 @@ export default function NewServiceEventScreen() {
 
   const levels = getNodeSelectLevels(nodeTree, selectedPath);
   const selectedNode = getSelectedNodeFromPath(nodeTree, selectedPath);
-  const isLeafSelected = Boolean(selectedNode && selectedNode.children.length === 0);
+  const isLeafSelected = Boolean(selectedNode && isLeafNode(selectedNode));
 
   async function save() {
     if (!vehicleId) {
@@ -99,61 +104,40 @@ export default function NewServiceEventScreen() {
       return;
     }
 
-    if (!selectedNode || selectedNode.children.length > 0) {
+    if (!selectedNode || !isLeafNode(selectedNode)) {
       setError("Выберите конечный (leaf) узел.");
       return;
     }
 
-    const parsedOdometer = Number.parseInt(odometer, 10);
-    if (Number.isNaN(parsedOdometer) || parsedOdometer < 0) {
-      setError("Введите корректный пробег.");
-      return;
-    }
-
-    const parsedEngineHours = engineHours.trim() === "" ? null : Number.parseInt(engineHours, 10);
-    if (
-      parsedEngineHours !== null &&
-      (Number.isNaN(parsedEngineHours) || parsedEngineHours < 0)
-    ) {
-      setError("Введите корректные моточасы.");
-      return;
-    }
-
-    if (!serviceType.trim()) {
-      setError("Укажите тип обслуживания.");
-      return;
-    }
-
-    const parsedCostAmount =
-      costAmount.trim() === "" ? null : Number.parseFloat(costAmount.replace(",", "."));
-    if (parsedCostAmount !== null && (Number.isNaN(parsedCostAmount) || parsedCostAmount < 0)) {
-      setError("Введите корректную стоимость.");
-      return;
-    }
-
-    const parsedEventDate = new Date(eventDate);
-    if (Number.isNaN(parsedEventDate.getTime())) {
-      setError("Введите корректную дату в формате YYYY-MM-DD.");
-      return;
-    }
-
-    const input: CreateServiceEventInput = {
+    const serviceFormValues: AddServiceEventFormValues = {
       nodeId: selectedNode.id,
-      eventDate: parsedEventDate.toISOString(),
-      odometer: parsedOdometer,
-      engineHours: parsedEngineHours,
-      serviceType: serviceType.trim(),
-      costAmount: parsedCostAmount,
-      currency: parsedCostAmount !== null ? currency.trim().toUpperCase() || null : null,
-      comment: comment.trim() || null,
+      eventDate,
+      serviceType,
+      odometer,
+      engineHours,
+      costAmount,
+      currency,
+      comment,
     };
+
+    const validation = validateAddServiceEventFormValuesMobile(serviceFormValues, {
+      todayDateYmd: getTodayDateYmdLocal(),
+      currentVehicleOdometer,
+      isLeafNode: selectedNode ? isLeafSelected : undefined,
+    });
+    if (validation.errors.length > 0) {
+      setError(validation.errors[0]);
+      return;
+    }
+
+    const input = normalizeAddServiceEventPayload(serviceFormValues);
 
     try {
       setIsSaving(true);
       setError("");
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
-      await endpoints.createVehicleServiceEvent(vehicleId, input);
+      await endpoints.createServiceEvent(vehicleId, input);
       if (source === "tree") {
         router.replace(`/vehicles/${vehicleId}`);
       } else {
@@ -175,7 +159,7 @@ export default function NewServiceEventScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.stateContainer}>
-          <ActivityIndicator size="large" color="#111827" />
+          <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка формы...</Text>
         </View>
       </SafeAreaView>
@@ -218,9 +202,9 @@ export default function NewServiceEventScreen() {
           </Text>
           <Text style={styles.selectedNodeHint}>
             {selectedNode
-              ? selectedNode.children.length > 0
+              ? !isLeafNode(selectedNode)
                 ? "Выберите конечный дочерний узел"
-                : getLeafStatusReasonShort(selectedNode) || "Готово к созданию события"
+                : getNodeShortExplanationLabel(selectedNode) || "Готово к созданию события"
               : "Выберите узел по уровням"}
           </Text>
         </View>
@@ -280,7 +264,7 @@ export default function NewServiceEventScreen() {
                 onChangeText={setCurrency}
                 style={styles.input}
                 autoCapitalize="characters"
-                placeholder="USD"
+                placeholder="RUB"
               />
             </Field>
           </View>
@@ -307,7 +291,7 @@ export default function NewServiceEventScreen() {
           ]}
         >
           {isSaving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={c.textInverse} />
           ) : (
             <Text style={styles.saveButtonText}>Сохранить событие</Text>
           )}
@@ -335,7 +319,7 @@ function Field({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: c.canvas,
   },
   content: {
     paddingHorizontal: 16,
@@ -351,12 +335,12 @@ const styles = StyleSheet.create({
   stateText: {
     marginTop: 12,
     fontSize: 14,
-    color: "#4B5563",
+    color: c.textSecondary,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#374151",
+    color: c.textMeta,
     marginBottom: 8,
     marginTop: 8,
   },
@@ -365,7 +349,7 @@ const styles = StyleSheet.create({
   },
   levelTitle: {
     fontSize: 12,
-    color: "#6B7280",
+    color: c.textMuted,
     marginBottom: 6,
   },
   optionWrap: {
@@ -375,46 +359,46 @@ const styles = StyleSheet.create({
   },
   optionChip: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    backgroundColor: "#FFFFFF",
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   optionChipActive: {
-    borderColor: "#111827",
-    backgroundColor: "#111827",
+    borderColor: c.primaryAction,
+    backgroundColor: c.primaryAction,
   },
   optionChipText: {
     fontSize: 13,
-    color: "#374151",
+    color: c.textMeta,
   },
   optionChipTextActive: {
-    color: "#FFFFFF",
+    color: c.textInverse,
     fontWeight: "600",
   },
   selectedNodeCard: {
     marginTop: 8,
     marginBottom: 12,
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E7EB",
+    backgroundColor: c.card,
+    borderColor: c.border,
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
   },
   selectedNodeLabel: {
     fontSize: 12,
-    color: "#6B7280",
+    color: c.textMuted,
   },
   selectedNodeValue: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
     marginTop: 4,
   },
   selectedNodeHint: {
     fontSize: 12,
-    color: "#6B7280",
+    color: c.textMuted,
     marginTop: 4,
   },
   field: {
@@ -422,18 +406,18 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: "#6B7280",
+    color: c.textMuted,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#D1D5DB",
+    backgroundColor: c.card,
+    borderColor: c.borderStrong,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: "#111827",
+    color: c.textPrimary,
   },
   multilineInput: {
     minHeight: 80,
@@ -452,12 +436,12 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 4,
     marginBottom: 8,
-    color: "#B91C1C",
+    color: c.error,
     fontSize: 13,
   },
   saveButton: {
     marginTop: 6,
-    backgroundColor: "#111827",
+    backgroundColor: c.primaryAction,
     borderRadius: 12,
     minHeight: 44,
     alignItems: "center",
@@ -470,7 +454,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   saveButtonText: {
-    color: "#FFFFFF",
+    color: c.textInverse,
     fontSize: 14,
     fontWeight: "700",
   },

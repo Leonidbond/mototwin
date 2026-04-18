@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
@@ -12,84 +12,139 @@ import {
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import type {
-  MonthlyServiceLogGroup,
   ServiceEventItem,
   ServiceEventsFilters,
   ServiceEventsSortDirection,
   ServiceEventsSortField,
+  ServiceLogEntryViewModel,
+  ServiceLogMonthGroupViewModel,
 } from "@mototwin/types";
 import {
-  filterAndSortServiceEvents,
-  getMonthlyCostLabel,
-  groupServiceEventsByMonth,
-  getStateUpdateSummary,
+  buildServiceLogTimelineProps,
+  getServiceLogEventKindBadgeLabel,
+  isServiceLogTimelineQueryActive,
+  SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
 } from "@mototwin/domain";
+import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
-
-function formatDate(isoString: string): string {
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return isoString.slice(0, 10);
-  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
-}
 
 // ─── Event cards ──────────────────────────────────────────────────────────────
 
-function ServiceCard({ event }: { event: ServiceEventItem }) {
-  const nodeName = event.node?.name ?? "—";
-  const date = formatDate(event.eventDate);
-  const odometerLine = `${event.odometer} км${event.engineHours != null ? ` · ${event.engineHours} ч` : ""}`;
+function ServiceCard({
+  entry,
+  isCommentExpanded,
+  onToggleComment,
+}: {
+  entry: ServiceLogEntryViewModel;
+  isCommentExpanded: boolean;
+  onToggleComment: () => void;
+}) {
+  const comment = entry.comment;
+  const commentLong =
+    comment != null && comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS;
 
   return (
     <View style={[styles.eventCard, styles.serviceCard]}>
       <View style={styles.eventKindBadge}>
-        <Text style={styles.eventKindText}>Сервис</Text>
+        <Text style={styles.eventKindText}>
+          {getServiceLogEventKindBadgeLabel(entry.eventKind)}
+        </Text>
       </View>
-      <Text style={styles.eventTitle}>{event.serviceType}</Text>
-      <Text style={styles.eventNode}>{nodeName}</Text>
+      <Text style={styles.eventTitle}>{entry.mainTitle}</Text>
+      <Text style={styles.eventNode}>{entry.secondaryTitle}</Text>
       <View style={styles.eventMeta}>
-        <Text style={styles.eventMetaText}>{date}</Text>
+        <Text style={styles.eventMetaText}>{entry.dateLabel}</Text>
         <Text style={styles.eventMetaDot}>·</Text>
-        <Text style={styles.eventMetaText}>{odometerLine}</Text>
+        <Text style={styles.eventMetaText}>{entry.compactMetricsLine}</Text>
       </View>
-      {event.comment ? (
-        <Text style={styles.eventComment}>{event.comment}</Text>
+      {comment ? (
+        <View style={styles.commentBlock}>
+          <Text style={styles.eventComment}>
+            {isCommentExpanded || !commentLong
+              ? comment
+              : `${comment.slice(0, SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS)}...`}
+          </Text>
+          {commentLong ? (
+            <Pressable onPress={onToggleComment} hitSlop={6}>
+              <Text style={styles.commentToggle}>
+                {isCommentExpanded ? "Скрыть" : "Показать"}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
-      {event.costAmount != null && event.costAmount > 0 && event.currency ? (
+      {entry.costAmount != null && entry.costCurrency ? (
         <Text style={styles.eventCost}>
-          {event.costAmount.toLocaleString("ru-RU")} {event.currency}
+          {entry.costAmount.toLocaleString("ru-RU")} {entry.costCurrency}
         </Text>
       ) : null}
     </View>
   );
 }
 
-function StateUpdateCard({ event }: { event: ServiceEventItem }) {
-  const date = formatDate(event.eventDate);
-  const summary = getStateUpdateSummary(event);
-  const odometerLine = `${event.odometer} км${event.engineHours != null ? ` · ${event.engineHours} ч` : ""}`;
+function StateUpdateCard({
+  entry,
+  isCommentExpanded,
+  onToggleComment,
+}: {
+  entry: ServiceLogEntryViewModel;
+  isCommentExpanded: boolean;
+  onToggleComment: () => void;
+}) {
+  const comment = entry.comment;
+  const commentLong =
+    comment != null && comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS;
 
   return (
     <View style={[styles.eventCard, styles.stateUpdateCard]}>
       <View style={[styles.eventKindBadge, styles.stateUpdateBadge]}>
-        <Text style={[styles.eventKindText, styles.stateUpdateBadgeText]}>Состояние</Text>
+        <Text style={[styles.eventKindText, styles.stateUpdateBadgeText]}>
+          {getServiceLogEventKindBadgeLabel(entry.eventKind)}
+        </Text>
       </View>
-      <Text style={styles.eventTitle}>{summary}</Text>
+      <Text style={[styles.eventTitle, styles.stateUpdateMainTitle]}>{entry.mainTitle}</Text>
+      {entry.stateUpdateSubtitle ? (
+        <Text style={styles.stateUpdateSubtitle}>{entry.stateUpdateSubtitle}</Text>
+      ) : null}
       <View style={styles.eventMeta}>
-        <Text style={styles.eventMetaText}>{date}</Text>
+        <Text style={styles.eventMetaText}>{entry.dateLabel}</Text>
         <Text style={styles.eventMetaDot}>·</Text>
-        <Text style={styles.eventMetaText}>{odometerLine}</Text>
+        <Text style={styles.eventMetaText}>{entry.compactMetricsLine}</Text>
       </View>
+      {comment ? (
+        <View style={styles.commentBlock}>
+          <Text style={[styles.eventComment, styles.stateUpdateComment]}>
+            {isCommentExpanded || !commentLong
+              ? comment
+              : `${comment.slice(0, SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS)}...`}
+          </Text>
+          {commentLong ? (
+            <Pressable onPress={onToggleComment} hitSlop={6}>
+              <Text style={styles.commentToggleMuted}>
+                {isCommentExpanded ? "Скрыть" : "Показать"}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
 
 // ─── Month group ──────────────────────────────────────────────────────────────
 
-function MonthGroup({ group }: { group: MonthlyServiceLogGroup }) {
-  const costLabel = getMonthlyCostLabel(group.summary.costByCurrency);
+function MonthGroup({
+  group,
+  expandedComments,
+  onToggleComment,
+}: {
+  group: ServiceLogMonthGroupViewModel;
+  expandedComments: Record<string, boolean>;
+  onToggleComment: (entryId: string) => void;
+}) {
   const hasServiceCount = group.summary.serviceCount > 0;
   const hasStateUpdates = group.summary.stateUpdateCount > 0;
-  const hasCost = Boolean(costLabel);
+  const hasCost = Boolean(group.summary.costLabel);
 
   return (
     <View style={styles.monthGroup}>
@@ -99,29 +154,29 @@ function MonthGroup({ group }: { group: MonthlyServiceLogGroup }) {
           {hasServiceCount ? (
             <View style={styles.monthSummaryChip}>
               <Text style={styles.monthSummaryChipText}>
-                SERVICE: {group.summary.serviceCount}
+                Обслуживание: {group.summary.serviceCount}
               </Text>
             </View>
           ) : null}
           {hasStateUpdates ? (
             <View style={styles.monthSummaryChip}>
               <Text style={styles.monthSummaryChipText}>
-                STATE_UPDATE: {group.summary.stateUpdateCount}
+                Обновления состояния: {group.summary.stateUpdateCount}
               </Text>
             </View>
           ) : null}
           {hasCost ? (
             <View style={styles.monthSummaryChip}>
-              <Text style={styles.monthSummaryChipText}>Расходы: {costLabel}</Text>
+              <Text style={styles.monthSummaryChipText}>Расходы: {group.summary.costLabel}</Text>
             </View>
           ) : null}
         </View>
       </View>
       <View style={styles.timelineList}>
-        {group.events.map((event) => {
-          const isStateUpdate = event.eventKind === "STATE_UPDATE";
+        {group.entries.map((entry) => {
+          const isStateUpdate = entry.eventKind === "STATE_UPDATE";
           return (
-            <View key={event.id} style={styles.timelineItem}>
+            <View key={entry.id} style={styles.timelineItem}>
               <View style={styles.timelineRail}>
                 <View
                   style={[
@@ -132,9 +187,17 @@ function MonthGroup({ group }: { group: MonthlyServiceLogGroup }) {
               </View>
               <View style={styles.timelineContent}>
                 {isStateUpdate ? (
-                  <StateUpdateCard event={event} />
+                  <StateUpdateCard
+                    entry={entry}
+                    isCommentExpanded={Boolean(expandedComments[entry.id])}
+                    onToggleComment={() => onToggleComment(entry.id)}
+                  />
                 ) : (
-                  <ServiceCard event={event} />
+                  <ServiceCard
+                    entry={entry}
+                    isCommentExpanded={Boolean(expandedComments[entry.id])}
+                    onToggleComment={() => onToggleComment(entry.id)}
+                  />
                 )}
               </View>
             </View>
@@ -152,7 +215,6 @@ export default function ServiceLogScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
 
-  const [groups, setGroups] = useState<MonthlyServiceLogGroup[]>([]);
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -166,6 +228,7 @@ export default function ServiceLogScreen() {
   const [sortField, setSortField] = useState<ServiceEventsSortField>("eventDate");
   const [sortDirection, setSortDirection] = useState<ServiceEventsSortDirection>("desc");
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -181,11 +244,9 @@ export default function ServiceLogScreen() {
         setError("");
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
-        const data = await endpoints.getVehicleServiceEvents(vehicleId);
+        const data = await endpoints.getServiceEvents(vehicleId);
         const nextEvents = data.serviceEvents ?? [];
         setEvents(nextEvents);
-        const grouped = groupServiceEventsByMonth(nextEvents);
-        setGroups(grouped);
       } catch (err) {
         console.error(err);
         setError("Не удалось загрузить журнал обслуживания.");
@@ -200,19 +261,22 @@ export default function ServiceLogScreen() {
     }, [load])
   );
 
-  const sortedAndFilteredEvents = filterAndSortServiceEvents(events, filters, {
-    field: sortField,
-    direction: sortDirection,
-  });
-  const visibleGroups = groupServiceEventsByMonth(sortedAndFilteredEvents);
-  const hasActiveFilters =
-    Boolean(filters.dateFrom) ||
-    Boolean(filters.dateTo) ||
-    Boolean(filters.eventKind) ||
-    Boolean(filters.serviceType.trim()) ||
-    Boolean(filters.node.trim()) ||
-    sortField !== "eventDate" ||
-    sortDirection !== "desc";
+  const visibleGroups = useMemo(
+    () =>
+      buildServiceLogTimelineProps(events, filters, {
+        field: sortField,
+        direction: sortDirection,
+      }, "compact").monthGroups,
+    [events, filters, sortField, sortDirection]
+  );
+  const hasActiveFilters = useMemo(
+    () =>
+      isServiceLogTimelineQueryActive(filters, {
+        field: sortField,
+        direction: sortDirection,
+      }),
+    [filters, sortField, sortDirection]
+  );
 
   const updateFilter = (field: keyof ServiceEventsFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -234,7 +298,7 @@ export default function ServiceLogScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.stateContainer}>
-          <ActivityIndicator size="large" color="#111827" />
+          <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка журнала...</Text>
         </View>
       </SafeAreaView>
@@ -337,8 +401,8 @@ export default function ServiceLogScreen() {
               <View style={styles.chipsRow}>
                 {[
                   { value: "", label: "Все" },
-                  { value: "SERVICE", label: "SERVICE" },
-                  { value: "STATE_UPDATE", label: "STATE_UPDATE" },
+                  { value: "SERVICE", label: "Сервис" },
+                  { value: "STATE_UPDATE", label: "Обновление состояния" },
                 ].map((option) => {
                   const active = filters.eventKind === option.value;
                   return (
@@ -359,9 +423,13 @@ export default function ServiceLogScreen() {
               <View style={styles.chipsRow}>
                 {[
                   { value: "eventDate" as ServiceEventsSortField, label: "Дата" },
-                  { value: "odometer" as ServiceEventsSortField, label: "Пробег" },
-                  { value: "node" as ServiceEventsSortField, label: "Узел" },
                   { value: "eventKind" as ServiceEventsSortField, label: "Тип" },
+                  { value: "serviceType" as ServiceEventsSortField, label: "Сервис" },
+                  { value: "node" as ServiceEventsSortField, label: "Узел" },
+                  { value: "odometer" as ServiceEventsSortField, label: "Пробег" },
+                  { value: "engineHours" as ServiceEventsSortField, label: "Моточасы" },
+                  { value: "cost" as ServiceEventsSortField, label: "Стоимость" },
+                  { value: "comment" as ServiceEventsSortField, label: "Комментарий" },
                 ].map((option) => {
                   const active = sortField === option.value;
                   return (
@@ -422,7 +490,17 @@ export default function ServiceLogScreen() {
         ) : null}
 
         {visibleGroups.map((group) => (
-          <MonthGroup key={group.monthKey} group={group} />
+          <MonthGroup
+            key={group.monthKey}
+            group={group}
+            expandedComments={expandedComments}
+            onToggleComment={(entryId) =>
+              setExpandedComments((prev) => ({
+                ...prev,
+                [entryId]: !prev[entryId],
+              }))
+            }
+          />
         ))}
       </ScrollView>
     </SafeAreaView>
@@ -432,7 +510,7 @@ export default function ServiceLogScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
+    backgroundColor: c.canvas,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -448,34 +526,34 @@ const styles = StyleSheet.create({
   stateText: {
     marginTop: 12,
     fontSize: 14,
-    color: "#4B5563",
+    color: c.textSecondary,
   },
   errorTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
     textAlign: "center",
   },
   errorText: {
     marginTop: 8,
-    color: "#B91C1C",
+    color: c.error,
     textAlign: "center",
     fontSize: 14,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   emptyText: {
     marginTop: 10,
     fontSize: 14,
-    color: "#6B7280",
+    color: c.textMuted,
     textAlign: "center",
     lineHeight: 20,
   },
   addButton: {
-    backgroundColor: "#111827",
+    backgroundColor: c.primaryAction,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
@@ -485,13 +563,13 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   addButtonText: {
-    color: "#FFFFFF",
+    color: c.textInverse,
     fontSize: 14,
     fontWeight: "700",
   },
   filterCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E7EB",
+    backgroundColor: c.card,
+    borderColor: c.border,
     borderWidth: 1,
     borderRadius: 14,
     padding: 12,
@@ -500,7 +578,7 @@ const styles = StyleSheet.create({
   filterTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   filterHeaderButton: {
     flexDirection: "row",
@@ -513,7 +591,7 @@ const styles = StyleSheet.create({
   },
   filterChevron: {
     fontSize: 16,
-    color: "#6B7280",
+    color: c.textMuted,
     width: 16,
     textAlign: "center",
   },
@@ -527,19 +605,19 @@ const styles = StyleSheet.create({
   },
   filterLabel: {
     fontSize: 11,
-    color: "#6B7280",
+    color: c.textMuted,
     marginBottom: 5,
     marginTop: 2,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: c.borderStrong,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
-    color: "#111827",
-    backgroundColor: "#FFFFFF",
+    color: c.textPrimary,
+    backgroundColor: c.card,
   },
   chipsRow: {
     flexDirection: "row",
@@ -549,50 +627,50 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    backgroundColor: "#FFFFFF",
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 5,
   },
   chipActive: {
-    borderColor: "#111827",
-    backgroundColor: "#111827",
+    borderColor: c.primaryAction,
+    backgroundColor: c.primaryAction,
   },
   chipText: {
     fontSize: 12,
-    color: "#4B5563",
+    color: c.textSecondary,
     fontWeight: "500",
   },
   chipTextActive: {
-    color: "#FFFFFF",
+    color: c.textInverse,
     fontWeight: "600",
   },
   resetButton: {
     alignSelf: "flex-start",
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: c.borderStrong,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.card,
   },
   resetButtonPressed: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: c.cardSubtle,
   },
   resetButtonDisabled: {
     opacity: 0.5,
   },
   resetButtonText: {
     fontSize: 12,
-    color: "#374151",
+    color: c.textMeta,
     fontWeight: "600",
   },
   filteredEmptyCard: {
-    borderColor: "#E5E7EB",
+    borderColor: c.border,
     borderWidth: 1,
     borderRadius: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.card,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 14,
@@ -600,12 +678,12 @@ const styles = StyleSheet.create({
   filteredEmptyTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
   },
   filteredEmptyText: {
     marginTop: 4,
     fontSize: 13,
-    color: "#6B7280",
+    color: c.textMuted,
     lineHeight: 18,
   },
 
@@ -614,9 +692,9 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   monthHeaderCard: {
-    borderColor: "#E5E7EB",
+    borderColor: c.border,
     borderWidth: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.card,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -625,7 +703,7 @@ const styles = StyleSheet.create({
   monthLabel: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111827",
+    color: c.textPrimary,
     textTransform: "capitalize",
   },
   monthSummaryRow: {
@@ -636,15 +714,15 @@ const styles = StyleSheet.create({
   },
   monthSummaryChip: {
     borderRadius: 999,
-    borderColor: "#E5E7EB",
+    borderColor: c.border,
     borderWidth: 1,
-    backgroundColor: "#FCFCFD",
+    backgroundColor: c.chipBackground,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   monthSummaryChipText: {
     fontSize: 11,
-    color: "#4B5563",
+    color: c.textSecondary,
     fontWeight: "600",
   },
 
@@ -667,12 +745,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   timelineDotService: {
-    borderColor: "#4F46E5",
-    backgroundColor: "#E0E7FF",
+    borderColor: c.timelineServiceBorder,
+    backgroundColor: c.timelineServiceFill,
   },
   timelineDotState: {
-    borderColor: "#9CA3AF",
-    backgroundColor: "#F3F4F6",
+    borderColor: c.timelineStateBorder,
+    backgroundColor: c.timelineStateFill,
   },
   timelineContent: {
     flex: 1,
@@ -680,57 +758,68 @@ const styles = StyleSheet.create({
 
   // Event card base
   eventCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E7EB",
+    backgroundColor: c.card,
+    borderColor: c.border,
     borderWidth: 1,
     borderRadius: 14,
     padding: 13,
     marginBottom: 0,
   },
   serviceCard: {
-    shadowColor: "#000000",
+    shadowColor: c.shadow,
     shadowOpacity: 0.03,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
   },
   stateUpdateCard: {
-    backgroundColor: "#FAFAFA",
-    borderColor: "#E5E7EB",
+    backgroundColor: c.cardMuted,
+    borderColor: c.border,
   },
 
   // Kind badge
   eventKindBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "#EDE9FE",
+    backgroundColor: c.serviceBadgeBg,
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 2,
     marginBottom: 6,
   },
   stateUpdateBadge: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: c.divider,
   },
   eventKindText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#6D28D9",
+    color: c.serviceBadgeText,
   },
   stateUpdateBadgeText: {
-    color: "#6B7280",
+    color: c.textMuted,
   },
 
   // Event content
   eventTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
+    color: c.textPrimary,
     lineHeight: 20,
+  },
+  stateUpdateMainTitle: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: c.textMeta,
+  },
+  stateUpdateSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: c.textMuted,
+    lineHeight: 16,
   },
   eventNode: {
     marginTop: 3,
     fontSize: 13,
     fontWeight: "600",
-    color: "#6B7280",
+    color: c.textMuted,
   },
   eventMeta: {
     flexDirection: "row",
@@ -740,22 +829,41 @@ const styles = StyleSheet.create({
   },
   eventMetaText: {
     fontSize: 12,
-    color: "#9CA3AF",
+    color: c.textTertiary,
   },
   eventMetaDot: {
     fontSize: 12,
-    color: "#D1D5DB",
+    color: c.borderStrong,
+  },
+  commentBlock: {
+    marginTop: 6,
   },
   eventComment: {
-    marginTop: 6,
     fontSize: 13,
-    color: "#4B5563",
+    color: c.textSecondary,
     lineHeight: 18,
+  },
+  stateUpdateComment: {
+    color: c.textMuted,
+  },
+  commentToggle: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textSecondary,
+    textDecorationLine: "underline",
+  },
+  commentToggleMuted: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textMuted,
+    textDecorationLine: "underline",
   },
   eventCost: {
     marginTop: 5,
     fontSize: 13,
     fontWeight: "600",
-    color: "#059669",
+    color: c.successStrong,
   },
 });

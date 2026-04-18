@@ -132,3 +132,55 @@ export function getLeafStatusReasonShort(node: NodeTreeItem): string | null {
 
   return node.statusExplanation?.reasonShort || null;
 }
+
+/** @see findNodePathById */
+export const getNodePathById = findNodePathById;
+
+export function isLeafNode(node: Pick<NodeTreeItem, "children">): boolean {
+  return node.children.length === 0;
+}
+
+export function flattenNodeTreeForSelection(
+  nodes: NodeTreeItem[],
+  parentId: string | null = null,
+  path: SelectedNodePath = []
+): FlattenedNodeSelectOption[] {
+  return flattenNodeTreeToSelectOptions(nodes, parentId, path);
+}
+
+export function getLeafNodeOptions(nodes: NodeTreeItem[]): FlattenedNodeSelectOption[] {
+  return flattenNodeTreeToSelectOptions(nodes).filter((option) => !option.hasChildren);
+}
+
+export function getTopLevelNodes(nodes: NodeTreeItem[]): NodeTreeItem[] {
+  return nodes;
+}
+
+export function getProblematicNodes(nodes: NodeTreeItem[]): NodeTreeItem[] {
+  const result: NodeTreeItem[] = [];
+
+  function walk(node: NodeTreeItem) {
+    const effective = node.effectiveStatus;
+    if (effective === "OVERDUE" || effective === "SOON") {
+      result.push(node);
+    }
+    for (const child of node.children) {
+      walk(child);
+    }
+  }
+
+  for (const root of nodes) {
+    walk(root);
+  }
+
+  return result;
+}
+
+export function getNodeShortExplanationLabel(node: NodeTreeItem): string | null {
+  return getLeafStatusReasonShort(node);
+}
+
+/** `statusExplanation.reasonShort` when the API attached an explanation (any depth). */
+export function getNodeTreeItemReasonShortLine(node: NodeTreeItem): string | null {
+  return node.statusExplanation?.reasonShort ?? null;
+}

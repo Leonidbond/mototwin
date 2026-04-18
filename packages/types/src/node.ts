@@ -80,3 +80,47 @@ export type CascadedNodeSelectionState = {
   path: SelectedNodePath;
   levels: NodeTreeItem[][];
 };
+
+/** Same payload as API; alias for documentation / future display fields. */
+export type NodeStatusExplanationViewModel = NodeStatusExplanation;
+
+/** Actions derived from tree rules (e.g. only leaves may add service events). */
+export type NodeTreeActionViewModel = {
+  addServiceEventAvailable: boolean;
+};
+
+/** One segment of a selection path with display metadata. */
+export type NodePathItemViewModel = {
+  id: string;
+  code: string;
+  name: string;
+  level: number;
+};
+
+/**
+ * Flattened option for cascaded pickers; alias of the existing select option type.
+ */
+export type NodeTreeSelectionOption = FlattenedNodeSelectOption;
+
+export type NodeTreeItemViewModel = {
+  id: string;
+  code: string;
+  name: string;
+  level: number;
+  displayOrder: number;
+  status: NodeStatus | null;
+  directStatus: NodeStatus | null;
+  computedStatus: NodeStatus | null;
+  effectiveStatus: NodeStatus | null;
+  /** Russian status label (primary display for status). */
+  statusLabel: string | null;
+  /** Short EN badge text (compact EN chip; prefer `statusLabel` for user-facing parity). */
+  statusBadgeLabel: string | null;
+  /** `statusExplanation.reasonShort` when the API provided it (any depth). */
+  shortExplanationLabel: string | null;
+  hasChildren: boolean;
+  canAddServiceEvent: boolean;
+  children: NodeTreeItemViewModel[];
+  statusExplanation: NodeStatusExplanationViewModel | null;
+  actions: NodeTreeActionViewModel;
+};

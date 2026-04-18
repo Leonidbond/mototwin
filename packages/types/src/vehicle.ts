@@ -12,6 +12,46 @@ export type VehicleSummary = {
   year: number;
 };
 
+export type VehicleSummaryViewModel = {
+  title: string;
+  subtitle: string;
+  yearVersionLine: string;
+  vinLine: string | null;
+  odometerLine: string;
+  engineHoursLine: string | null;
+  engineHoursLineWithUnit: string | null;
+  rideProfileSummary: string | null;
+};
+
+export type VehicleDetailViewModel = {
+  displayName: string;
+  brandModelLine: string;
+  yearVersionLine: string;
+  vinLine: string;
+};
+
+export type VehicleStateViewModel = {
+  odometerLabel: string;
+  odometerValue: string;
+  engineHoursLabel: string;
+  engineHoursValue: string;
+};
+
+export type RideProfileViewModel = {
+  usageType: string;
+  ridingStyle: string;
+  loadType: string;
+  usageIntensity: string;
+};
+
+export type VehicleTechnicalInfoViewModel = {
+  items: Array<{
+    key: string;
+    label: string;
+    value: string;
+  }>;
+};
+
 export type GarageVehicleItem = {
   id: string;
   nickname: string | null;
@@ -27,8 +67,13 @@ export type GarageVehicleItem = {
   modelVariant: {
     year: number;
     versionName: string;
+    market?: string | null;
     engineType: string | null;
     coolingType: string | null;
+    wheelSizes?: string | null;
+    brakeSystem?: string | null;
+    chainPitch?: string | null;
+    stockSprockets?: string | null;
   } | null;
   rideProfile: VehicleRideProfile | null;
 };

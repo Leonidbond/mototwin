@@ -29,7 +29,7 @@ The Vehicle Detail screen (`apps/app/app/vehicles/[id].tsx`) now shows the full 
 
 ## Data
 
-Uses `GET /api/vehicles/:id/node-tree` via `getVehicleNodeTree` from `@mototwin/api-client`.
+Uses `GET /api/vehicles/:id/node-tree` via `getNodeTree` from `@mototwin/api-client`.
 
 The response is `{ nodeTree: NodeTreeItem[] }` — each item contains:
 - `name`, `effectiveStatus`, `statusExplanation.reasonShort`
@@ -41,7 +41,7 @@ Loaded in parallel with vehicle detail on screen mount.
 
 - `@mototwin/types` — `NodeTreeItem`, `VehicleDetail`
 - `@mototwin/domain` — `getNodeStatusLabel`
-- `@mototwin/api-client` — `getVehicleNodeTree`, `getVehicleDetail`
+- `@mototwin/api-client` — `getNodeTree`, `getVehicleDetail`
 
 ## What is intentionally deferred
 

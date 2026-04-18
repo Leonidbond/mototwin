@@ -2,48 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { buildGarageCardProps, filterMeaningfulGarageSpecHighlights } from "@mototwin/domain";
+import { productSemanticColors } from "@mototwin/design-tokens";
+import type { GarageVehicleItem } from "@mototwin/types";
 
-type GarageVehicle = {
-  id: string;
-  nickname: string | null;
-  vin: string | null;
-  odometer: number;
-  engineHours: number | null;
-  createdAt: string;
-  brand: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-  model: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-  modelVariant: {
-    id: string;
-    year: number;
-    versionName: string;
-    generation: string | null;
-    market: string | null;
-    engineType: string | null;
-    coolingType: string | null;
-    wheelSizes: string | null;
-    brakeSystem: string | null;
-    chainPitch: string | null;
-    stockSprockets: string | null;
-  };
-  rideProfile: {
-    id: string;
-    usageType: string;
-    ridingStyle: string;
-    loadType: string;
-    usageIntensity: string;
-  } | null;
-};
+const garageApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
 export default function GaragePage() {
-  const [vehicles, setVehicles] = useState<GarageVehicle[]>([]);
+  const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -53,18 +20,13 @@ export default function GaragePage() {
         setIsLoading(true);
         setError("");
 
-        const response = await fetch("/api/garage");
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.error || "Не удалось загрузить гараж.");
-          return;
-        }
-
+        const data = await garageApi.getGarageVehicles();
         setVehicles(data.vehicles ?? []);
       } catch (err) {
         console.error(err);
-        setError("Произошла ошибка при загрузке гаража.");
+        setError(
+          err instanceof Error ? err.message : "Произошла ошибка при загрузке гаража."
+        );
       } finally {
         setIsLoading(false);
       }
@@ -74,7 +36,10 @@ export default function GaragePage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-white px-6 py-16 text-gray-950">
+    <main
+      className="min-h-screen px-6 py-16 text-gray-950"
+      style={{ backgroundColor: productSemanticColors.canvas }}
+    >
       <div className="mx-auto max-w-6xl">
         <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -92,7 +57,8 @@ export default function GaragePage() {
 
           <Link
             href="/onboarding"
-            className="inline-flex items-center justify-center rounded-xl bg-gray-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-gray-800"
+            className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
+            style={{ backgroundColor: productSemanticColors.primaryAction }}
           >
             Добавить мотоцикл
           </Link>
@@ -105,8 +71,16 @@ export default function GaragePage() {
         ) : null}
 
         {error ? (
-          <div className="rounded-3xl border border-red-200 bg-red-50 p-8">
-            <p className="text-sm text-red-600">{error}</p>
+          <div
+            className="rounded-3xl border p-8"
+            style={{
+              borderColor: productSemanticColors.errorBorder,
+              backgroundColor: productSemanticColors.errorSurface,
+            }}
+          >
+            <p className="text-sm font-medium" style={{ color: productSemanticColors.error }}>
+              {error}
+            </p>
           </div>
         ) : null}
 
@@ -122,9 +96,10 @@ export default function GaragePage() {
             <div className="mt-8">
               <Link
                 href="/onboarding"
-                className="inline-flex items-center justify-center rounded-xl bg-gray-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-gray-800"
+                className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
+                style={{ backgroundColor: productSemanticColors.primaryAction }}
               >
-                Перейти к onboarding
+                Добавить мотоцикл
               </Link>
             </div>
           </div>
@@ -132,15 +107,19 @@ export default function GaragePage() {
 
         {!isLoading && !error && vehicles.length > 0 ? (
           <div className="grid gap-6">
-            {vehicles.map((vehicle) => (
-              <section
-                key={vehicle.id}
-                className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm"
-              >
+            {vehicles.map((vehicle) => {
+              const card = buildGarageCardProps(vehicle);
+              const specHighlights = filterMeaningfulGarageSpecHighlights(card.specHighlights);
+
+              return (
+                <section
+                  key={vehicle.id}
+                  className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm"
+                >
                 <div className="flex flex-col gap-8 lg:flex-row lg:justify-between">
                   <div className="max-w-3xl">
                     <div className="text-sm text-gray-500">
-                      {vehicle.brand.name} | {vehicle.model.name}
+                      {card.brandModelCaption}
                     </div>
 
                     <h2 className="mt-3 text-3xl font-semibold tracking-tight text-gray-950">
@@ -148,27 +127,25 @@ export default function GaragePage() {
                         href={`/vehicles/${vehicle.id}`}
                         className="transition hover:text-gray-700 hover:underline"
                       >
-                        {vehicle.nickname ||
-                          `${vehicle.brand.name} ${vehicle.model.name}`}
+                        {card.summary.title}
                       </Link>
                     </h2>
 
                     <p className="mt-3 text-base leading-7 text-gray-600">
-                      {vehicle.modelVariant.year} |{" "}
-                      {vehicle.modelVariant.versionName}
+                      {card.summary.yearVersionLine.replace(" · ", " | ")}
                     </p>
 
                     <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      <InfoCard label="Пробег" value={`${vehicle.odometer} км`} />
+                      <InfoCard label="Пробег" value={card.summary.odometerLine} />
                       <InfoCard
                         label="Моточасы"
                         value={
-                          vehicle.engineHours !== null
-                            ? `${vehicle.engineHours}`
+                          card.summary.engineHoursLine !== null
+                            ? card.summary.engineHoursLine
                             : "Не указаны"
                         }
                       />
-                      <InfoCard label="VIN" value={vehicle.vin || "Не указан"} />
+                      <InfoCard label="VIN" value={card.summary.vinLine || "Не указан"} />
                     </div>
 
                   </div>
@@ -178,33 +155,31 @@ export default function GaragePage() {
                       Профиль эксплуатации
                     </h3>
 
-                    {vehicle.rideProfile ? (
+                    {card.rideProfile ? (
                       <div className="mt-4 space-y-3 text-sm leading-6 text-gray-700">
                         <div>
                           <span className="font-medium text-gray-950">
                             Сценарий:
                           </span>{" "}
-                          {formatUsageType(vehicle.rideProfile.usageType)}
+                          {card.rideProfile.usageType}
                         </div>
                         <div>
                           <span className="font-medium text-gray-950">
                             Стиль:
                           </span>{" "}
-                          {formatRidingStyle(vehicle.rideProfile.ridingStyle)}
+                          {card.rideProfile.ridingStyle}
                         </div>
                         <div>
                           <span className="font-medium text-gray-950">
                             Нагрузка:
                           </span>{" "}
-                          {formatLoadType(vehicle.rideProfile.loadType)}
+                          {card.rideProfile.loadType}
                         </div>
                         <div>
                           <span className="font-medium text-gray-950">
                             Интенсивность:
                           </span>{" "}
-                          {formatUsageIntensity(
-                            vehicle.rideProfile.usageIntensity
-                          )}
+                          {card.rideProfile.usageIntensity}
                         </div>
                       </div>
                     ) : (
@@ -215,26 +190,16 @@ export default function GaragePage() {
                   </div>
                 </div>
 
-                <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <SpecCard
-                    label="Двигатель"
-                    value={vehicle.modelVariant.engineType || "Не указан"}
-                  />
-                  <SpecCard
-                    label="Охлаждение"
-                    value={vehicle.modelVariant.coolingType || "Не указано"}
-                  />
-                  <SpecCard
-                    label="Колеса"
-                    value={vehicle.modelVariant.wheelSizes || "Не указаны"}
-                  />
-                  <SpecCard
-                    label="Тормоза"
-                    value={vehicle.modelVariant.brakeSystem || "Не указаны"}
-                  />
-                </div>
+                {specHighlights.length > 0 ? (
+                  <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {specHighlights.map((spec) => (
+                      <SpecCard key={spec.label} label={spec.label} value={spec.value} />
+                    ))}
+                  </div>
+                ) : null}
               </section>
-            ))}
+              );
+            })}
           </div>
         ) : null}
       </div>
@@ -262,60 +227,4 @@ function SpecCard({ label, value }: { label: string; value: string }) {
       <div className="mt-2 text-sm font-medium text-gray-950">{value}</div>
     </div>
   );
-}
-
-function formatUsageType(value: string) {
-  switch (value) {
-    case "CITY":
-      return "Город";
-    case "HIGHWAY":
-      return "Трасса";
-    case "MIXED":
-      return "Смешанный";
-    case "OFFROAD":
-      return "Off-road";
-    default:
-      return value;
-  }
-}
-
-function formatRidingStyle(value: string) {
-  switch (value) {
-    case "CALM":
-      return "Спокойный";
-    case "ACTIVE":
-      return "Активный";
-    case "AGGRESSIVE":
-      return "Агрессивный";
-    default:
-      return value;
-  }
-}
-
-function formatLoadType(value: string) {
-  switch (value) {
-    case "SOLO":
-      return "Один";
-    case "PASSENGER":
-      return "С пассажиром";
-    case "LUGGAGE":
-      return "С багажом";
-    case "PASSENGER_LUGGAGE":
-      return "Пассажир и багаж";
-    default:
-      return value;
-  }
-}
-
-function formatUsageIntensity(value: string) {
-  switch (value) {
-    case "LOW":
-      return "Низкая";
-    case "MEDIUM":
-      return "Средняя";
-    case "HIGH":
-      return "Высокая";
-    default:
-      return value;
-  }
 }

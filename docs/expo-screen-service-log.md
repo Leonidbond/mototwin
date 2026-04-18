@@ -16,7 +16,7 @@ Vehicle Detail is now at `apps/app/app/vehicles/[id]/index.tsx` (moved from `[id
 
 ## Data
 
-Uses `GET /api/vehicles/:id/service-events` via `getVehicleServiceEvents` from `@mototwin/api-client`.
+Uses `GET /api/vehicles/:id/service-events` via `getServiceEvents` from `@mototwin/api-client`.
 
 Returns `{ serviceEvents: ServiceEventItem[] }` — sorted newest first by the backend.
 
@@ -61,7 +61,7 @@ Each month shows:
 
 - `@mototwin/types` — `ServiceEventItem`, `MonthlyServiceLogGroup`
 - `@mototwin/domain` — `groupServiceEventsByMonth`, `getMonthlyCostLabel`, `getStateUpdateSummary`
-- `@mototwin/api-client` — `getVehicleServiceEvents`
+- `@mototwin/api-client` — `getServiceEvents`
 
 ## What is intentionally deferred
 
