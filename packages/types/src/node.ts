@@ -163,3 +163,22 @@ export type NodeSubtreeModalViewModel = {
   childNodes: NodeTreeItemViewModel[];
   isLeafRoot: boolean;
 };
+
+export type NodeTreeSearchOptions = {
+  query: string;
+  limit?: number;
+  minQueryLength?: number;
+};
+
+export type NodeTreeSearchResultViewModel = {
+  nodeId: string;
+  topLevelNodeId: string;
+  nodeName: string;
+  nodeCode: string;
+  pathLabel: string;
+  effectiveStatus: NodeStatus | null;
+  statusLabel: string | null;
+  shortExplanationLabel: string | null;
+  isLeaf: boolean;
+  ancestorIds: string[];
+};

@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
@@ -28,6 +29,7 @@ import {
   findNodeTreeItemById,
   getNodeSubtreeById,
   getTopLevelNodeTreeItems,
+  searchNodeTree,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
 } from "@mototwin/domain";
@@ -37,6 +39,7 @@ import type {
   NodeTreeItemProps,
   NodeTreeItemViewModel,
   NodeSubtreeModalViewModel,
+  NodeTreeSearchResultViewModel,
   ServiceEventItem,
   VehicleDetail,
 } from "@mototwin/types";
@@ -72,6 +75,7 @@ type NodeRowProps = {
   onOpenStatusExplanation?: (node: NodeTreeItemViewModel) => void;
   onOpenServiceLogForNode?: (node: NodeTreeItemViewModel) => void;
   isMaintenanceModeEnabled: boolean;
+  highlightedNodeId?: string | null;
 };
 
 function NodeRow({
@@ -84,6 +88,7 @@ function NodeRow({
   onOpenStatusExplanation,
   onOpenServiceLogForNode,
   isMaintenanceModeEnabled,
+  highlightedNodeId,
 }: NodeRowProps) {
   const treeItemContract: NodeTreeItemProps = {
     item: node,
@@ -128,6 +133,7 @@ function NodeRow({
           { paddingLeft: indent },
           isTopLevel && styles.nodeRowTopLevel,
           depth > 0 && styles.nodeRowNested,
+          highlightedNodeId === rowNode.id && styles.nodeRowHighlighted,
           accentColor !== "transparent" && { borderLeftColor: accentColor, borderLeftWidth: 3 },
           pressed && hasChildren && styles.nodeRowPressed,
         ]}
@@ -258,6 +264,7 @@ function NodeRow({
               onOpenStatusExplanation={onOpenStatusExplanation}
               onOpenServiceLogForNode={onOpenServiceLogForNode}
               isMaintenanceModeEnabled={isMaintenanceModeEnabled}
+              highlightedNodeId={highlightedNodeId}
             />
           ))
         : null}
@@ -283,6 +290,9 @@ export default function VehicleDetailScreen() {
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(true);
   const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
   const [selectedTopLevelNodeId, setSelectedTopLevelNodeId] = useState<string | null>(null);
+  const [nodeSearchQuery, setNodeSearchQuery] = useState("");
+  const [debouncedNodeSearchQuery, setDebouncedNodeSearchQuery] = useState("");
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
   const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
   const [statusExplanationNode, setStatusExplanationNode] =
@@ -376,6 +386,15 @@ export default function VehicleDetailScreen() {
   }, [vehicleId]);
 
   useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedNodeSearchQuery(nodeSearchQuery);
+    }, 180);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [nodeSearchQuery]);
+
+  useEffect(() => {
     if (!vehicleId || !hasLoadedCollapsePrefs) return;
     void writeCollapsiblePreference(
       `vehicleDetail.${vehicleId}.usageProfile.expanded`,
@@ -423,6 +442,15 @@ export default function VehicleDetailScreen() {
         : null,
     [selectedTopLevelNode, isNodeMaintenanceModeEnabled]
   );
+  const nodeSearchResults = useMemo<NodeTreeSearchResultViewModel[]>(
+    () =>
+      searchNodeTree(topLevelNodeViewModels, {
+        query: debouncedNodeSearchQuery,
+        limit: 10,
+        minQueryLength: 2,
+      }),
+    [topLevelNodeViewModels, debouncedNodeSearchQuery]
+  );
 
   const expenseSummary = useMemo(
     () => buildExpenseSummaryFromServiceEvents(serviceEvents),
@@ -459,6 +487,7 @@ export default function VehicleDetailScreen() {
   const openServiceLogForTreeNode = useCallback(
     (vm: NodeTreeItemViewModel) => {
       setSelectedTopLevelNodeId(null);
+      setHighlightedNodeId(null);
       const raw = findNodeTreeItemById(nodeTree, vm.id);
       if (!raw) {
         return;
@@ -472,6 +501,7 @@ export default function VehicleDetailScreen() {
   const openWishlistForTreeNode = useCallback(
     (nodeId: string) => {
       setSelectedTopLevelNodeId(null);
+      setHighlightedNodeId(null);
       router.push(buildVehicleWishlistNewHref(vehicleId, nodeId));
     },
     [router, vehicleId]
@@ -479,13 +509,28 @@ export default function VehicleDetailScreen() {
   const openAddServiceFromTreeNode = useCallback(
     (leafNodeId: string) => {
       setSelectedTopLevelNodeId(null);
+      setHighlightedNodeId(null);
       router.push(`/vehicles/${vehicleId}/service-events/new?source=tree&nodeId=${leafNodeId}`);
     },
     [router, vehicleId]
   );
   const openStatusExplanationFromTreeNode = useCallback((node: NodeTreeItemViewModel) => {
     setSelectedTopLevelNodeId(null);
+    setHighlightedNodeId(null);
     setStatusExplanationNode(node);
+  }, []);
+  const openSearchResultInSubtreeModal = useCallback((result: NodeTreeSearchResultViewModel) => {
+    setNodeSearchQuery("");
+    setDebouncedNodeSearchQuery("");
+    setHighlightedNodeId(result.nodeId);
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      for (const ancestorId of result.ancestorIds) {
+        next.add(ancestorId);
+      }
+      return next;
+    });
+    setSelectedTopLevelNodeId(result.topLevelNodeId);
   }, []);
   const getNodeModeToggleLabel = () =>
     isNodeMaintenanceModeEnabled ? "План обслуживания: вкл" : "Показывать план обслуживания";
@@ -542,7 +587,7 @@ export default function VehicleDetailScreen() {
         node={statusExplanationNode}
         onClose={() => setStatusExplanationNode(null)}
       />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Identity + state card */}
         <View style={styles.infoCard}>
           {hasNickname ? (
@@ -838,6 +883,65 @@ export default function VehicleDetailScreen() {
               ? "В режиме плана показываются сроки и интервалы обслуживания прямо в дереве узлов."
               : "Разверните нужный узел, чтобы проверить статус и быстро добавить обслуживание для leaf-элемента."}
           </Text>
+          <Text style={styles.searchLabel}>Поиск по узлам</Text>
+          <TextInput
+            style={styles.searchInput}
+            value={nodeSearchQuery}
+            onChangeText={setNodeSearchQuery}
+            placeholder="Поиск по узлам"
+            placeholderTextColor={c.textSecondary}
+            returnKeyType="search"
+          />
+          {nodeSearchQuery.trim().length > 0 && nodeSearchQuery.trim().length < 2 ? (
+            <Text style={styles.searchHint}>Введите минимум 2 символа.</Text>
+          ) : null}
+          {nodeSearchQuery.trim().length >= 2 ? (
+            nodeSearchResults.length > 0 ? (
+              <View style={styles.searchResultsBox}>
+                {nodeSearchResults.map((result) => (
+                  <Pressable
+                    key={result.nodeId}
+                    onPress={() => openSearchResultInSubtreeModal(result)}
+                    style={({ pressed }) => [
+                      styles.searchResultRow,
+                      pressed && styles.searchResultRowPressed,
+                    ]}
+                  >
+                    <View style={styles.searchResultTextCol}>
+                      <Text style={styles.searchResultTitle}>{result.nodeName}</Text>
+                      <Text style={styles.searchResultPath}>{result.pathLabel}</Text>
+                      <Text style={styles.searchResultCode}>{result.nodeCode}</Text>
+                      {result.shortExplanationLabel ? (
+                        <Text style={styles.searchResultPath}>{result.shortExplanationLabel}</Text>
+                      ) : null}
+                    </View>
+                    {result.effectiveStatus ? (
+                      <View
+                        style={[
+                          styles.badge,
+                          {
+                            backgroundColor: getStatusColors(result.effectiveStatus).bg,
+                            borderColor: getStatusColors(result.effectiveStatus).border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.badgeText,
+                            { color: getStatusColors(result.effectiveStatus).text },
+                          ]}
+                        >
+                          {result.statusLabel}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.searchNoResults}>Узлы не найдены</Text>
+            )
+          ) : null}
           {isNodeTreeLoading ? (
             <Text style={styles.treeLoadingText}>Загрузка дерева узлов...</Text>
           ) : null}
@@ -864,7 +968,10 @@ export default function VehicleDetailScreen() {
                 <View key={node.id}>
                   {index > 0 ? <View style={styles.treeDivider} /> : null}
                   <Pressable
-                    onPress={() => setSelectedTopLevelNodeId(node.id)}
+                    onPress={() => {
+                      setHighlightedNodeId(null);
+                      setSelectedTopLevelNodeId(node.id);
+                    }}
                     style={({ pressed }) => [styles.topLevelNodeRow, pressed && styles.topLevelNodeRowPressed]}
                   >
                     <View style={styles.topLevelNodeRowLeft}>
@@ -913,14 +1020,23 @@ export default function VehicleDetailScreen() {
         visible={Boolean(selectedNodeSubtreeModalViewModel)}
         animationType="slide"
         transparent
-        onRequestClose={() => setSelectedTopLevelNodeId(null)}
+        onRequestClose={() => {
+          setSelectedTopLevelNodeId(null);
+          setHighlightedNodeId(null);
+        }}
       >
         <View style={styles.subtreeModalOverlay}>
           <View style={styles.subtreeModalCard}>
             {selectedNodeSubtreeModalViewModel ? (
               <>
                 <View style={styles.subtreeModalHeader}>
-                  <View style={styles.subtreeModalHeaderTextCol}>
+                  <View
+                    style={[
+                      styles.subtreeModalHeaderTextCol,
+                      highlightedNodeId === selectedNodeSubtreeModalViewModel.rootNodeId &&
+                        styles.subtreeModalHeaderTextColHighlighted,
+                    ]}
+                  >
                     <Text style={styles.subtreeModalTitle}>
                       {selectedNodeSubtreeModalViewModel.rootNodeName}
                     </Text>
@@ -954,7 +1070,10 @@ export default function VehicleDetailScreen() {
                       </Text>
                     </Pressable>
                     <Pressable
-                      onPress={() => setSelectedTopLevelNodeId(null)}
+                      onPress={() => {
+                        setSelectedTopLevelNodeId(null);
+                        setHighlightedNodeId(null);
+                      }}
                       style={({ pressed }) => [
                         styles.subtreeModalCloseBtn,
                         pressed && styles.subtreeModalCloseBtnPressed,
@@ -965,7 +1084,7 @@ export default function VehicleDetailScreen() {
                   </View>
                 </View>
 
-                <ScrollView contentContainerStyle={styles.subtreeModalBody}>
+                <ScrollView contentContainerStyle={styles.subtreeModalBody} keyboardShouldPersistTaps="handled">
                   {selectedNodeSubtreeModalViewModel.isLeafRoot ? (
                     selectedTopLevelNode ? (
                       <NodeRow
@@ -978,6 +1097,7 @@ export default function VehicleDetailScreen() {
                         onOpenStatusExplanation={openStatusExplanationFromTreeNode}
                         onOpenServiceLogForNode={openServiceLogForTreeNode}
                         isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
+                        highlightedNodeId={highlightedNodeId}
                       />
                     ) : null
                   ) : (
@@ -993,6 +1113,7 @@ export default function VehicleDetailScreen() {
                         onOpenStatusExplanation={openStatusExplanationFromTreeNode}
                         onOpenServiceLogForNode={openServiceLogForTreeNode}
                         isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
+                        highlightedNodeId={highlightedNodeId}
                       />
                     ))
                   )}
@@ -1485,10 +1606,87 @@ const styles = StyleSheet.create({
   },
   sectionSubheader: {
     marginTop: 4,
-    marginBottom: 10,
+    marginBottom: 8,
     fontSize: 13,
     lineHeight: 18,
     color: c.textMuted,
+  },
+  searchLabel: {
+    marginBottom: 6,
+    fontSize: 11,
+    fontWeight: "700",
+    color: c.textMuted,
+    textTransform: "uppercase",
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 10,
+    backgroundColor: c.card,
+    color: c.textPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    marginBottom: 6,
+  },
+  searchHint: {
+    marginBottom: 8,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  searchResultsBox: {
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.chipBackground,
+    padding: 6,
+    gap: 6,
+    marginBottom: 10,
+  },
+  searchResultRow: {
+    borderWidth: 1,
+    borderColor: "transparent",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: c.card,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  searchResultRowPressed: {
+    borderColor: c.borderStrong,
+  },
+  searchResultTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  searchResultTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: c.textPrimary,
+  },
+  searchResultPath: {
+    marginTop: 2,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  searchResultCode: {
+    marginTop: 2,
+    fontSize: 11,
+    color: c.textTertiary,
+  },
+  searchNoResults: {
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: c.textSecondary,
+    fontSize: 13,
+    backgroundColor: c.card,
   },
   treeLoadingText: {
     marginBottom: 10,
@@ -1589,6 +1787,11 @@ const styles = StyleSheet.create({
   nodeRowNested: {
     backgroundColor: c.chipBackground,
   },
+  nodeRowHighlighted: {
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+    backgroundColor: "#FFF7ED",
+  },
   nodeRowPressed: {
     backgroundColor: c.divider,
   },
@@ -1686,6 +1889,14 @@ const styles = StyleSheet.create({
   subtreeModalHeaderTextCol: {
     flex: 1,
     minWidth: 0,
+  },
+  subtreeModalHeaderTextColHighlighted: {
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+    borderRadius: 10,
+    backgroundColor: "#FFF7ED",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   subtreeModalHeaderActions: {
     alignItems: "flex-end",

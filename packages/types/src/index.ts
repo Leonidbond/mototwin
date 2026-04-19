@@ -27,6 +27,8 @@ export type {
   NodeMaintenancePlanSummaryViewModel,
   TopLevelNodeSummaryViewModel,
   NodeSubtreeModalViewModel,
+  NodeTreeSearchOptions,
+  NodeTreeSearchResultViewModel,
 } from "./node";
 export type {
   ServiceEventKind,

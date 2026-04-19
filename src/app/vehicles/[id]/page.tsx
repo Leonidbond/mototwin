@@ -23,6 +23,7 @@ import {
   findNodeTreeItemById,
   getNodeSubtreeById,
   getTopLevelNodeTreeItems,
+  searchNodeTree,
   formatIsoCalendarDateRu,
   getAvailableChildrenForSelectedPath,
   getNodeSelectLevels,
@@ -81,6 +82,7 @@ import type {
   NodeTreeItemViewModel,
   NodeMaintenancePlanSummaryViewModel,
   NodeSubtreeModalViewModel,
+  NodeTreeSearchResultViewModel,
   SelectedNodePath,
   ServiceEventItem,
   ServiceEventsFilters,
@@ -149,6 +151,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [isTechnicalSummarySectionExpanded, setIsTechnicalSummarySectionExpanded] = useState(true);
   const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
   const [selectedTopLevelNodeId, setSelectedTopLevelNodeId] = useState<string | null>(null);
+  const [nodeSearchQuery, setNodeSearchQuery] = useState("");
+  const [debouncedNodeSearchQuery, setDebouncedNodeSearchQuery] = useState("");
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [hasLoadedDetailCollapsePrefs, setHasLoadedDetailCollapsePrefs] = useState(false);
   const [isAttentionModalOpen, setIsAttentionModalOpen] = useState(false);
   const [wishlistItems, setWishlistItems] = useState<PartWishlistItem[]>([]);
@@ -263,6 +268,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         : null,
     [selectedTopLevelNode, isNodeMaintenanceModeEnabled]
   );
+  const nodeSearchResults = useMemo<NodeTreeSearchResultViewModel[]>(
+    () =>
+      searchNodeTree(topLevelNodeViewModels, {
+        query: debouncedNodeSearchQuery,
+        limit: 10,
+        minQueryLength: 2,
+      }),
+    [topLevelNodeViewModels, debouncedNodeSearchQuery]
+  );
 
   const expenseSummary = useMemo(
     () => buildExpenseSummaryFromServiceEvents(serviceEvents),
@@ -341,6 +355,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     [wishlistRecommendations]
   );
   const wishlistNodeRequiredError = wishlistFormError.includes("Выберите узел мотоцикла");
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedNodeSearchQuery(nodeSearchQuery);
+    }, 180);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [nodeSearchQuery]);
 
   useEffect(() => {
     if (!vehicleId) {
@@ -1062,8 +1085,27 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setIsAttentionModalOpen(false);
     openWishlistModalForCreate(item.nodeId);
   };
-  const closeTopLevelNodeSubtreeModal = () => setSelectedTopLevelNodeId(null);
-  const openTopLevelNodeSubtreeModal = (nodeId: string) => setSelectedTopLevelNodeId(nodeId);
+  const closeTopLevelNodeSubtreeModal = () => {
+    setSelectedTopLevelNodeId(null);
+    setHighlightedNodeId(null);
+  };
+  const openTopLevelNodeSubtreeModal = (nodeId: string) => {
+    setHighlightedNodeId(null);
+    setSelectedTopLevelNodeId(nodeId);
+  };
+  const openSearchResultInSubtreeModal = (result: NodeTreeSearchResultViewModel) => {
+    setNodeSearchQuery("");
+    setDebouncedNodeSearchQuery("");
+    setHighlightedNodeId(result.nodeId);
+    setExpandedNodes((prev) => {
+      const next = { ...prev };
+      for (const ancestorId of result.ancestorIds) {
+        next[ancestorId] = true;
+      }
+      return next;
+    });
+    setSelectedTopLevelNodeId(result.topLevelNodeId);
+  };
   const openServiceLogFromTreeContext = (node: NodeTreeItemViewModel) => {
     closeTopLevelNodeSubtreeModal();
     openServiceLogFilteredByNode(node);
@@ -1113,7 +1155,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     return (
       <div key={node.id} className="space-y-2.5">
         <div
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3.5"
+          className={`rounded-xl border bg-white px-4 py-3.5 ${
+            highlightedNodeId === node.id
+              ? "border-amber-300 ring-2 ring-amber-200"
+              : "border-gray-200"
+          }`}
           style={{ marginLeft: `${depth * 16}px` }}
         >
           <div className="flex items-start justify-between gap-3">
@@ -2070,49 +2116,109 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               ) : null}
 
               {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
-                <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {topLevelNodeViewModels.map((rootNode) => {
-                    const summary = buildTopLevelNodeSummaryViewModel(rootNode, {
-                      maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
-                    });
-                    return (
-                      <button
-                        key={rootNode.id}
-                        type="button"
-                        onClick={() => openTopLevelNodeSubtreeModal(rootNode.id)}
-                        className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5 text-left transition hover:border-gray-300 hover:bg-gray-50"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h3 className="truncate text-[15px] font-semibold text-gray-950">
-                              {summary.nodeName}
-                            </h3>
-                            {summary.shortExplanationLabel ? (
-                              <p className="mt-1.5 text-xs text-gray-500">
-                                {summary.shortExplanationLabel}
-                              </p>
-                            ) : null}
-                            {summary.maintenanceSummaryLine ? (
-                              <p className="mt-1.5 text-xs font-medium text-gray-700">
-                                {summary.maintenanceSummaryLine}
-                              </p>
-                            ) : null}
+                <div className="mt-5 space-y-4">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="node-tree-search"
+                      className="block text-xs font-medium uppercase tracking-wide text-gray-500"
+                    >
+                      Поиск по узлам
+                    </label>
+                    <input
+                      id="node-tree-search"
+                      type="search"
+                      value={nodeSearchQuery}
+                      onChange={(event) => setNodeSearchQuery(event.target.value)}
+                      placeholder="Поиск по узлам"
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-400 focus:ring-2 focus:ring-gray-200"
+                    />
+                    {nodeSearchQuery.trim().length > 0 && nodeSearchQuery.trim().length < 2 ? (
+                      <p className="text-xs text-gray-500">Введите минимум 2 символа.</p>
+                    ) : null}
+                  </div>
+                  {nodeSearchQuery.trim().length >= 2 ? (
+                    nodeSearchResults.length > 0 ? (
+                      <div className="space-y-2 rounded-2xl border border-gray-200 bg-gray-50/70 p-2.5">
+                        {nodeSearchResults.map((result) => (
+                          <button
+                            key={result.nodeId}
+                            type="button"
+                            onClick={() => openSearchResultInSubtreeModal(result)}
+                            className="w-full rounded-xl border border-transparent bg-white px-3 py-2.5 text-left transition hover:border-gray-300"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-gray-950">{result.nodeName}</p>
+                                <p className="truncate text-xs text-gray-500">{result.pathLabel}</p>
+                                <p className="truncate text-[11px] text-gray-400">{result.nodeCode}</p>
+                                {result.shortExplanationLabel ? (
+                                  <p className="truncate pt-1 text-xs text-gray-500">
+                                    {result.shortExplanationLabel}
+                                  </p>
+                                ) : null}
+                              </div>
+                              {result.effectiveStatus ? (
+                                <span
+                                  className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                                  style={getStatusBadgeStyle(result.effectiveStatus)}
+                                >
+                                  {result.statusLabel}
+                                </span>
+                              ) : null}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="rounded-xl border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600">
+                        Узлы не найдены
+                      </p>
+                    )
+                  ) : null}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {topLevelNodeViewModels.map((rootNode) => {
+                      const summary = buildTopLevelNodeSummaryViewModel(rootNode, {
+                        maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
+                      });
+                      return (
+                        <button
+                          key={rootNode.id}
+                          type="button"
+                          onClick={() => openTopLevelNodeSubtreeModal(rootNode.id)}
+                          className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5 text-left transition hover:border-gray-300 hover:bg-gray-50"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h3 className="truncate text-[15px] font-semibold text-gray-950">
+                                {summary.nodeName}
+                              </h3>
+                              {summary.shortExplanationLabel ? (
+                                <p className="mt-1.5 text-xs text-gray-500">
+                                  {summary.shortExplanationLabel}
+                                </p>
+                              ) : null}
+                              {summary.maintenanceSummaryLine ? (
+                                <p className="mt-1.5 text-xs font-medium text-gray-700">
+                                  {summary.maintenanceSummaryLine}
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {summary.effectiveStatus ? (
+                                <span
+                                  className="inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium"
+                                  style={getStatusBadgeStyle(summary.effectiveStatus)}
+                                >
+                                  {summary.statusLabel}
+                                </span>
+                              ) : null}
+                              <span className="text-sm text-gray-400">›</span>
+                            </div>
                           </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            {summary.effectiveStatus ? (
-                              <span
-                                className="inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium"
-                                style={getStatusBadgeStyle(summary.effectiveStatus)}
-                              >
-                                {summary.statusLabel}
-                              </span>
-                            ) : null}
-                            <span className="text-sm text-gray-400">›</span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : null}
             </section>
@@ -2128,7 +2234,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         >
           <div className="w-full max-w-5xl rounded-3xl border border-gray-200 bg-white shadow-xl">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
-              <div>
+              <div
+                className={
+                  highlightedNodeId === selectedNodeSubtreeModalViewModel.rootNodeId
+                    ? "rounded-lg border border-amber-300 bg-amber-50/40 px-2 py-1"
+                    : undefined
+                }
+              >
                 <h2 className="text-xl font-semibold tracking-tight text-gray-950">
                   {selectedNodeSubtreeModalViewModel.rootNodeName}
                 </h2>
