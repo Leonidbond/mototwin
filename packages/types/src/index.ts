@@ -107,6 +107,8 @@ export type {
   PartSkusResponse,
   PartSkuDetailResponse,
   PartRecommendationsResponse,
+  ServiceKitsResponse,
+  AddServiceKitToWishlistResponse,
 } from "./api";
 export type {
   PartSkuSearchFilters,
@@ -135,6 +137,15 @@ export type {
   PartWishlistStatusGroupViewModel,
 } from "./part-wishlist";
 export { PART_WISHLIST_DEFAULT_CURRENCY } from "./part-wishlist";
+export type {
+  ServiceKitDefinition,
+  ServiceKitItemDefinition,
+  ServiceKitItemViewModel,
+  ServiceKitViewModel,
+  AddServiceKitToWishlistPayload,
+  AddServiceKitToWishlistSkippedItem,
+  AddServiceKitToWishlistResult,
+} from "./service-kit";
 export type {
   GarageCardProps,
   VehicleHeaderProps,

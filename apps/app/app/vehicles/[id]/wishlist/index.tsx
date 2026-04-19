@@ -233,10 +233,13 @@ export default function VehicleWishlistScreen() {
                         {item.costLabelRu ? (
                           <Text style={styles.itemCost}>Стоимость: {item.costLabelRu}</Text>
                         ) : null}
-                        <Text style={styles.itemMeta}>
-                          Кол-во: {item.quantity}
-                          {item.comment ? ` · ${item.comment}` : ""}
-                        </Text>
+                        <Text style={styles.itemMeta}>Кол-во: {item.quantity}</Text>
+                        {item.kitOriginLabelRu ? (
+                          <Text style={styles.kitBadge}>{item.kitOriginLabelRu}</Text>
+                        ) : null}
+                        {item.commentBodyRu ? (
+                          <Text style={styles.itemMeta}>{item.commentBodyRu}</Text>
+                        ) : null}
                       </Pressable>
                       <View style={styles.cardActions}>
                         <Pressable
@@ -362,6 +365,17 @@ const styles = StyleSheet.create({
   itemNode: { marginTop: 6, fontSize: 13, color: c.textSecondary },
   itemCost: { marginTop: 4, fontSize: 13, color: c.textSecondary },
   itemMeta: { marginTop: 4, fontSize: 13, color: c.textMuted, lineHeight: 18 },
+  kitBadge: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#3730a3",
+    backgroundColor: "#eef2ff",
+  },
   cardActions: {
     marginTop: 12,
     flexDirection: "row",

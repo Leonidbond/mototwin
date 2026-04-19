@@ -40,6 +40,7 @@ import type {
   FlattenedNodeSelectOption,
   PartRecommendationGroup,
   PartRecommendationViewModel,
+  ServiceKitViewModel,
   PartSkuViewModel,
   PartWishlistFormValues,
   PartWishlistItem,
@@ -94,6 +95,10 @@ export function WishlistItemEditor({
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [recommendationsError, setRecommendationsError] = useState("");
   const [addingRecommendedSkuId, setAddingRecommendedSkuId] = useState("");
+  const [serviceKits, setServiceKits] = useState<ServiceKitViewModel[]>([]);
+  const [serviceKitsLoading, setServiceKitsLoading] = useState(false);
+  const [serviceKitsError, setServiceKitsError] = useState("");
+  const [addingKitCode, setAddingKitCode] = useState("");
   const wishlistSkuSearchGen = useRef(0);
   const [loadedWishlistItem, setLoadedWishlistItem] = useState<PartWishlistItem | null>(null);
 
@@ -249,6 +254,35 @@ export function WishlistItemEditor({
       });
   }, [apiBaseUrl, form.nodeId, isLoading, vehicleId]);
 
+  useEffect(() => {
+    if (isLoading || !vehicleId) {
+      return;
+    }
+    const nodeId = form.nodeId.trim();
+    if (!nodeId || mode === "edit") {
+      setServiceKits([]);
+      setServiceKitsError("");
+      setServiceKitsLoading(false);
+      return;
+    }
+    setServiceKitsLoading(true);
+    setServiceKitsError("");
+    const client = createApiClient({ baseUrl: apiBaseUrl });
+    const endpoints = createMotoTwinEndpoints(client);
+    void endpoints
+      .getServiceKits({ nodeId, vehicleId })
+      .then((res) => {
+        setServiceKits(res.kits ?? []);
+      })
+      .catch(() => {
+        setServiceKits([]);
+        setServiceKitsError("Не удалось загрузить комплекты обслуживания.");
+      })
+      .finally(() => {
+        setServiceKitsLoading(false);
+      });
+  }, [apiBaseUrl, form.nodeId, isLoading, mode, vehicleId]);
+
   const applyRecommendedSkuToForm = (rec: PartRecommendationViewModel) => {
     const skuFromRecommendation: PartSkuViewModel = {
       id: rec.skuId,
@@ -306,6 +340,36 @@ export function WishlistItemEditor({
       );
     } finally {
       setAddingRecommendedSkuId("");
+    }
+  }
+
+  async function addServiceKit(kit: ServiceKitViewModel) {
+    if (!vehicleId || mode === "edit") {
+      return;
+    }
+    const contextNodeId = form.nodeId.trim();
+    if (!contextNodeId) {
+      setSaveError("Выберите узел мотоцикла");
+      return;
+    }
+    try {
+      setAddingKitCode(kit.code);
+      const client = createApiClient({ baseUrl: apiBaseUrl });
+      const endpoints = createMotoTwinEndpoints(client);
+      const res = await endpoints.addServiceKitToWishlist(vehicleId, {
+        kitCode: kit.code,
+        contextNodeId,
+      });
+      Alert.alert(
+        "Список покупок",
+        `Комплект добавлен: ${res.result.createdItems.length} создано, ${res.result.skippedItems.length} пропущено.`
+      );
+      router.replace(`/vehicles/${vehicleId}/wishlist`);
+    } catch (e) {
+      console.error(e);
+      setSaveError(e instanceof Error ? e.message : "Не удалось добавить комплект.");
+    } finally {
+      setAddingKitCode("");
     }
   }
 
@@ -517,6 +581,45 @@ export function WishlistItemEditor({
                       </View>
                     ))
                   : null}
+                {mode === "create" ? (
+                  <View style={styles.kitsBox}>
+                    <Text style={styles.labelCompact}>Комплекты обслуживания</Text>
+                    {serviceKitsError ? <Text style={styles.inlineError}>{serviceKitsError}</Text> : null}
+                    {serviceKitsLoading ? <Text style={styles.mutedSmall}>Загружаем комплекты…</Text> : null}
+                    {!serviceKitsLoading && serviceKits.length === 0 ? (
+                      <Text style={styles.mutedSmall}>Для этого узла пока нет подходящих комплектов.</Text>
+                    ) : null}
+                    {!serviceKitsLoading
+                      ? serviceKits.map((kit) => (
+                          <View key={kit.code} style={styles.kitCard}>
+                            <Text style={styles.recName}>{kit.title}</Text>
+                            <Text style={styles.skuResultMeta}>{kit.description}</Text>
+                            {kit.items.map((item) => (
+                              <Text key={item.key} style={styles.skuResultMeta}>
+                                • {item.title} x{item.quantity}
+                                {item.matchedSkuTitle ? ` — ${item.matchedSkuTitle}` : " — без SKU"}
+                              </Text>
+                            ))}
+                            <Pressable
+                              onPress={() => void addServiceKit(kit)}
+                              disabled={addingKitCode === kit.code}
+                              style={({ pressed }) => [
+                                styles.recommendationBtn,
+                                pressed && styles.recommendationBtnPressed,
+                                addingKitCode === kit.code && styles.recommendationBtnDisabled,
+                              ]}
+                            >
+                              <Text style={styles.recommendationBtnText}>
+                                {addingKitCode === kit.code
+                                  ? "Добавление комплекта…"
+                                  : "Добавить комплект в список покупок"}
+                              </Text>
+                            </Pressable>
+                          </View>
+                        ))
+                      : null}
+                  </View>
+                ) : null}
               </View>
             ) : null}
             <Text style={styles.labelCompact}>Найти в каталоге</Text>
@@ -801,6 +904,20 @@ const styles = StyleSheet.create({
   recommendationLabel: { marginTop: 4, fontSize: 11, color: c.textSecondary, fontWeight: "600" },
   recommendationWarning: { marginTop: 2, fontSize: 11, color: "#92400e" },
   recommendationWarningVerify: { fontWeight: "600", color: "#78350f" },
+  kitsBox: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+    paddingTop: 8,
+  },
+  kitCard: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 10,
+    padding: 8,
+    backgroundColor: c.card,
+  },
   recommendationBtn: {
     marginTop: 8,
     alignSelf: "flex-start",

@@ -1,6 +1,7 @@
 import type { PartWishlistItem } from "./part-wishlist";
 import type { PartSkuViewModel } from "./part-catalog";
 import type { PartRecommendationViewModel } from "./part-recommendation";
+import type { AddServiceKitToWishlistResult, ServiceKitViewModel } from "./service-kit";
 import type { ServiceEventItem } from "./service-event";
 import type {
   BrandItem,
@@ -87,4 +88,12 @@ export type PartSkuDetailResponse = {
 
 export type PartRecommendationsResponse = {
   recommendations: PartRecommendationViewModel[];
+};
+
+export type ServiceKitsResponse = {
+  kits: ServiceKitViewModel[];
+};
+
+export type AddServiceKitToWishlistResponse = {
+  result: AddServiceKitToWishlistResult;
 };

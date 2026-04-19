@@ -83,6 +83,7 @@ import type {
   AddServiceEventFormValues,
   PartRecommendationViewModel,
   PartRecommendationGroup,
+  ServiceKitViewModel,
   PartWishlistFormValues,
   PartWishlistItem,
   PartSkuViewModel,
@@ -160,6 +161,10 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [wishlistRecommendationsLoading, setWishlistRecommendationsLoading] = useState(false);
   const [wishlistRecommendationsError, setWishlistRecommendationsError] = useState("");
   const [wishlistAddingRecommendedSkuId, setWishlistAddingRecommendedSkuId] = useState("");
+  const [wishlistServiceKits, setWishlistServiceKits] = useState<ServiceKitViewModel[]>([]);
+  const [wishlistServiceKitsLoading, setWishlistServiceKitsLoading] = useState(false);
+  const [wishlistServiceKitsError, setWishlistServiceKitsError] = useState("");
+  const [wishlistAddingKitCode, setWishlistAddingKitCode] = useState("");
   const wishlistSkuSearchGen = useRef(0);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -347,6 +352,33 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       })
       .finally(() => {
         setWishlistRecommendationsLoading(false);
+      });
+  }, [isWishlistModalOpen, vehicleId, wishlistForm.nodeId]);
+
+  useEffect(() => {
+    if (!isWishlistModalOpen || !vehicleId) {
+      return;
+    }
+    const nodeId = wishlistForm.nodeId.trim();
+    if (!nodeId) {
+      setWishlistServiceKits([]);
+      setWishlistServiceKitsError("");
+      setWishlistServiceKitsLoading(false);
+      return;
+    }
+    setWishlistServiceKitsLoading(true);
+    setWishlistServiceKitsError("");
+    void vehicleDetailApi
+      .getServiceKits({ nodeId, vehicleId })
+      .then((res) => {
+        setWishlistServiceKits(res.kits ?? []);
+      })
+      .catch(() => {
+        setWishlistServiceKits([]);
+        setWishlistServiceKitsError("Не удалось загрузить комплекты обслуживания.");
+      })
+      .finally(() => {
+        setWishlistServiceKitsLoading(false);
       });
   }, [isWishlistModalOpen, vehicleId, wishlistForm.nodeId]);
 
@@ -640,6 +672,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setWishlistRecommendations([]);
     setWishlistRecommendationsError("");
     setWishlistAddingRecommendedSkuId("");
+    setWishlistServiceKits([]);
+    setWishlistServiceKitsError("");
+    setWishlistAddingKitCode("");
     setWishlistForm(
       createInitialPartWishlistFormValues({
         nodeId: presetNodeId ?? "",
@@ -662,6 +697,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setWishlistRecommendations([]);
     setWishlistRecommendationsError("");
     setWishlistAddingRecommendedSkuId("");
+    setWishlistServiceKits([]);
+    setWishlistServiceKitsError("");
+    setWishlistAddingKitCode("");
     setWishlistForm(partWishlistFormValuesFromItem(item));
     setWishlistFormError("");
     setIsWishlistModalOpen(true);
@@ -680,6 +718,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setWishlistRecommendations([]);
     setWishlistRecommendationsError("");
     setWishlistAddingRecommendedSkuId("");
+    setWishlistServiceKits([]);
+    setWishlistServiceKitsError("");
+    setWishlistAddingKitCode("");
   };
 
   const submitWishlistForm = async () => {
@@ -792,6 +833,35 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       );
     } finally {
       setWishlistAddingRecommendedSkuId("");
+    }
+  };
+
+  const addServiceKitToWishlist = async (kit: ServiceKitViewModel) => {
+    if (!vehicleId || wishlistEditingId) {
+      return;
+    }
+    const contextNodeId = wishlistForm.nodeId.trim();
+    if (!contextNodeId) {
+      setWishlistFormError("Выберите узел мотоцикла");
+      return;
+    }
+    try {
+      setWishlistAddingKitCode(kit.code);
+      const res = await vehicleDetailApi.addServiceKitToWishlist(vehicleId, {
+        kitCode: kit.code,
+        contextNodeId,
+      });
+      await Promise.all([loadWishlist(), loadNodeTree()]);
+      setWishlistNotice(
+        `Комплект добавлен: ${res.result.createdItems.length} создано, ${res.result.skippedItems.length} пропущено.`
+      );
+      closeWishlistModal();
+    } catch (e) {
+      setWishlistFormError(
+        e instanceof Error ? e.message : "Не удалось добавить комплект обслуживания."
+      );
+    } finally {
+      setWishlistAddingKitCode("");
     }
   };
 
@@ -1666,8 +1736,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                     Стоимость: {it.costLabelRu}
                                   </p>
                                 ) : null}
-                                {it.comment ? (
-                                  <p className="mt-1 text-xs text-gray-600">{it.comment}</p>
+                                {it.kitOriginLabelRu ? (
+                                  <p className="mt-1 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
+                                    {it.kitOriginLabelRu}
+                                  </p>
+                                ) : null}
+                                {it.commentBodyRu ? (
+                                  <p className="mt-1 text-xs text-gray-600">{it.commentBodyRu}</p>
                                 ) : null}
                               </div>
                               <div className="flex shrink-0 flex-wrap items-center gap-1">
@@ -2608,6 +2683,52 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                           </div>
                         ))}
                       </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {wishlistForm.nodeId.trim() && !wishlistEditingId ? (
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-white p-2">
+                    <p className="text-[11px] font-medium text-gray-700">Комплекты обслуживания</p>
+                    {wishlistServiceKitsError ? (
+                      <p className="mt-1 text-[11px]" style={{ color: productSemanticColors.error }}>
+                        {wishlistServiceKitsError}
+                      </p>
+                    ) : null}
+                    {wishlistServiceKitsLoading ? (
+                      <p className="mt-1 text-[11px] text-gray-500">Загружаем комплекты…</p>
+                    ) : null}
+                    {!wishlistServiceKitsLoading && wishlistServiceKits.length === 0 ? (
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        Для этого узла пока нет подходящих комплектов.
+                      </p>
+                    ) : null}
+                    {!wishlistServiceKitsLoading && wishlistServiceKits.length > 0 ? (
+                      <ul className="mt-2 space-y-2">
+                        {wishlistServiceKits.map((kit) => (
+                          <li key={kit.code} className="rounded-md border border-gray-200 bg-gray-50 p-2">
+                            <p className="text-xs font-semibold text-gray-900">{kit.title}</p>
+                            <p className="mt-0.5 text-[11px] text-gray-600">{kit.description}</p>
+                            <ul className="mt-1 space-y-0.5">
+                              {kit.items.map((item) => (
+                                <li key={item.key} className="text-[11px] text-gray-600">
+                                  • {item.title} x{item.quantity}
+                                  {item.matchedSkuTitle ? ` — ${item.matchedSkuTitle}` : " — без SKU"}
+                                </li>
+                              ))}
+                            </ul>
+                            <button
+                              type="button"
+                              onClick={() => void addServiceKitToWishlist(kit)}
+                              disabled={wishlistAddingKitCode === kit.code}
+                              className="mt-2 inline-flex rounded-lg border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {wishlistAddingKitCode === kit.code
+                                ? "Добавление комплекта…"
+                                : "Добавить комплект в список покупок"}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     ) : null}
                   </div>
                 ) : null}

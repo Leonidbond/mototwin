@@ -30,6 +30,10 @@ export type PartWishlistItemViewModel = PartWishlistItem & {
   statusLabelRu: string;
   /** Preformatted “amount currency” for list UI when {@link PartWishlistItem.costAmount} is set. */
   costLabelRu?: string;
+  /** UI-only label extracted from comment prefix, e.g. "Из комплекта: Замена масла". */
+  kitOriginLabelRu?: string | null;
+  /** Comment without kit-origin line for compact display. */
+  commentBodyRu?: string | null;
 };
 
 /** Form fields as edited in UI (web / Expo). */

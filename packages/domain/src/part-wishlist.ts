@@ -67,6 +67,48 @@ export function isLikelyWishlistInstallServiceEvent(event: {
 /** Shown when status becomes INSTALLED but the line has no node link (no auto-open of Add Service Event). */
 export const WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT =
   "Позиция не привязана к узлу, сервисное событие не открыто автоматически";
+export const WISHLIST_KIT_ORIGIN_PREFIX_RU = "Из комплекта:";
+const WISHLIST_KIT_ORIGIN_LEGACY_PREFIX_RU = "Комплект:";
+
+function extractWishlistKitOriginLine(comment: string): string | null {
+  const firstLine = comment.split("\n")[0]?.trim() ?? "";
+  if (firstLine.startsWith(WISHLIST_KIT_ORIGIN_PREFIX_RU)) {
+    return firstLine;
+  }
+  if (firstLine.startsWith(WISHLIST_KIT_ORIGIN_LEGACY_PREFIX_RU)) {
+    return firstLine.replace(WISHLIST_KIT_ORIGIN_LEGACY_PREFIX_RU, WISHLIST_KIT_ORIGIN_PREFIX_RU);
+  }
+  return null;
+}
+
+export function extractWishlistKitOriginLabel(comment: string | null | undefined): string | null {
+  const text = comment?.trim();
+  if (!text) {
+    return null;
+  }
+  return extractWishlistKitOriginLine(text);
+}
+
+export function isWishlistItemFromKitByComment(comment: string | null | undefined): boolean {
+  return extractWishlistKitOriginLabel(comment) !== null;
+}
+
+export function stripWishlistKitOriginFromComment(comment: string | null | undefined): string | null {
+  const text = comment?.trim();
+  if (!text) {
+    return null;
+  }
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) {
+    return null;
+  }
+  const hasKitOriginLine = extractWishlistKitOriginLine(lines[0]) !== null;
+  const body = hasKitOriginLine ? lines.slice(1).join("\n").trim() : text;
+  return body || null;
+}
 
 export function isWishlistTransitionToInstalled(
   previousStatus: PartWishlistItemStatus,
@@ -270,9 +312,13 @@ export function normalizeUpdatePartWishlistPayload(
 }
 
 export function buildPartWishlistItemViewModel(item: PartWishlistItem): PartWishlistItemViewModel {
+  const kitOriginLabelRu = extractWishlistKitOriginLabel(item.comment);
+  const commentBodyRu = stripWishlistKitOriginFromComment(item.comment);
   const base: PartWishlistItemViewModel = {
     ...item,
     statusLabelRu: getPartWishlistStatusLabelRu(item.status),
+    kitOriginLabelRu,
+    commentBodyRu,
   };
   if (item.costAmount != null && Number.isFinite(item.costAmount)) {
     const cur = item.currency?.trim() || PART_WISHLIST_DEFAULT_CURRENCY;

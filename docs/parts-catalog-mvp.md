@@ -196,6 +196,8 @@ DRIVETRAIN.CHAIN
 TIRES.FRONT
 ```
 
+Примечание по текущему UI-дереву обслуживания: шины продолжают использовать коды `TIRES.FRONT` / `TIRES.REAR` как source-of-truth для правил и рекомендаций, но в выдаче `node-tree` они отображаются как дочерние узлы раздела колёс (под `WHEELS.FRONT` / `WHEELS.REAR`) для более удобной навигации.
+
 Это дерево используется для:
 
 - сервисных событий;
@@ -1026,6 +1028,17 @@ VERIFY_REQUIRED
 ```
 
 Пустое состояние подбора по узлу в wishlist (web и Expo): «Для этого узла пока нет рекомендаций из каталога».
+
+### 11.5 Service kits как потребитель рекомендаций (MVP)
+
+Service kits используют тот же каталог и recommendation semantics:
+
+- kit item задаёт `nodeCode` + `partType`;
+- backend подбирает SKU из кандидатов узла и предпочтительно берёт более надёжный recommendation type (`EXACT_FIT` / `MODEL_FIT` выше generic/verify);
+- если SKU не найден, создаётся manual wishlist item с обязательным `nodeId`;
+- kits не создают сервисные события автоматически и не меняют правила журнала/расходов.
+
+Подробнее: [service-kits-mvp.md](./service-kits-mvp.md).
 
 ---
 

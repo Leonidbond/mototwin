@@ -128,6 +128,7 @@ export {
 export {
   PART_WISHLIST_STATUS_ORDER,
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
+  WISHLIST_KIT_ORIGIN_PREFIX_RU,
   WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU,
   WISHLIST_INSTALL_SERVICE_TYPE_RU,
   buildPartWishlistItemViewModel,
@@ -138,12 +139,15 @@ export {
   isActiveWishlistItem,
   isPartWishlistItemStatus,
   isLikelyWishlistInstallServiceEvent,
+  isWishlistItemFromKitByComment,
   isWishlistTransitionToInstalled,
+  extractWishlistKitOriginLabel,
   normalizeCreatePartWishlistPayload,
   normalizePartWishlistCostMutationArgs,
   normalizeUpdatePartWishlistPayload,
   partWishlistFormValuesFromItem,
   partWishlistStatusLabelsRu,
+  stripWishlistKitOriginFromComment,
   validatePartWishlistFormValues,
   applyPartSkuViewModelToPartWishlistFormValues,
   clearPartWishlistFormSkuSelection,
@@ -174,3 +178,10 @@ export {
   sortPartRecommendations,
   sortPartRecommendationsWithinGroup,
 } from "./part-recommendation";
+export {
+  SERVICE_KIT_DEFINITIONS,
+  buildServiceKitViewModel,
+  chooseBestSkuForKitItem,
+  expandServiceKitToWishlistDrafts,
+  getServiceKitsForNode,
+} from "./service-kits";

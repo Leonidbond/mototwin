@@ -1,4 +1,6 @@
 import type {
+  AddServiceKitToWishlistPayload,
+  AddServiceKitToWishlistResponse,
   BrandsResponse,
   CreatePartWishlistItemInput,
   CreateServiceEventInput,
@@ -14,6 +16,7 @@ import type {
   PartSkusResponse,
   PartSkuSearchFilters,
   ServiceEventsResponse,
+  ServiceKitsResponse,
   UpdatePartWishlistItemInput,
   UpdateVehicleProfileInput,
   UpdateVehicleProfileResponse,
@@ -74,6 +77,28 @@ export function createMotoTwinEndpoints(client: ApiClient) {
       });
       return client.request<PartRecommendationsResponse>(
         `/api/parts/recommended-skus?${q.toString()}`
+      );
+    },
+
+    getServiceKits(params?: { nodeId?: string; vehicleId?: string }) {
+      const q = new URLSearchParams();
+      if (params?.nodeId?.trim()) {
+        q.set("nodeId", params.nodeId.trim());
+      }
+      if (params?.vehicleId?.trim()) {
+        q.set("vehicleId", params.vehicleId.trim());
+      }
+      const qs = q.toString();
+      return client.request<ServiceKitsResponse>(`/api/parts/service-kits${qs ? `?${qs}` : ""}`);
+    },
+
+    addServiceKitToWishlist(vehicleId: string, input: AddServiceKitToWishlistPayload) {
+      return client.request<AddServiceKitToWishlistResponse>(
+        `/api/vehicles/${vehicleId}/wishlist/kits`,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        }
       );
     },
 
