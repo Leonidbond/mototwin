@@ -79,6 +79,17 @@ export async function GET(request: NextRequest) {
         const hasGenericFitment = row.fitments.some(
           (fitment) => (fitment.fitmentType || "").toUpperCase() === "GENERIC_NODE"
         );
+        const matchingFitment =
+          row.fitments.find(
+            (fitment) =>
+              fitment.modelVariantId &&
+              vehicle.modelVariantId &&
+              fitment.modelVariantId === vehicle.modelVariantId
+          ) ??
+          row.fitments.find((fitment) => fitment.modelId && fitment.modelId === vehicle.modelId) ??
+          row.fitments.find((fitment) => (fitment.fitmentType || "").toUpperCase() === "GENERIC_NODE") ??
+          row.fitments[0] ??
+          null;
         const fitmentConfidence = row.fitments[0]?.confidence ?? 0;
         const confidence = Math.max(relationConfidence, fitmentConfidence);
 
@@ -90,6 +101,7 @@ export async function GET(request: NextRequest) {
           hasExactFit,
           hasModelFit,
           hasGenericFitment,
+          fitmentNote: matchingFitment?.note ?? null,
         });
       })
     );

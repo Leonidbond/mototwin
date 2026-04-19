@@ -982,8 +982,8 @@ VERIFY_REQUIRED
 4. Присвоить тип рекомендации (`PartRecommendationType`) и **консервативные** подписи (не обещать гарантированную совместимость без данных):
    - `EXACT_FIT` — «Подходит к этой модификации»;
    - `MODEL_FIT` — «Подходит к модели»;
-   - `GENERIC_NODE_MATCH` — «Универсальные позиции для узла»;
-   - `RELATED_CONSUMABLE` — «Сопутствующие расходники»;
+   - `GENERIC_NODE_MATCH` — «Универсальная позиция для узла»;
+   - `RELATED_CONSUMABLE` — «Сопутствующий расходник»;
    - `VERIFY_REQUIRED` — «Проверьте совместимость».
 
 ### 11.4. MVP endpoint рекомендаций (реализовано)
@@ -995,7 +995,7 @@ VERIFY_REQUIRED
 - консервативную маркировку (`VERIFY_REQUIRED`, `RELATED_CONSUMABLE`) там, где точной совместимости недостаточно.
 
 В ответе возвращаются `PartRecommendationViewModel` с полями:
-`skuId`, `canonicalName`, `brandName`, `partType`, `partNumbers`, `priceAmount`, `currency`, `primaryNode`, `relationType`, `confidence`, `recommendationType`, `recommendationLabel`, `compatibilityWarning`.
+`skuId`, `canonicalName`, `brandName`, `partType`, `partNumbers`, `priceAmount`, `currency`, `primaryNode`, `relationType`, `confidence`, `recommendationType`, `recommendationLabel`, `whyRecommended`, `fitmentNote`, `compatibilityWarning`.
 
 На сервере список дополнительно упорядочивается (`sortPartRecommendations`: тип → relation → confidence → признак цены → имя). Клиенты **группируют** ответ по `recommendationType` и сортируют строки внутри секции через общие хелперы (`buildPartRecommendationGroupsForDisplay`, `groupPartRecommendationsByType`, `sortPartRecommendationGroups`, `sortPartRecommendationsWithinGroup`), чтобы web и Expo показывали одинаковый порядок секций и строк.
 
@@ -1005,7 +1005,9 @@ VERIFY_REQUIRED
 
 **Заголовки секций (RU):** задаются `getPartRecommendationGroupTitle` (совпадают с `recommendationLabel` в view model).
 
-**Предупреждения:** `getPartRecommendationWarningLabel` / `getPartRecommendationWarningLabelForType` — для `VERIFY_REQUIRED` и `RELATED_CONSUMABLE` показывают короткие нейтральные тексты; позиции `VERIFY_REQUIRED` в UI дополнительно выделяются (рамка/фон), без формулировок вроде «100% подходит».
+**Объяснение рекомендации:** `buildPartRecommendationExplanation` + `getPartRecommendationWhyText` дают единые тексты «почему рекомендовано» для web/Expo.
+
+**Предупреждения:** `getPartRecommendationWarningText` / `getPartRecommendationWarningLabelForType` — для `VERIFY_REQUIRED` и `RELATED_CONSUMABLE` показывают короткие нейтральные тексты; позиции `VERIFY_REQUIRED` в UI дополнительно выделяются (рамка/фон), без формулировок вроде «100% подходит».
 
 5. Отсортировать (серверный flat-order):
    - exact fit выше;
@@ -1022,8 +1024,8 @@ VERIFY_REQUIRED
 ```text
 Подходит к этой модификации
 Подходит к модели
-Универсальные позиции для узла
-Сопутствующие расходники
+Универсальная позиция для узла
+Сопутствующий расходник
 Проверьте совместимость
 ```
 

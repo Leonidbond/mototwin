@@ -590,6 +590,10 @@ export function WishlistItemEditor({
                                 </Text>
                               ) : null}
                               <Text style={styles.recommendationLabel}>{rec.recommendationLabel}</Text>
+                              <Text style={styles.skuResultMeta}>{rec.whyRecommended}</Text>
+                              {rec.fitmentNote ? (
+                                <Text style={styles.skuResultMeta}>{rec.fitmentNote}</Text>
+                              ) : null}
                               {warn ? (
                                 <Text
                                   style={[

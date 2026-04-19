@@ -2767,6 +2767,10 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                       </p>
                                     ) : null}
                                     <p className="text-[11px] text-gray-700">{rec.recommendationLabel}</p>
+                                    <p className="text-[11px] text-gray-600">{rec.whyRecommended}</p>
+                                    {rec.fitmentNote ? (
+                                      <p className="text-[11px] text-gray-500">{rec.fitmentNote}</p>
+                                    ) : null}
                                     {warn ? (
                                       <p
                                         className={`text-[11px] ${

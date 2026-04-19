@@ -25,6 +25,8 @@ export type PartRecommendationViewModel = {
   confidence: number;
   recommendationType: PartRecommendationType;
   recommendationLabel: string;
+  whyRecommended: string;
+  fitmentNote: string | null;
   compatibilityWarning: string | null;
 };
 

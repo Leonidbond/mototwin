@@ -14,6 +14,7 @@ type RecommendationInput = {
   hasExactFit: boolean;
   hasModelFit: boolean;
   hasGenericFitment: boolean;
+  fitmentNote?: string | null;
 };
 
 /** Display order for recommendation groups (highest trust first). */
@@ -28,8 +29,8 @@ export const PART_RECOMMENDATION_GROUP_ORDER: readonly PartRecommendationType[] 
 const groupTitleMap: Record<PartRecommendationType, string> = {
   EXACT_FIT: "Подходит к этой модификации",
   MODEL_FIT: "Подходит к модели",
-  GENERIC_NODE_MATCH: "Универсальные позиции для узла",
-  RELATED_CONSUMABLE: "Сопутствующие расходники",
+  GENERIC_NODE_MATCH: "Универсальная позиция для узла",
+  RELATED_CONSUMABLE: "Сопутствующий расходник",
   VERIFY_REQUIRED: "Проверьте совместимость",
 };
 
@@ -53,11 +54,43 @@ export function getPartRecommendationWarningLabelForType(
   return null;
 }
 
+export function getPartRecommendationWarningText(type: PartRecommendationType): string | null {
+  return getPartRecommendationWarningLabelForType(type);
+}
+
 /** User-facing warning line for a recommendation row (framework-agnostic). */
 export function getPartRecommendationWarningLabel(
   item: PartRecommendationViewModel
 ): string | null {
   return getPartRecommendationWarningLabelForType(item.recommendationType);
+}
+
+export function getPartRecommendationWhyText(type: PartRecommendationType): string {
+  if (type === "EXACT_FIT") {
+    return "Есть применимость к этой модификации мотоцикла";
+  }
+  if (type === "MODEL_FIT") {
+    return "Есть применимость к модели мотоцикла";
+  }
+  if (type === "GENERIC_NODE_MATCH") {
+    return "Позиция связана с этим узлом, но точная совместимость не подтверждена";
+  }
+  if (type === "RELATED_CONSUMABLE") {
+    return "Может понадобиться при обслуживании этого узла";
+  }
+  return "Нет подтвержденной применимости к вашей модификации";
+}
+
+export function buildPartRecommendationExplanation(type: PartRecommendationType): {
+  recommendationLabel: string;
+  whyRecommended: string;
+  compatibilityWarning: string | null;
+} {
+  return {
+    recommendationLabel: getPartRecommendationLabel(type),
+    whyRecommended: getPartRecommendationWhyText(type),
+    compatibilityWarning: getPartRecommendationWarningText(type),
+  };
 }
 
 export function classifyPartRecommendation(input: RecommendationInput): PartRecommendationType {
@@ -86,6 +119,7 @@ export function buildPartRecommendationViewModel(
   input: RecommendationInput
 ): PartRecommendationViewModel {
   const recommendationType = classifyPartRecommendation(input);
+  const explanation = buildPartRecommendationExplanation(recommendationType);
   return {
     skuId: input.sku.id,
     canonicalName: input.sku.canonicalName,
@@ -98,8 +132,10 @@ export function buildPartRecommendationViewModel(
     relationType: input.relationType,
     confidence: input.confidence,
     recommendationType,
-    recommendationLabel: getPartRecommendationLabel(recommendationType),
-    compatibilityWarning: getPartRecommendationWarningLabelForType(recommendationType),
+    recommendationLabel: explanation.recommendationLabel,
+    whyRecommended: explanation.whyRecommended,
+    fitmentNote: input.fitmentNote?.trim() || null,
+    compatibilityWarning: explanation.compatibilityWarning,
   };
 }
 
