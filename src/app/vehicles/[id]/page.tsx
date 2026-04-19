@@ -21,6 +21,8 @@ import {
   createServiceLogNodeFilter,
   findNodePathById,
   findNodeTreeItemById,
+  getNodeSubtreeById,
+  getTopLevelNodeTreeItems,
   formatIsoCalendarDateRu,
   getAvailableChildrenForSelectedPath,
   getNodeSelectLevels,
@@ -41,7 +43,10 @@ import {
   formatExpenseAmountRu,
   buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
+  buildNodeSubtreeModalViewModel,
+  buildTopLevelNodeSummaryViewModel,
   buildNodeTreeItemViewModel,
+  buildNodeMaintenancePlanViewModel,
   buildPartWishlistItemViewModel,
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
@@ -74,6 +79,8 @@ import type {
   NodeStatus,
   NodeTreeItem,
   NodeTreeItemViewModel,
+  NodeMaintenancePlanSummaryViewModel,
+  NodeSubtreeModalViewModel,
   SelectedNodePath,
   ServiceEventItem,
   ServiceEventsFilters,
@@ -140,6 +147,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [isExpenseSectionExpanded, setIsExpenseSectionExpanded] = useState(false);
   const [isUsageProfileSectionExpanded, setIsUsageProfileSectionExpanded] = useState(true);
   const [isTechnicalSummarySectionExpanded, setIsTechnicalSummarySectionExpanded] = useState(true);
+  const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
+  const [selectedTopLevelNodeId, setSelectedTopLevelNodeId] = useState<string | null>(null);
   const [hasLoadedDetailCollapsePrefs, setHasLoadedDetailCollapsePrefs] = useState(false);
   const [isAttentionModalOpen, setIsAttentionModalOpen] = useState(false);
   const [wishlistItems, setWishlistItems] = useState<PartWishlistItem[]>([]);
@@ -234,6 +243,26 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     () => buildNodeTreeSectionProps(nodeTree),
     [nodeTree]
   );
+  const topLevelNodeViewModels = useMemo(
+    () => getTopLevelNodeTreeItems(nodeTreeViewModel),
+    [nodeTreeViewModel]
+  );
+  const selectedTopLevelNode = useMemo(
+    () =>
+      selectedTopLevelNodeId
+        ? getNodeSubtreeById(topLevelNodeViewModels, selectedTopLevelNodeId)
+        : null,
+    [topLevelNodeViewModels, selectedTopLevelNodeId]
+  );
+  const selectedNodeSubtreeModalViewModel = useMemo<NodeSubtreeModalViewModel | null>(
+    () =>
+      selectedTopLevelNode
+        ? buildNodeSubtreeModalViewModel(selectedTopLevelNode, {
+            maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
+          })
+        : null,
+    [selectedTopLevelNode, isNodeMaintenanceModeEnabled]
+  );
 
   const expenseSummary = useMemo(
     () => buildExpenseSummaryFromServiceEvents(serviceEvents),
@@ -320,6 +349,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     try {
       const usageRaw = localStorage.getItem(`vehicleDetail.${vehicleId}.usageProfile.expanded`);
       const techRaw = localStorage.getItem(`vehicleDetail.${vehicleId}.technicalSummary.expanded`);
+      const maintenanceModeRaw = localStorage.getItem(
+        `vehicleDetail.${vehicleId}.nodeMaintenanceMode.enabled`
+      );
       if (usageRaw === "true" || usageRaw === "false") {
         setIsUsageProfileSectionExpanded(usageRaw === "true");
       } else {
@@ -330,9 +362,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       } else {
         setIsTechnicalSummarySectionExpanded(true);
       }
+      if (maintenanceModeRaw === "true" || maintenanceModeRaw === "false") {
+        setIsNodeMaintenanceModeEnabled(maintenanceModeRaw === "true");
+      } else {
+        setIsNodeMaintenanceModeEnabled(false);
+      }
     } catch {
       setIsUsageProfileSectionExpanded(true);
       setIsTechnicalSummarySectionExpanded(true);
+      setIsNodeMaintenanceModeEnabled(false);
     } finally {
       setHasLoadedDetailCollapsePrefs(true);
     }
@@ -365,6 +403,20 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       // Ignore localStorage failures for local UI prefs.
     }
   }, [vehicleId, hasLoadedDetailCollapsePrefs, isTechnicalSummarySectionExpanded]);
+
+  useEffect(() => {
+    if (!vehicleId || !hasLoadedDetailCollapsePrefs) {
+      return;
+    }
+    try {
+      localStorage.setItem(
+        `vehicleDetail.${vehicleId}.nodeMaintenanceMode.enabled`,
+        String(isNodeMaintenanceModeEnabled)
+      );
+    } catch {
+      // Ignore localStorage failures for local UI prefs.
+    }
+  }, [vehicleId, hasLoadedDetailCollapsePrefs, isNodeMaintenanceModeEnabled]);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -1010,10 +1062,53 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setIsAttentionModalOpen(false);
     openWishlistModalForCreate(item.nodeId);
   };
+  const closeTopLevelNodeSubtreeModal = () => setSelectedTopLevelNodeId(null);
+  const openTopLevelNodeSubtreeModal = (nodeId: string) => setSelectedTopLevelNodeId(nodeId);
+  const openServiceLogFromTreeContext = (node: NodeTreeItemViewModel) => {
+    closeTopLevelNodeSubtreeModal();
+    openServiceLogFilteredByNode(node);
+  };
+  const openAddServiceEventFromTreeContext = (leafNodeId: string) => {
+    closeTopLevelNodeSubtreeModal();
+    openAddServiceEventFromLeafNode(leafNodeId);
+  };
+  const openWishlistFromTreeContext = (nodeId: string) => {
+    closeTopLevelNodeSubtreeModal();
+    openWishlistModalForCreate(nodeId);
+  };
+  const openStatusExplanationFromTreeContext = (node: NodeTreeItemViewModel) => {
+    closeTopLevelNodeSubtreeModal();
+    setSelectedStatusExplanationNode(node);
+  };
+  const getNodeModeToggleLabel = () =>
+    isNodeMaintenanceModeEnabled ? "План обслуживания: вкл" : "Показывать план обслуживания";
+
+  const formatNodeMaintenanceSummaryLine = (
+    summary: NodeMaintenancePlanSummaryViewModel | null
+  ): string | null => {
+    if (!summary) {
+      return null;
+    }
+    const parts: string[] = [];
+    if (summary.overdueCount > 0) {
+      parts.push(`Просрочено: ${summary.overdueCount}`);
+    }
+    if (summary.soonCount > 0) {
+      parts.push(`Скоро: ${summary.soonCount}`);
+    }
+    if (summary.plannedLaterCount > 0) {
+      parts.push(`Запланировано: ${summary.plannedLaterCount}`);
+    }
+    return parts.length > 0 ? parts.join(" · ") : null;
+  };
 
   const renderChildTreeNode = (node: NodeTreeItemViewModel, depth: number): ReactNode => {
     const hasChildren = node.hasChildren;
     const isExpanded = Boolean(expandedNodes[node.id]);
+    const maintenancePlan = isNodeMaintenanceModeEnabled
+      ? buildNodeMaintenancePlanViewModel(node)
+      : null;
+    const parentMaintenanceSummary = formatNodeMaintenanceSummaryLine(maintenancePlan?.parentSummary ?? null);
 
     return (
       <div key={node.id} className="space-y-2.5">
@@ -1046,11 +1141,38 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               canOpenNodeStatusExplanationModal(node) ? (
                 <button
                   type="button"
-                  onClick={() => setSelectedStatusExplanationNode(node)}
+                  onClick={() => openStatusExplanationFromTreeContext(node)}
                   className="mt-1.5 pl-8 text-left text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-gray-700"
                 >
                   {node.shortExplanationLabel}
                 </button>
+              ) : null}
+              {isNodeMaintenanceModeEnabled &&
+              maintenancePlan &&
+              !node.shortExplanationLabel &&
+              maintenancePlan.shortText ? (
+                <p className="mt-1.5 pl-8 text-xs text-gray-500">{maintenancePlan.shortText}</p>
+              ) : null}
+              {isNodeMaintenanceModeEnabled && parentMaintenanceSummary ? (
+                <p className="mt-1.5 pl-8 text-xs font-medium text-gray-700">{parentMaintenanceSummary}</p>
+              ) : null}
+              {isNodeMaintenanceModeEnabled &&
+              maintenancePlan &&
+              !hasChildren &&
+              maintenancePlan.hasMeaningfulData ? (
+                <div className="mt-1.5 space-y-1 pl-8">
+                  {maintenancePlan.dueLines.map((line) => (
+                    <p key={line} className="text-xs text-gray-600">
+                      {line}
+                    </p>
+                  ))}
+                  {maintenancePlan.lastServiceLine ? (
+                    <p className="text-xs text-gray-500">{maintenancePlan.lastServiceLine}</p>
+                  ) : null}
+                  {maintenancePlan.ruleIntervalLine ? (
+                    <p className="text-xs text-gray-500">{maintenancePlan.ruleIntervalLine}</p>
+                  ) : null}
+                </div>
               ) : null}
             </div>
 
@@ -1058,7 +1180,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               {node.effectiveStatus ? (
                 <button
                   type="button"
-                  onClick={() => openServiceLogFilteredByNode(node)}
+                  onClick={() => openServiceLogFromTreeContext(node)}
                   className="inline-flex h-7 cursor-pointer items-center rounded-full border px-2.5 text-xs font-medium transition hover:ring-2 hover:ring-gray-300 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-400"
                   style={getStatusBadgeStyle(node.effectiveStatus)}
                   title="Показать записи журнала по этому узлу"
@@ -1070,7 +1192,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               {node.canAddServiceEvent ? (
                 <button
                   type="button"
-                  onClick={() => openAddServiceEventFromLeafNode(node.id)}
+                  onClick={() => openAddServiceEventFromTreeContext(node.id)}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                   aria-label="Добавить сервисное событие"
                   title="Добавить сервисное событие"
@@ -1080,7 +1202,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               ) : null}
               <button
                 type="button"
-                onClick={() => openWishlistModalForCreate(node.id)}
+                onClick={() => openWishlistFromTreeContext(node.id)}
                 className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
                 title="Добавить в список покупок"
               >
@@ -1908,16 +2030,27 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
             <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
-                  Дерево узлов
-                </h2>
-                <button
-                  type="button"
-                  onClick={openServiceLogModalFull}
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-                >
-                  Открыть журнал обслуживания
-                </button>
+                <h2 className="text-2xl font-semibold tracking-tight text-gray-950">Дерево узлов</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
+                    className={`inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-medium transition ${
+                      isNodeMaintenanceModeEnabled
+                        ? "border-gray-900 bg-gray-900 text-white hover:bg-gray-800"
+                        : "border-gray-300 text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    {getNodeModeToggleLabel()}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openServiceLogModalFull}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                  >
+                    Открыть журнал обслуживания
+                  </button>
+                </div>
               </div>
 
               {isNodeTreeLoading ? (
@@ -1938,97 +2071,46 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
               {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
                 <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {nodeTreeViewModel.map((rootNode) => {
-                    const hasChildren = rootNode.hasChildren;
-                    const isExpanded = Boolean(expandedNodes[rootNode.id]);
-
+                  {topLevelNodeViewModels.map((rootNode) => {
+                    const summary = buildTopLevelNodeSummaryViewModel(rootNode, {
+                      maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
+                    });
                     return (
-                      <div
+                      <button
                         key={rootNode.id}
-                        className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5"
+                        type="button"
+                        onClick={() => openTopLevelNodeSubtreeModal(rootNode.id)}
+                        className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5 text-left transition hover:border-gray-300 hover:bg-gray-50"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              {hasChildren ? (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleNodeExpansion(rootNode.id)}
-                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition hover:bg-gray-50"
-                                  aria-label={
-                                    isExpanded ? "Свернуть ветку" : "Развернуть ветку"
-                                  }
-                                >
-                                  {isExpanded ? "−" : "+"}
-                                </button>
-                              ) : (
-                                <span className="inline-flex h-6 w-6 items-center justify-center text-gray-400">
-                                  •
-                                </span>
-                              )}
-                              <h3 className="truncate text-[15px] font-semibold text-gray-950">
-                                {rootNode.name}
-                              </h3>
-                            </div>
-                            {rootNode.shortExplanationLabel &&
-                            canOpenNodeStatusExplanationModal(rootNode) ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setSelectedStatusExplanationNode(rootNode)
-                                }
-                                className="mt-1.5 pl-8 text-left text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-gray-700"
-                              >
-                                {rootNode.shortExplanationLabel}
-                              </button>
+                            <h3 className="truncate text-[15px] font-semibold text-gray-950">
+                              {summary.nodeName}
+                            </h3>
+                            {summary.shortExplanationLabel ? (
+                              <p className="mt-1.5 text-xs text-gray-500">
+                                {summary.shortExplanationLabel}
+                              </p>
+                            ) : null}
+                            {summary.maintenanceSummaryLine ? (
+                              <p className="mt-1.5 text-xs font-medium text-gray-700">
+                                {summary.maintenanceSummaryLine}
+                              </p>
                             ) : null}
                           </div>
-
                           <div className="flex shrink-0 items-center gap-2">
-                            {rootNode.effectiveStatus ? (
-                              <button
-                                type="button"
-                                onClick={() => openServiceLogFilteredByNode(rootNode)}
-                                className="inline-flex h-7 cursor-pointer items-center rounded-full border px-2.5 text-xs font-medium transition hover:ring-2 hover:ring-gray-300 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-400"
-                                style={getStatusBadgeStyle(rootNode.effectiveStatus)}
-                                title="Показать записи журнала по этому узлу"
-                                aria-label={`Открыть журнал обслуживания по узлу «${rootNode.name}»`}
+                            {summary.effectiveStatus ? (
+                              <span
+                                className="inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium"
+                                style={getStatusBadgeStyle(summary.effectiveStatus)}
                               >
-                                {rootNode.statusLabel}
-                              </button>
+                                {summary.statusLabel}
+                              </span>
                             ) : null}
-                            {rootNode.canAddServiceEvent ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openAddServiceEventFromLeafNode(rootNode.id)
-                                }
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                                aria-label="Добавить сервисное событие"
-                                title="Добавить сервисное событие"
-                              >
-                                +
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => openWishlistModalForCreate(rootNode.id)}
-                              className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
-                              title="Добавить в список покупок"
-                            >
-                              В список
-                            </button>
+                            <span className="text-sm text-gray-400">›</span>
                           </div>
                         </div>
-
-                        {hasChildren && isExpanded ? (
-                          <div className="mt-4 space-y-2.5">
-                            {rootNode.children.map((child) =>
-                              renderChildTreeNode(child, 0)
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -2038,6 +2120,68 @@ export default function VehiclePage({ params }: VehiclePageProps) {
           </div>
         ) : null}
       </div>
+
+      {selectedNodeSubtreeModalViewModel ? (
+        <div
+          className="fixed inset-0 z-40 flex items-start justify-center px-4 py-6 sm:items-center"
+          style={{ backgroundColor: productSemanticColors.overlayModal }}
+        >
+          <div className="w-full max-w-5xl rounded-3xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                  {selectedNodeSubtreeModalViewModel.rootNodeName}
+                </h2>
+                {selectedNodeSubtreeModalViewModel.shortExplanationLabel ? (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {selectedNodeSubtreeModalViewModel.shortExplanationLabel}
+                  </p>
+                ) : null}
+                {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine ? (
+                  <p className="mt-1 text-xs font-medium text-gray-700">
+                    {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
+                  className={`inline-flex h-8 items-center justify-center rounded-lg border px-3 text-xs font-medium transition ${
+                    isNodeMaintenanceModeEnabled
+                      ? "border-gray-900 bg-gray-900 text-white hover:bg-gray-800"
+                      : "border-gray-300 text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  {getNodeModeToggleLabel()}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeTopLevelNodeSubtreeModal}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[72vh] overflow-y-auto px-6 py-6">
+              {selectedNodeSubtreeModalViewModel.isLeafRoot ? (
+                <div className="space-y-2.5">
+                  {selectedTopLevelNode ? renderChildTreeNode(selectedTopLevelNode, 0) : null}
+                </div>
+              ) : selectedNodeSubtreeModalViewModel.childNodes.length > 0 ? (
+                <div className="space-y-2.5">
+                  {selectedNodeSubtreeModalViewModel.childNodes.map((child) =>
+                    renderChildTreeNode(child, 0)
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600">Для этого узла нет дочерних элементов.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isServiceLogModalOpen ? (
         <div

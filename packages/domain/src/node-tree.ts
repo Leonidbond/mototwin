@@ -27,6 +27,10 @@ export function flattenNodeTreeToSelectOptions(
   });
 }
 
+export function getTopLevelNodeTreeItems<T>(nodes: T[]): T[] {
+  return nodes;
+}
+
 export function findNodeTreeItemById(
   nodes: NodeTreeItem[],
   targetNodeId: string
@@ -38,6 +42,22 @@ export function findNodeTreeItemById(
     const found = findNodeTreeItemById(node.children, targetNodeId);
     if (found) {
       return found;
+    }
+  }
+  return null;
+}
+
+export function getNodeSubtreeById<T extends { id: string; children: T[] }>(
+  nodes: T[],
+  targetNodeId: string
+): T | null {
+  for (const node of nodes) {
+    if (node.id === targetNodeId) {
+      return node;
+    }
+    const nested = getNodeSubtreeById(node.children, targetNodeId);
+    if (nested) {
+      return nested;
     }
   }
   return null;

@@ -124,3 +124,42 @@ export type NodeTreeItemViewModel = {
   statusExplanation: NodeStatusExplanationViewModel | null;
   actions: NodeTreeActionViewModel;
 };
+
+export type NodeTreeMaintenanceModeState = "default" | "maintenance_plan";
+
+export type NodeMaintenancePlanSummaryViewModel = {
+  overdueCount: number;
+  soonCount: number;
+  plannedLaterCount: number;
+  scheduledLeafCount: number;
+};
+
+export type NodeMaintenancePlanViewModel = {
+  nodeId: string;
+  shortText: string | null;
+  dueLines: string[];
+  lastServiceLine: string | null;
+  ruleIntervalLine: string | null;
+  parentSummary: NodeMaintenancePlanSummaryViewModel | null;
+  hasMeaningfulData: boolean;
+};
+
+export type TopLevelNodeSummaryViewModel = {
+  nodeId: string;
+  nodeName: string;
+  effectiveStatus: NodeStatus | null;
+  statusLabel: string | null;
+  shortExplanationLabel: string | null;
+  maintenanceSummaryLine: string | null;
+};
+
+export type NodeSubtreeModalViewModel = {
+  rootNodeId: string;
+  rootNodeName: string;
+  effectiveStatus: NodeStatus | null;
+  statusLabel: string | null;
+  shortExplanationLabel: string | null;
+  maintenanceSummaryLine: string | null;
+  childNodes: NodeTreeItemViewModel[];
+  isLeafRoot: boolean;
+};

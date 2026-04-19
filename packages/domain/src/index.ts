@@ -21,6 +21,8 @@ export {
   getLeafNodeOptions,
   getTopLevelNodes,
   getProblematicNodes,
+  getTopLevelNodeTreeItems,
+  getNodeSubtreeById,
 } from "./node-tree";
 export {
   buildNodeTreeItemViewModel,
@@ -29,6 +31,16 @@ export {
   getNodePathItemViewModels,
   getNodePathItemViewModelsByNodeId,
 } from "./node-tree-view-models";
+export {
+  buildTopLevelNodeSummaryViewModel,
+  buildNodeSubtreeModalViewModel,
+} from "./node-tree-subtree-view-models";
+export {
+  buildNodeMaintenancePlanSummary,
+  buildNodeMaintenancePlanViewModel,
+  getNodeMaintenanceDueText,
+  getNodeMaintenancePlanShortText,
+} from "./node-maintenance-plan";
 export {
   DEFAULT_SERVICE_LOG_SORT_STATE,
   filterAndSortServiceEvents,

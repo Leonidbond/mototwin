@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -15,6 +16,9 @@ import {
   buildAttentionSummaryFromNodeTree,
   buildExpenseSummaryFromServiceEvents,
   buildNodeTreeSectionProps,
+  buildNodeSubtreeModalViewModel,
+  buildTopLevelNodeSummaryViewModel,
+  buildNodeMaintenancePlanViewModel,
   buildRideProfileViewModel,
   buildVehicleDetailViewModel,
   buildVehicleStateViewModel,
@@ -22,6 +26,8 @@ import {
   canOpenNodeStatusExplanationModal,
   createServiceLogNodeFilter,
   findNodeTreeItemById,
+  getNodeSubtreeById,
+  getTopLevelNodeTreeItems,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
 } from "@mototwin/domain";
@@ -30,6 +36,7 @@ import type {
   NodeTreeItem,
   NodeTreeItemProps,
   NodeTreeItemViewModel,
+  NodeSubtreeModalViewModel,
   ServiceEventItem,
   VehicleDetail,
 } from "@mototwin/types";
@@ -64,6 +71,7 @@ type NodeRowProps = {
   onAddToWishlist?: (nodeId: string) => void;
   onOpenStatusExplanation?: (node: NodeTreeItemViewModel) => void;
   onOpenServiceLogForNode?: (node: NodeTreeItemViewModel) => void;
+  isMaintenanceModeEnabled: boolean;
 };
 
 function NodeRow({
@@ -75,6 +83,7 @@ function NodeRow({
   onAddToWishlist,
   onOpenStatusExplanation,
   onOpenServiceLogForNode,
+  isMaintenanceModeEnabled,
 }: NodeRowProps) {
   const treeItemContract: NodeTreeItemProps = {
     item: node,
@@ -97,6 +106,18 @@ function NodeRow({
   const isTopLevel = depth === 0;
   const badgeStyle = !isTopLevel ? styles.badgeNested : undefined;
   const badgeTextStyle = !isTopLevel ? styles.badgeTextNested : undefined;
+  const maintenancePlan = isMaintenanceModeEnabled ? buildNodeMaintenancePlanViewModel(rowNode) : null;
+  const summary = maintenancePlan?.parentSummary;
+  const summaryLine =
+    summary && (summary.overdueCount > 0 || summary.soonCount > 0 || summary.plannedLaterCount > 0)
+      ? [
+          summary.overdueCount > 0 ? `Просрочено: ${summary.overdueCount}` : null,
+          summary.soonCount > 0 ? `Скоро: ${summary.soonCount}` : null,
+          summary.plannedLaterCount > 0 ? `Запланировано: ${summary.plannedLaterCount}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : null;
 
   return (
     <View style={styles.nodeContainer}>
@@ -136,6 +157,30 @@ function NodeRow({
               </Pressable>
             ) : reasonShort ? (
               <Text style={styles.reasonShort}>{reasonShort}</Text>
+            ) : null}
+            {isMaintenanceModeEnabled && maintenancePlan && !reasonShort && maintenancePlan.shortText ? (
+              <Text style={styles.reasonShort}>{maintenancePlan.shortText}</Text>
+            ) : null}
+            {isMaintenanceModeEnabled && summaryLine ? (
+              <Text style={styles.planSummaryText}>{summaryLine}</Text>
+            ) : null}
+            {isMaintenanceModeEnabled &&
+            maintenancePlan &&
+            !hasChildren &&
+            maintenancePlan.hasMeaningfulData ? (
+              <View style={styles.planLeafBlock}>
+                {maintenancePlan.dueLines.map((line) => (
+                  <Text key={line} style={styles.planLeafLine}>
+                    {line}
+                  </Text>
+                ))}
+                {maintenancePlan.lastServiceLine ? (
+                  <Text style={styles.planLeafMuted}>{maintenancePlan.lastServiceLine}</Text>
+                ) : null}
+                {maintenancePlan.ruleIntervalLine ? (
+                  <Text style={styles.planLeafMuted}>{maintenancePlan.ruleIntervalLine}</Text>
+                ) : null}
+              </View>
             ) : null}
           </View>
         </View>
@@ -212,6 +257,7 @@ function NodeRow({
               onAddToWishlist={onAddToWishlist}
               onOpenStatusExplanation={onOpenStatusExplanation}
               onOpenServiceLogForNode={onOpenServiceLogForNode}
+              isMaintenanceModeEnabled={isMaintenanceModeEnabled}
             />
           ))
         : null}
@@ -235,6 +281,8 @@ export default function VehicleDetailScreen() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isRideProfileExpanded, setIsRideProfileExpanded] = useState(true);
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(true);
+  const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
+  const [selectedTopLevelNodeId, setSelectedTopLevelNodeId] = useState<string | null>(null);
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
   const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
   const [statusExplanationNode, setStatusExplanationNode] =
@@ -317,8 +365,12 @@ export default function VehicleDetailScreen() {
       const technical = await readCollapsiblePreference(
         `vehicleDetail.${vehicleId}.technicalSummary.expanded`
       );
+      const maintenanceMode = await readCollapsiblePreference(
+        `vehicleDetail.${vehicleId}.nodeMaintenanceMode.enabled`
+      );
       setIsRideProfileExpanded(usage ?? true);
       setIsTechnicalExpanded(technical ?? true);
+      setIsNodeMaintenanceModeEnabled(maintenanceMode ?? false);
       setHasLoadedCollapsePrefs(true);
     })();
   }, [vehicleId]);
@@ -339,9 +391,37 @@ export default function VehicleDetailScreen() {
     );
   }, [vehicleId, hasLoadedCollapsePrefs, isTechnicalExpanded]);
 
+  useEffect(() => {
+    if (!vehicleId || !hasLoadedCollapsePrefs) return;
+    void writeCollapsiblePreference(
+      `vehicleDetail.${vehicleId}.nodeMaintenanceMode.enabled`,
+      isNodeMaintenanceModeEnabled
+    );
+  }, [vehicleId, hasLoadedCollapsePrefs, isNodeMaintenanceModeEnabled]);
+
   const { roots: nodeTreeViewModel } = useMemo(
     () => buildNodeTreeSectionProps(nodeTree),
     [nodeTree]
+  );
+  const topLevelNodeViewModels = useMemo(
+    () => getTopLevelNodeTreeItems(nodeTreeViewModel),
+    [nodeTreeViewModel]
+  );
+  const selectedTopLevelNode = useMemo(
+    () =>
+      selectedTopLevelNodeId
+        ? getNodeSubtreeById(topLevelNodeViewModels, selectedTopLevelNodeId)
+        : null,
+    [topLevelNodeViewModels, selectedTopLevelNodeId]
+  );
+  const selectedNodeSubtreeModalViewModel = useMemo<NodeSubtreeModalViewModel | null>(
+    () =>
+      selectedTopLevelNode
+        ? buildNodeSubtreeModalViewModel(selectedTopLevelNode, {
+            maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
+          })
+        : null,
+    [selectedTopLevelNode, isNodeMaintenanceModeEnabled]
   );
 
   const expenseSummary = useMemo(
@@ -378,6 +458,7 @@ export default function VehicleDetailScreen() {
 
   const openServiceLogForTreeNode = useCallback(
     (vm: NodeTreeItemViewModel) => {
+      setSelectedTopLevelNodeId(null);
       const raw = findNodeTreeItemById(nodeTree, vm.id);
       if (!raw) {
         return;
@@ -390,10 +471,24 @@ export default function VehicleDetailScreen() {
 
   const openWishlistForTreeNode = useCallback(
     (nodeId: string) => {
+      setSelectedTopLevelNodeId(null);
       router.push(buildVehicleWishlistNewHref(vehicleId, nodeId));
     },
     [router, vehicleId]
   );
+  const openAddServiceFromTreeNode = useCallback(
+    (leafNodeId: string) => {
+      setSelectedTopLevelNodeId(null);
+      router.push(`/vehicles/${vehicleId}/service-events/new?source=tree&nodeId=${leafNodeId}`);
+    },
+    [router, vehicleId]
+  );
+  const openStatusExplanationFromTreeNode = useCallback((node: NodeTreeItemViewModel) => {
+    setSelectedTopLevelNodeId(null);
+    setStatusExplanationNode(node);
+  }, []);
+  const getNodeModeToggleLabel = () =>
+    isNodeMaintenanceModeEnabled ? "План обслуживания: вкл" : "Показывать план обслуживания";
 
   const hasNickname = Boolean(vehicle?.nickname?.trim());
 
@@ -716,14 +811,32 @@ export default function VehicleDetailScreen() {
         <View>
           <Text style={styles.sectionHeader}>Состояние узлов</Text>
           <Pressable
+            style={({ pressed }) => [
+              styles.maintenanceModeToggle,
+              isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleActive,
+              pressed && styles.maintenanceModeTogglePressed,
+            ]}
+            onPress={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
+          >
+            <Text
+              style={[
+                styles.maintenanceModeToggleText,
+                isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleTextActive,
+              ]}
+            >
+              {getNodeModeToggleLabel()}
+            </Text>
+          </Pressable>
+          <Pressable
             style={({ pressed }) => [styles.sectionJournalButton, pressed && styles.sectionJournalButtonPressed]}
             onPress={() => router.push(`/vehicles/${vehicleId}/service-log`)}
           >
             <Text style={styles.sectionJournalButtonText}>Журнал обслуживания</Text>
           </Pressable>
           <Text style={styles.sectionSubheader}>
-            Разверните нужный узел, чтобы проверить статус и быстро добавить обслуживание для
-            leaf-элемента.
+            {isNodeMaintenanceModeEnabled
+              ? "В режиме плана показываются сроки и интервалы обслуживания прямо в дереве узлов."
+              : "Разверните нужный узел, чтобы проверить статус и быстро добавить обслуживание для leaf-элемента."}
           </Text>
           {isNodeTreeLoading ? (
             <Text style={styles.treeLoadingText}>Загрузка дерева узлов...</Text>
@@ -743,25 +856,50 @@ export default function VehicleDetailScreen() {
           ) : null}
           {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
             <View style={styles.treeCard}>
-              {nodeTreeViewModel.map((node, index) => (
+              {topLevelNodeViewModels.map((node, index) => {
+                const summary = buildTopLevelNodeSummaryViewModel(node, {
+                  maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
+                });
+                return (
                 <View key={node.id}>
                   {index > 0 ? <View style={styles.treeDivider} /> : null}
-                  <NodeRow
-                    node={node}
-                    depth={0}
-                    expandedIds={expandedIds}
-                    onToggle={toggleNode}
-                    onAddFromLeaf={(leafNodeId) =>
-                      router.push(
-                        `/vehicles/${vehicleId}/service-events/new?source=tree&nodeId=${leafNodeId}`
-                      )
-                    }
-                    onAddToWishlist={openWishlistForTreeNode}
-                    onOpenStatusExplanation={setStatusExplanationNode}
-                    onOpenServiceLogForNode={openServiceLogForTreeNode}
-                  />
+                  <Pressable
+                    onPress={() => setSelectedTopLevelNodeId(node.id)}
+                    style={({ pressed }) => [styles.topLevelNodeRow, pressed && styles.topLevelNodeRowPressed]}
+                  >
+                    <View style={styles.topLevelNodeRowLeft}>
+                      <Text style={styles.topLevelNodeName}>{summary.nodeName}</Text>
+                      {summary.shortExplanationLabel ? (
+                        <Text style={styles.reasonShort}>{summary.shortExplanationLabel}</Text>
+                      ) : null}
+                      {summary.maintenanceSummaryLine ? (
+                        <Text style={styles.planSummaryText}>{summary.maintenanceSummaryLine}</Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.topLevelNodeRowRight}>
+                      {summary.effectiveStatus ? (
+                        <View
+                          style={[
+                            styles.badge,
+                            { backgroundColor: getStatusColors(summary.effectiveStatus).bg, borderColor: getStatusColors(summary.effectiveStatus).border },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.badgeText,
+                              { color: getStatusColors(summary.effectiveStatus).text },
+                            ]}
+                          >
+                            {summary.statusLabel}
+                          </Text>
+                        </View>
+                      ) : null}
+                      <Text style={styles.sectionChevron}>›</Text>
+                    </View>
+                  </Pressable>
                 </View>
-              ))}
+              );
+              })}
             </View>
           ) : null}
           {!isNodeTreeLoading && !nodeTreeError && nodeTree.length === 0 ? (
@@ -771,6 +909,99 @@ export default function VehicleDetailScreen() {
           ) : null}
         </View>
       </ScrollView>
+      <Modal
+        visible={Boolean(selectedNodeSubtreeModalViewModel)}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedTopLevelNodeId(null)}
+      >
+        <View style={styles.subtreeModalOverlay}>
+          <View style={styles.subtreeModalCard}>
+            {selectedNodeSubtreeModalViewModel ? (
+              <>
+                <View style={styles.subtreeModalHeader}>
+                  <View style={styles.subtreeModalHeaderTextCol}>
+                    <Text style={styles.subtreeModalTitle}>
+                      {selectedNodeSubtreeModalViewModel.rootNodeName}
+                    </Text>
+                    {selectedNodeSubtreeModalViewModel.shortExplanationLabel ? (
+                      <Text style={styles.subtreeModalSubtitle}>
+                        {selectedNodeSubtreeModalViewModel.shortExplanationLabel}
+                      </Text>
+                    ) : null}
+                    {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine ? (
+                      <Text style={styles.planSummaryText}>
+                        {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.subtreeModalHeaderActions}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.maintenanceModeToggle,
+                        isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleActive,
+                        pressed && styles.maintenanceModeTogglePressed,
+                      ]}
+                      onPress={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
+                    >
+                      <Text
+                        style={[
+                          styles.maintenanceModeToggleText,
+                          isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleTextActive,
+                        ]}
+                      >
+                        {getNodeModeToggleLabel()}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setSelectedTopLevelNodeId(null)}
+                      style={({ pressed }) => [
+                        styles.subtreeModalCloseBtn,
+                        pressed && styles.subtreeModalCloseBtnPressed,
+                      ]}
+                    >
+                      <Text style={styles.subtreeModalCloseBtnText}>Закрыть</Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <ScrollView contentContainerStyle={styles.subtreeModalBody}>
+                  {selectedNodeSubtreeModalViewModel.isLeafRoot ? (
+                    selectedTopLevelNode ? (
+                      <NodeRow
+                        node={selectedTopLevelNode}
+                        depth={0}
+                        expandedIds={expandedIds}
+                        onToggle={toggleNode}
+                        onAddFromLeaf={openAddServiceFromTreeNode}
+                        onAddToWishlist={openWishlistForTreeNode}
+                        onOpenStatusExplanation={openStatusExplanationFromTreeNode}
+                        onOpenServiceLogForNode={openServiceLogForTreeNode}
+                        isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
+                      />
+                    ) : null
+                  ) : (
+                    selectedNodeSubtreeModalViewModel.childNodes.map((child) => (
+                      <NodeRow
+                        key={child.id}
+                        node={child}
+                        depth={0}
+                        expandedIds={expandedIds}
+                        onToggle={toggleNode}
+                        onAddFromLeaf={openAddServiceFromTreeNode}
+                        onAddToWishlist={openWishlistForTreeNode}
+                        onOpenStatusExplanation={openStatusExplanationFromTreeNode}
+                        onOpenServiceLogForNode={openServiceLogForTreeNode}
+                        isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
+                      />
+                    ))
+                  )}
+                </ScrollView>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1211,6 +1442,31 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: c.textMeta,
   },
+  maintenanceModeToggle: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: c.card,
+  },
+  maintenanceModeToggleActive: {
+    backgroundColor: c.textPrimary,
+    borderColor: c.textPrimary,
+  },
+  maintenanceModeTogglePressed: {
+    opacity: 0.9,
+  },
+  maintenanceModeToggleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textMeta,
+  },
+  maintenanceModeToggleTextActive: {
+    color: c.textInverse,
+  },
   sectionJournalButton: {
     marginTop: 8,
     alignSelf: "flex-start",
@@ -1286,6 +1542,32 @@ const styles = StyleSheet.create({
     backgroundColor: c.divider,
     marginLeft: 14,
   },
+  topLevelNodeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 56,
+  },
+  topLevelNodeRowPressed: {
+    backgroundColor: c.divider,
+  },
+  topLevelNodeRowLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  topLevelNodeName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: c.textPrimary,
+    lineHeight: 20,
+  },
+  topLevelNodeRowRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
 
   // Node row
   nodeRow: {
@@ -1354,6 +1636,91 @@ const styles = StyleSheet.create({
   reasonShortLink: {
     color: c.textSecondary,
     textDecorationLine: "underline",
+  },
+  planSummaryText: {
+    marginTop: 3,
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textSecondary,
+    lineHeight: 16,
+  },
+  planLeafBlock: {
+    marginTop: 4,
+    gap: 2,
+  },
+  planLeafLine: {
+    fontSize: 11,
+    color: c.textMeta,
+    lineHeight: 15,
+  },
+  planLeafMuted: {
+    fontSize: 11,
+    color: c.textMuted,
+    lineHeight: 15,
+  },
+  subtreeModalOverlay: {
+    flex: 1,
+    backgroundColor: c.overlayModal,
+    paddingHorizontal: 10,
+    paddingVertical: 16,
+    justifyContent: "center",
+  },
+  subtreeModalCard: {
+    maxHeight: "86%",
+    backgroundColor: c.card,
+    borderColor: c.border,
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  subtreeModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: c.divider,
+  },
+  subtreeModalHeaderTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  subtreeModalHeaderActions: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  subtreeModalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  subtreeModalSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  subtreeModalCloseBtn: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: c.card,
+  },
+  subtreeModalCloseBtnPressed: {
+    backgroundColor: c.divider,
+  },
+  subtreeModalCloseBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textMeta,
+  },
+  subtreeModalBody: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    paddingBottom: 16,
   },
 
   // Badge

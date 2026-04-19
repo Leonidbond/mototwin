@@ -22,6 +22,11 @@ export type {
   NodePathItemViewModel,
   NodeTreeSelectionOption,
   NodeTreeItemViewModel,
+  NodeTreeMaintenanceModeState,
+  NodeMaintenancePlanViewModel,
+  NodeMaintenancePlanSummaryViewModel,
+  TopLevelNodeSummaryViewModel,
+  NodeSubtreeModalViewModel,
 } from "./node";
 export type {
   ServiceEventKind,
