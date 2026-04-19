@@ -91,6 +91,9 @@ export default function AttentionScreen() {
   const openWishlistForItem = (item: AttentionItemViewModel) => {
     router.push(buildVehicleWishlistNewHref(vehicleId, item.nodeId));
   };
+  const openNodeContextForItem = (item: AttentionItemViewModel) => {
+    router.push(`/vehicles/${vehicleId}?nodeContextId=${encodeURIComponent(item.nodeId)}`);
+  };
 
   const openStatusExplanationForItem = (item: AttentionItemViewModel) => {
     if (!item.canOpenStatusExplanation) {
@@ -223,6 +226,15 @@ export default function AttentionScreen() {
                           ]}
                         >
                           <Text style={styles.actionBtnTextSecondary}>В список покупок</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => openNodeContextForItem(item)}
+                          style={({ pressed }) => [
+                            styles.actionBtnSecondary,
+                            pressed && styles.actionBtnPressed,
+                          ]}
+                        >
+                          <Text style={styles.actionBtnTextSecondary}>Контекст узла</Text>
                         </Pressable>
                       </View>
                     </View>

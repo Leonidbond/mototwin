@@ -1,148 +1,174 @@
-# MotoTwin Node Tree and Data Model
+# MotoTwin Node Tree (Current DB Snapshot)
 
-## Purpose
+This document reflects the **current active `Node` dictionary in DB** (`Node.isActive = true`), with full hierarchy and current labels/codes.
 
-This document describes:
-- the hierarchical node taxonomy used in MotoTwin MVP;
-- how node-related entities are stored in the database;
-- how `TopNodeState` and `ServiceEvent` are linked to nodes.
+## Hierarchy Rules
 
-The scope is MVP foundation: topology, status storage, and service logging linkage.
+- each node has `code`, `name`, `parentId`, `level`, `displayOrder`
+- hierarchy is stored by `parentId` (self-relation), not only by code prefix
+- order below follows `displayOrder`, then `code`
 
-## Node Tree Structure
+## Current Node Tree
 
-`Node` uses dot-separated codes to represent hierarchy.
+- Двигатель (`ENGINE`)
+  - Верх двигателя (`ENGINE.TOPEND`)
+    - Цилиндр (`ENGINE.TOPEND.CYLINDER`)
+    - Поршень (`ENGINE.TOPEND.PISTON`)
+    - Кольца (`ENGINE.TOPEND.RINGS`)
+    - ГБЦ (`ENGINE.TOPEND.HEAD`)
+    - Клапаны/сальники/пружины (`ENGINE.TOPEND.VALVES`)
+    - Распредвал/рокеры (`ENGINE.TOPEND.CAM`)
+  - ГРМ (`ENGINE.TIMING`)
+    - Цепь ГРМ (`ENGINE.TIMING.CHAIN`)
+    - Натяжитель/успокоители (`ENGINE.TIMING.TENSIONER`)
+  - Низ двигателя (`ENGINE.BOTTOMEND`)
+    - Коленвал/шатун (`ENGINE.BOTTOMEND.CRANK`)
+    - Подшипники/сальники (`ENGINE.BOTTOMEND.BEARINGS`)
+  - Смазка (`ENGINE.LUBE`)
+    - Маслонасос (`ENGINE.LUBE.PUMP`)
+    - Масло двигателя (`ENGINE.LUBE.OIL`)
+    - Маслофильтр/сетка (`ENGINE.LUBE.FILTER`)
+    - Прокладки/сальники (двигатель) (`ENGINE.LUBE.GASKETS`)
+  - Сцепление (`ENGINE.CLUTCH`)
+    - Диски сцепления (`ENGINE.CLUTCH.PLATES`)
+    - Корзина/ступица (`ENGINE.CLUTCH.BASKET`)
+    - Привод сцепления (трос/гидро) (`ENGINE.CLUTCH.ACTUATION`)
+  - КПП (`ENGINE.GEARBOX`)
+    - Шестерни/валы (`ENGINE.GEARBOX.GEARS`)
+    - Барабан/вилки/механизм переключения (`ENGINE.GEARBOX.SHIFT`)
+  - Запуск двигателя (`ENGINE.START`)
+    - Стартер/реле/бендикс (если есть) (`ENGINE.START.STARTER`)
+    - Кикстартер (если есть) (`ENGINE.START.KICK`)
+  - Крепления двигателя/опоры (`ENGINE.MOUNTS`)
+- Масло двигателя (`engine_oil`)
+- Цепь и звезды (`chain_drive`)
+- Топливная система (`FUEL`)
+  - Бак/крышка/клапаны (`FUEL.TANK`)
+  - Топливные шланги/фильтр/кран (`FUEL.LINES`)
+  - Насос (если EFI) (`FUEL.PUMP`)
+  - Карбюратор (`FUEL.CARB`)
+    - Ремкомплект/жиклёры/игла/поплавок (`FUEL.CARB.REPAIR`)
+  - Инжектор (если EFI) (`FUEL.EFI`)
+    - Форсунка (`FUEL.EFI.INJECTOR`)
+    - Дроссель (`FUEL.EFI.THROTTLE`)
+    - Датчики (TPS/MAP/…) (`FUEL.EFI.SENSORS`)
+- Впуск воздуха (`INTAKE`)
+  - Airbox/патрубки (`INTAKE.AIRBOX`)
+  - Воздушный фильтр (`INTAKE.FILTER`)
+- Охлаждение (`COOLING`)
+  - Воздушное (если есть элементы) (`COOLING.AIR`)
+  - Жидкостное (`COOLING.LIQUID`)
+    - Радиаторы/крышка (`COOLING.LIQUID.RADIATOR`)
+    - Помпа/крыльчатка/сальники (`COOLING.LIQUID.PUMP`)
+    - Патрубки/хомуты (`COOLING.LIQUID.HOSES`)
+    - Термостат (если есть) (`COOLING.LIQUID.THERMOSTAT`)
+    - Расширительный бачок (`COOLING.LIQUID.EXPANSION`)
+- Выпуск (`EXHAUST`)
+  - Коллектор/прокладки (`EXHAUST.HEADER`)
+  - Глушитель/банка (`EXHAUST.MUFFLER`)
+  - Крепёж/теплоэкраны (`EXHAUST.MOUNTS`)
+  - Лямбда/датчики (если есть) (`EXHAUST.SENSOR`)
+  - DB-killer/вставки (если есть) (`EXHAUST.DBKILLER`)
+- Электрика (`ELECTRICS`)
+  - АКБ/клеммы (`ELECTRICS.BATTERY`)
+  - Предохранители/реле (`ELECTRICS.FUSES`)
+  - Зарядка (`ELECTRICS.CHARGING`)
+    - Статор/ротор (`ELECTRICS.CHARGING.STATOR`)
+    - Регулятор напряжения (`ELECTRICS.CHARGING.REGULATOR`)
+  - Зажигание (`ELECTRICS.IGNITION`)
+    - CDI/ECU (`ELECTRICS.IGNITION.CDI_ECU`)
+    - Катушка (`ELECTRICS.IGNITION.COIL`)
+    - Свеча/колпачок (`ELECTRICS.IGNITION.SPARK`)
+  - Проводка/жгуты/разъёмы (`ELECTRICS.WIRING`)
+  - Свет (`ELECTRICS.LIGHTS`)
+    - Фара (`ELECTRICS.LIGHTS.HEAD`)
+    - Задний фонарь (`ELECTRICS.LIGHTS.TAIL`)
+    - Поворотники (если есть) (`ELECTRICS.LIGHTS.TURN`)
+  - Сигнал (`ELECTRICS.HORN`)
+  - Приборка/датчики (`ELECTRICS.DASH`)
+    - Датчик скорости (`ELECTRICS.DASH.SPEED`)
+    - Датчик нейтрали (`ELECTRICS.DASH.NEUTRAL`)
+- Рама и кузов (`CHASSIS`)
+  - Рама (`CHASSIS.FRAME`)
+  - Подрамник (`CHASSIS.SUBFRAME`)
+  - Крепёж/оси/втулки (общие) (`CHASSIS.MOUNTS`)
+  - Сиденье/чехол (`CHASSIS.SEAT`)
+  - Пластик (`CHASSIS.PLASTICS`)
+    - Крылья (`CHASSIS.PLASTICS.FENDERS`)
+    - Боковины/панели (`CHASSIS.PLASTICS.SIDE`)
+    - Защита вилки (`CHASSIS.PLASTICS.FORK_GUARDS`)
+    - Защита рук (если есть) (`CHASSIS.PLASTICS.HANDGUARDS`)
+  - Защита (`CHASSIS.PROTECTION`)
+    - Защита картера (`CHASSIS.PROTECTION.SKID`)
+    - Защита радиаторов (если есть) (`CHASSIS.PROTECTION.RADIATOR`)
+    - Защита рамы/маятника (`CHASSIS.PROTECTION.FRAME`)
+- Рулевое (`STEERING`)
+  - Руль/крепления/проставки (`STEERING.HANDLEBAR`)
+  - Грипсы (`STEERING.GRIPS`)
+  - Пульты/кнопки (`STEERING.CONTROLS`)
+  - Демпфер руля (если есть) (`STEERING.DAMPER`)
+  - Рулевая колонка (`STEERING.HEADSET`)
+    - Подшипники рулевой (`STEERING.HEADSET.BEARINGS`)
+  - Траверсы (`STEERING.TRIPLES`)
+- Подвеска (`SUSPENSION`)
+  - Передняя (`SUSPENSION.FRONT`)
+    - Вилка (`SUSPENSION.FRONT.FORK`)
+    - Сальники/пыльники (`SUSPENSION.FRONT.SEALS`)
+    - Втулки скольжения (`SUSPENSION.FRONT.BUSHINGS`)
+    - Масло/обслуживание (`SUSPENSION.FRONT.OIL`)
+    - Пружины (если отдельно) (`SUSPENSION.FRONT.SPRINGS`)
+  - Задняя (`SUSPENSION.REAR`)
+    - Амортизатор (`SUSPENSION.REAR.SHOCK`)
+    - Линк/прогрессия (`SUSPENSION.REAR.LINKAGE`)
+    - Маятник (`SUSPENSION.REAR.SWINGARM`)
+    - Подшипники/сальники/втулки маятника/линка (`SUSPENSION.REAR.BEARINGS`)
+- Колёса/шины (`WHEELS`)
+  - Переднее колесо (`WHEELS.FRONT`)
+    - Обод (`WHEELS.FRONT.RIM`)
+    - Спицы/ниппели (`WHEELS.FRONT.SPOKES`)
+    - Ступица (`WHEELS.FRONT.HUB`)
+    - Подшипники/ось/проставки (`WHEELS.FRONT.BEARINGS`)
+  - Заднее колесо (`WHEELS.REAR`)
+    - Обод (`WHEELS.REAR.RIM`)
+    - Спицы/ниппели (`WHEELS.REAR.SPOKES`)
+    - Ступица (`WHEELS.REAR.HUB`)
+    - Подшипники/ось/проставки (`WHEELS.REAR.BEARINGS`)
+- Резина/камеры (`TIRES`)
+  - Передняя шина/камера (`TIRES.FRONT`)
+  - Задняя шина/камера (`TIRES.REAR`)
+  - Буксаторы/ободная лента (`TIRES.RIMLOCK`)
+- Тормоза (`BRAKES`)
+  - Передний тормоз (`BRAKES.FRONT`)
+    - Главный цилиндр/рычаг (`BRAKES.FRONT.MASTER`)
+    - Суппорт (перед) (`BRAKES.FRONT.CALIPER`)
+    - Колодки (перед) (`BRAKES.FRONT.PADS`)
+    - Диск (перед) (`BRAKES.FRONT.DISC`)
+    - Шланг/фитинги (перед) (`BRAKES.FRONT.LINE`)
+  - Задний тормоз (`BRAKES.REAR`)
+    - Главный цилиндр/педаль (`BRAKES.REAR.MASTER`)
+    - Суппорт (зад) (`BRAKES.REAR.CALIPER`)
+    - Колодки (зад) (`BRAKES.REAR.PADS`)
+    - Диск (зад) (`BRAKES.REAR.DISC`)
+    - Шланг/фитинги (зад) (`BRAKES.REAR.LINE`)
+  - Тормозная жидкость/прокачка (`BRAKES.FLUID`)
+- Привод (`DRIVETRAIN`)
+  - Цепь (`DRIVETRAIN.CHAIN`)
+  - Ведущая звезда (`DRIVETRAIN.FRONT_SPROCKET`)
+  - Ведомая звезда (`DRIVETRAIN.REAR_SPROCKET`)
+  - Ролики/направляющая (`DRIVETRAIN.CHAIN_GUIDE`)
+  - Слайдер/ползун цепи (`DRIVETRAIN.SWINGARM_SLIDER`)
+  - Натяжители/регулировка (`DRIVETRAIN.TENSIONERS`)
+  - Защита цепи (если есть) (`DRIVETRAIN.GUARD`)
+- Органы управления (`CONTROLS`)
+  - Ручка газа/трос (`CONTROLS.THROTTLE`)
+  - Рычаг/трос/гидро (как орган управления) (`CONTROLS.CLUTCH`)
+  - Рычаг переднего тормоза (`CONTROLS.FRONT_BRAKE`)
+  - Педаль заднего тормоза (`CONTROLS.REAR_BRAKE`)
+  - Лапка КПП (`CONTROLS.SHIFTER`)
+  - Подножки (`CONTROLS.FOOTPEG`)
+  - Тросы/рубашки (общие) (`CONTROLS.CABLES`)
 
-Examples:
-- `ENGINE` (top level)
-- `ENGINE.TOPEND` (child of `ENGINE`)
-- `ENGINE.TOPEND.CYLINDER` (child of `ENGINE.TOPEND`)
+## Notes
 
-Hierarchy rules:
-- parent is derived from code prefix before the last dot;
-- level is the number of code segments;
-- top-level nodes have one segment and `level = 1`.
-
-Top-level categories (used for vehicle top-node states):
-- `ENGINE`
-- `FUEL`
-- `COOLING`
-- `EXHAUST`
-- `ELECTRICS`
-- `CHASSIS`
-- `STEERING`
-- `SUSPENSION`
-- `WHEELS`
-- `BRAKES`
-- `DRIVETRAIN`
-- `CONTROLS`
-
-Important example in lubrication branch:
-- `ENGINE.LUBE`
-- `ENGINE.LUBE.OIL`
-- `ENGINE.LUBE.FILTER`
-- `ENGINE.LUBE.GASKETS`
-
-## Database Model
-
-### `Node`
-
-Dictionary table for the full taxonomy (top-level + child nodes).
-
-Core fields:
-- `id`
-- `code` (unique machine-readable path, e.g. `BRAKES.FRONT.PADS`)
-- `name` (human-readable RU label)
-- `parentId` (nullable self-reference)
-- `level` (depth by code)
-- `displayOrder` (stable order in UI/dictionary)
-- `isActive`
-- `createdAt`
-
-Relations:
-- self relation:
-  - `parent` (`Node?`)
-  - `children` (`Node[]`)
-- `topNodeStates` (`TopNodeState[]`)
-- `serviceEvents` (`ServiceEvent[]`)
-
-### `TopNodeState`
-
-Represents current state of one top-level node for one vehicle.
-
-Core fields:
-- `id`
-- `vehicleId`
-- `nodeId` (references `Node`)
-- `status` (`TopNodeStatus`)
-- `lastServiceEventId` (nullable string, no relation yet by design)
-- `note` (nullable)
-- `createdAt`
-- `updatedAt`
-
-Constraints:
-- unique pair: `[vehicleId, nodeId]`
-- index on `vehicleId`
-- index on `nodeId`
-
-Usage notes:
-- in MVP, records are created only for top-level node codes;
-- child nodes are kept in `Node` dictionary only.
-- `TopNodeState` is used for top-level status only, not for full tree nodes.
-
-### `ServiceEvent`
-
-Maintenance/service event linked to vehicle and node.
-
-Core fields:
-- `id`
-- `vehicleId`
-- `nodeId` (references `Node`)
-- `eventDate`
-- `odometer`
-- `engineHours` (nullable)
-- `serviceType`
-- `installedPartsJson` (nullable JSON)
-- `costAmount` (nullable)
-- `currency` (nullable)
-- `comment` (nullable)
-- `createdAt`
-
-Relations:
-- `vehicle` (`Vehicle`)
-- `node` (`Node`)
-
-Constraints:
-- index on `vehicleId`
-- index on `nodeId`
-
-## Status Enum
-
-`TopNodeStatus` values:
-- `OK`
-- `SOON`
-- `OVERDUE`
-- `RECENTLY_REPLACED`
-
-Current backend behavior:
-- after successful `ServiceEvent` creation for allowed node+vehicle pair,
-  matching `TopNodeState` is set to `RECENTLY_REPLACED`.
-- service event can be created only for nodes available in vehicle `TopNodeState`.
-
-## API Notes
-
-Current APIs around nodes:
-- `GET /api/vehicles/[id]/top-nodes` - top-level states for vehicle.
-- `GET /api/vehicles/[id]/node-tree` - nested node tree with top-level status fields.
-- `GET /api/vehicles/[id]/service-events` - service log with related `node` metadata.
-- `POST /api/vehicles/[id]/service-events` - create event with `nodeId`.
-
-## Seed Behavior (Current)
-
-Seed populates:
-- full `Node` taxonomy;
-- `TopNodeState` only for top-level nodes and existing vehicles.
-
-Seed is rerunnable and non-destructive for garage data:
-- does not wipe vehicles/ride profiles;
-- avoids duplicates through upsert + unique constraints.
+- This is a live DB snapshot, not a static seed-only contract.
+- If taxonomy changes in DB (seed/update scripts), this doc should be regenerated.

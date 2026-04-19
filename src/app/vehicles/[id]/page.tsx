@@ -24,8 +24,10 @@ import {
   getNodeSubtreeById,
   getTopLevelNodeTreeItems,
   buildNodeSearchResultActions,
+  buildNodeContextViewModel,
   searchNodeTree,
   formatIsoCalendarDateRu,
+  getRecentServiceEventsForNode,
   getAvailableChildrenForSelectedPath,
   getNodeSelectLevels,
   getSelectedNodeFromPath,
@@ -85,6 +87,7 @@ import type {
   NodeSubtreeModalViewModel,
   NodeTreeSearchResultViewModel,
   NodeTreeSearchActionKey,
+  NodeContextViewModel,
   SelectedNodePath,
   ServiceEventItem,
   ServiceEventsFilters,
@@ -156,6 +159,17 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [nodeSearchQuery, setNodeSearchQuery] = useState("");
   const [debouncedNodeSearchQuery, setDebouncedNodeSearchQuery] = useState("");
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
+  const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
+    PartRecommendationViewModel[]
+  >([]);
+  const [nodeContextRecommendationsLoading, setNodeContextRecommendationsLoading] = useState(false);
+  const [nodeContextRecommendationsError, setNodeContextRecommendationsError] = useState("");
+  const [nodeContextServiceKits, setNodeContextServiceKits] = useState<ServiceKitViewModel[]>([]);
+  const [nodeContextServiceKitsLoading, setNodeContextServiceKitsLoading] = useState(false);
+  const [nodeContextServiceKitsError, setNodeContextServiceKitsError] = useState("");
+  const [nodeContextAddingRecommendedSkuId, setNodeContextAddingRecommendedSkuId] = useState("");
+  const [nodeContextAddingKitCode, setNodeContextAddingKitCode] = useState("");
   const [hasLoadedDetailCollapsePrefs, setHasLoadedDetailCollapsePrefs] = useState(false);
   const [isAttentionModalOpen, setIsAttentionModalOpen] = useState(false);
   const [wishlistItems, setWishlistItems] = useState<PartWishlistItem[]>([]);
@@ -270,6 +284,40 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         : null,
     [selectedTopLevelNode, isNodeMaintenanceModeEnabled]
   );
+  const selectedNodeContextNode = useMemo(
+    () =>
+      selectedNodeContextId
+        ? getNodeSubtreeById(topLevelNodeViewModels, selectedNodeContextId)
+        : null,
+    [topLevelNodeViewModels, selectedNodeContextId]
+  );
+  const selectedNodeContextRawNode = useMemo(
+    () =>
+      selectedNodeContextId
+        ? findNodeTreeItemById(nodeTree, selectedNodeContextId)
+        : null,
+    [nodeTree, selectedNodeContextId]
+  );
+  const selectedNodeContextViewModel = useMemo<NodeContextViewModel | null>(() => {
+    if (!selectedNodeContextNode || !selectedNodeContextRawNode) {
+      return null;
+    }
+    return buildNodeContextViewModel({
+      node: selectedNodeContextNode,
+      nodeTree: topLevelNodeViewModels,
+      maintenancePlan: buildNodeMaintenancePlanViewModel(selectedNodeContextNode),
+      recentServiceEvents: getRecentServiceEventsForNode(selectedNodeContextRawNode, serviceEvents),
+      recommendations: nodeContextRecommendations,
+      serviceKits: nodeContextServiceKits,
+    });
+  }, [
+    selectedNodeContextNode,
+    selectedNodeContextRawNode,
+    topLevelNodeViewModels,
+    serviceEvents,
+    nodeContextRecommendations,
+    nodeContextServiceKits,
+  ]);
   const nodeSearchResults = useMemo<NodeTreeSearchResultViewModel[]>(
     () =>
       searchNodeTree(topLevelNodeViewModels, {
@@ -366,6 +414,55 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       window.clearTimeout(timeoutId);
     };
   }, [nodeSearchQuery]);
+
+  useEffect(() => {
+    if (!vehicleId || !selectedNodeContextId) {
+      setNodeContextRecommendations([]);
+      setNodeContextRecommendationsError("");
+      setNodeContextRecommendationsLoading(false);
+      return;
+    }
+    setNodeContextRecommendationsLoading(true);
+    setNodeContextRecommendationsError("");
+    void vehicleDetailApi
+      .getRecommendedSkusForNode(vehicleId, selectedNodeContextId)
+      .then((res) => {
+        setNodeContextRecommendations(res.recommendations ?? []);
+      })
+      .catch(() => {
+        setNodeContextRecommendations([]);
+        setNodeContextRecommendationsError("Не удалось загрузить рекомендации по узлу.");
+      })
+      .finally(() => {
+        setNodeContextRecommendationsLoading(false);
+      });
+  }, [vehicleId, selectedNodeContextId]);
+
+  useEffect(() => {
+    if (!vehicleId || !selectedNodeContextId) {
+      setNodeContextServiceKits([]);
+      setNodeContextServiceKitsError("");
+      setNodeContextServiceKitsLoading(false);
+      return;
+    }
+    setNodeContextServiceKitsLoading(true);
+    setNodeContextServiceKitsError("");
+    void vehicleDetailApi
+      .getServiceKits({
+        vehicleId,
+        nodeId: selectedNodeContextId,
+      })
+      .then((res) => {
+        setNodeContextServiceKits(res.kits ?? []);
+      })
+      .catch(() => {
+        setNodeContextServiceKits([]);
+        setNodeContextServiceKitsError("Не удалось загрузить комплекты обслуживания.");
+      })
+      .finally(() => {
+        setNodeContextServiceKitsLoading(false);
+      });
+  }, [vehicleId, selectedNodeContextId]);
 
   useEffect(() => {
     if (!vehicleId) {
@@ -1087,9 +1184,23 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setIsAttentionModalOpen(false);
     openWishlistModalForCreate(item.nodeId);
   };
+  const openNodeContextFromAttentionItem = (item: AttentionItemViewModel) => {
+    setIsAttentionModalOpen(false);
+    openNodeContextModal(item.nodeId);
+  };
   const closeTopLevelNodeSubtreeModal = () => {
     setSelectedTopLevelNodeId(null);
     setHighlightedNodeId(null);
+  };
+  const closeNodeContextModal = () => {
+    setSelectedNodeContextId(null);
+    setNodeContextAddingRecommendedSkuId("");
+    setNodeContextAddingKitCode("");
+  };
+  const openNodeContextModal = (nodeId: string) => {
+    setIsAttentionModalOpen(false);
+    closeTopLevelNodeSubtreeModal();
+    setSelectedNodeContextId(nodeId);
   };
   const openTopLevelNodeSubtreeModal = (nodeId: string) => {
     setHighlightedNodeId(null);
@@ -1118,6 +1229,80 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
     openServiceLogFilteredByNode(selectedNode);
   };
+  const addRecommendedSkuToWishlistFromNodeContext = async (rec: PartRecommendationViewModel) => {
+    if (!vehicleId || !selectedNodeContextId) {
+      return;
+    }
+    try {
+      setNodeContextAddingRecommendedSkuId(rec.skuId);
+      const payload = normalizeCreatePartWishlistPayload({
+        ...createInitialPartWishlistFormValues({
+          nodeId: selectedNodeContextId,
+          status: "NEEDED",
+        }),
+        skuId: rec.skuId,
+      });
+      await vehicleDetailApi.createWishlistItem(vehicleId, payload);
+      await Promise.all([loadWishlist(), loadNodeTree()]);
+      setWishlistNotice("Рекомендованный SKU добавлен в список покупок.");
+    } catch (e) {
+      setNodeContextRecommendationsError(
+        e instanceof Error ? e.message : "Не удалось добавить рекомендованный SKU."
+      );
+    } finally {
+      setNodeContextAddingRecommendedSkuId("");
+    }
+  };
+  const addServiceKitToWishlistFromNodeContext = async (kit: ServiceKitViewModel) => {
+    if (!vehicleId || !selectedNodeContextId) {
+      return;
+    }
+    try {
+      setNodeContextAddingKitCode(kit.code);
+      const res = await vehicleDetailApi.addServiceKitToWishlist(vehicleId, {
+        kitCode: kit.code,
+        contextNodeId: selectedNodeContextId,
+      });
+      await Promise.all([loadWishlist(), loadNodeTree()]);
+      setWishlistNotice(
+        `Комплект добавлен: ${res.result.createdItems.length} создано, ${res.result.skippedItems.length} пропущено.`
+      );
+    } catch (e) {
+      setNodeContextServiceKitsError(
+        e instanceof Error ? e.message : "Не удалось добавить комплект обслуживания."
+      );
+    } finally {
+      setNodeContextAddingKitCode("");
+    }
+  };
+  const handleNodeContextAction = (actionKey: string) => {
+    if (!selectedNodeContextNode) {
+      return;
+    }
+    if (actionKey === "journal") {
+      closeNodeContextModal();
+      openServiceLogFilteredByNode(selectedNodeContextNode);
+      return;
+    }
+    if (actionKey === "add_service_event" && selectedNodeContextNode.canAddServiceEvent) {
+      closeNodeContextModal();
+      openAddServiceEventFromLeafNode(selectedNodeContextNode.id);
+      return;
+    }
+    if (actionKey === "add_wishlist" && !selectedNodeContextNode.hasChildren) {
+      closeNodeContextModal();
+      openWishlistModalForCreate(selectedNodeContextNode.id);
+      return;
+    }
+    if (actionKey === "add_kit" && nodeContextServiceKits[0]) {
+      void addServiceKitToWishlistFromNodeContext(nodeContextServiceKits[0]);
+      return;
+    }
+    if (actionKey === "open_status_explanation" && selectedNodeContextNode.statusExplanation) {
+      closeNodeContextModal();
+      setSelectedStatusExplanationNode(selectedNodeContextNode);
+    }
+  };
   const openWishlistFromSearchResult = (result: NodeTreeSearchResultViewModel) => {
     if (!result.isLeaf) {
       return;
@@ -1132,7 +1317,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     result: NodeTreeSearchResultViewModel
   ) => {
     if (actionKey === "open") {
-      openSearchResultInSubtreeModal(result);
+      openNodeContextModal(result.nodeId);
       return;
     }
     if (actionKey === "service_log") {
@@ -1290,6 +1475,14 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 title="Добавить в список покупок"
               >
                 В список
+              </button>
+              <button
+                type="button"
+                onClick={() => openNodeContextModal(node.id)}
+                className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
+                title="Открыть контекст узла"
+              >
+                Контекст
               </button>
             </div>
           </div>
@@ -3457,7 +3650,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                 </p>
                               ) : null}
                               <div className="mt-1 flex flex-wrap items-center gap-2">
-                                <p className="text-base font-semibold text-gray-950">{item.name}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => openNodeContextFromAttentionItem(item)}
+                                  className="text-base font-semibold text-gray-950 transition hover:underline"
+                                >
+                                  {item.name}
+                                </button>
                                 <span
                                   className="inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
                                   style={{
@@ -3505,6 +3704,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                 >
                                   В список покупок
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openNodeContextFromAttentionItem(item)}
+                                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
+                                >
+                                  Контекст узла
+                                </button>
                               </div>
                             </li>
                           );
@@ -3514,6 +3720,187 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedNodeContextViewModel ? (
+        <div className="fixed inset-0 z-[65] flex items-start justify-center bg-black/45 px-4 py-6 sm:items-center">
+          <div className="w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
+              <div className="min-w-0">
+                <h2 className="truncate text-xl font-semibold tracking-tight text-gray-950">
+                  {selectedNodeContextViewModel.nodeName}
+                </h2>
+                <p className="truncate text-xs text-gray-500">{selectedNodeContextViewModel.pathLabel}</p>
+                <p className="truncate text-[11px] text-gray-400">{selectedNodeContextViewModel.nodeCode}</p>
+                {selectedNodeContextViewModel.shortExplanationLabel ? (
+                  <p className="mt-1 text-sm text-gray-600">
+                    {selectedNodeContextViewModel.shortExplanationLabel}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedNodeContextViewModel.effectiveStatus ? (
+                  <span
+                    className="inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium"
+                    style={getStatusBadgeStyle(selectedNodeContextViewModel.effectiveStatus)}
+                  >
+                    {selectedNodeContextViewModel.statusLabel}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={closeNodeContextModal}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[74vh] space-y-4 overflow-y-auto px-6 py-6">
+              <div className="flex flex-wrap gap-2">
+                {selectedNodeContextViewModel.actions.map((action) => (
+                  <button
+                    key={action.key}
+                    type="button"
+                    onClick={() => handleNodeContextAction(action.key)}
+                    className="inline-flex h-8 items-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+
+              {selectedNodeContextViewModel.maintenancePlan &&
+              selectedNodeContextViewModel.maintenancePlan.hasMeaningfulData ? (
+                <section className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-gray-900">План обслуживания</h3>
+                  {selectedNodeContextViewModel.maintenancePlan.shortText ? (
+                    <p className="mt-1 text-xs text-gray-600">
+                      {selectedNodeContextViewModel.maintenancePlan.shortText}
+                    </p>
+                  ) : null}
+                  <div className="mt-2 space-y-1">
+                    {selectedNodeContextViewModel.maintenancePlan.dueLines.map((line) => (
+                      <p key={line} className="text-xs text-gray-700">
+                        {line}
+                      </p>
+                    ))}
+                    {selectedNodeContextViewModel.maintenancePlan.lastServiceLine ? (
+                      <p className="text-xs text-gray-500">
+                        {selectedNodeContextViewModel.maintenancePlan.lastServiceLine}
+                      </p>
+                    ) : null}
+                    {selectedNodeContextViewModel.maintenancePlan.ruleIntervalLine ? (
+                      <p className="text-xs text-gray-500">
+                        {selectedNodeContextViewModel.maintenancePlan.ruleIntervalLine}
+                      </p>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="rounded-xl border border-gray-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-gray-900">Последние сервисные события</h3>
+                {selectedNodeContextViewModel.recentServiceEvents.length === 0 ? (
+                  <p className="mt-2 text-xs text-gray-500">По этому узлу записей пока нет.</p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {selectedNodeContextViewModel.recentServiceEvents.map((event) => (
+                      <li key={event.id} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                        <p className="text-xs font-medium text-gray-900">
+                          {formatIsoCalendarDateRu(event.eventDate)} · {event.serviceType}
+                        </p>
+                        <p className="text-xs text-gray-600">Пробег: {event.odometer} км</p>
+                        {event.costLabelRu ? (
+                          <p className="text-xs text-gray-500">Стоимость: {event.costLabelRu}</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section className="rounded-xl border border-gray-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-gray-900">Рекомендации SKU</h3>
+                {nodeContextRecommendationsError ? (
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
+                    {nodeContextRecommendationsError}
+                  </p>
+                ) : null}
+                {nodeContextRecommendationsLoading ? (
+                  <p className="mt-2 text-xs text-gray-500">Загрузка рекомендаций...</p>
+                ) : null}
+                {!nodeContextRecommendationsLoading && nodeContextRecommendations.length === 0 ? (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Для этого узла пока нет рекомендаций из каталога.
+                  </p>
+                ) : null}
+                <div className="mt-2 space-y-2">
+                  {nodeContextRecommendations.slice(0, 5).map((rec) => (
+                    <div
+                      key={rec.skuId}
+                      className="flex items-start justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium text-gray-900">
+                          {rec.brandName} · {rec.canonicalName}
+                        </p>
+                        <p className="truncate text-[11px] text-gray-600">{rec.recommendationLabel}</p>
+                        {rec.compatibilityWarning ? (
+                          <p className="truncate text-[11px] text-amber-700">{rec.compatibilityWarning}</p>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void addRecommendedSkuToWishlistFromNodeContext(rec)}
+                        disabled={nodeContextAddingRecommendedSkuId === rec.skuId}
+                        className="inline-flex h-7 shrink-0 items-center rounded-md border border-gray-300 bg-white px-2.5 text-[11px] font-medium text-gray-800 transition hover:bg-gray-50 disabled:opacity-60"
+                      >
+                        {nodeContextAddingRecommendedSkuId === rec.skuId ? "Добавление..." : "В список"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-gray-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-gray-900">Комплекты обслуживания</h3>
+                {nodeContextServiceKitsError ? (
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
+                    {nodeContextServiceKitsError}
+                  </p>
+                ) : null}
+                {nodeContextServiceKitsLoading ? (
+                  <p className="mt-2 text-xs text-gray-500">Загрузка комплектов...</p>
+                ) : null}
+                {!nodeContextServiceKitsLoading && nodeContextServiceKits.length === 0 ? (
+                  <p className="mt-2 text-xs text-gray-500">Для этого узла комплекты не найдены.</p>
+                ) : null}
+                <div className="mt-2 space-y-2">
+                  {nodeContextServiceKits.slice(0, 3).map((kit) => (
+                    <div
+                      key={kit.code}
+                      className="flex items-start justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium text-gray-900">{kit.title}</p>
+                        <p className="truncate text-[11px] text-gray-600">{kit.description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void addServiceKitToWishlistFromNodeContext(kit)}
+                        disabled={nodeContextAddingKitCode === kit.code}
+                        className="inline-flex h-7 shrink-0 items-center rounded-md border border-gray-300 bg-white px-2.5 text-[11px] font-medium text-gray-800 transition hover:bg-gray-50 disabled:opacity-60"
+                      >
+                        {nodeContextAddingKitCode === kit.code ? "Добавление..." : "Добавить"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </div>
           </div>
         </div>

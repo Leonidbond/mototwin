@@ -1,4 +1,10 @@
 export {
+  buildNodeContextPathLabel,
+  buildNodeContextViewModel,
+  getNodeContextActions,
+  getRecentServiceEventsForNode,
+} from "./node-context";
+export {
   getNodeStatusPriority,
   getNodeStatusLabel,
   compareNodeStatuses,

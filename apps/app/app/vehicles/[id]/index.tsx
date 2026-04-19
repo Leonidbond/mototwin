@@ -17,6 +17,7 @@ import {
   buildAttentionSummaryFromNodeTree,
   buildExpenseSummaryFromServiceEvents,
   buildNodeTreeSectionProps,
+  buildNodeContextViewModel,
   buildNodeSearchResultActions,
   buildNodeSubtreeModalViewModel,
   buildTopLevelNodeSummaryViewModel,
@@ -33,8 +34,10 @@ import {
   searchNodeTree,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
+  getRecentServiceEventsForNode,
 } from "@mototwin/domain";
 import type {
+  NodeContextViewModel,
   NodeStatus,
   NodeTreeItem,
   NodeTreeItemProps,
@@ -42,7 +45,9 @@ import type {
   NodeSubtreeModalViewModel,
   NodeTreeSearchResultViewModel,
   NodeTreeSearchActionKey,
+  PartRecommendationViewModel,
   ServiceEventItem,
+  ServiceKitViewModel,
   VehicleDetail,
 } from "@mototwin/types";
 import { productSemanticColors as c, statusSemanticTokens } from "@mototwin/design-tokens";
@@ -74,6 +79,7 @@ type NodeRowProps = {
   onToggle: (id: string) => void;
   onAddFromLeaf: (leafNodeId: string) => void;
   onAddToWishlist?: (nodeId: string) => void;
+  onOpenContext?: (nodeId: string) => void;
   onOpenStatusExplanation?: (node: NodeTreeItemViewModel) => void;
   onOpenServiceLogForNode?: (node: NodeTreeItemViewModel) => void;
   isMaintenanceModeEnabled: boolean;
@@ -87,6 +93,7 @@ function NodeRow({
   onToggle,
   onAddFromLeaf,
   onAddToWishlist,
+  onOpenContext,
   onOpenStatusExplanation,
   onOpenServiceLogForNode,
   isMaintenanceModeEnabled,
@@ -241,6 +248,18 @@ function NodeRow({
               <Text style={styles.wishlistTreeButtonText}>В список</Text>
             </Pressable>
           ) : null}
+          {onOpenContext ? (
+            <Pressable
+              onPress={() => onOpenContext(rowNode.id)}
+              style={({ pressed }) => [
+                styles.wishlistTreeButton,
+                pressed && styles.wishlistTreeButtonPressed,
+              ]}
+              hitSlop={6}
+            >
+              <Text style={styles.wishlistTreeButtonText}>Контекст</Text>
+            </Pressable>
+          ) : null}
           {rowNode.canAddServiceEvent ? (
             <Pressable
               onPress={() => treeItemContract.onRequestAddServiceEvent?.()}
@@ -263,6 +282,7 @@ function NodeRow({
               onToggle={onToggle}
               onAddFromLeaf={onAddFromLeaf}
               onAddToWishlist={onAddToWishlist}
+              onOpenContext={onOpenContext}
               onOpenStatusExplanation={onOpenStatusExplanation}
               onOpenServiceLogForNode={onOpenServiceLogForNode}
               isMaintenanceModeEnabled={isMaintenanceModeEnabled}
@@ -278,8 +298,10 @@ function NodeRow({
 
 export default function VehicleDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; nodeContextId?: string }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
+  const nodeContextIdParam =
+    typeof params.nodeContextId === "string" ? params.nodeContextId : "";
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
@@ -292,9 +314,20 @@ export default function VehicleDetailScreen() {
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(true);
   const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
   const [selectedTopLevelNodeId, setSelectedTopLevelNodeId] = useState<string | null>(null);
+  const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
   const [nodeSearchQuery, setNodeSearchQuery] = useState("");
   const [debouncedNodeSearchQuery, setDebouncedNodeSearchQuery] = useState("");
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
+    PartRecommendationViewModel[]
+  >([]);
+  const [nodeContextRecommendationsLoading, setNodeContextRecommendationsLoading] = useState(false);
+  const [nodeContextRecommendationsError, setNodeContextRecommendationsError] = useState("");
+  const [nodeContextServiceKits, setNodeContextServiceKits] = useState<ServiceKitViewModel[]>([]);
+  const [nodeContextServiceKitsLoading, setNodeContextServiceKitsLoading] = useState(false);
+  const [nodeContextServiceKitsError, setNodeContextServiceKitsError] = useState("");
+  const [nodeContextAddingRecommendedSkuId, setNodeContextAddingRecommendedSkuId] = useState("");
+  const [nodeContextAddingKitCode, setNodeContextAddingKitCode] = useState("");
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
   const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
   const [statusExplanationNode, setStatusExplanationNode] =
@@ -397,6 +430,61 @@ export default function VehicleDetailScreen() {
   }, [nodeSearchQuery]);
 
   useEffect(() => {
+    if (!nodeContextIdParam) {
+      return;
+    }
+    setSelectedTopLevelNodeId(null);
+    setHighlightedNodeId(nodeContextIdParam);
+    setSelectedNodeContextId(nodeContextIdParam);
+  }, [nodeContextIdParam]);
+
+  useEffect(() => {
+    if (!vehicleId || !selectedNodeContextId) {
+      setNodeContextRecommendations([]);
+      setNodeContextRecommendationsError("");
+      setNodeContextRecommendationsLoading(false);
+      return;
+    }
+    setNodeContextRecommendationsLoading(true);
+    setNodeContextRecommendationsError("");
+    void createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }))
+      .getRecommendedSkusForNode(vehicleId, selectedNodeContextId)
+      .then((res) => {
+        setNodeContextRecommendations(res.recommendations ?? []);
+      })
+      .catch(() => {
+        setNodeContextRecommendations([]);
+        setNodeContextRecommendationsError("Не удалось загрузить рекомендации по узлу.");
+      })
+      .finally(() => {
+        setNodeContextRecommendationsLoading(false);
+      });
+  }, [apiBaseUrl, vehicleId, selectedNodeContextId]);
+
+  useEffect(() => {
+    if (!vehicleId || !selectedNodeContextId) {
+      setNodeContextServiceKits([]);
+      setNodeContextServiceKitsError("");
+      setNodeContextServiceKitsLoading(false);
+      return;
+    }
+    setNodeContextServiceKitsLoading(true);
+    setNodeContextServiceKitsError("");
+    void createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }))
+      .getServiceKits({ nodeId: selectedNodeContextId, vehicleId })
+      .then((res) => {
+        setNodeContextServiceKits(res.kits ?? []);
+      })
+      .catch(() => {
+        setNodeContextServiceKits([]);
+        setNodeContextServiceKitsError("Не удалось загрузить комплекты обслуживания.");
+      })
+      .finally(() => {
+        setNodeContextServiceKitsLoading(false);
+      });
+  }, [apiBaseUrl, vehicleId, selectedNodeContextId]);
+
+  useEffect(() => {
     if (!vehicleId || !hasLoadedCollapsePrefs) return;
     void writeCollapsiblePreference(
       `vehicleDetail.${vehicleId}.usageProfile.expanded`,
@@ -444,6 +532,37 @@ export default function VehicleDetailScreen() {
         : null,
     [selectedTopLevelNode, isNodeMaintenanceModeEnabled]
   );
+  const selectedNodeContextNode = useMemo(
+    () =>
+      selectedNodeContextId
+        ? getNodeSubtreeById(topLevelNodeViewModels, selectedNodeContextId)
+        : null,
+    [topLevelNodeViewModels, selectedNodeContextId]
+  );
+  const selectedNodeContextRawNode = useMemo(
+    () => (selectedNodeContextId ? findNodeTreeItemById(nodeTree, selectedNodeContextId) : null),
+    [nodeTree, selectedNodeContextId]
+  );
+  const selectedNodeContextViewModel = useMemo<NodeContextViewModel | null>(() => {
+    if (!selectedNodeContextNode || !selectedNodeContextRawNode) {
+      return null;
+    }
+    return buildNodeContextViewModel({
+      node: selectedNodeContextNode,
+      nodeTree: topLevelNodeViewModels,
+      maintenancePlan: buildNodeMaintenancePlanViewModel(selectedNodeContextNode),
+      recentServiceEvents: getRecentServiceEventsForNode(selectedNodeContextRawNode, serviceEvents),
+      recommendations: nodeContextRecommendations,
+      serviceKits: nodeContextServiceKits,
+    });
+  }, [
+    selectedNodeContextNode,
+    selectedNodeContextRawNode,
+    topLevelNodeViewModels,
+    serviceEvents,
+    nodeContextRecommendations,
+    nodeContextServiceKits,
+  ]);
   const nodeSearchResults = useMemo<NodeTreeSearchResultViewModel[]>(
     () =>
       searchNodeTree(topLevelNodeViewModels, {
@@ -534,6 +653,16 @@ export default function VehicleDetailScreen() {
     });
     setSelectedTopLevelNodeId(result.topLevelNodeId);
   }, []);
+  const closeNodeContextModal = useCallback(() => {
+    setSelectedNodeContextId(null);
+    setNodeContextAddingRecommendedSkuId("");
+    setNodeContextAddingKitCode("");
+  }, []);
+  const openNodeContextModal = useCallback((nodeId: string) => {
+    setSelectedTopLevelNodeId(null);
+    setHighlightedNodeId(null);
+    setSelectedNodeContextId(nodeId);
+  }, []);
   const openServiceLogFromSearchResult = useCallback(
     (result: NodeTreeSearchResultViewModel) => {
       setNodeSearchQuery("");
@@ -562,7 +691,7 @@ export default function VehicleDetailScreen() {
   const handleSearchResultAction = useCallback(
     (actionKey: NodeTreeSearchActionKey, result: NodeTreeSearchResultViewModel) => {
       if (actionKey === "open") {
-        openSearchResultInSubtreeModal(result);
+        openNodeContextModal(result.nodeId);
         return;
       }
       if (actionKey === "service_log") {
@@ -573,7 +702,89 @@ export default function VehicleDetailScreen() {
         openWishlistFromSearchResult(result);
       }
     },
-    [openSearchResultInSubtreeModal, openServiceLogFromSearchResult, openWishlistFromSearchResult]
+    [openNodeContextModal, openServiceLogFromSearchResult, openWishlistFromSearchResult]
+  );
+  const addRecommendedSkuToWishlistFromNodeContext = useCallback(
+    async (rec: PartRecommendationViewModel) => {
+      if (!vehicleId || !selectedNodeContextId) {
+        return;
+      }
+      try {
+        setNodeContextAddingRecommendedSkuId(rec.skuId);
+        await createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).createWishlistItem(
+          vehicleId,
+          {
+            nodeId: selectedNodeContextId,
+            skuId: rec.skuId,
+            status: "NEEDED",
+            quantity: 1,
+          }
+        );
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setNodeContextAddingRecommendedSkuId("");
+      }
+    },
+    [apiBaseUrl, vehicleId, selectedNodeContextId]
+  );
+  const addServiceKitFromNodeContext = useCallback(
+    async (kit: ServiceKitViewModel) => {
+      if (!vehicleId || !selectedNodeContextId) {
+        return;
+      }
+      try {
+        setNodeContextAddingKitCode(kit.code);
+        await createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).addServiceKitToWishlist(
+          vehicleId,
+          { kitCode: kit.code, contextNodeId: selectedNodeContextId }
+        );
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setNodeContextAddingKitCode("");
+      }
+    },
+    [apiBaseUrl, vehicleId, selectedNodeContextId]
+  );
+  const handleNodeContextAction = useCallback(
+    (actionKey: string) => {
+      if (!selectedNodeContextNode) {
+        return;
+      }
+      if (actionKey === "journal") {
+        closeNodeContextModal();
+        openServiceLogForTreeNode(selectedNodeContextNode);
+        return;
+      }
+      if (actionKey === "add_service_event" && selectedNodeContextNode.canAddServiceEvent) {
+        closeNodeContextModal();
+        openAddServiceFromTreeNode(selectedNodeContextNode.id);
+        return;
+      }
+      if (actionKey === "add_wishlist" && !selectedNodeContextNode.hasChildren) {
+        closeNodeContextModal();
+        openWishlistForTreeNode(selectedNodeContextNode.id);
+        return;
+      }
+      if (actionKey === "add_kit" && nodeContextServiceKits[0]) {
+        void addServiceKitFromNodeContext(nodeContextServiceKits[0]);
+        return;
+      }
+      if (actionKey === "open_status_explanation" && selectedNodeContextNode.statusExplanation) {
+        closeNodeContextModal();
+        setStatusExplanationNode(selectedNodeContextNode);
+      }
+    },
+    [
+      selectedNodeContextNode,
+      closeNodeContextModal,
+      openServiceLogForTreeNode,
+      openAddServiceFromTreeNode,
+      openWishlistForTreeNode,
+      nodeContextServiceKits,
+      addServiceKitFromNodeContext,
+    ]
   );
   const getNodeModeToggleLabel = () =>
     isNodeMaintenanceModeEnabled ? "План обслуживания: вкл" : "Показывать план обслуживания";
@@ -1075,6 +1286,163 @@ export default function VehicleDetailScreen() {
         </View>
       </ScrollView>
       <Modal
+        visible={Boolean(selectedNodeContextViewModel)}
+        animationType="slide"
+        transparent
+        onRequestClose={closeNodeContextModal}
+      >
+        <View style={styles.subtreeModalOverlay}>
+          <View style={styles.subtreeModalCard}>
+            {selectedNodeContextViewModel ? (
+              <>
+                <View style={styles.subtreeModalHeader}>
+                  <View style={styles.subtreeModalHeaderTextCol}>
+                    <Text style={styles.subtreeModalTitle}>{selectedNodeContextViewModel.nodeName}</Text>
+                    <Text style={styles.subtreeModalSubtitle}>{selectedNodeContextViewModel.pathLabel}</Text>
+                    <Text style={styles.searchResultCode}>{selectedNodeContextViewModel.nodeCode}</Text>
+                  </View>
+                  <Pressable
+                    onPress={closeNodeContextModal}
+                    style={({ pressed }) => [
+                      styles.subtreeModalCloseBtn,
+                      pressed && styles.subtreeModalCloseBtnPressed,
+                    ]}
+                  >
+                    <Text style={styles.subtreeModalCloseBtnText}>Закрыть</Text>
+                  </Pressable>
+                </View>
+                <ScrollView contentContainerStyle={styles.subtreeModalBody} keyboardShouldPersistTaps="handled">
+                  <View style={styles.searchActionsRow}>
+                    {selectedNodeContextViewModel.actions.map((action) => (
+                      <Pressable
+                        key={action.key}
+                        onPress={() => handleNodeContextAction(action.key)}
+                        style={({ pressed }) => [
+                          styles.searchActionBtn,
+                          pressed && styles.searchActionBtnPressed,
+                        ]}
+                      >
+                        <Text style={styles.searchActionBtnText}>{action.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  {selectedNodeContextViewModel.maintenancePlan &&
+                  selectedNodeContextViewModel.maintenancePlan.hasMeaningfulData ? (
+                    <View style={styles.searchResultCard}>
+                      <Text style={styles.searchResultTitle}>План обслуживания</Text>
+                      {selectedNodeContextViewModel.maintenancePlan.dueLines.map((line) => (
+                        <Text key={line} style={styles.searchResultPath}>
+                          {line}
+                        </Text>
+                      ))}
+                      {selectedNodeContextViewModel.maintenancePlan.lastServiceLine ? (
+                        <Text style={styles.searchResultPath}>
+                          {selectedNodeContextViewModel.maintenancePlan.lastServiceLine}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  <View style={styles.searchResultCard}>
+                    <Text style={styles.searchResultTitle}>Последние сервисные события</Text>
+                    {selectedNodeContextViewModel.recentServiceEvents.length === 0 ? (
+                      <Text style={styles.searchResultPath}>По этому узлу записей пока нет.</Text>
+                    ) : (
+                      selectedNodeContextViewModel.recentServiceEvents.map((event) => (
+                        <View key={event.id} style={styles.searchResultRow}>
+                          <View style={styles.searchResultTextCol}>
+                            <Text style={styles.searchResultTitle}>
+                              {formatIsoCalendarDateRu(event.eventDate)} · {event.serviceType}
+                            </Text>
+                            <Text style={styles.searchResultPath}>Пробег: {event.odometer} км</Text>
+                            {event.costLabelRu ? (
+                              <Text style={styles.searchResultPath}>Стоимость: {event.costLabelRu}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </View>
+
+                  <View style={styles.searchResultCard}>
+                    <Text style={styles.searchResultTitle}>Рекомендации SKU</Text>
+                    {nodeContextRecommendationsError ? (
+                      <Text style={[styles.searchResultPath, { color: c.error }]}>
+                        {nodeContextRecommendationsError}
+                      </Text>
+                    ) : null}
+                    {nodeContextRecommendationsLoading ? (
+                      <Text style={styles.searchResultPath}>Загрузка рекомендаций...</Text>
+                    ) : null}
+                    {!nodeContextRecommendationsLoading && nodeContextRecommendations.length === 0 ? (
+                      <Text style={styles.searchResultPath}>
+                        Для этого узла пока нет рекомендаций из каталога.
+                      </Text>
+                    ) : null}
+                    {nodeContextRecommendations.slice(0, 5).map((rec) => (
+                      <View key={rec.skuId} style={styles.searchResultRow}>
+                        <View style={styles.searchResultTextCol}>
+                          <Text style={styles.searchResultTitle}>
+                            {rec.brandName} · {rec.canonicalName}
+                          </Text>
+                          <Text style={styles.searchResultPath}>{rec.recommendationLabel}</Text>
+                        </View>
+                        <Pressable
+                          onPress={() => void addRecommendedSkuToWishlistFromNodeContext(rec)}
+                          style={({ pressed }) => [
+                            styles.searchActionBtn,
+                            pressed && styles.searchActionBtnPressed,
+                          ]}
+                        >
+                          <Text style={styles.searchActionBtnText}>
+                            {nodeContextAddingRecommendedSkuId === rec.skuId ? "..." : "В список"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.searchResultCard}>
+                    <Text style={styles.searchResultTitle}>Комплекты обслуживания</Text>
+                    {nodeContextServiceKitsError ? (
+                      <Text style={[styles.searchResultPath, { color: c.error }]}>
+                        {nodeContextServiceKitsError}
+                      </Text>
+                    ) : null}
+                    {nodeContextServiceKitsLoading ? (
+                      <Text style={styles.searchResultPath}>Загрузка комплектов...</Text>
+                    ) : null}
+                    {!nodeContextServiceKitsLoading && nodeContextServiceKits.length === 0 ? (
+                      <Text style={styles.searchResultPath}>Для этого узла комплекты не найдены.</Text>
+                    ) : null}
+                    {nodeContextServiceKits.slice(0, 3).map((kit) => (
+                      <View key={kit.code} style={styles.searchResultRow}>
+                        <View style={styles.searchResultTextCol}>
+                          <Text style={styles.searchResultTitle}>{kit.title}</Text>
+                          <Text style={styles.searchResultPath}>{kit.description}</Text>
+                        </View>
+                        <Pressable
+                          onPress={() => void addServiceKitFromNodeContext(kit)}
+                          style={({ pressed }) => [
+                            styles.searchActionBtn,
+                            pressed && styles.searchActionBtnPressed,
+                          ]}
+                        >
+                          <Text style={styles.searchActionBtnText}>
+                            {nodeContextAddingKitCode === kit.code ? "..." : "Добавить"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+      <Modal
         visible={Boolean(selectedNodeSubtreeModalViewModel)}
         animationType="slide"
         transparent
@@ -1152,6 +1520,7 @@ export default function VehicleDetailScreen() {
                         onToggle={toggleNode}
                         onAddFromLeaf={openAddServiceFromTreeNode}
                         onAddToWishlist={openWishlistForTreeNode}
+                        onOpenContext={openNodeContextModal}
                         onOpenStatusExplanation={openStatusExplanationFromTreeNode}
                         onOpenServiceLogForNode={openServiceLogForTreeNode}
                         isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
@@ -1168,6 +1537,7 @@ export default function VehicleDetailScreen() {
                         onToggle={toggleNode}
                         onAddFromLeaf={openAddServiceFromTreeNode}
                         onAddToWishlist={openWishlistForTreeNode}
+                        onOpenContext={openNodeContextModal}
                         onOpenStatusExplanation={openStatusExplanationFromTreeNode}
                         onOpenServiceLogForNode={openServiceLogForTreeNode}
                         isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}

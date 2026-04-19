@@ -160,6 +160,14 @@ export type {
   ServiceKitPreviewViewModel,
 } from "./service-kit";
 export type {
+  NodeContextActionKey,
+  NodeContextActionViewModel,
+  NodeContextRecommendationSummary,
+  NodeContextServiceEventSummary,
+  NodeContextServiceKitSummary,
+  NodeContextViewModel,
+} from "./node-context";
+export type {
   GarageCardProps,
   VehicleHeaderProps,
   VehicleStateSectionProps,
