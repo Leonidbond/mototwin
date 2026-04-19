@@ -72,6 +72,24 @@ const createWishlistSchema = z
     }
   });
 
+async function resolveLeafNodeIdOrError(nodeId: string) {
+  const node = await prisma.node.findUnique({
+    where: { id: nodeId },
+    select: { id: true },
+  });
+  if (!node) {
+    return NextResponse.json({ error: "Узел не найден." }, { status: 404 });
+  }
+  const hasChildren = await prisma.node.count({ where: { parentId: nodeId } });
+  if (hasChildren > 0) {
+    return NextResponse.json(
+      { error: "Выберите конечный узел для позиции списка покупок" },
+      { status: 400 }
+    );
+  }
+  return null;
+}
+
 function toWire(row: {
   id: string;
   vehicleId: string;
@@ -198,14 +216,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
 
     const nodeId = draft.nodeId;
-    if (nodeId) {
-      const node = await prisma.node.findUnique({
-        where: { id: nodeId },
-        select: { id: true },
-      });
-      if (!node) {
-        return NextResponse.json({ error: "Узел не найден." }, { status: 404 });
-      }
+    if (!nodeId) {
+      return NextResponse.json({ error: "Выберите узел мотоцикла" }, { status: 400 });
+    }
+    const leafError = await resolveLeafNodeIdOrError(nodeId);
+    if (leafError) {
+      return leafError;
     }
 
     const { costAmount, currency } = normalizePartWishlistCostMutationArgs(

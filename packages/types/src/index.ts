@@ -122,6 +122,7 @@ export type {
 export type {
   PartRecommendationType,
   PartRecommendationViewModel,
+  PartRecommendationGroup,
   PartRecommendationFilters,
 } from "./part-recommendation";
 export type {

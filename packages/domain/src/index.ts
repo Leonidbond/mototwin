@@ -161,8 +161,16 @@ export {
   getPartSkuViewModelDisplayLines,
 } from "./part-catalog";
 export {
+  PART_RECOMMENDATION_GROUP_ORDER,
+  buildPartRecommendationGroupsForDisplay,
   buildPartRecommendationViewModel,
   classifyPartRecommendation,
-  sortPartRecommendations,
+  getPartRecommendationGroupTitle,
   getPartRecommendationLabel,
+  getPartRecommendationWarningLabel,
+  getPartRecommendationWarningLabelForType,
+  groupPartRecommendationsByType,
+  sortPartRecommendationGroups,
+  sortPartRecommendations,
+  sortPartRecommendationsWithinGroup,
 } from "./part-recommendation";

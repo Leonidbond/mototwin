@@ -73,7 +73,7 @@ export default function VehicleWishlistScreen() {
     const previousStatus = item.status;
     const buttons = PART_WISHLIST_STATUS_ORDER.map((status) => ({
       text: partWishlistStatusLabelsRu[status],
-      onPress: () => void patchStatus(item.id, status, previousStatus),
+      onPress: () => void patchStatus(item, status, previousStatus),
     }));
     Alert.alert("Статус", item.title, [
       ...buttons,
@@ -82,18 +82,23 @@ export default function VehicleWishlistScreen() {
   };
 
   async function patchStatus(
-    itemId: string,
+    item: PartWishlistItemViewModel,
     status: PartWishlistItemStatus,
     previousStatus: PartWishlistItemStatus
   ) {
     if (!vehicleId) {
       return;
     }
+    const nodeId = item.nodeId?.trim() ?? "";
+    if (!nodeId) {
+      Alert.alert("Список покупок", "Выберите узел мотоцикла");
+      return;
+    }
     try {
-      setBusyId(itemId);
+      setBusyId(item.id);
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
-      const res = await endpoints.updateWishlistItem(vehicleId, itemId, { status });
+      const res = await endpoints.updateWishlistItem(vehicleId, item.id, { status, nodeId });
       await load();
       if (isWishlistTransitionToInstalled(previousStatus, res.item.status)) {
         if (res.item.nodeId) {

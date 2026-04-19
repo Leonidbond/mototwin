@@ -49,7 +49,8 @@ export type CreatePartWishlistItemInput = {
   /** Required unless `skuId` is sent (server fills from SKU). */
   title?: string;
   quantity?: number;
-  nodeId?: string | null;
+  /** Required by product rule (wishlist line must be linked to motorcycle node). */
+  nodeId: string;
   skuId?: string | null;
   comment?: string | null;
   status?: PartWishlistItemStatus;
@@ -60,7 +61,8 @@ export type CreatePartWishlistItemInput = {
 export type UpdatePartWishlistItemInput = {
   title?: string;
   quantity?: number;
-  nodeId?: string | null;
+  /** Required by product rule; PATCH must not clear node link. */
+  nodeId: string;
   skuId?: string | null;
   comment?: string | null;
   status?: PartWishlistItemStatus;

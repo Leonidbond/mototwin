@@ -21,7 +21,11 @@ import {
   clearPartWishlistFormSkuSelection,
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
+  buildPartRecommendationGroupsForDisplay,
+  formatExpenseAmountRu,
   formatPartSkuSearchResultMetaLineRu,
+  getPartRecommendationGroupTitle,
+  getPartRecommendationWarningLabel,
   getPartSkuViewModelDisplayLines,
   getWishlistItemSkuDisplayLines,
   normalizeCreatePartWishlistPayload,
@@ -34,6 +38,7 @@ import {
 } from "@mototwin/domain";
 import type {
   FlattenedNodeSelectOption,
+  PartRecommendationGroup,
   PartRecommendationViewModel,
   PartSkuViewModel,
   PartWishlistFormValues,
@@ -95,11 +100,17 @@ export function WishlistItemEditor({
   const selectedNodeLabel = useMemo(() => {
     const raw = form.nodeId.trim();
     if (!raw) {
-      return "Не привязано";
+      return "Выберите узел мотоцикла";
     }
     const opt = findOptionById(nodeTreeOptions, raw);
     return opt?.name ?? raw;
   }, [form.nodeId, nodeTreeOptions]);
+  const nodeRequiredError = saveError.includes("Выберите узел мотоцикла");
+
+  const recommendationGroups = useMemo(
+    (): PartRecommendationGroup[] => buildPartRecommendationGroupsForDisplay(recommendations),
+    [recommendations]
+  );
 
   const load = useCallback(async () => {
     if (!vehicleId) {
@@ -412,6 +423,18 @@ export function WishlistItemEditor({
             style={styles.input}
           />
 
+          <Text style={styles.label}>
+            Узел мотоцикла <Text style={styles.requiredMark}>*</Text>
+          </Text>
+          <Pressable
+            onPress={() => setNodePickerOpen(true)}
+            style={({ pressed }) => [styles.nodePickBtn, pressed && styles.nodePickBtnPressed]}
+          >
+            <Text style={styles.nodePickBtnText}>{selectedNodeLabel}</Text>
+            <Text style={styles.nodePickChevron}>▾</Text>
+          </Pressable>
+          {nodeRequiredError ? <Text style={styles.inlineError}>Выберите узел мотоцикла</Text> : null}
+
           <View style={styles.skuBox}>
             <Text style={styles.skuBoxTitle}>SKU из каталога</Text>
             <Text style={styles.skuBoxHint}>
@@ -423,40 +446,74 @@ export function WishlistItemEditor({
                 {recommendationsError ? <Text style={styles.inlineError}>{recommendationsError}</Text> : null}
                 {recommendationsLoading ? <Text style={styles.mutedSmall}>Загружаем рекомендации…</Text> : null}
                 {!recommendationsLoading && recommendations.length === 0 ? (
-                  <Text style={styles.mutedSmall}>Для этого узла пока нет рекомендаций.</Text>
+                  <Text style={styles.mutedSmall}>
+                    Для этого узла пока нет рекомендаций из каталога
+                  </Text>
                 ) : null}
-                {!recommendationsLoading
-                  ? recommendations.slice(0, 6).map((rec) => (
-                      <View key={rec.skuId} style={styles.recommendationCard}>
-                        <Text style={styles.skuResultPrimary}>
-                          {rec.brandName} — {rec.canonicalName}
+                {!recommendationsLoading && recommendationGroups.length > 0
+                  ? recommendationGroups.map((group) => (
+                      <View key={group.recommendationType} style={styles.recommendationGroup}>
+                        <Text style={styles.recommendationGroupTitle}>
+                          {getPartRecommendationGroupTitle(group.recommendationType)}
                         </Text>
-                        <Text style={styles.skuResultMeta}>
-                          {[rec.partNumbers.slice(0, 2).join(", "), rec.partType]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </Text>
-                        <Text style={styles.recommendationLabel}>{rec.recommendationLabel}</Text>
-                        {rec.compatibilityWarning ? (
-                          <Text style={styles.recommendationWarning}>{rec.compatibilityWarning}</Text>
-                        ) : null}
-                        <Pressable
-                          onPress={() => void addRecommendedSku(rec)}
-                          disabled={addingRecommendedSkuId === rec.skuId}
-                          style={({ pressed }) => [
-                            styles.recommendationBtn,
-                            pressed && styles.recommendationBtnPressed,
-                            addingRecommendedSkuId === rec.skuId && styles.recommendationBtnDisabled,
-                          ]}
-                        >
-                          <Text style={styles.recommendationBtnText}>
-                            {mode === "edit"
-                              ? "Применить SKU"
-                              : addingRecommendedSkuId === rec.skuId
-                                ? "Добавление…"
-                                : "Добавить в список покупок"}
-                          </Text>
-                        </Pressable>
+                        {group.items.map((rec) => {
+                          const primaryNo = rec.partNumbers[0]?.trim() || "";
+                          const warn = getPartRecommendationWarningLabel(rec);
+                          const isVerify = rec.recommendationType === "VERIFY_REQUIRED";
+                          return (
+                            <View
+                              key={rec.skuId}
+                              style={[
+                                styles.recommendationCard,
+                                isVerify && styles.recommendationCardVerify,
+                              ]}
+                            >
+                              <Text style={styles.recName}>{rec.canonicalName}</Text>
+                              <Text style={styles.skuResultMeta}>{rec.brandName}</Text>
+                              {primaryNo ? (
+                                <Text style={styles.skuResultMeta}>Арт.: {primaryNo}</Text>
+                              ) : null}
+                              {rec.partType.trim() ? (
+                                <Text style={styles.skuResultMeta}>{rec.partType}</Text>
+                              ) : null}
+                              {rec.priceAmount != null ? (
+                                <Text style={styles.skuResultMeta}>
+                                  {`${formatExpenseAmountRu(rec.priceAmount)} ${
+                                    rec.currency?.trim() || ""
+                                  }`.trim()}
+                                </Text>
+                              ) : null}
+                              <Text style={styles.recommendationLabel}>{rec.recommendationLabel}</Text>
+                              {warn ? (
+                                <Text
+                                  style={[
+                                    styles.recommendationWarning,
+                                    isVerify && styles.recommendationWarningVerify,
+                                  ]}
+                                >
+                                  {warn}
+                                </Text>
+                              ) : null}
+                              <Pressable
+                                onPress={() => void addRecommendedSku(rec)}
+                                disabled={addingRecommendedSkuId === rec.skuId}
+                                style={({ pressed }) => [
+                                  styles.recommendationBtn,
+                                  pressed && styles.recommendationBtnPressed,
+                                  addingRecommendedSkuId === rec.skuId && styles.recommendationBtnDisabled,
+                                ]}
+                              >
+                                <Text style={styles.recommendationBtnText}>
+                                  {mode === "edit"
+                                    ? "Применить SKU"
+                                    : addingRecommendedSkuId === rec.skuId
+                                      ? "Добавление…"
+                                      : "Добавить в список покупок"}
+                                </Text>
+                              </Pressable>
+                            </View>
+                          );
+                        })}
                       </View>
                     ))
                   : null}
@@ -590,15 +647,6 @@ export function WishlistItemEditor({
             })}
           </View>
 
-          <Text style={styles.label}>Узел (необязательно)</Text>
-          <Pressable
-            onPress={() => setNodePickerOpen(true)}
-            style={({ pressed }) => [styles.nodePickBtn, pressed && styles.nodePickBtnPressed]}
-          >
-            <Text style={styles.nodePickBtnText}>{selectedNodeLabel}</Text>
-            <Text style={styles.nodePickChevron}>▾</Text>
-          </Pressable>
-
           <Text style={styles.label}>Комментарий</Text>
           <TextInput
             value={form.comment}
@@ -647,15 +695,6 @@ export function WishlistItemEditor({
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.modalScroll}>
-            <Pressable
-              onPress={() => {
-                setForm((f) => ({ ...f, nodeId: "" }));
-                setNodePickerOpen(false);
-              }}
-              style={({ pressed }) => [styles.modalRow, pressed && styles.modalRowPressed]}
-            >
-              <Text style={styles.modalRowTextMuted}>Не привязано</Text>
-            </Pressable>
             {nodeTreeOptions.map((opt) => (
               <Pressable
                 key={opt.id}
@@ -711,6 +750,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 14,
   },
+  requiredMark: { color: c.error },
   labelCompact: {
     fontSize: 11,
     fontWeight: "600",
@@ -736,6 +776,14 @@ const styles = StyleSheet.create({
     backgroundColor: c.card,
     padding: 10,
   },
+  recommendationGroup: {
+    marginTop: 10,
+  },
+  recommendationGroupTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
   recommendationCard: {
     marginTop: 8,
     borderWidth: 1,
@@ -744,8 +792,15 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: c.cardMuted,
   },
+  recommendationCardVerify: {
+    borderLeftWidth: 3,
+    borderLeftColor: "#d97706",
+    backgroundColor: "rgba(251, 191, 36, 0.12)",
+  },
+  recName: { fontSize: 13, fontWeight: "600", color: c.textPrimary },
   recommendationLabel: { marginTop: 4, fontSize: 11, color: c.textSecondary, fontWeight: "600" },
   recommendationWarning: { marginTop: 2, fontSize: 11, color: "#92400e" },
+  recommendationWarningVerify: { fontWeight: "600", color: "#78350f" },
   recommendationBtn: {
     marginTop: 8,
     alignSelf: "flex-start",

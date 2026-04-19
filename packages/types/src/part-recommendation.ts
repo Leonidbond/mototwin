@@ -27,3 +27,9 @@ export type PartRecommendationViewModel = {
   recommendationLabel: string;
   compatibilityWarning: string | null;
 };
+
+/** Group of SKU recommendations sharing the same {@link PartRecommendationType} (UI sections). */
+export type PartRecommendationGroup = {
+  recommendationType: PartRecommendationType;
+  items: PartRecommendationViewModel[];
+};

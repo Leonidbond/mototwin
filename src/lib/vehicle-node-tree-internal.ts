@@ -98,15 +98,28 @@ export async function loadCatalogNodeContext(prisma: PrismaClient): Promise<Cata
     },
   });
 
+  const nodeIdByCode = new Map(nodes.map((node) => [node.code, node.id]));
+  const wheelsFrontId = nodeIdByCode.get("WHEELS.FRONT") ?? null;
+  const wheelsRearId = nodeIdByCode.get("WHEELS.REAR") ?? null;
+  const remappedNodes = nodes.map((node) => {
+    if (node.code === "TIRES.FRONT" && wheelsFrontId) {
+      return { ...node, parentId: wheelsFrontId };
+    }
+    if ((node.code === "TIRES.REAR" || node.code === "TIRES.RIMLOCK") && wheelsRearId) {
+      return { ...node, parentId: wheelsRearId };
+    }
+    return node;
+  });
+
   const parentNodeIds = new Set<string>();
-  for (const node of nodes) {
+  for (const node of remappedNodes) {
     if (node.parentId) {
       parentNodeIds.add(node.parentId);
     }
   }
 
   const leafNodeIds = new Set<string>();
-  for (const node of nodes) {
+  for (const node of remappedNodes) {
     if (!parentNodeIds.has(node.id)) {
       leafNodeIds.add(node.id);
     }
@@ -150,7 +163,7 @@ export async function loadCatalogNodeContext(prisma: PrismaClient): Promise<Cata
   );
 
   const childrenByParentId = new Map<string, FlatNode[]>();
-  for (const node of nodes) {
+  for (const node of remappedNodes) {
     if (!node.parentId) {
       continue;
     }
@@ -163,7 +176,7 @@ export async function loadCatalogNodeContext(prisma: PrismaClient): Promise<Cata
     children.sort((a, b) => a.displayOrder - b.displayOrder);
   }
 
-  const topLevelNodes = nodes
+  const topLevelNodes = remappedNodes
     .filter(
       (node) =>
         node.level === 1 &&

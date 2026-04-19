@@ -166,6 +166,9 @@ export function validatePartWishlistFormValues(values: PartWishlistFormValues): 
   if (!isPartWishlistItemStatus(values.status)) {
     errors.push("Недопустимый статус.");
   }
+  if (!values.nodeId.trim()) {
+    errors.push("Выберите узел мотоцикла");
+  }
 
   const trimmedCost = values.costAmount.trim();
   if (trimmedCost !== "") {
@@ -230,7 +233,7 @@ export function normalizeCreatePartWishlistPayload(
     title: title || undefined,
     skuId: skuIdRaw ? skuIdRaw : null,
     quantity: Number.isInteger(quantity) && quantity >= 1 ? quantity : 1,
-    nodeId: nodeIdRaw ? nodeIdRaw : null,
+    nodeId: nodeIdRaw,
     comment: values.comment.trim() ? values.comment.trim() : null,
     status: values.status,
     costAmount,
@@ -256,7 +259,7 @@ export function normalizeUpdatePartWishlistPayload(
     skuId: skuIdRaw ? skuIdRaw : null,
     status: values.status,
     comment: values.comment.trim() ? values.comment.trim() : null,
-    nodeId: nodeIdRaw ? nodeIdRaw : null,
+    nodeId: nodeIdRaw,
     costAmount,
     currency,
   };

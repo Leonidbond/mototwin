@@ -977,12 +977,12 @@ VERIFY_REQUIRED
    - exact `modelVariantId`;
    - затем `modelId + year`;
    - затем generic node fitment.
-4. Присвоить label:
-   - `Подходит к этой модификации`;
-   - `Подходит к модели`;
-   - `Универсальная позиция для узла`;
-   - `Сопутствующий расходник`;
-   - `Проверьте совместимость`.
+4. Присвоить тип рекомендации (`PartRecommendationType`) и **консервативные** подписи (не обещать гарантированную совместимость без данных):
+   - `EXACT_FIT` — «Подходит к этой модификации»;
+   - `MODEL_FIT` — «Подходит к модели»;
+   - `GENERIC_NODE_MATCH` — «Универсальные позиции для узла»;
+   - `RELATED_CONSUMABLE` — «Сопутствующие расходники»;
+   - `VERIFY_REQUIRED` — «Проверьте совместимость».
 
 ### 11.4. MVP endpoint рекомендаций (реализовано)
 
@@ -994,7 +994,18 @@ VERIFY_REQUIRED
 
 В ответе возвращаются `PartRecommendationViewModel` с полями:
 `skuId`, `canonicalName`, `brandName`, `partType`, `partNumbers`, `priceAmount`, `currency`, `primaryNode`, `relationType`, `confidence`, `recommendationType`, `recommendationLabel`, `compatibilityWarning`.
-5. Отсортировать:
+
+На сервере список дополнительно упорядочивается (`sortPartRecommendations`: тип → relation → confidence → признак цены → имя). Клиенты **группируют** ответ по `recommendationType` и сортируют строки внутри секции через общие хелперы (`buildPartRecommendationGroupsForDisplay`, `groupPartRecommendationsByType`, `sortPartRecommendationGroups`, `sortPartRecommendationsWithinGroup`), чтобы web и Expo показывали одинаковый порядок секций и строк.
+
+**Порядок секций (сверху вниз):** `EXACT_FIT` → `MODEL_FIT` → `GENERIC_NODE_MATCH` → `RELATED_CONSUMABLE` → `VERIFY_REQUIRED`.
+
+**Внутри секции:** выше `confidence`, затем строки с указанной ценой, затем стабильный порядок по бренду и названию.
+
+**Заголовки секций (RU):** задаются `getPartRecommendationGroupTitle` (совпадают с `recommendationLabel` в view model).
+
+**Предупреждения:** `getPartRecommendationWarningLabel` / `getPartRecommendationWarningLabelForType` — для `VERIFY_REQUIRED` и `RELATED_CONSUMABLE` показывают короткие нейтральные тексты; позиции `VERIFY_REQUIRED` в UI дополнительно выделяются (рамка/фон), без формулировок вроде «100% подходит».
+
+5. Отсортировать (серверный flat-order):
    - exact fit выше;
    - primary выше;
    - confidence выше;
@@ -1004,15 +1015,17 @@ VERIFY_REQUIRED
 
 Пока нет полной базы совместимости, нельзя обещать “точно подходит”.
 
-Нужны labels:
+Подписи типов и секций UI (консервативные формулировки):
 
 ```text
 Подходит к этой модификации
 Подходит к модели
-Универсальная позиция для узла
-Сопутствующий расходник
+Универсальные позиции для узла
+Сопутствующие расходники
 Проверьте совместимость
 ```
+
+Пустое состояние подбора по узлу в wishlist (web и Expo): «Для этого узла пока нет рекомендаций из каталога».
 
 ---
 

@@ -35,7 +35,18 @@ const patchWishlistSchema = z
   .object({
     title: z.string().trim().min(1, "Название не может быть пустым").optional(),
     quantity: z.number().int().min(1, "Количество должно быть не меньше 1").optional(),
-    nodeId: z.union([z.string().trim().min(1), z.null()]).optional(),
+    nodeId: z
+      .union([z.string(), z.null(), z.undefined()])
+      .transform((v) => {
+        if (v === undefined) {
+          return undefined;
+        }
+        if (v === null) {
+          return null;
+        }
+        const t = String(v).trim();
+        return t.length > 0 ? t : null;
+      }),
     skuId: z
       .union([z.string(), z.null(), z.undefined()])
       .transform((v) => {
@@ -54,6 +65,24 @@ const patchWishlistSchema = z
     currency: z.union([z.string(), z.null()]).optional(),
   })
   .strict();
+
+async function resolveLeafNodeIdOrError(nodeId: string) {
+  const node = await prisma.node.findUnique({
+    where: { id: nodeId },
+    select: { id: true },
+  });
+  if (!node) {
+    return NextResponse.json({ error: "Узел не найден." }, { status: 404 });
+  }
+  const hasChildren = await prisma.node.count({ where: { parentId: nodeId } });
+  if (hasChildren > 0) {
+    return NextResponse.json(
+      { error: "Выберите конечный узел для позиции списка покупок" },
+      { status: 400 }
+    );
+  }
+  return null;
+}
 
 function toWire(row: {
   id: string;
@@ -136,13 +165,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       targetSku = s;
     }
 
+    if (parsed.nodeId === null) {
+      return NextResponse.json({ error: "Выберите узел мотоцикла" }, { status: 400 });
+    }
+
     if (parsed.nodeId !== undefined && parsed.nodeId !== null) {
-      const node = await prisma.node.findUnique({
-        where: { id: parsed.nodeId },
-        select: { id: true },
-      });
-      if (!node) {
-        return NextResponse.json({ error: "Узел не найден." }, { status: 404 });
+      const leafError = await resolveLeafNodeIdOrError(parsed.nodeId);
+      if (leafError) {
+        return leafError;
       }
     }
 
@@ -156,6 +186,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       !existing.nodeId
     ) {
       nextNodeId = targetSku.primaryNodeId;
+    }
+
+    if (!nextNodeId) {
+      return NextResponse.json({ error: "Выберите узел мотоцикла" }, { status: 400 });
+    }
+
+    const finalLeafError = await resolveLeafNodeIdOrError(nextNodeId);
+    if (finalLeafError) {
+      return finalLeafError;
     }
 
     const shouldWriteNodeId =
