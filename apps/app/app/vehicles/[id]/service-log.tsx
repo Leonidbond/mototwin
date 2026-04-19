@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -29,6 +28,7 @@ import {
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
+import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
 
 function readSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) {
@@ -455,7 +455,7 @@ export default function ServiceLogScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <KeyboardAwareScrollScreen contentContainerStyle={styles.scrollContent}>
         <Pressable
           style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
           onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
@@ -682,7 +682,7 @@ export default function ServiceLogScreen() {
             }
           />
         ))}
-      </ScrollView>
+      </KeyboardAwareScrollScreen>
     </SafeAreaView>
   );
 }

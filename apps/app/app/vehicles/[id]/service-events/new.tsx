@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -32,6 +31,7 @@ import type {
   SelectedNodePath,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
+import { KeyboardAwareScrollScreen } from "../../../components/keyboard-aware-scroll-screen";
 
 export default function NewServiceEventScreen() {
   const router = useRouter();
@@ -257,7 +257,7 @@ export default function NewServiceEventScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <Text style={styles.sectionTitle}>Узел обслуживания</Text>
         {levels.map((levelNodes, levelIndex) => (
           <View key={`level-${levelIndex}`} style={styles.levelBlock}>
@@ -385,7 +385,7 @@ export default function NewServiceEventScreen() {
             <Text style={styles.saveButtonText}>Сохранить событие</Text>
           )}
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollScreen>
     </SafeAreaView>
   );
 }

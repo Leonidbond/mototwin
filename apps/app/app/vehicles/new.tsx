@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -32,6 +31,7 @@ import type {
   RideUsageType,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../src/api-base-url";
+import { KeyboardAwareScrollScreen } from "../components/keyboard-aware-scroll-screen";
 
 type RideOption<T extends string> = {
   value: T;
@@ -241,7 +241,7 @@ export default function NewVehicleScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <Text style={styles.title}>Добавление мотоцикла</Text>
         <Text style={styles.description}>
           Заполните базовые данные. Сначала выберите марку, затем модель и модификацию.
@@ -421,7 +421,7 @@ export default function NewVehicleScreen() {
             {isSaving ? "Сохраняем..." : "Добавить мотоцикл"}
           </Text>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollScreen>
     </SafeAreaView>
   );
 }

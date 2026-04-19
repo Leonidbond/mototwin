@@ -13,6 +13,9 @@ export default function GaragePage() {
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
+  const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
+  const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
 
   useEffect(() => {
     const loadGarage = async () => {
@@ -34,6 +37,41 @@ export default function GaragePage() {
 
     loadGarage();
   }, []);
+
+  useEffect(() => {
+    try {
+      const usageRaw = localStorage.getItem("garage.usageProfile.expanded");
+      const techRaw = localStorage.getItem("garage.technicalSummary.expanded");
+      if (usageRaw === "true" || usageRaw === "false") {
+        setIsUsageProfileExpanded(usageRaw === "true");
+      }
+      if (techRaw === "true" || techRaw === "false") {
+        setIsTechnicalSummaryExpanded(techRaw === "true");
+      }
+    } catch {
+      // Ignore localStorage failures for local UI prefs.
+    } finally {
+      setHasLoadedCollapsePrefs(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedCollapsePrefs) return;
+    try {
+      localStorage.setItem("garage.usageProfile.expanded", String(isUsageProfileExpanded));
+    } catch {
+      // Ignore localStorage failures for local UI prefs.
+    }
+  }, [hasLoadedCollapsePrefs, isUsageProfileExpanded]);
+
+  useEffect(() => {
+    if (!hasLoadedCollapsePrefs) return;
+    try {
+      localStorage.setItem("garage.technicalSummary.expanded", String(isTechnicalSummaryExpanded));
+    } catch {
+      // Ignore localStorage failures for local UI prefs.
+    }
+  }, [hasLoadedCollapsePrefs, isTechnicalSummaryExpanded]);
 
   return (
     <main
@@ -196,52 +234,79 @@ export default function GaragePage() {
                       backgroundColor: productSemanticColors.cardMuted,
                     }}
                   >
-                    <h3 className="text-base font-semibold text-gray-950">
-                      Профиль эксплуатации
-                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setIsUsageProfileExpanded((prev) => !prev)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg text-left"
+                      aria-expanded={isUsageProfileExpanded}
+                    >
+                      <h3 className="text-base font-semibold text-gray-950">Профиль эксплуатации</h3>
+                      <span className="text-sm text-gray-500" aria-hidden>
+                        {isUsageProfileExpanded ? "▾" : "▸"}
+                      </span>
+                    </button>
 
-                    {card.rideProfile ? (
-                      <div className="mt-4 space-y-3 text-sm leading-6 text-gray-700">
-                        <div>
-                          <span className="font-medium text-gray-950">
-                            Сценарий:
-                          </span>{" "}
-                          {card.rideProfile.usageType}
+                    {isUsageProfileExpanded ? (
+                      card.rideProfile ? (
+                        <div className="mt-4 space-y-3 text-sm leading-6 text-gray-700">
+                          <div>
+                            <span className="font-medium text-gray-950">
+                              Сценарий:
+                            </span>{" "}
+                            {card.rideProfile.usageType}
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-950">
+                              Стиль:
+                            </span>{" "}
+                            {card.rideProfile.ridingStyle}
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-950">
+                              Нагрузка:
+                            </span>{" "}
+                            {card.rideProfile.loadType}
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-950">
+                              Интенсивность:
+                            </span>{" "}
+                            {card.rideProfile.usageIntensity}
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-medium text-gray-950">
-                            Стиль:
-                          </span>{" "}
-                          {card.rideProfile.ridingStyle}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-950">
-                            Нагрузка:
-                          </span>{" "}
-                          {card.rideProfile.loadType}
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-950">
-                            Интенсивность:
-                          </span>{" "}
-                          {card.rideProfile.usageIntensity}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mt-4 text-sm text-gray-600">
-                        Профиль эксплуатации пока не задан.
-                      </p>
-                    )}
+                      ) : (
+                        <p className="mt-4 text-sm text-gray-600">
+                          Профиль эксплуатации пока не задан.
+                        </p>
+                      )
+                    ) : null}
                   </div>
                 </div>
 
-                {specHighlights.length > 0 ? (
-                  <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {specHighlights.map((spec) => (
-                      <SpecCard key={spec.label} label={spec.label} value={spec.value} />
-                    ))}
-                  </div>
-                ) : null}
+                <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsTechnicalSummaryExpanded((prev) => !prev)}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg text-left"
+                    aria-expanded={isTechnicalSummaryExpanded}
+                  >
+                    <h3 className="text-base font-semibold text-gray-950">Техническая сводка</h3>
+                    <span className="text-sm text-gray-500" aria-hidden>
+                      {isTechnicalSummaryExpanded ? "▾" : "▸"}
+                    </span>
+                  </button>
+                  {isTechnicalSummaryExpanded ? (
+                    specHighlights.length > 0 ? (
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {specHighlights.map((spec) => (
+                          <SpecCard key={spec.label} label={spec.label} value={spec.value} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-gray-600">Технические параметры пока не заполнены.</p>
+                    )
+                  ) : null}
+                </div>
               </section>
               );
             })}

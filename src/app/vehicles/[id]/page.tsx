@@ -138,6 +138,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     useState<NodeTreeItemViewModel | null>(null);
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [isExpenseSectionExpanded, setIsExpenseSectionExpanded] = useState(false);
+  const [isUsageProfileSectionExpanded, setIsUsageProfileSectionExpanded] = useState(true);
+  const [isTechnicalSummarySectionExpanded, setIsTechnicalSummarySectionExpanded] = useState(true);
+  const [hasLoadedDetailCollapsePrefs, setHasLoadedDetailCollapsePrefs] = useState(false);
   const [isAttentionModalOpen, setIsAttentionModalOpen] = useState(false);
   const [wishlistItems, setWishlistItems] = useState<PartWishlistItem[]>([]);
   const [isWishlistLoading, setIsWishlistLoading] = useState(false);
@@ -309,6 +312,59 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     [wishlistRecommendations]
   );
   const wishlistNodeRequiredError = wishlistFormError.includes("Выберите узел мотоцикла");
+
+  useEffect(() => {
+    if (!vehicleId) {
+      return;
+    }
+    try {
+      const usageRaw = localStorage.getItem(`vehicleDetail.${vehicleId}.usageProfile.expanded`);
+      const techRaw = localStorage.getItem(`vehicleDetail.${vehicleId}.technicalSummary.expanded`);
+      if (usageRaw === "true" || usageRaw === "false") {
+        setIsUsageProfileSectionExpanded(usageRaw === "true");
+      } else {
+        setIsUsageProfileSectionExpanded(true);
+      }
+      if (techRaw === "true" || techRaw === "false") {
+        setIsTechnicalSummarySectionExpanded(techRaw === "true");
+      } else {
+        setIsTechnicalSummarySectionExpanded(true);
+      }
+    } catch {
+      setIsUsageProfileSectionExpanded(true);
+      setIsTechnicalSummarySectionExpanded(true);
+    } finally {
+      setHasLoadedDetailCollapsePrefs(true);
+    }
+  }, [vehicleId]);
+
+  useEffect(() => {
+    if (!vehicleId || !hasLoadedDetailCollapsePrefs) {
+      return;
+    }
+    try {
+      localStorage.setItem(
+        `vehicleDetail.${vehicleId}.usageProfile.expanded`,
+        String(isUsageProfileSectionExpanded)
+      );
+    } catch {
+      // Ignore localStorage failures for local UI prefs.
+    }
+  }, [vehicleId, hasLoadedDetailCollapsePrefs, isUsageProfileSectionExpanded]);
+
+  useEffect(() => {
+    if (!vehicleId || !hasLoadedDetailCollapsePrefs) {
+      return;
+    }
+    try {
+      localStorage.setItem(
+        `vehicleDetail.${vehicleId}.technicalSummary.expanded`,
+        String(isTechnicalSummarySectionExpanded)
+      );
+    } catch {
+      // Ignore localStorage failures for local UI prefs.
+    }
+  }, [vehicleId, hasLoadedDetailCollapsePrefs, isTechnicalSummarySectionExpanded]);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -1450,9 +1506,19 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               <div className="mt-7 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
                 <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-base font-semibold tracking-tight text-gray-950">
-                      Профиль эксплуатации
-                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setIsUsageProfileSectionExpanded((prev) => !prev)}
+                      className="inline-flex items-center gap-2 text-left"
+                      aria-expanded={isUsageProfileSectionExpanded}
+                    >
+                      <h2 className="text-base font-semibold tracking-tight text-gray-950">
+                        Профиль эксплуатации
+                      </h2>
+                      <span className="text-sm text-gray-500" aria-hidden>
+                        {isUsageProfileSectionExpanded ? "▾" : "▸"}
+                      </span>
+                    </button>
                     <button
                       type="button"
                       onClick={openEditProfileModal}
@@ -1462,48 +1528,62 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     </button>
                   </div>
 
-                  {rideProfileViewModel ? (
-                    <div className="mt-4 space-y-2.5 text-sm leading-6 text-gray-700">
-                      <div>
-                        <span className="font-medium text-gray-950">
-                          Сценарий:
-                        </span>{" "}
-                        {rideProfileViewModel.usageType}
+                  {isUsageProfileSectionExpanded ? (
+                    rideProfileViewModel ? (
+                      <div className="mt-4 space-y-2.5 text-sm leading-6 text-gray-700">
+                        <div>
+                          <span className="font-medium text-gray-950">
+                            Сценарий:
+                          </span>{" "}
+                          {rideProfileViewModel.usageType}
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-950">Стиль:</span>{" "}
+                          {rideProfileViewModel.ridingStyle}
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-950">
+                            Нагрузка:
+                          </span>{" "}
+                          {rideProfileViewModel.loadType}
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-950">
+                            Интенсивность:
+                          </span>{" "}
+                          {rideProfileViewModel.usageIntensity}
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium text-gray-950">Стиль:</span>{" "}
-                        {rideProfileViewModel.ridingStyle}
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-950">
-                          Нагрузка:
-                        </span>{" "}
-                        {rideProfileViewModel.loadType}
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-950">
-                          Интенсивность:
-                        </span>{" "}
-                        {rideProfileViewModel.usageIntensity}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="mt-4 text-sm text-gray-600">
-                      Профиль эксплуатации пока не задан.
-                    </p>
-                  )}
+                    ) : (
+                      <p className="mt-4 text-sm text-gray-600">
+                        Профиль эксплуатации пока не задан.
+                      </p>
+                    )
+                  ) : null}
                 </div>
 
                 <div className="rounded-2xl border border-gray-200 bg-white p-5">
-                  <h2 className="text-base font-semibold tracking-tight text-gray-950">
-                    Техническая сводка
-                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsTechnicalSummarySectionExpanded((prev) => !prev)}
+                    className="inline-flex items-center gap-2 text-left"
+                    aria-expanded={isTechnicalSummarySectionExpanded}
+                  >
+                    <h2 className="text-base font-semibold tracking-tight text-gray-950">
+                      Техническая сводка
+                    </h2>
+                    <span className="text-sm text-gray-500" aria-hidden>
+                      {isTechnicalSummarySectionExpanded ? "▾" : "▸"}
+                    </span>
+                  </button>
 
-                  <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
-                    {technicalInfoViewModel.items.map((item) => (
-                      <SpecCard key={item.key} label={item.label} value={item.value} />
-                    ))}
-                  </div>
+                  {isTechnicalSummarySectionExpanded ? (
+                    <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
+                      {technicalInfoViewModel.items.map((item) => (
+                        <SpecCard key={item.key} label={item.label} value={item.value} />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </section>

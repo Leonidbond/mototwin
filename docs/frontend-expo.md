@@ -83,7 +83,14 @@ Defined in `apps/app/app/_layout.tsx`:
 - Expo uses shared packages for API contracts and core domain formatting helpers.
 - UI and navigation remain mobile-specific (React Native + Expo Router).
 
-### 4.1 API / debug line policy (product UI)
+### 4.1 Keyboard-aware forms policy
+
+- Все формы Expo с `TextInput` (добавление мотоцикла, редактирование профиля, обновление состояния, добавление сервисного события, wishlist-редактор, фильтры журнала) используют keyboard-aware layout.
+- Базовый паттерн: `KeyboardAvoidingView` + `ScrollView` + `keyboardShouldPersistTaps="handled"` + `keyboardDismissMode="on-drag"`.
+- Для повторного использования применяется локальный helper в Expo app: `apps/app/app/components/keyboard-aware-scroll-screen.tsx`.
+- Логика валидации и API-вызовов не меняется; правки касаются только UX и достижимости полей/кнопок при открытой клавиатуре.
+
+### 4.2 API / debug line policy (product UI)
 
 - **Production-like builds** (`__DEV__ === false`, e.g. release): the app **must not** show raw API base URLs or other developer-only diagnostics in normal screens.
 - **Development** (`__DEV__ === true`): the garage **error** state may show **«Текущий API: …»** so engineers can confirm which host `getApiBaseUrl()` resolved to. User-facing copy (title, explanation, «Повторить») is unchanged.

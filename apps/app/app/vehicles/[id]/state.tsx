@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +13,7 @@ import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { normalizeVehicleStatePayload, validateVehicleStateFormValues } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
+import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
 
 export default function UpdateVehicleStateScreen() {
   const router = useRouter();
@@ -109,7 +109,7 @@ export default function UpdateVehicleStateScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Текущее состояние</Text>
           <Text style={styles.cardSubtitle}>
@@ -156,7 +156,7 @@ export default function UpdateVehicleStateScreen() {
             )}
           </Pressable>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollScreen>
     </SafeAreaView>
   );
 }

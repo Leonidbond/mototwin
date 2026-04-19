@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -19,12 +19,19 @@ import {
 } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
+import {
+  readCollapsiblePreference,
+  writeCollapsiblePreference,
+} from "../src/ui-collapsible-preferences";
 
 export default function HomeScreen() {
   const router = useRouter();
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
+  const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
+  const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -49,6 +56,30 @@ export default function HomeScreen() {
       loadGarage();
     }, [loadGarage])
   );
+
+  useEffect(() => {
+    void (async () => {
+      const usage = await readCollapsiblePreference("garage.usageProfile.expanded");
+      const tech = await readCollapsiblePreference("garage.technicalSummary.expanded");
+      if (usage != null) {
+        setIsUsageProfileExpanded(usage);
+      }
+      if (tech != null) {
+        setIsTechnicalSummaryExpanded(tech);
+      }
+      setHasLoadedCollapsePrefs(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedCollapsePrefs) return;
+    void writeCollapsiblePreference("garage.usageProfile.expanded", isUsageProfileExpanded);
+  }, [hasLoadedCollapsePrefs, isUsageProfileExpanded]);
+
+  useEffect(() => {
+    if (!hasLoadedCollapsePrefs) return;
+    void writeCollapsiblePreference("garage.technicalSummary.expanded", isTechnicalSummaryExpanded);
+  }, [hasLoadedCollapsePrefs, isTechnicalSummaryExpanded]);
 
   const retryLoadGarage = async () => {
     try {
@@ -136,39 +167,60 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {rideProfile ? (
-          <View style={styles.rideProfileBlock}>
+        <View style={styles.collapsibleBlock}>
+          <Pressable
+            onPress={() => setIsUsageProfileExpanded((prev) => !prev)}
+            style={({ pressed }) => [styles.collapsibleHeader, pressed && styles.collapsibleHeaderPressed]}
+          >
             <Text style={styles.rideProfileTitle}>Профиль эксплуатации</Text>
-            <View style={styles.secondaryMetaWrap}>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaChipLabel}>Сценарий: {rideProfile.usageType}</Text>
+            <Text style={styles.collapsibleChevron}>{isUsageProfileExpanded ? "▾" : "▸"}</Text>
+          </Pressable>
+          {isUsageProfileExpanded ? (
+            rideProfile ? (
+              <View style={styles.secondaryMetaWrap}>
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipLabel}>Сценарий: {rideProfile.usageType}</Text>
+                </View>
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipLabel}>Стиль: {rideProfile.ridingStyle}</Text>
+                </View>
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipLabel}>Нагрузка: {rideProfile.loadType}</Text>
+                </View>
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipLabel}>Интенсивность: {rideProfile.usageIntensity}</Text>
+                </View>
               </View>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaChipLabel}>Стиль: {rideProfile.ridingStyle}</Text>
-              </View>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaChipLabel}>Нагрузка: {rideProfile.loadType}</Text>
-              </View>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaChipLabel}>Интенсивность: {rideProfile.usageIntensity}</Text>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <Text style={styles.noRideProfile}>Профиль эксплуатации пока не задан.</Text>
-        )}
+            ) : (
+              <Text style={styles.noRideProfile}>Профиль эксплуатации пока не задан.</Text>
+            )
+          ) : null}
+        </View>
 
-        {specHighlights.length > 0 ? (
-          <View style={styles.secondaryMetaWrap}>
-            {specHighlights.map((spec) => (
-              <View key={spec.label} style={styles.metaChip}>
-                <Text style={styles.metaChipLabel}>
-                  {spec.label}: {spec.value}
-                </Text>
+        <View style={styles.collapsibleBlock}>
+          <Pressable
+            onPress={() => setIsTechnicalSummaryExpanded((prev) => !prev)}
+            style={({ pressed }) => [styles.collapsibleHeader, pressed && styles.collapsibleHeaderPressed]}
+          >
+            <Text style={styles.rideProfileTitle}>Техническая сводка</Text>
+            <Text style={styles.collapsibleChevron}>{isTechnicalSummaryExpanded ? "▾" : "▸"}</Text>
+          </Pressable>
+          {isTechnicalSummaryExpanded ? (
+            specHighlights.length > 0 ? (
+              <View style={styles.secondaryMetaWrap}>
+                {specHighlights.map((spec) => (
+                  <View key={spec.label} style={styles.metaChip}>
+                    <Text style={styles.metaChipLabel}>
+                      {spec.label}: {spec.value}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        ) : null}
+            ) : (
+              <Text style={styles.noRideProfile}>Технические параметры пока не заполнены.</Text>
+            )
+          ) : null}
+        </View>
       </View>
     );
   };
@@ -445,6 +497,21 @@ const styles = StyleSheet.create({
   },
   rideProfileBlock: {
     marginTop: 10,
+  },
+  collapsibleBlock: {
+    marginTop: 10,
+  },
+  collapsibleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  collapsibleHeaderPressed: {
+    opacity: 0.92,
+  },
+  collapsibleChevron: {
+    fontSize: 14,
+    color: c.textMuted,
   },
   rideProfileTitle: {
     fontSize: 13,

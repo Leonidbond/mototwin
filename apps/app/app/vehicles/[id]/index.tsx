@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
@@ -35,6 +35,10 @@ import type {
 } from "@mototwin/types";
 import { productSemanticColors as c, statusSemanticTokens } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
+import {
+  readCollapsiblePreference,
+  writeCollapsiblePreference,
+} from "../../../src/ui-collapsible-preferences";
 import { buildVehicleServiceLogHref } from "./service-log";
 import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
@@ -229,8 +233,9 @@ export default function VehicleDetailScreen() {
   const [nodeTreeError, setNodeTreeError] = useState("");
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [isRideProfileExpanded, setIsRideProfileExpanded] = useState(false);
-  const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(false);
+  const [isRideProfileExpanded, setIsRideProfileExpanded] = useState(true);
+  const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(true);
+  const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
   const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
   const [statusExplanationNode, setStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
@@ -302,6 +307,37 @@ export default function VehicleDetailScreen() {
       load();
     }, [load])
   );
+
+  useEffect(() => {
+    if (!vehicleId) return;
+    void (async () => {
+      const usage = await readCollapsiblePreference(
+        `vehicleDetail.${vehicleId}.usageProfile.expanded`
+      );
+      const technical = await readCollapsiblePreference(
+        `vehicleDetail.${vehicleId}.technicalSummary.expanded`
+      );
+      setIsRideProfileExpanded(usage ?? true);
+      setIsTechnicalExpanded(technical ?? true);
+      setHasLoadedCollapsePrefs(true);
+    })();
+  }, [vehicleId]);
+
+  useEffect(() => {
+    if (!vehicleId || !hasLoadedCollapsePrefs) return;
+    void writeCollapsiblePreference(
+      `vehicleDetail.${vehicleId}.usageProfile.expanded`,
+      isRideProfileExpanded
+    );
+  }, [vehicleId, hasLoadedCollapsePrefs, isRideProfileExpanded]);
+
+  useEffect(() => {
+    if (!vehicleId || !hasLoadedCollapsePrefs) return;
+    void writeCollapsiblePreference(
+      `vehicleDetail.${vehicleId}.technicalSummary.expanded`,
+      isTechnicalExpanded
+    );
+  }, [vehicleId, hasLoadedCollapsePrefs, isTechnicalExpanded]);
 
   const { roots: nodeTreeViewModel } = useMemo(
     () => buildNodeTreeSectionProps(nodeTree),
@@ -479,24 +515,27 @@ export default function VehicleDetailScreen() {
         </View>
 
         <View style={styles.secondarySectionCard}>
-          <Pressable
-            style={({ pressed }) => [styles.sectionHeaderRow, pressed && styles.sectionHeaderRowPressed]}
-            onPress={() => setIsRideProfileExpanded((prev) => !prev)}
-          >
-            <Text style={styles.secondarySectionTitle}>Профиль эксплуатации</Text>
-            <View style={styles.sectionHeaderActions}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.inlineActionButton,
-                  pressed && styles.inlineActionButtonPressed,
-                ]}
-                onPress={() => router.push(`/vehicles/${vehicleId}/profile`)}
-              >
-                <Text style={styles.inlineActionButtonText}>Редактировать</Text>
-              </Pressable>
+          <View style={styles.sectionHeaderRow}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.sectionHeaderToggle,
+                pressed && styles.sectionHeaderRowPressed,
+              ]}
+              onPress={() => setIsRideProfileExpanded((prev) => !prev)}
+            >
+              <Text style={styles.secondarySectionTitle}>Профиль эксплуатации</Text>
               <Text style={styles.sectionChevron}>{isRideProfileExpanded ? "▾" : "▸"}</Text>
-            </View>
-          </Pressable>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.inlineActionButton,
+                pressed && styles.inlineActionButtonPressed,
+              ]}
+              onPress={() => router.push(`/vehicles/${vehicleId}/profile`)}
+            >
+              <Text style={styles.inlineActionButtonText}>Редактировать</Text>
+            </Pressable>
+          </View>
           {isRideProfileExpanded ? (
             rideProfileViewModel ? (
               <View style={styles.secondarySectionGrid}>
@@ -517,7 +556,10 @@ export default function VehicleDetailScreen() {
         {hasTechnicalInfo ? (
           <View style={styles.secondarySectionCard}>
             <Pressable
-              style={({ pressed }) => [styles.sectionHeaderRow, pressed && styles.sectionHeaderRowPressed]}
+              style={({ pressed }) => [
+                styles.sectionHeaderToggle,
+                pressed && styles.sectionHeaderRowPressed,
+              ]}
               onPress={() => setIsTechnicalExpanded((prev) => !prev)}
             >
               <Text style={styles.secondarySectionTitle}>Техническая сводка</Text>
@@ -948,6 +990,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 8,
+  },
+  sectionHeaderToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flex: 1,
+    marginRight: 8,
   },
   sectionHeaderRowPressed: {
     opacity: 0.92,

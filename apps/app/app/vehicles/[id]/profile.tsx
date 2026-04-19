@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,6 +29,7 @@ import type {
   VehicleRideProfile,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../src/api-base-url";
+import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
 
 const USAGE_TYPES = RIDE_USAGE_TYPE_OPTIONS as Array<{ value: RideUsageType; label: string }>;
 const RIDING_STYLES = RIDE_RIDING_STYLE_OPTIONS as Array<{ value: RideStyle; label: string }>;
@@ -154,7 +154,7 @@ export default function EditVehicleProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Профиль мотоцикла</Text>
           <Text style={styles.cardSubtitle}>
@@ -223,7 +223,7 @@ export default function EditVehicleProfileScreen() {
             )}
           </Pressable>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollScreen>
     </SafeAreaView>
   );
 }
