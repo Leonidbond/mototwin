@@ -23,6 +23,7 @@ import {
   findNodeTreeItemById,
   getNodeSubtreeById,
   getTopLevelNodeTreeItems,
+  buildNodeSearchResultActions,
   searchNodeTree,
   formatIsoCalendarDateRu,
   getAvailableChildrenForSelectedPath,
@@ -83,6 +84,7 @@ import type {
   NodeMaintenancePlanSummaryViewModel,
   NodeSubtreeModalViewModel,
   NodeTreeSearchResultViewModel,
+  NodeTreeSearchActionKey,
   SelectedNodePath,
   ServiceEventItem,
   ServiceEventsFilters,
@@ -1105,6 +1107,41 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       return next;
     });
     setSelectedTopLevelNodeId(result.topLevelNodeId);
+  };
+  const openServiceLogFromSearchResult = (result: NodeTreeSearchResultViewModel) => {
+    setNodeSearchQuery("");
+    setDebouncedNodeSearchQuery("");
+    setHighlightedNodeId(null);
+    const selectedNode = getNodeSubtreeById(topLevelNodeViewModels, result.nodeId);
+    if (!selectedNode) {
+      return;
+    }
+    openServiceLogFilteredByNode(selectedNode);
+  };
+  const openWishlistFromSearchResult = (result: NodeTreeSearchResultViewModel) => {
+    if (!result.isLeaf) {
+      return;
+    }
+    setNodeSearchQuery("");
+    setDebouncedNodeSearchQuery("");
+    setHighlightedNodeId(null);
+    openWishlistModalForCreate(result.nodeId);
+  };
+  const handleSearchResultAction = (
+    actionKey: NodeTreeSearchActionKey,
+    result: NodeTreeSearchResultViewModel
+  ) => {
+    if (actionKey === "open") {
+      openSearchResultInSubtreeModal(result);
+      return;
+    }
+    if (actionKey === "service_log") {
+      openServiceLogFromSearchResult(result);
+      return;
+    }
+    if (actionKey === "buy") {
+      openWishlistFromSearchResult(result);
+    }
   };
   const openServiceLogFromTreeContext = (node: NodeTreeItemViewModel) => {
     closeTopLevelNodeSubtreeModal();
@@ -2140,33 +2177,49 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     nodeSearchResults.length > 0 ? (
                       <div className="space-y-2 rounded-2xl border border-gray-200 bg-gray-50/70 p-2.5">
                         {nodeSearchResults.map((result) => (
-                          <button
+                          <div
                             key={result.nodeId}
-                            type="button"
-                            onClick={() => openSearchResultInSubtreeModal(result)}
-                            className="w-full rounded-xl border border-transparent bg-white px-3 py-2.5 text-left transition hover:border-gray-300"
+                            className="rounded-xl border border-transparent bg-white px-3 py-2.5 transition hover:border-gray-300"
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-gray-950">{result.nodeName}</p>
-                                <p className="truncate text-xs text-gray-500">{result.pathLabel}</p>
-                                <p className="truncate text-[11px] text-gray-400">{result.nodeCode}</p>
-                                {result.shortExplanationLabel ? (
-                                  <p className="truncate pt-1 text-xs text-gray-500">
-                                    {result.shortExplanationLabel}
-                                  </p>
+                            <button
+                              type="button"
+                              onClick={() => openSearchResultInSubtreeModal(result)}
+                              className="w-full text-left"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium text-gray-950">{result.nodeName}</p>
+                                  <p className="truncate text-xs text-gray-500">{result.pathLabel}</p>
+                                  <p className="truncate text-[11px] text-gray-400">{result.nodeCode}</p>
+                                  {result.shortExplanationLabel ? (
+                                    <p className="truncate pt-1 text-xs text-gray-500">
+                                      {result.shortExplanationLabel}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                {result.effectiveStatus ? (
+                                  <span
+                                    className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                                    style={getStatusBadgeStyle(result.effectiveStatus)}
+                                  >
+                                    {result.statusLabel}
+                                  </span>
                                 ) : null}
                               </div>
-                              {result.effectiveStatus ? (
-                                <span
-                                  className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
-                                  style={getStatusBadgeStyle(result.effectiveStatus)}
+                            </button>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {buildNodeSearchResultActions(result).map((action) => (
+                                <button
+                                  key={`${result.nodeId}.${action.key}`}
+                                  type="button"
+                                  onClick={() => handleSearchResultAction(action.key, result)}
+                                  className="inline-flex h-7 items-center rounded-md border border-gray-300 px-2.5 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
                                 >
-                                  {result.statusLabel}
-                                </span>
-                              ) : null}
+                                  {action.label}
+                                </button>
+                              ))}
                             </div>
-                          </button>
+                          </div>
                         ))}
                       </div>
                     ) : (

@@ -182,3 +182,10 @@ export type NodeTreeSearchResultViewModel = {
   isLeaf: boolean;
   ancestorIds: string[];
 };
+
+export type NodeTreeSearchActionKey = "open" | "service_log" | "buy";
+
+export type NodeTreeSearchActionViewModel = {
+  key: NodeTreeSearchActionKey;
+  label: string;
+};

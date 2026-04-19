@@ -1,4 +1,8 @@
-import type { NodeTreeSearchOptions, NodeTreeSearchResultViewModel } from "@mototwin/types";
+import type {
+  NodeTreeSearchActionViewModel,
+  NodeTreeSearchOptions,
+  NodeTreeSearchResultViewModel,
+} from "@mototwin/types";
 
 type SearchableNode = {
   id: string;
@@ -132,4 +136,23 @@ export function searchNodeTree(
       isLeaf: item.isLeaf,
       ancestorIds: item.ancestorIds,
     }));
+}
+
+export function isNodeSearchBuyActionAvailable(result: NodeTreeSearchResultViewModel): boolean {
+  return result.isLeaf;
+}
+
+export function buildNodeSearchResultActions(
+  result: NodeTreeSearchResultViewModel
+): NodeTreeSearchActionViewModel[] {
+  const actions: NodeTreeSearchActionViewModel[] = [
+    { key: "open", label: "Открыть" },
+    { key: "service_log", label: "Журнал" },
+  ];
+
+  if (isNodeSearchBuyActionAvailable(result)) {
+    actions.push({ key: "buy", label: "Купить" });
+  }
+
+  return actions;
 }

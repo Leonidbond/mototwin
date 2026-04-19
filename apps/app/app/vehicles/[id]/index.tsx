@@ -17,6 +17,7 @@ import {
   buildAttentionSummaryFromNodeTree,
   buildExpenseSummaryFromServiceEvents,
   buildNodeTreeSectionProps,
+  buildNodeSearchResultActions,
   buildNodeSubtreeModalViewModel,
   buildTopLevelNodeSummaryViewModel,
   buildNodeMaintenancePlanViewModel,
@@ -40,6 +41,7 @@ import type {
   NodeTreeItemViewModel,
   NodeSubtreeModalViewModel,
   NodeTreeSearchResultViewModel,
+  NodeTreeSearchActionKey,
   ServiceEventItem,
   VehicleDetail,
 } from "@mototwin/types";
@@ -532,6 +534,47 @@ export default function VehicleDetailScreen() {
     });
     setSelectedTopLevelNodeId(result.topLevelNodeId);
   }, []);
+  const openServiceLogFromSearchResult = useCallback(
+    (result: NodeTreeSearchResultViewModel) => {
+      setNodeSearchQuery("");
+      setDebouncedNodeSearchQuery("");
+      setHighlightedNodeId(null);
+      const selectedNode = getNodeSubtreeById(topLevelNodeViewModels, result.nodeId);
+      if (!selectedNode) {
+        return;
+      }
+      openServiceLogForTreeNode(selectedNode);
+    },
+    [openServiceLogForTreeNode, topLevelNodeViewModels]
+  );
+  const openWishlistFromSearchResult = useCallback(
+    (result: NodeTreeSearchResultViewModel) => {
+      if (!result.isLeaf) {
+        return;
+      }
+      setNodeSearchQuery("");
+      setDebouncedNodeSearchQuery("");
+      setHighlightedNodeId(null);
+      openWishlistForTreeNode(result.nodeId);
+    },
+    [openWishlistForTreeNode]
+  );
+  const handleSearchResultAction = useCallback(
+    (actionKey: NodeTreeSearchActionKey, result: NodeTreeSearchResultViewModel) => {
+      if (actionKey === "open") {
+        openSearchResultInSubtreeModal(result);
+        return;
+      }
+      if (actionKey === "service_log") {
+        openServiceLogFromSearchResult(result);
+        return;
+      }
+      if (actionKey === "buy") {
+        openWishlistFromSearchResult(result);
+      }
+    },
+    [openSearchResultInSubtreeModal, openServiceLogFromSearchResult, openWishlistFromSearchResult]
+  );
   const getNodeModeToggleLabel = () =>
     isNodeMaintenanceModeEnabled ? "План обслуживания: вкл" : "Показывать план обслуживания";
 
@@ -899,43 +942,58 @@ export default function VehicleDetailScreen() {
             nodeSearchResults.length > 0 ? (
               <View style={styles.searchResultsBox}>
                 {nodeSearchResults.map((result) => (
-                  <Pressable
-                    key={result.nodeId}
-                    onPress={() => openSearchResultInSubtreeModal(result)}
-                    style={({ pressed }) => [
-                      styles.searchResultRow,
-                      pressed && styles.searchResultRowPressed,
-                    ]}
-                  >
-                    <View style={styles.searchResultTextCol}>
-                      <Text style={styles.searchResultTitle}>{result.nodeName}</Text>
-                      <Text style={styles.searchResultPath}>{result.pathLabel}</Text>
-                      <Text style={styles.searchResultCode}>{result.nodeCode}</Text>
-                      {result.shortExplanationLabel ? (
-                        <Text style={styles.searchResultPath}>{result.shortExplanationLabel}</Text>
-                      ) : null}
-                    </View>
-                    {result.effectiveStatus ? (
-                      <View
-                        style={[
-                          styles.badge,
-                          {
-                            backgroundColor: getStatusColors(result.effectiveStatus).bg,
-                            borderColor: getStatusColors(result.effectiveStatus).border,
-                          },
-                        ]}
-                      >
-                        <Text
+                  <View key={result.nodeId} style={styles.searchResultCard}>
+                    <Pressable
+                      onPress={() => openSearchResultInSubtreeModal(result)}
+                      style={({ pressed }) => [
+                        styles.searchResultRow,
+                        pressed && styles.searchResultRowPressed,
+                      ]}
+                    >
+                      <View style={styles.searchResultTextCol}>
+                        <Text style={styles.searchResultTitle}>{result.nodeName}</Text>
+                        <Text style={styles.searchResultPath}>{result.pathLabel}</Text>
+                        <Text style={styles.searchResultCode}>{result.nodeCode}</Text>
+                        {result.shortExplanationLabel ? (
+                          <Text style={styles.searchResultPath}>{result.shortExplanationLabel}</Text>
+                        ) : null}
+                      </View>
+                      {result.effectiveStatus ? (
+                        <View
                           style={[
-                            styles.badgeText,
-                            { color: getStatusColors(result.effectiveStatus).text },
+                            styles.badge,
+                            {
+                              backgroundColor: getStatusColors(result.effectiveStatus).bg,
+                              borderColor: getStatusColors(result.effectiveStatus).border,
+                            },
                           ]}
                         >
-                          {result.statusLabel}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </Pressable>
+                          <Text
+                            style={[
+                              styles.badgeText,
+                              { color: getStatusColors(result.effectiveStatus).text },
+                            ]}
+                          >
+                            {result.statusLabel}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                    <View style={styles.searchActionsRow}>
+                      {buildNodeSearchResultActions(result).map((action) => (
+                        <Pressable
+                          key={`${result.nodeId}.${action.key}`}
+                          onPress={() => handleSearchResultAction(action.key, result)}
+                          style={({ pressed }) => [
+                            styles.searchActionBtn,
+                            pressed && styles.searchActionBtnPressed,
+                          ]}
+                        >
+                          <Text style={styles.searchActionBtnText}>{action.label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
                 ))}
               </View>
             ) : (
@@ -1655,6 +1713,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 8,
   },
+  searchResultCard: {
+    borderRadius: 10,
+    backgroundColor: c.card,
+  },
   searchResultRowPressed: {
     borderColor: c.borderStrong,
   },
@@ -1676,6 +1738,30 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 11,
     color: c.textTertiary,
+  },
+  searchActionsRow: {
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingBottom: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  searchActionBtn: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: c.card,
+  },
+  searchActionBtnPressed: {
+    backgroundColor: c.divider,
+  },
+  searchActionBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textMeta,
   },
   searchNoResults: {
     marginBottom: 10,

@@ -29,6 +29,8 @@ export type {
   NodeSubtreeModalViewModel,
   NodeTreeSearchOptions,
   NodeTreeSearchResultViewModel,
+  NodeTreeSearchActionKey,
+  NodeTreeSearchActionViewModel,
 } from "./node";
 export type {
   ServiceEventKind,

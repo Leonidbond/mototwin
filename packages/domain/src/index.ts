@@ -36,8 +36,10 @@ export {
   buildNodeSubtreeModalViewModel,
 } from "./node-tree-subtree-view-models";
 export {
+  buildNodeSearchResultActions,
   buildNodePathLabel,
   getAncestorIdsForNode,
+  isNodeSearchBuyActionAvailable,
   getTopLevelAncestorForNode,
   searchNodeTree,
 } from "./node-tree-search";
