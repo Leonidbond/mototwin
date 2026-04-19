@@ -180,8 +180,12 @@ export {
 } from "./part-recommendation";
 export {
   SERVICE_KIT_DEFINITIONS,
+  buildServiceKitPreview,
   buildServiceKitViewModel,
   chooseBestSkuForKitItem,
   expandServiceKitToWishlistDrafts,
+  getServiceKitPreviewItemStatusLabel,
   getServiceKitsForNode,
+  isDuplicateActiveWishlistItem,
+  normalizeWishlistTitle,
 } from "./service-kits";

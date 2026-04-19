@@ -7,6 +7,7 @@ import {
   buildWishlistItemSkuInfo,
   expandServiceKitToWishlistDrafts,
   getServiceKitsForNode,
+  normalizeWishlistTitle,
   normalizePartWishlistCostMutationArgs,
   sortPartRecommendations,
 } from "@mototwin/domain";
@@ -194,19 +195,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
 
     const nodeIdByCode = new Map<string, string>();
-    const warningsByItemKey = new Map<string, string>();
+    const nodeIssueByCode = new Map<string, "MISSING_NODE" | "NON_LEAF_NODE">();
+    const foundNodeCodeSet = new Set(rawNodes.map((node) => node.code));
+    for (const code of codes) {
+      if (!foundNodeCodeSet.has(code)) {
+        nodeIssueByCode.set(code, "MISSING_NODE");
+      }
+    }
     for (const node of rawNodes) {
       const childrenCount = await prisma.node.count({ where: { parentId: node.id } });
       if (childrenCount === 0) {
         nodeIdByCode.set(node.code, node.id);
-      }
-    }
-    for (const item of kit.items) {
-      if (!nodeIdByCode.has(item.nodeCode)) {
-        warningsByItemKey.set(
-          item.key,
-          `Узел ${item.nodeCode} недоступен или не является конечным.`
-        );
+      } else {
+        nodeIssueByCode.set(node.code, "NON_LEAF_NODE");
       }
     }
 
@@ -218,13 +219,59 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const expanded = expandServiceKitToWishlistDrafts({
       kit,
       nodeIdByCode,
+      nodeIssueByCode,
       recommendationsByNodeCode,
       existingActiveItems: activeRows,
     });
 
-    const createdRows = await prisma.$transaction(async (tx) => {
+    const txResult = await prisma.$transaction(async (tx) => {
+      const txSkips = [...expanded.skipped];
       const list = [];
+      const txActiveRows = await tx.partWishlistItem.findMany({
+        where: {
+          vehicleId,
+          status: {
+            in: [PartWishlistItemStatus.NEEDED, PartWishlistItemStatus.ORDERED, PartWishlistItemStatus.BOUGHT],
+          },
+        },
+        select: { nodeId: true, skuId: true, title: true },
+      });
+      const existingSkuKeys = new Set(
+        txActiveRows
+          .filter((item) => item.nodeId && item.skuId)
+          .map((item) => `${item.nodeId}|${item.skuId}`)
+      );
+      const existingManualKeys = new Set(
+        txActiveRows
+          .filter((item) => item.nodeId && !item.skuId)
+          .map((item) => `${item.nodeId}|${normalizeWishlistTitle(item.title)}`)
+      );
       for (const draft of expanded.drafts) {
+        if (draft.skuId) {
+          const key = `${draft.nodeId}|${draft.skuId}`;
+          if (existingSkuKeys.has(key)) {
+            txSkips.push({
+              itemKey: draft.itemKey,
+              title: draft.title,
+              reason: "DUPLICATE_ACTIVE_ITEM",
+              message: "Похожая активная позиция с этим SKU уже есть в списке.",
+            });
+            continue;
+          }
+          existingSkuKeys.add(key);
+        } else {
+          const key = `${draft.nodeId}|${normalizeWishlistTitle(draft.title)}`;
+          if (existingManualKeys.has(key)) {
+            txSkips.push({
+              itemKey: draft.itemKey,
+              title: draft.title,
+              reason: "DUPLICATE_ACTIVE_ITEM",
+              message: "Похожая активная позиция уже есть в списке.",
+            });
+            continue;
+          }
+          existingManualKeys.add(key);
+        }
         const normalizedCost = normalizePartWishlistCostMutationArgs(draft.costAmount, draft.currency);
         const created = await tx.partWishlistItem.create({
           data: {
@@ -245,14 +292,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
         });
         list.push(created);
       }
-      return list;
+      return { createdRows: list, txSkips };
     });
 
-    const warnings = [...expanded.warnings, ...warningsByItemKey.values()];
+    const warnings = [...expanded.warnings];
     const result = {
       kitCode: kit.code,
-      createdItems: createdRows.map((row) => toWire(row)),
-      skippedItems: expanded.skipped,
+      createdItems: txResult.createdRows.map((row) => toWire(row)),
+      skippedItems: txResult.txSkips,
       warnings,
     };
 

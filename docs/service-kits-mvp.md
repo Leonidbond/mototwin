@@ -79,8 +79,29 @@ Backend endpoint: `POST /api/vehicles/[id]/wishlist/kits`
 
 - тот же `vehicleId + nodeId + skuId` (для SKU-строк)
 - тот же `vehicleId + nodeId + normalized(title)` (для manual-строк)
+- `normalized(title)` = trim + схлопывание повторных пробелов + case-insensitive сравнение
 
 Такие элементы попадают в `skippedItems`.
+
+Причины пропуска возвращаются кодами:
+
+- `DUPLICATE_ACTIVE_ITEM`
+- `MISSING_NODE`
+- `NON_LEAF_NODE`
+- `NO_MATCHED_SKU` (зарезервировано для случаев, где manual fallback невозможен)
+
+## Preview перед добавлением
+
+Перед финальным добавлением kit в wishlist web и Expo показывают preview по каждой позиции:
+
+- название позиции;
+- узел;
+- сопоставленный SKU (если найден);
+- стоимость/валюта (если есть);
+- статус: `Будет добавлено` / `Уже есть в списке` / `Не удалось сопоставить узел`.
+
+Если все позиции в preview уже дубликаты или невалидны, действие добавления недоступно.
+Если часть позиций доступна, создаются только доступные строки.
 
 ## Ограничения этого шага
 
@@ -88,6 +109,7 @@ Backend endpoint: `POST /api/vehicles/[id]/wishlist/kits`
 - Никаких multi-part service events.
 - Никакого автосоздания события при добавлении комплекта.
 - Expense Summary меняется только после ручного сохранения сервисного события по отдельной позиции.
+- Duplicate safety остаётся и на backend (`POST .../wishlist/kits`) — даже если UI preview устарел, endpoint не создаёт duplicate active items.
 
 ## UI-маркировка происхождения из комплекта (без schema changes)
 

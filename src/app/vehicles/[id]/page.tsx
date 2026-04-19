@@ -58,6 +58,8 @@ import {
   applyPartSkuViewModelToPartWishlistFormValues,
   buildPartRecommendationGroupsForDisplay,
   clearPartWishlistFormSkuSelection,
+  buildServiceKitPreview,
+  getServiceKitPreviewItemStatusLabel,
   formatPartSkuSearchResultMetaLineRu,
   getPartRecommendationGroupTitle,
   getPartRecommendationWarningLabel,
@@ -84,6 +86,7 @@ import type {
   PartRecommendationViewModel,
   PartRecommendationGroup,
   ServiceKitViewModel,
+  ServiceKitPreviewViewModel,
   PartWishlistFormValues,
   PartWishlistItem,
   PartSkuViewModel,
@@ -261,6 +264,35 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     () => groupPartWishlistItemsByStatus(wishlistActiveViewModels),
     [wishlistActiveViewModels]
   );
+  const serviceKitNodesByCode = useMemo(() => {
+    const out = new Map<string, { id: string; name: string; hasChildren: boolean }>();
+    const stack = [...nodeTree];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node) {
+        continue;
+      }
+      out.set(node.code, { id: node.id, name: node.name, hasChildren: node.children.length > 0 });
+      for (const child of node.children) {
+        stack.push(child);
+      }
+    }
+    return out;
+  }, [nodeTree]);
+  const serviceKitPreviewByCode = useMemo(() => {
+    const out = new Map<string, ServiceKitPreviewViewModel>();
+    for (const kit of wishlistServiceKits) {
+      out.set(
+        kit.code,
+        buildServiceKitPreview({
+          kit,
+          nodesByCode: serviceKitNodesByCode,
+          activeWishlistItems: wishlistItems,
+        })
+      );
+    }
+    return out;
+  }, [serviceKitNodesByCode, wishlistItems, wishlistServiceKits]);
   const wishlistNodeOptions = useMemo(
     () => flattenNodeTreeToSelectOptions(nodeTree),
     [nodeTree]
@@ -2704,30 +2736,60 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     ) : null}
                     {!wishlistServiceKitsLoading && wishlistServiceKits.length > 0 ? (
                       <ul className="mt-2 space-y-2">
-                        {wishlistServiceKits.map((kit) => (
+                        {wishlistServiceKits.map((kit) => {
+                          const preview = serviceKitPreviewByCode.get(kit.code);
+                          return (
                           <li key={kit.code} className="rounded-md border border-gray-200 bg-gray-50 p-2">
                             <p className="text-xs font-semibold text-gray-900">{kit.title}</p>
                             <p className="mt-0.5 text-[11px] text-gray-600">{kit.description}</p>
-                            <ul className="mt-1 space-y-0.5">
-                              {kit.items.map((item) => (
-                                <li key={item.key} className="text-[11px] text-gray-600">
-                                  • {item.title} x{item.quantity}
-                                  {item.matchedSkuTitle ? ` — ${item.matchedSkuTitle}` : " — без SKU"}
+                            <ul className="mt-1 space-y-1">
+                              {(preview?.items ?? []).map((item) => (
+                                <li
+                                  key={item.itemKey}
+                                  className={`rounded border px-2 py-1 text-[11px] ${
+                                    item.status === "WILL_ADD"
+                                      ? "border-emerald-200 bg-emerald-50/70 text-emerald-800"
+                                      : item.status === "DUPLICATE_ACTIVE_ITEM"
+                                        ? "border-gray-200 bg-white text-gray-500"
+                                        : "border-amber-200 bg-amber-50/80 text-amber-800"
+                                  }`}
+                                >
+                                  <p>
+                                    {item.title}
+                                    {item.matchedSkuTitle ? ` — ${item.matchedSkuTitle}` : ""}
+                                  </p>
+                                  <p className="mt-0.5">
+                                    {item.nodeName ? `Узел: ${item.nodeName}` : `Узел: ${item.nodeCode}`}
+                                    {item.costAmount != null
+                                      ? ` · ${formatExpenseAmountRu(item.costAmount)} ${item.currency ?? ""}`.trim()
+                                      : ""}
+                                  </p>
+                                  <p className="mt-0.5 font-medium">
+                                    {getServiceKitPreviewItemStatusLabel(item.status)}
+                                  </p>
                                 </li>
                               ))}
                             </ul>
+                            {preview ? (
+                              <p className="mt-1 text-[11px] text-gray-600">
+                                Доступно к добавлению: {preview.addableCount} · Уже есть: {preview.duplicateCount} ·
+                                Пропуск: {preview.invalidCount}
+                              </p>
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => void addServiceKitToWishlist(kit)}
-                              disabled={wishlistAddingKitCode === kit.code}
+                              disabled={
+                                wishlistAddingKitCode === kit.code || (preview ? !preview.canAddAny : false)
+                              }
                               className="mt-2 inline-flex rounded-lg border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {wishlistAddingKitCode === kit.code
                                 ? "Добавление комплекта…"
-                                : "Добавить комплект в список покупок"}
+                                : "Добавить доступные позиции"}
                             </button>
                           </li>
-                        ))}
+                        )})}
                       </ul>
                     ) : null}
                   </div>

@@ -22,12 +22,14 @@ import {
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
   buildPartRecommendationGroupsForDisplay,
+  buildServiceKitPreview,
   formatExpenseAmountRu,
   formatPartSkuSearchResultMetaLineRu,
   getPartRecommendationGroupTitle,
   getPartRecommendationWarningLabel,
   getPartSkuViewModelDisplayLines,
   getWishlistItemSkuDisplayLines,
+  getServiceKitPreviewItemStatusLabel,
   normalizeCreatePartWishlistPayload,
   normalizeUpdatePartWishlistPayload,
   partWishlistFormValuesFromItem,
@@ -38,8 +40,10 @@ import {
 } from "@mototwin/domain";
 import type {
   FlattenedNodeSelectOption,
+  NodeTreeItem,
   PartRecommendationGroup,
   PartRecommendationViewModel,
+  ServiceKitPreviewViewModel,
   ServiceKitViewModel,
   PartSkuViewModel,
   PartWishlistFormValues,
@@ -78,6 +82,8 @@ export function WishlistItemEditor({
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [nodeTreeOptions, setNodeTreeOptions] = useState<FlattenedNodeSelectOption[]>([]);
+  const [nodeTreeRaw, setNodeTreeRaw] = useState<NodeTreeItem[]>([]);
+  const [wishlistItemsForPreview, setWishlistItemsForPreview] = useState<PartWishlistItem[]>([]);
   const [form, setForm] = useState<PartWishlistFormValues>(() =>
     createInitialPartWishlistFormValues({ nodeId: presetNodeId })
   );
@@ -116,6 +122,35 @@ export function WishlistItemEditor({
     (): PartRecommendationGroup[] => buildPartRecommendationGroupsForDisplay(recommendations),
     [recommendations]
   );
+  const serviceKitNodesByCode = useMemo(() => {
+    const out = new Map<string, { id: string; name: string; hasChildren: boolean }>();
+    const stack = [...nodeTreeRaw];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node) {
+        continue;
+      }
+      out.set(node.code, { id: node.id, name: node.name, hasChildren: node.children.length > 0 });
+      for (const child of node.children) {
+        stack.push(child);
+      }
+    }
+    return out;
+  }, [nodeTreeRaw]);
+  const serviceKitPreviewByCode = useMemo(() => {
+    const out = new Map<string, ServiceKitPreviewViewModel>();
+    for (const kit of serviceKits) {
+      out.set(
+        kit.code,
+        buildServiceKitPreview({
+          kit,
+          nodesByCode: serviceKitNodesByCode,
+          activeWishlistItems: wishlistItemsForPreview,
+        })
+      );
+    }
+    return out;
+  }, [serviceKitNodesByCode, serviceKits, wishlistItemsForPreview]);
 
   const load = useCallback(async () => {
     if (!vehicleId) {
@@ -131,9 +166,14 @@ export function WishlistItemEditor({
       const endpoints = createMotoTwinEndpoints(client);
 
       if (mode === "create") {
-        const tree = await endpoints.getNodeTree(vehicleId);
+        const [tree, wishlist] = await Promise.all([
+          endpoints.getNodeTree(vehicleId),
+          endpoints.getVehicleWishlist(vehicleId),
+        ]);
         const nodes = tree.nodeTree ?? [];
+        setNodeTreeRaw(nodes);
         setNodeTreeOptions(flattenNodeTreeToSelectOptions(nodes));
+        setWishlistItemsForPreview(wishlist.items ?? []);
         const initial = createInitialPartWishlistFormValues({ nodeId: presetNodeId });
         setForm(initial);
         statusWhenLoadedRef.current = initial.status;
@@ -150,7 +190,9 @@ export function WishlistItemEditor({
           endpoints.getVehicleWishlist(vehicleId),
         ]);
         const nodes = tree.nodeTree ?? [];
+        setNodeTreeRaw(nodes);
         setNodeTreeOptions(flattenNodeTreeToSelectOptions(nodes));
+        setWishlistItemsForPreview(wishlist.items ?? []);
         const row = wishlist.items.find((i) => i.id === itemIdSafe);
         if (!row) {
           setLoadError("Позиция не найдена.");
@@ -590,19 +632,44 @@ export function WishlistItemEditor({
                       <Text style={styles.mutedSmall}>Для этого узла пока нет подходящих комплектов.</Text>
                     ) : null}
                     {!serviceKitsLoading
-                      ? serviceKits.map((kit) => (
+                      ? serviceKits.map((kit) => {
+                          const preview = serviceKitPreviewByCode.get(kit.code);
+                          return (
                           <View key={kit.code} style={styles.kitCard}>
                             <Text style={styles.recName}>{kit.title}</Text>
                             <Text style={styles.skuResultMeta}>{kit.description}</Text>
-                            {kit.items.map((item) => (
-                              <Text key={item.key} style={styles.skuResultMeta}>
-                                • {item.title} x{item.quantity}
-                                {item.matchedSkuTitle ? ` — ${item.matchedSkuTitle}` : " — без SKU"}
+                            {(preview?.items ?? []).map((item) => {
+                              const muted = item.status !== "WILL_ADD";
+                              return (
+                                <View
+                                  key={item.itemKey}
+                                  style={[styles.kitPreviewRow, muted && styles.kitPreviewRowMuted]}
+                                >
+                                  <Text style={[styles.skuResultMeta, muted && styles.kitPreviewTextMuted]}>
+                                    {item.title}
+                                    {item.matchedSkuTitle ? ` — ${item.matchedSkuTitle}` : ""}
+                                  </Text>
+                                  <Text style={[styles.skuResultMeta, muted && styles.kitPreviewTextMuted]}>
+                                    {item.nodeName ? `Узел: ${item.nodeName}` : `Узел: ${item.nodeCode}`}
+                                    {item.costAmount != null
+                                      ? ` · ${formatExpenseAmountRu(item.costAmount)} ${item.currency ?? ""}`.trim()
+                                      : ""}
+                                  </Text>
+                                  <Text style={[styles.kitPreviewStatus, muted && styles.kitPreviewTextMuted]}>
+                                    {getServiceKitPreviewItemStatusLabel(item.status)}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                            {preview ? (
+                              <Text style={styles.skuResultMeta}>
+                                Доступно: {preview.addableCount} · Уже есть: {preview.duplicateCount} · Пропуск:{" "}
+                                {preview.invalidCount}
                               </Text>
-                            ))}
+                            ) : null}
                             <Pressable
                               onPress={() => void addServiceKit(kit)}
-                              disabled={addingKitCode === kit.code}
+                              disabled={addingKitCode === kit.code || (preview ? !preview.canAddAny : false)}
                               style={({ pressed }) => [
                                 styles.recommendationBtn,
                                 pressed && styles.recommendationBtnPressed,
@@ -612,11 +679,11 @@ export function WishlistItemEditor({
                               <Text style={styles.recommendationBtnText}>
                                 {addingKitCode === kit.code
                                   ? "Добавление комплекта…"
-                                  : "Добавить комплект в список покупок"}
+                                  : "Добавить доступные позиции"}
                               </Text>
                             </Pressable>
                           </View>
-                        ))
+                        )})
                       : null}
                   </View>
                 ) : null}
@@ -917,6 +984,26 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 8,
     backgroundColor: c.card,
+  },
+  kitPreviewRow: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 8,
+    padding: 6,
+    backgroundColor: c.cardMuted,
+  },
+  kitPreviewRowMuted: {
+    opacity: 0.75,
+  },
+  kitPreviewStatus: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textSecondary,
+  },
+  kitPreviewTextMuted: {
+    color: c.textMuted,
   },
   recommendationBtn: {
     marginTop: 8,

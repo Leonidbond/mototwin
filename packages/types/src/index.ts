@@ -143,8 +143,12 @@ export type {
   ServiceKitItemViewModel,
   ServiceKitViewModel,
   AddServiceKitToWishlistPayload,
+  ServiceKitSkippedReason,
   AddServiceKitToWishlistSkippedItem,
   AddServiceKitToWishlistResult,
+  ServiceKitPreviewItemStatus,
+  ServiceKitPreviewItemViewModel,
+  ServiceKitPreviewViewModel,
 } from "./service-kit";
 export type {
   GarageCardProps,

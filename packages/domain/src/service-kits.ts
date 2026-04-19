@@ -1,11 +1,15 @@
 import type {
+  AddServiceKitToWishlistSkippedItem,
   PartRecommendationType,
   PartRecommendationViewModel,
+  PartWishlistItem,
   ServiceKitDefinition,
   ServiceKitItemDefinition,
+  ServiceKitPreviewItemStatus,
+  ServiceKitPreviewViewModel,
   ServiceKitViewModel,
 } from "@mototwin/types";
-import { WISHLIST_KIT_ORIGIN_PREFIX_RU } from "./part-wishlist";
+import { isActiveWishlistItem, WISHLIST_KIT_ORIGIN_PREFIX_RU } from "./part-wishlist";
 
 export type ServiceKitWishlistDraft = {
   itemKey: string;
@@ -19,11 +23,7 @@ export type ServiceKitWishlistDraft = {
   currency: string | null;
 };
 
-export type ExpandServiceKitSkip = {
-  itemKey: string;
-  title: string;
-  reason: string;
-};
+export type ExpandServiceKitSkip = AddServiceKitToWishlistSkippedItem;
 
 type ExistingActiveWishlistItem = {
   nodeId: string | null;
@@ -34,6 +34,7 @@ type ExistingActiveWishlistItem = {
 type ExpandServiceKitParams = {
   kit: ServiceKitDefinition;
   nodeIdByCode: Map<string, string>;
+  nodeIssueByCode?: Map<string, "MISSING_NODE" | "NON_LEAF_NODE">;
   recommendationsByNodeCode: Map<string, PartRecommendationViewModel[]>;
   existingActiveItems: ExistingActiveWishlistItem[];
 };
@@ -44,6 +45,12 @@ const recommendationTypeRank: Record<PartRecommendationType, number> = {
   GENERIC_NODE_MATCH: 2,
   RELATED_CONSUMABLE: 3,
   VERIFY_REQUIRED: 4,
+};
+
+type ServiceKitNodeRef = {
+  id: string;
+  name: string;
+  hasChildren: boolean;
 };
 
 export const SERVICE_KIT_DEFINITIONS: ServiceKitDefinition[] = [
@@ -313,6 +320,8 @@ export function buildServiceKitViewModel(
         required: item.required,
         matchedSkuId: picked?.skuId ?? null,
         matchedSkuTitle: picked?.canonicalName ?? null,
+        matchedPriceAmount: picked?.priceAmount ?? null,
+        matchedCurrency: picked?.currency?.trim() || null,
         recommendationType: picked?.recommendationType ?? null,
         warning: warningsByItemKey?.get(item.key) ?? null,
       };
@@ -320,8 +329,131 @@ export function buildServiceKitViewModel(
   };
 }
 
-function normalizeTitleForDuplicate(title: string): string {
-  return title.trim().toLowerCase();
+export function normalizeWishlistTitle(title: string): string {
+  return title.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function buildActiveDuplicateSets(items: ExistingActiveWishlistItem[]) {
+  const existingSkuKeys = new Set(
+    items
+      .filter((item) => item.nodeId && item.skuId)
+      .map((item) => `${item.nodeId}|${item.skuId}`)
+  );
+  const existingManualKeys = new Set(
+    items
+      .filter((item) => item.nodeId && !item.skuId)
+      .map((item) => `${item.nodeId}|${normalizeWishlistTitle(item.title)}`)
+  );
+  return { existingSkuKeys, existingManualKeys };
+}
+
+export function isDuplicateActiveWishlistItem(args: {
+  nodeId: string;
+  skuId: string | null;
+  title: string;
+  existingActiveItems: ExistingActiveWishlistItem[];
+}): boolean {
+  const { nodeId, skuId, title, existingActiveItems } = args;
+  const { existingSkuKeys, existingManualKeys } = buildActiveDuplicateSets(existingActiveItems);
+  if (skuId) {
+    return existingSkuKeys.has(`${nodeId}|${skuId}`);
+  }
+  return existingManualKeys.has(`${nodeId}|${normalizeWishlistTitle(title)}`);
+}
+
+export function getServiceKitPreviewItemStatusLabel(status: ServiceKitPreviewItemStatus): string {
+  if (status === "WILL_ADD") {
+    return "Будет добавлено";
+  }
+  if (status === "DUPLICATE_ACTIVE_ITEM") {
+    return "Уже есть в списке";
+  }
+  return "Не удалось сопоставить узел";
+}
+
+export function buildServiceKitPreview(params: {
+  kit: ServiceKitViewModel;
+  activeWishlistItems: Pick<PartWishlistItem, "nodeId" | "skuId" | "title" | "status">[];
+  nodesByCode: Map<string, ServiceKitNodeRef>;
+}): ServiceKitPreviewViewModel {
+  const activeItems: ExistingActiveWishlistItem[] = params.activeWishlistItems
+    .filter((item) => isActiveWishlistItem({ status: item.status }))
+    .map((item) => ({ nodeId: item.nodeId, skuId: item.skuId ?? null, title: item.title }));
+  const mutableActiveItems = [...activeItems];
+  const previewItems = params.kit.items.map((item) => {
+    const nodeRef = params.nodesByCode.get(item.nodeCode);
+    const candidateTitle = item.matchedSkuTitle ?? item.title;
+    if (!nodeRef) {
+      return {
+        itemKey: item.key,
+        title: candidateTitle,
+        nodeCode: item.nodeCode,
+        nodeName: null,
+        matchedSkuId: item.matchedSkuId,
+        matchedSkuTitle: item.matchedSkuTitle,
+        costAmount: item.matchedPriceAmount,
+        currency: item.matchedCurrency,
+        status: "MISSING_NODE" as const,
+      };
+    }
+    if (nodeRef.hasChildren) {
+      return {
+        itemKey: item.key,
+        title: candidateTitle,
+        nodeCode: item.nodeCode,
+        nodeName: nodeRef.name,
+        matchedSkuId: item.matchedSkuId,
+        matchedSkuTitle: item.matchedSkuTitle,
+        costAmount: item.matchedPriceAmount,
+        currency: item.matchedCurrency,
+        status: "NON_LEAF_NODE" as const,
+      };
+    }
+    const duplicate = isDuplicateActiveWishlistItem({
+      nodeId: nodeRef.id,
+      skuId: item.matchedSkuId,
+      title: candidateTitle,
+      existingActiveItems: mutableActiveItems,
+    });
+    if (duplicate) {
+      return {
+        itemKey: item.key,
+        title: candidateTitle,
+        nodeCode: item.nodeCode,
+        nodeName: nodeRef.name,
+        matchedSkuId: item.matchedSkuId,
+        matchedSkuTitle: item.matchedSkuTitle,
+        costAmount: item.matchedPriceAmount,
+        currency: item.matchedCurrency,
+        status: "DUPLICATE_ACTIVE_ITEM" as const,
+      };
+    }
+    mutableActiveItems.push({ nodeId: nodeRef.id, skuId: item.matchedSkuId, title: candidateTitle });
+    return {
+      itemKey: item.key,
+      title: candidateTitle,
+      nodeCode: item.nodeCode,
+      nodeName: nodeRef.name,
+      matchedSkuId: item.matchedSkuId,
+      matchedSkuTitle: item.matchedSkuTitle,
+      costAmount: item.matchedPriceAmount,
+      currency: item.matchedCurrency,
+      status: "WILL_ADD" as const,
+    };
+  });
+  const addableCount = previewItems.filter((item) => item.status === "WILL_ADD").length;
+  const duplicateCount = previewItems.filter(
+    (item) => item.status === "DUPLICATE_ACTIVE_ITEM"
+  ).length;
+  const invalidCount = previewItems.length - addableCount - duplicateCount;
+  return {
+    kitCode: params.kit.code,
+    canAddAny: addableCount > 0,
+    addableCount,
+    duplicateCount,
+    invalidCount,
+    items: previewItems,
+  };
 }
 
 export function expandServiceKitToWishlistDrafts(
@@ -331,23 +463,24 @@ export function expandServiceKitToWishlistDrafts(
   const skipped: ExpandServiceKitSkip[] = [];
   const warnings: string[] = [];
   const drafts: ServiceKitWishlistDraft[] = [];
-  const existingSkuKeys = new Set(
-    existingActiveItems
-      .filter((item) => item.nodeId && item.skuId)
-      .map((item) => `${item.nodeId}|${item.skuId}`)
-  );
-  const existingManualKeys = new Set(
-    existingActiveItems
-      .filter((item) => item.nodeId && !item.skuId)
-      .map((item) => `${item.nodeId}|${normalizeTitleForDuplicate(item.title)}`)
-  );
+  const { existingSkuKeys, existingManualKeys } = buildActiveDuplicateSets(existingActiveItems);
 
   for (const item of kit.items) {
+    const nodeIssue = params.nodeIssueByCode?.get(item.nodeCode);
+    if (nodeIssue) {
+      const message =
+        nodeIssue === "NON_LEAF_NODE"
+          ? `Узел ${item.nodeCode} не является конечным.`
+          : `Узел ${item.nodeCode} недоступен.`;
+      skipped.push({ itemKey: item.key, title: item.title, reason: nodeIssue, message });
+      warnings.push(message);
+      continue;
+    }
     const nodeId = nodeIdByCode.get(item.nodeCode);
     if (!nodeId) {
-      const reason = `Узел ${item.nodeCode} недоступен или не является конечным.`;
-      skipped.push({ itemKey: item.key, title: item.title, reason });
-      warnings.push(reason);
+      const message = `Узел ${item.nodeCode} недоступен или не является конечным.`;
+      skipped.push({ itemKey: item.key, title: item.title, reason: "MISSING_NODE", message });
+      warnings.push(message);
       continue;
     }
 
@@ -362,18 +495,20 @@ export function expandServiceKitToWishlistDrafts(
         skipped.push({
           itemKey: item.key,
           title,
-          reason: "Похожая активная позиция с этим SKU уже есть в списке.",
+          reason: "DUPLICATE_ACTIVE_ITEM",
+          message: "Похожая активная позиция с этим SKU уже есть в списке.",
         });
         continue;
       }
       existingSkuKeys.add(key);
     } else {
-      const key = `${nodeId}|${normalizeTitleForDuplicate(title)}`;
+      const key = `${nodeId}|${normalizeWishlistTitle(title)}`;
       if (existingManualKeys.has(key)) {
         skipped.push({
           itemKey: item.key,
           title,
-          reason: "Похожая активная позиция уже есть в списке.",
+          reason: "DUPLICATE_ACTIVE_ITEM",
+          message: "Похожая активная позиция уже есть в списке.",
         });
         continue;
       }

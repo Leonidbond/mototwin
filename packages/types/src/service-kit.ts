@@ -31,6 +31,8 @@ export type ServiceKitItemViewModel = {
   required: boolean;
   matchedSkuId: string | null;
   matchedSkuTitle: string | null;
+  matchedPriceAmount: number | null;
+  matchedCurrency: string | null;
   recommendationType: PartRecommendationType | null;
   warning: string | null;
 };
@@ -49,10 +51,17 @@ export type AddServiceKitToWishlistPayload = {
   contextNodeId?: string | null;
 };
 
+export type ServiceKitSkippedReason =
+  | "DUPLICATE_ACTIVE_ITEM"
+  | "MISSING_NODE"
+  | "NON_LEAF_NODE"
+  | "NO_MATCHED_SKU";
+
 export type AddServiceKitToWishlistSkippedItem = {
   itemKey: string;
   title: string;
-  reason: string;
+  reason: ServiceKitSkippedReason;
+  message: string;
 };
 
 export type AddServiceKitToWishlistResult = {
@@ -60,4 +69,32 @@ export type AddServiceKitToWishlistResult = {
   createdItems: PartWishlistItem[];
   skippedItems: AddServiceKitToWishlistSkippedItem[];
   warnings: string[];
+};
+
+export type ServiceKitPreviewItemStatus =
+  | "WILL_ADD"
+  | "DUPLICATE_ACTIVE_ITEM"
+  | "MISSING_NODE"
+  | "NON_LEAF_NODE"
+  | "NO_MATCHED_SKU";
+
+export type ServiceKitPreviewItemViewModel = {
+  itemKey: string;
+  title: string;
+  nodeCode: string;
+  nodeName: string | null;
+  matchedSkuId: string | null;
+  matchedSkuTitle: string | null;
+  costAmount: number | null;
+  currency: string | null;
+  status: ServiceKitPreviewItemStatus;
+};
+
+export type ServiceKitPreviewViewModel = {
+  kitCode: string;
+  canAddAny: boolean;
+  addableCount: number;
+  duplicateCount: number;
+  invalidCount: number;
+  items: ServiceKitPreviewItemViewModel[];
 };
