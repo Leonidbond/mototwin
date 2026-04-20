@@ -23,7 +23,9 @@ Parity оценивается по core workflows, business outcome и поль�
 - **Expo:** implemented (`index`)
 - **Parity status:** aligned as personal dashboard semantics (`Мой гараж`) with existing garage cards, shared summary meaning, and unchanged vehicle-detail navigation.
 - **Notes:** both clients use shared `buildGarageDashboardSummary` (motorcycles count + attention counts from existing garage payload, no extra backend calls), preserve card-level `attentionSummary` indicator, and keep collapsible **«Профиль эксплуатации»** / **«Техническая сводка»** local UI state (`garage.usageProfile.expanded`, `garage.technicalSummary.expanded`, default collapsed). Empty state and primary CTA (`Добавить мотоцикл`) are aligned. See [garage-dashboard-mvp.md](./garage-dashboard-mvp.md) and [auth-roadmap.md](./auth-roadmap.md).
-- **Local settings parity:** both clients expose local Garage settings (currency, distance unit, date format, default snooze days; engine-hours unit fixed to `h`) with shared defaults/normalization in domain. Persistence is local-only (web `localStorage`, Expo local storage helper), no backend sync yet. See [user-settings-mvp.md](./user-settings-mvp.md).
+- **Local settings parity:** both clients expose local Garage settings (currency, distance unit, date format, default snooze days; engine-hours unit fixed to `h`) with shared defaults/normalization in domain. Persistence is local-only (web `localStorage`, Expo local storage helper), no backend sync yet. `defaultCurrency` is wired to wishlist create + add-service-event defaults while preserving item-specific wishlist-install prefill. See [user-settings-mvp.md](./user-settings-mvp.md).
+- **Auth/ownership note:** both clients remain pre-auth in MVP and must not claim user isolation yet; planned ownership migration is documented in [auth-data-ownership-architecture.md](./auth-data-ownership-architecture.md).
+- **Phase 1 ownership status:** backend now has demo user + demo garage ownership foundation; web/Expo UX remains unchanged and still pre-auth by behavior.
 
 ## 3.2 Add motorcycle
 

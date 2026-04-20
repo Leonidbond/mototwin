@@ -22,8 +22,17 @@
 ### User / Subscription
 
 - `User` has many `Vehicle`.
+- `User` has many `Garage`.
+- `User.email` is nullable unique (transitional pre-auth ownership mode).
+- `User.displayName` is optional.
 - `Subscription` is optional 1:1 to `User` (`userId` unique).
 - Runtime MVP currently uses demo user approach for vehicle flows.
+
+### Garage
+
+- `Garage` belongs to `User` via `ownerUserId`.
+- `Garage` has many `Vehicle`.
+- Current pre-auth runtime uses stable demo garage title `Мой гараж`.
 
 ### Brand / Model / ModelVariant
 
@@ -34,7 +43,7 @@
 
 ### Vehicle / RideProfile
 
-- `Vehicle` links to `User`, `Brand`, `Model`, `ModelVariant`.
+- `Vehicle` links to `User`, optional `Garage`, `Brand`, `Model`, `ModelVariant`.
 - `RideProfile` is effectively 1:1 with `Vehicle` via unique `vehicleId`.
 - `Vehicle` also links to `ServiceEvent`, `NodeState`, `TopNodeState`.
 
@@ -71,6 +80,8 @@
 ## 4. Relationship summary
 
 - `User 1:N Vehicle`
+- `User 1:N Garage`
+- `Garage 1:N Vehicle`
 - `Vehicle 1:1 RideProfile` (optional, enforced by unique)
 - `Vehicle 1:N ServiceEvent`
 - `Vehicle 1:N NodeState`
@@ -97,7 +108,25 @@ Computed and aggregated statuses are returned by backend node-tree endpoint.
 - `STATE_UPDATE` log entry still requires `nodeId` due to schema requirement.
 - No separate audit actor model in `ServiceEvent` yet.
 
-## 7. Related docs
+## 7. Ownership transition status
+
+Implemented in Phase 1:
+
+- `Garage` model and relation to `User`;
+- `Vehicle.garageId` relation (nullable transitional field);
+- demo user + demo garage seeding and backfill path for missing `garageId`.
+
+Planned next:
+
+- wider API ownership filtering by resolved current-user context;
+- later login/session replacement for demo resolver;
+- later server-side `UserSettings`.
+
+Reference:
+
+- [auth-data-ownership-architecture.md](./auth-data-ownership-architecture.md)
+
+## 8. Related docs
 
 - `api-backend.md`
 - `functional-logic.md`

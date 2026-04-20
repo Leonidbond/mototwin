@@ -16,6 +16,7 @@ import {
   createInitialAddServiceEventFromNode,
   createInitialAddServiceEventFormValues,
   createInitialAddServiceEventFromWishlistItem,
+  getDefaultCurrencyFromSettings,
   getNodePathById,
   getNodeSelectLevels,
   getNodeShortExplanationLabel,
@@ -35,6 +36,7 @@ import type {
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../../components/keyboard-aware-scroll-screen";
+import { readUserLocalSettings } from "../../../../src/ui-user-local-settings";
 
 export default function NewServiceEventScreen() {
   const router = useRouter();
@@ -98,6 +100,8 @@ export default function NewServiceEventScreen() {
       try {
         setIsLoading(true);
         setError("");
+        const localSettings = await readUserLocalSettings();
+        const defaultCurrency = getDefaultCurrencyFromSettings(localSettings);
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
         const [vehicleData, treeData, eventsData] = await Promise.all([
@@ -145,6 +149,7 @@ export default function NewServiceEventScreen() {
           setEngineHours(
             vehicleData.vehicle?.engineHours != null ? String(vehicleData.vehicle.engineHours) : ""
           );
+          setCurrency(defaultCurrency);
         }
 
         const fromWishlist =
@@ -215,10 +220,11 @@ export default function NewServiceEventScreen() {
             setOdometer(prefill.odometer);
             setEngineHours(prefill.engineHours);
             setCostAmount(prefill.costAmount);
-            setCurrency(prefill.currency);
+          setCurrency(defaultCurrency);
             setComment(prefill.comment);
             setInstalledPartsJson(prefill.installedPartsJson);
           } else {
+          setCurrency(defaultCurrency);
             setInstalledPartsJson("");
           }
         } else {

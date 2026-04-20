@@ -31,7 +31,10 @@ Shared storage key constant:
 ## Current integration
 
 - Settings are editable and persisted in Garage dashboard settings section on both platforms.
-- Value usage in forms (wishlist/service-event default currency) is intentionally deferred to a follow-up step to avoid broad cross-screen refactor in this task scope.
+- `Валюта по умолчанию` is used as default currency in:
+  - wishlist create form;
+  - add service event form (direct add and node-context add).
+- Existing wishlist-`INSTALLED` prefill keeps item-specific currency when it is present.
 
 ## Not implemented yet
 

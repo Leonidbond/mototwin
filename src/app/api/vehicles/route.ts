@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserContext } from "../_shared/current-user-context";
 
 const createVehicleSchema = z.object({
   brandId: z.string().min(1),
@@ -18,28 +19,16 @@ const createVehicleSchema = z.object({
   }),
 });
 
-const DEMO_USER_EMAIL = "demo@mototwin.local";
-
 export async function POST(request: NextRequest) {
   try {
     const json = await request.json();
     const data = createVehicleSchema.parse(json);
-
-    const user = await prisma.user.findUnique({
-      where: { email: DEMO_USER_EMAIL },
-      select: { id: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Demo user not found" },
-        { status: 500 }
-      );
-    }
+    const currentUser = await getCurrentUserContext();
 
     const vehicle = await prisma.vehicle.create({
       data: {
-        userId: user.id,
+        userId: currentUser.userId,
+        garageId: currentUser.garageId,
         brandId: data.brandId,
         modelId: data.modelId,
         modelVariantId: data.modelVariantId,

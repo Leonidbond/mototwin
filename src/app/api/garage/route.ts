@@ -1,26 +1,15 @@
 import { NextResponse } from "next/server";
 import { computeGarageAttentionByVehicleId } from "@/lib/vehicle-node-tree-internal";
 import { prisma } from "@/lib/prisma";
-
-const DEMO_USER_EMAIL = "demo@mototwin.local";
+import { getCurrentUserContext } from "../_shared/current-user-context";
 
 export async function GET() {
   try {
-    const user = await prisma.user.findUnique({
-      where: { email: DEMO_USER_EMAIL },
-      select: { id: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Demo user not found" },
-        { status: 500 }
-      );
-    }
+    const currentUser = await getCurrentUserContext();
 
     const vehicles = await prisma.vehicle.findMany({
       where: {
-        userId: user.id,
+        garageId: currentUser.garageId,
       },
       orderBy: {
         createdAt: "desc",

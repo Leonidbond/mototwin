@@ -1016,6 +1016,7 @@ async function seedPartCatalogFromJson(nodeIdByCode: Map<string, string>): Promi
 /** Стабильные QA-мотоциклы для проверки рекомендаций каталога (паритет fitment с parts-skus.qa.json). */
 async function upsertDemoCatalogVehicle(input: {
   userId: string;
+  garageId: string;
   nickname: string;
   brandId: string;
   modelId: string;
@@ -1032,6 +1033,7 @@ async function upsertDemoCatalogVehicle(input: {
           await prisma.vehicle.update({
             where: { id: existing.id },
             data: {
+              garageId: input.garageId,
               brandId: input.brandId,
               modelId: input.modelId,
               modelVariantId: input.modelVariantId,
@@ -1043,6 +1045,7 @@ async function upsertDemoCatalogVehicle(input: {
           await prisma.vehicle.create({
             data: {
               userId: input.userId,
+              garageId: input.garageId,
               brandId: input.brandId,
               modelId: input.modelId,
               modelVariantId: input.modelVariantId,
@@ -1077,11 +1080,37 @@ async function main() {
   const testUser = await prisma.user.upsert({
     where: { email: "demo@mototwin.local" },
     update: {
+      displayName: "Demo User",
       passwordHash: null,
     },
     create: {
       email: "demo@mototwin.local",
+      displayName: "Demo User",
       passwordHash: null,
+    },
+  });
+
+  const demoGarage = await prisma.garage.upsert({
+    where: {
+      ownerUserId_title: {
+        ownerUserId: testUser.id,
+        title: "Мой гараж",
+      },
+    },
+    update: {},
+    create: {
+      ownerUserId: testUser.id,
+      title: "Мой гараж",
+    },
+  });
+
+  await prisma.vehicle.updateMany({
+    where: {
+      garageId: null,
+    },
+    data: {
+      userId: testUser.id,
+      garageId: demoGarage.id,
     },
   });
 
@@ -1241,6 +1270,7 @@ async function main() {
   if (variantR12502023) {
     await upsertDemoCatalogVehicle({
       userId: testUser.id,
+      garageId: demoGarage.id,
       nickname: "QA — BMW R 1250 GS 2023",
       brandId: bmw.id,
       modelId: r1250gs.id,
@@ -1253,6 +1283,7 @@ async function main() {
   if (variant6902022) {
     await upsertDemoCatalogVehicle({
       userId: testUser.id,
+      garageId: demoGarage.id,
       nickname: "QA — KTM 690 Enduro R 2022",
       brandId: ktm.id,
       modelId: enduro690.id,
@@ -1484,6 +1515,7 @@ async function main() {
   console.log({
     brands: ["BMW", "KTM"],
     testUserEmail: testUser.email,
+    demoGarageId: demoGarage.id,
     seededNodes: seededNodes.length,
     topLevelNodes: topLevelNodes.length,
     topNodeStates: topNodeStateRows.length,

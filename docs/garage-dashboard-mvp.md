@@ -7,8 +7,10 @@ Garage is positioned as a personal dashboard area: **«Личный гараж /
 Current MVP scope:
 
 - no login/register;
-- no account backend model yet;
+- no real auth session yet;
 - dashboard semantics over existing garage data.
+- prepared to migrate to authenticated user-owned garage model later.
+ - Phase 1 ownership foundation exists in backend data model (demo user + demo garage).
 
 ## Product framing
 
@@ -67,3 +69,4 @@ New shared view model:
 Helper is pure and uses only provided garage list data; no extra backend calls.
 
 Local settings are described in [user-settings-mvp.md](./user-settings-mvp.md).
+Planned auth/data ownership foundation is described in [auth-data-ownership-architecture.md](./auth-data-ownership-architecture.md).

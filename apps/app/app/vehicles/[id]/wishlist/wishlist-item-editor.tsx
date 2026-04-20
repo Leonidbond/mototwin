@@ -21,6 +21,7 @@ import {
   clearPartWishlistFormSkuSelection,
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
+  getDefaultCurrencyFromSettings,
   buildPartRecommendationGroupsForDisplay,
   buildServiceKitPreview,
   formatExpenseAmountRu,
@@ -52,6 +53,7 @@ import type {
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
+import { readUserLocalSettings } from "../../../../src/ui-user-local-settings";
 import { buildServiceEventNewFromWishlistHref } from "./hrefs";
 
 type WishlistItemEditorProps = {
@@ -164,6 +166,8 @@ export function WishlistItemEditor({
       setLoadError("");
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
+      const localSettings = await readUserLocalSettings();
+      const defaultCurrency = getDefaultCurrencyFromSettings(localSettings);
 
       if (mode === "create") {
         const [tree, wishlist] = await Promise.all([
@@ -175,7 +179,7 @@ export function WishlistItemEditor({
         setNodeTreeOptions(flattenNodeTreeToSelectOptions(nodes));
         setWishlistItemsForPreview(wishlist.items ?? []);
         const initial = createInitialPartWishlistFormValues({ nodeId: presetNodeId });
-        setForm(initial);
+        setForm({ ...initial, currency: defaultCurrency });
         statusWhenLoadedRef.current = initial.status;
         setLoadedWishlistItem(null);
       } else {

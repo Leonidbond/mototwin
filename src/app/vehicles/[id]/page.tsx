@@ -58,6 +58,7 @@ import {
   buildNodeMaintenancePlanViewModel,
   formatSnoozeUntilLabel,
   getAttentionSnoozeFilterLabel,
+  getDefaultCurrencyFromSettings,
   groupAttentionItemsByStatus,
   buildPartWishlistItemViewModel,
   createInitialPartWishlistFormValues,
@@ -83,6 +84,9 @@ import {
   getPartSkuViewModelDisplayLines,
   getWishlistItemSkuDisplayLines,
   isNodeSnoozed,
+  normalizeUserLocalSettings,
+  DEFAULT_USER_LOCAL_SETTINGS,
+  USER_LOCAL_SETTINGS_STORAGE_KEY,
 } from "@mototwin/domain";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
@@ -938,6 +942,19 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setInstalledPartsJson(values.installedPartsJson);
   };
 
+  const readDefaultCurrencySetting = () => {
+    try {
+      const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
+      if (!raw) {
+        return DEFAULT_USER_LOCAL_SETTINGS.defaultCurrency;
+      }
+      const settings = normalizeUserLocalSettings(JSON.parse(raw));
+      return getDefaultCurrencyFromSettings(settings);
+    } catch {
+      return DEFAULT_USER_LOCAL_SETTINGS.defaultCurrency;
+    }
+  };
+
   const openAddServiceEventFromLeafNode = (leafNodeId: string) => {
     if (!vehicle) {
       setServiceEventFormError("Не удалось загрузить данные мотоцикла.");
@@ -961,6 +978,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       },
       currentDateYmd: todayDate,
     });
+    values.currency = readDefaultCurrencySetting();
 
     setServiceEventFormError("");
     setServiceEventFormSuccess("");
@@ -1104,12 +1122,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setWishlistServiceKits([]);
     setWishlistServiceKitsError("");
     setWishlistAddingKitCode("");
-    setWishlistForm(
-      createInitialPartWishlistFormValues({
-        nodeId: presetNodeId ?? "",
-        status: "NEEDED",
-      })
-    );
+    const initialWishlistForm = createInitialPartWishlistFormValues({
+      nodeId: presetNodeId ?? "",
+      status: "NEEDED",
+    });
+    setWishlistForm({ ...initialWishlistForm, currency: readDefaultCurrencySetting() });
     setWishlistFormError("");
     setIsWishlistModalOpen(true);
   };
@@ -1825,6 +1842,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setEditingServiceEventId(null);
     setSelectedNodePath([]);
     const empty = createInitialAddServiceEventFormValues();
+    empty.currency = readDefaultCurrencySetting();
     applyAddServiceEventFormValues(empty);
   };
 
