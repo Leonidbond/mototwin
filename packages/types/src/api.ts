@@ -37,6 +37,16 @@ export type CreateServiceEventResponse = {
   serviceEvent: ServiceEventItem;
 };
 
+export type UpdateServiceEventResponse = {
+  serviceEvent: ServiceEventItem;
+};
+
+export type DeleteServiceEventResponse = {
+  deleted: true;
+  eventId: string;
+  affectedNodeId: string;
+};
+
 export type UpdateVehicleStateResponse = {
   vehicle: {
     id: string;

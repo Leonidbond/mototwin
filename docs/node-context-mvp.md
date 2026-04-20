@@ -50,6 +50,8 @@ If no node-specific template exists, fallback is:
 
 Wishlist `INSTALLED → Добавить сервисное событие` keeps its own wishlist-specific prefill and does not use node template defaults.
 
+Node Context does not add separate lifecycle actions for historical events: service-history correction/deletion is done from Service Log timeline (`SERVICE` rows only).
+
 ## Entry Points
 
 Node Context is opened from:

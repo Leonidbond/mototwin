@@ -17,6 +17,7 @@ export type ServiceEventItem = {
   serviceType: string;
   odometer: number;
   engineHours: number | null;
+  installedPartsJson?: unknown | null;
   costAmount: number | null;
   currency: string | null;
   comment: string | null;
@@ -34,3 +35,5 @@ export type CreateServiceEventInput = {
   comment?: string | null;
   installedPartsJson?: unknown | null;
 };
+
+export type UpdateServiceEventInput = CreateServiceEventInput;

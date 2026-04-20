@@ -37,6 +37,7 @@ export type {
   ServiceEventNode,
   ServiceEventItem,
   CreateServiceEventInput,
+  UpdateServiceEventInput,
 } from "./service-event";
 export type {
   RideUsageType,
@@ -104,6 +105,8 @@ export type {
   VehicleNodeTreeResponse,
   ServiceEventsResponse,
   CreateServiceEventResponse,
+  UpdateServiceEventResponse,
+  DeleteServiceEventResponse,
   UpdateVehicleStateResponse,
   UpdateVehicleProfileResponse,
   BrandsResponse,

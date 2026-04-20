@@ -5,6 +5,7 @@ import type {
   CreatePartWishlistItemInput,
   CreateServiceEventInput,
   CreateServiceEventResponse,
+  DeleteServiceEventResponse,
   CreateVehicleInput,
   CreateVehicleResponse,
   CreateWishlistItemResponse,
@@ -20,6 +21,8 @@ import type {
   UpdatePartWishlistItemInput,
   UpdateVehicleProfileInput,
   UpdateVehicleProfileResponse,
+  UpdateServiceEventInput,
+  UpdateServiceEventResponse,
   UpdateVehicleStateInput,
   UpdateVehicleStateResponse,
   UpdateWishlistItemResponse,
@@ -152,6 +155,23 @@ export function createMotoTwinEndpoints(client: ApiClient) {
           method: "POST",
           body: JSON.stringify(input),
         }
+      );
+    },
+
+    updateServiceEvent(vehicleId: string, eventId: string, input: UpdateServiceEventInput) {
+      return client.request<UpdateServiceEventResponse>(
+        `/api/vehicles/${vehicleId}/service-events/${eventId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(input),
+        }
+      );
+    },
+
+    deleteServiceEvent(vehicleId: string, eventId: string) {
+      return client.request<DeleteServiceEventResponse>(
+        `/api/vehicles/${vehicleId}/service-events/${eventId}`,
+        { method: "DELETE" }
       );
     },
 

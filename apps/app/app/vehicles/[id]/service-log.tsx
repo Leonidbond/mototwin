@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -100,10 +101,14 @@ function ServiceCard({
   entry,
   isCommentExpanded,
   onToggleComment,
+  onEdit,
+  onDelete,
 }: {
   entry: ServiceLogEntryViewModel;
   isCommentExpanded: boolean;
   onToggleComment: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const comment = entry.comment;
   const commentLong =
@@ -147,6 +152,14 @@ function ServiceCard({
           {entry.costAmount.toLocaleString("ru-RU")} {entry.costCurrency}
         </Text>
       ) : null}
+      <View style={styles.rowActions}>
+        <Pressable onPress={onEdit} hitSlop={6}>
+          <Text style={styles.editAction}>Редактировать</Text>
+        </Pressable>
+        <Pressable onPress={onDelete} hitSlop={6}>
+          <Text style={styles.deleteAction}>Удалить</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -206,10 +219,14 @@ function MonthGroup({
   group,
   expandedComments,
   onToggleComment,
+  onEditServiceEvent,
+  onDeleteServiceEvent,
 }: {
   group: ServiceLogMonthGroupViewModel;
   expandedComments: Record<string, boolean>;
   onToggleComment: (entryId: string) => void;
+  onEditServiceEvent: (entryId: string) => void;
+  onDeleteServiceEvent: (entryId: string) => void;
 }) {
   const hasServiceCount = group.summary.serviceCount > 0;
   const hasStateUpdates = group.summary.stateUpdateCount > 0;
@@ -266,6 +283,8 @@ function MonthGroup({
                     entry={entry}
                     isCommentExpanded={Boolean(expandedComments[entry.id])}
                     onToggleComment={() => onToggleComment(entry.id)}
+                    onEdit={() => onEditServiceEvent(entry.id)}
+                    onDelete={() => onDeleteServiceEvent(entry.id)}
                   />
                 )}
               </View>
@@ -286,6 +305,7 @@ export default function ServiceLogScreen() {
     nodeIds?: string;
     nodeLabel?: string;
     paidOnly?: string;
+    feedback?: string;
   }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
 
@@ -303,6 +323,11 @@ export default function ServiceLogScreen() {
   const [sortDirection, setSortDirection] = useState<ServiceEventsSortDirection>("desc");
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [actionMessage, setActionMessage] = useState<{
+    tone: "success" | "error";
+    title: string;
+    details?: string;
+  } | null>(null);
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -315,6 +340,39 @@ export default function ServiceLogScreen() {
     () => parsePaidOnlyFromParams(params.paidOnly),
     [params.paidOnly]
   );
+
+  useEffect(() => {
+    const feedback = typeof params.feedback === "string" ? params.feedback : "";
+    if (!feedback) {
+      return;
+    }
+    if (feedback === "created") {
+      setActionMessage({
+        tone: "success",
+        title: "Сервисное событие добавлено",
+        details: "Статусы и расходы обновлены",
+      });
+    } else if (feedback === "updated") {
+      setActionMessage({
+        tone: "success",
+        title: "Сервисное событие обновлено",
+        details: "Статусы и расходы обновлены",
+      });
+    }
+    router.replace(buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, paidOnlyActive));
+  }, [params.feedback, paidOnlyActive, nodeSubtreeFilter, router, vehicleId]);
+
+  useEffect(() => {
+    if (!actionMessage) {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      setActionMessage(null);
+    }, 4500);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [actionMessage]);
 
   const effectiveFilters = useMemo(
     (): ServiceEventsFilters => ({
@@ -418,6 +476,52 @@ export default function ServiceLogScreen() {
     );
   };
 
+  const openEditServiceEvent = (eventId: string) => {
+    router.push(
+      `/vehicles/${vehicleId}/service-events/new?source=service-log&eventId=${encodeURIComponent(eventId)}`
+    );
+  };
+
+  const openDeleteServiceEventConfirm = (eventId: string) => {
+    const event = events.find((item) => item.id === eventId);
+    if (!event || event.eventKind === "STATE_UPDATE") {
+      return;
+    }
+    Alert.alert(
+      "Удалить сервисное событие?",
+      "Это может изменить статус узла и суммы расходов.",
+      [
+        { text: "Отмена", style: "cancel" },
+        {
+          text: "Удалить",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                setError("");
+                const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+                await endpoints.deleteServiceEvent(vehicleId, eventId);
+                await load();
+                setActionMessage({
+                  tone: "success",
+                  title: "Сервисное событие удалено",
+                  details: "Статусы и расходы обновлены",
+                });
+              } catch (deleteError) {
+                console.error(deleteError);
+                setError("Не удалось удалить сервисное событие.");
+                setActionMessage({
+                  tone: "error",
+                  title: "Не удалось удалить сервисное событие",
+                });
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -462,6 +566,27 @@ export default function ServiceLogScreen() {
         >
           <Text style={styles.addButtonText}>+ Добавить сервисное событие</Text>
         </Pressable>
+
+        {actionMessage ? (
+          <View
+            style={[
+              styles.actionMessageCard,
+              actionMessage.tone === "success"
+                ? styles.actionMessageSuccess
+                : styles.actionMessageError,
+            ]}
+          >
+            <View style={styles.actionMessageBody}>
+              <Text style={styles.actionMessageTitle}>{actionMessage.title}</Text>
+              {actionMessage.details ? (
+                <Text style={styles.actionMessageDetails}>{actionMessage.details}</Text>
+              ) : null}
+            </View>
+            <Pressable onPress={() => setActionMessage(null)}>
+              <Text style={styles.actionMessageDismiss}>Скрыть</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {nodeSubtreeFilter ? (
           <View style={styles.nodeFilterBanner}>
@@ -674,6 +799,8 @@ export default function ServiceLogScreen() {
             key={group.monthKey}
             group={group}
             expandedComments={expandedComments}
+            onEditServiceEvent={openEditServiceEvent}
+            onDeleteServiceEvent={openDeleteServiceEventConfirm}
             onToggleComment={(entryId) =>
               setExpandedComments((prev) => ({
                 ...prev,
@@ -746,6 +873,44 @@ const styles = StyleSheet.create({
     color: c.textInverse,
     fontSize: 14,
     fontWeight: "700",
+  },
+  actionMessageCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  actionMessageSuccess: {
+    borderColor: c.successBorder,
+    backgroundColor: c.successSurface,
+  },
+  actionMessageError: {
+    borderColor: c.errorBorder,
+    backgroundColor: c.errorSurface,
+  },
+  actionMessageBody: {
+    flex: 1,
+  },
+  actionMessageTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  actionMessageDetails: {
+    marginTop: 2,
+    fontSize: 12,
+    color: c.textSecondary,
+  },
+  actionMessageDismiss: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textSecondary,
+    textDecorationLine: "underline",
   },
   nodeFilterBanner: {
     flexDirection: "row",
@@ -1111,5 +1276,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: c.successStrong,
+  },
+  editAction: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textSecondary,
+    textDecorationLine: "underline",
+  },
+  deleteAction: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.error,
+    textDecorationLine: "underline",
+  },
+  rowActions: {
+    flexDirection: "row",
+    gap: 14,
   },
 });

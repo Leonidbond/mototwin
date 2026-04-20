@@ -8,6 +8,7 @@ import type {
   EditVehicleProfilePayload,
   FormValidationResult,
   PartWishlistItem,
+  ServiceEventItem,
   UpdateVehicleStateFormValues,
   UpdateVehicleStatePayload,
 } from "@mototwin/types";
@@ -221,6 +222,47 @@ export function createInitialAddServiceEventFromWishlistItem(
     comment: buildAddServiceEventCommentFromWishlistItem(item),
     installedPartsJson: buildWishlistInstalledPartsJsonString(item),
   };
+}
+
+type CreateInitialEditServiceEventValuesOptions = {
+  fallbackCurrency?: string;
+};
+
+function toIsoDateInputValue(isoDateLike: string): string {
+  const date = new Date(isoDateLike);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toISOString().slice(0, 10);
+  }
+  return isoDateLike.trim().slice(0, 10);
+}
+
+export function createInitialEditServiceEventValues(
+  event: ServiceEventItem,
+  options?: CreateInitialEditServiceEventValuesOptions
+): AddServiceEventFormValues {
+  const base = createInitialAddServiceEventFormValues();
+  return {
+    ...base,
+    nodeId: event.nodeId,
+    eventDate: toIsoDateInputValue(event.eventDate),
+    serviceType: event.serviceType ?? "",
+    odometer: String(event.odometer),
+    engineHours: event.engineHours != null ? String(event.engineHours) : "",
+    costAmount: event.costAmount != null ? formatExpenseAmountRu(event.costAmount) : "",
+    currency:
+      event.currency?.trim().toUpperCase() ||
+      options?.fallbackCurrency ||
+      DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
+    comment: event.comment ?? "",
+    installedPartsJson:
+      event.installedPartsJson == null ? "" : JSON.stringify(event.installedPartsJson, null, 2),
+  };
+}
+
+export function normalizeEditServiceEventPayload(
+  values: AddServiceEventFormValues
+): AddServiceEventPayload {
+  return normalizeAddServiceEventPayload(values);
 }
 
 export function normalizeAddServiceEventPayload(

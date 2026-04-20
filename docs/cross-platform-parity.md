@@ -43,7 +43,7 @@ Parity оценивается по core workflows, business outcome и поль�
 - **Web:** implemented inside vehicle page modal
 - **Expo:** implemented as dedicated route (`vehicles/[id]/service-log`)
 - **Parity status:** aligned by business outcome
-- **Notes:** both support reading `SERVICE` and `STATE_UPDATE`, filtering/sorting and grouped understanding. Entry date string: web `default`, Expo `compact`; month headers shared — **4.1**. На Expo формы/фильтры с `TextInput` используют keyboard-aware layout (локальный UI-слой, без backend/API изменений).
+- **Notes:** both support reading `SERVICE` and `STATE_UPDATE`, filtering/sorting and grouped understanding. `SERVICE` rows have edit + delete actions on both clients and reuse existing service-event lifecycle routes (`PATCH` / `DELETE` on `/api/vehicles/[id]/service-events/[eventId]`); `STATE_UPDATE` remains read-only in this flow. Both clients show aligned action feedback after create/edit/delete (`добавлено` / `обновлено` / `удалено`, with optional `Статусы и расходы обновлены` detail), while UI mechanism stays platform-local (web inline notice, Expo inline message). Entry date string: web `default`, Expo `compact`; month headers shared — **4.1**. На Expo формы/фильтры с `TextInput` используют keyboard-aware layout (локальный UI-слой, без backend/API изменений).
 
 ## 3.4.1 Expense summary (MVP)
 

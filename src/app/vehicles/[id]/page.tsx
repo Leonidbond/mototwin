@@ -17,6 +17,7 @@ import {
   createInitialAddServiceEventFormValues,
   createInitialAddServiceEventFromNode,
   createInitialAddServiceEventFromWishlistItem,
+  createInitialEditServiceEventValues,
   createInitialEditVehicleProfileFormValues,
   createInitialVehicleStateFormValues,
   createServiceLogNodeFilter,
@@ -34,6 +35,7 @@ import {
   getSelectedNodeFromPath,
   getStatusExplanationTriggeredByLabel,
   normalizeAddServiceEventPayload,
+  normalizeEditServiceEventPayload,
   normalizeEditVehicleProfilePayload,
   normalizeVehicleStatePayload,
   RIDE_LOAD_TYPE_OPTIONS,
@@ -115,6 +117,12 @@ type VehiclePageProps = {
   }>;
 };
 
+type ServiceLogActionNotice = {
+  tone: "success" | "error";
+  title: string;
+  details?: string;
+};
+
 export default function VehiclePage({ params }: VehiclePageProps) {
   const [vehicleId, setVehicleId] = useState("");
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
@@ -145,8 +153,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     useState<ServiceLogNodeFilter | null>(null);
   const [isAddServiceEventModalOpen, setIsAddServiceEventModalOpen] = useState(false);
   const [isCreatingServiceEvent, setIsCreatingServiceEvent] = useState(false);
+  const [editingServiceEventId, setEditingServiceEventId] = useState<string | null>(null);
   const [serviceEventFormError, setServiceEventFormError] = useState("");
   const [serviceEventFormSuccess, setServiceEventFormSuccess] = useState("");
+  const [serviceLogActionNotice, setServiceLogActionNotice] =
+    useState<ServiceLogActionNotice | null>(null);
   const [selectedNodePath, setSelectedNodePath] = useState<SelectedNodePath>([]);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
@@ -710,6 +721,18 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     setPaidOnlyFilter(false);
   };
 
+  useEffect(() => {
+    if (!serviceLogActionNotice) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setServiceLogActionNotice(null);
+    }, 4500);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [serviceLogActionNotice]);
+
   const openServiceLogModalWithPaidExpenses = () => {
     setPaidOnlyFilter(true);
     setIsServiceLogModalOpen(true);
@@ -874,6 +897,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
     setServiceEventFormError("");
     setServiceEventFormSuccess("");
+    setEditingServiceEventId(null);
     applyAddServiceEventFormValues(values);
     setSelectedNodePath(nodePath);
     setIsAddServiceEventModalOpen(true);
@@ -894,6 +918,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
     setServiceEventFormError("");
     setServiceEventFormSuccess("");
+    setEditingServiceEventId(null);
     const values = createInitialAddServiceEventFromWishlistItem(
       item,
       { odometer: vehicle.odometer, engineHours: vehicle.engineHours },
@@ -902,6 +927,64 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     applyAddServiceEventFormValues(values);
     setSelectedNodePath(nodePath);
     setIsAddServiceEventModalOpen(true);
+  };
+
+  const openEditServiceEventFromLog = (eventId: string) => {
+    const serviceEvent = serviceEvents.find((candidate) => candidate.id === eventId);
+    if (!serviceEvent || serviceEvent.eventKind === "STATE_UPDATE") {
+      return;
+    }
+
+    const nodePath = findNodePathById(nodeTree, serviceEvent.nodeId);
+    if (!nodePath) {
+      setServiceEventFormError("Не удалось определить путь узла.");
+      return;
+    }
+
+    setServiceEventFormError("");
+    setServiceEventFormSuccess("");
+    setEditingServiceEventId(serviceEvent.id);
+    applyAddServiceEventFormValues(createInitialEditServiceEventValues(serviceEvent));
+    setSelectedNodePath(nodePath);
+    setIsAddServiceEventModalOpen(true);
+  };
+
+  const deleteServiceEventFromLog = async (eventId: string) => {
+    const serviceEvent = serviceEvents.find((candidate) => candidate.id === eventId);
+    if (!serviceEvent || serviceEvent.eventKind === "STATE_UPDATE") {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Удалить сервисное событие?\nЭто может изменить статус узла и суммы расходов."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setServiceEventFormError("");
+      setServiceEventFormSuccess("");
+      await vehicleDetailApi.deleteServiceEvent(vehicleId, eventId);
+      if (editingServiceEventId === eventId) {
+        setIsAddServiceEventModalOpen(false);
+        resetServiceEventForm();
+      }
+      await Promise.all([loadServiceEvents(), loadNodeTree(), loadWishlist()]);
+      setServiceEventFormSuccess("Сервисное событие удалено.");
+      setServiceLogActionNotice({
+        tone: "success",
+        title: "Сервисное событие удалено",
+        details: "Статусы и расходы обновлены",
+      });
+    } catch (deleteError) {
+      console.error(deleteError);
+      setServiceEventFormError("Не удалось удалить сервисное событие.");
+      setServiceLogActionNotice({
+        tone: "error",
+        title: "Не удалось удалить сервисное событие",
+      });
+    }
   };
 
   const openServiceLogForAttentionItem = (item: AttentionItemViewModel) => {
@@ -1646,12 +1729,20 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   };
 
   const resetServiceEventForm = () => {
+    setEditingServiceEventId(null);
     setSelectedNodePath([]);
     const empty = createInitialAddServiceEventFormValues();
     applyAddServiceEventFormValues(empty);
   };
 
-  const handleCreateServiceEvent = async () => {
+  const openCreateServiceEventModal = () => {
+    resetServiceEventForm();
+    setServiceEventFormError("");
+    setServiceEventFormSuccess("");
+    setIsAddServiceEventModalOpen(true);
+  };
+
+  const handleSubmitServiceEvent = async () => {
     try {
       setServiceEventFormError("");
       setServiceEventFormSuccess("");
@@ -1685,23 +1776,39 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       }
 
       setIsCreatingServiceEvent(true);
+      if (editingServiceEventId) {
+        await vehicleDetailApi.updateServiceEvent(
+          vehicleId,
+          editingServiceEventId,
+          normalizeEditServiceEventPayload(serviceFormValues)
+        );
+      } else {
+        await vehicleDetailApi.createServiceEvent(
+          vehicleId,
+          normalizeAddServiceEventPayload(serviceFormValues)
+        );
+      }
 
-      await vehicleDetailApi.createServiceEvent(
-        vehicleId,
-        normalizeAddServiceEventPayload(serviceFormValues)
+      setServiceEventFormSuccess(
+        editingServiceEventId ? "Сервисное событие обновлено." : "Сервисное событие добавлено."
       );
-
-      setServiceEventFormSuccess("Сервисное событие добавлено.");
+      setServiceLogActionNotice({
+        tone: "success",
+        title: editingServiceEventId
+          ? "Сервисное событие обновлено"
+          : "Сервисное событие добавлено",
+        details: "Статусы и расходы обновлены",
+      });
       resetServiceEventForm();
       await Promise.all([loadServiceEvents(), loadNodeTree(), loadWishlist()]);
       setIsAddServiceEventModalOpen(false);
     } catch (createError) {
       console.error(createError);
-      setServiceEventFormError(
-        createError instanceof Error
-          ? createError.message
-          : "Произошла ошибка при создании события."
-      );
+      setServiceEventFormError("Не удалось сохранить сервисное событие.");
+      setServiceLogActionNotice({
+        tone: "error",
+        title: "Не удалось сохранить сервисное событие",
+      });
     } finally {
       setIsCreatingServiceEvent(false);
     }
@@ -2576,12 +2683,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    resetServiceEventForm();
-                    setServiceEventFormError("");
-                    setServiceEventFormSuccess("");
-                    setIsAddServiceEventModalOpen(true);
-                  }}
+                  onClick={openCreateServiceEventModal}
                   className="inline-flex h-9 items-center justify-center rounded-lg bg-gray-950 px-3.5 text-sm font-medium text-white transition hover:bg-gray-800"
                 >
                   Добавить сервисное событие
@@ -2640,6 +2742,40 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 >
                   {serviceEventFormSuccess}
                 </p>
+              ) : null}
+
+              {serviceLogActionNotice ? (
+                <div
+                  className="mb-4 flex items-start justify-between gap-3 rounded-xl border px-3 py-2 text-sm"
+                  style={{
+                    borderColor:
+                      serviceLogActionNotice.tone === "success"
+                        ? productSemanticColors.successBorder
+                        : productSemanticColors.errorBorder,
+                    backgroundColor:
+                      serviceLogActionNotice.tone === "success"
+                        ? productSemanticColors.successSurface
+                        : productSemanticColors.errorSurface,
+                    color:
+                      serviceLogActionNotice.tone === "success"
+                        ? productSemanticColors.successText
+                        : productSemanticColors.error,
+                  }}
+                >
+                  <div>
+                    <p className="font-medium">{serviceLogActionNotice.title}</p>
+                    {serviceLogActionNotice.details ? (
+                      <p className="mt-0.5 text-xs">{serviceLogActionNotice.details}</p>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setServiceLogActionNotice(null)}
+                    className="text-xs underline decoration-dotted underline-offset-2"
+                  >
+                    Скрыть
+                  </button>
+                </div>
               ) : null}
 
               {isServiceEventsLoading ? (
@@ -2908,13 +3044,33 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                             {entry.dateLabel}
                                           </span>
                                         </div>
-                                        <span
-                                          className={`text-xs ${
-                                            isStateUpdate ? "text-gray-500" : "text-gray-600"
-                                          }`}
-                                        >
-                                          {entry.secondaryTitle}
-                                        </span>
+                                        <div className="flex items-center gap-3">
+                                          <span
+                                            className={`text-xs ${
+                                              isStateUpdate ? "text-gray-500" : "text-gray-600"
+                                            }`}
+                                          >
+                                            {entry.secondaryTitle}
+                                          </span>
+                                          {!isStateUpdate ? (
+                                            <div className="flex items-center gap-3">
+                                              <button
+                                                type="button"
+                                                onClick={() => openEditServiceEventFromLog(entry.id)}
+                                                className="text-xs font-medium text-gray-700 underline decoration-dotted underline-offset-2 transition hover:text-gray-950"
+                                              >
+                                                Редактировать
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => void deleteServiceEventFromLog(entry.id)}
+                                                className="text-xs font-medium text-red-700 underline decoration-dotted underline-offset-2 transition hover:text-red-900"
+                                              >
+                                                Удалить
+                                              </button>
+                                            </div>
+                                          ) : null}
+                                        </div>
                                       </div>
 
                                       <div className="mt-2">
@@ -3010,7 +3166,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
           <div className="w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-xl font-semibold tracking-tight text-gray-950">
-                Добавить сервисное событие
+                {editingServiceEventId
+                  ? "Редактировать сервисное событие"
+                  : "Добавить сервисное событие"}
               </h2>
               <button
                 type="button"
@@ -3139,7 +3297,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 <div className="border-t border-gray-100 pt-5">
                 <button
                   type="button"
-                  onClick={handleCreateServiceEvent}
+                  onClick={handleSubmitServiceEvent}
                   disabled={
                     isCreatingServiceEvent ||
                     !isLeafNodeSelected ||
@@ -3147,7 +3305,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   }
                   className="inline-flex h-11 items-center justify-center rounded-xl bg-gray-950 px-6 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isCreatingServiceEvent ? "Сохраняем..." : "Добавить событие"}
+                  {isCreatingServiceEvent
+                    ? "Сохраняем..."
+                    : editingServiceEventId
+                      ? "Сохранить изменения"
+                      : "Добавить событие"}
                 </button>
 
                 {!isLeafNodeSelected && selectedFinalNode ? (
