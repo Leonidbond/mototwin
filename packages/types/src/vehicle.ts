@@ -52,6 +52,14 @@ export type VehicleTechnicalInfoViewModel = {
   }>;
 };
 
+export type GarageDashboardSummaryViewModel = {
+  motorcyclesCount: number;
+  motorcyclesWithAttentionCount: number;
+  attentionItemsTotalCount: number;
+  activeWishlistItemsCount: number | null;
+  currentMonthExpensesLabel: string | null;
+};
+
 /** Counts from the same attention rules as `buildAttentionSummaryFromNodeTree` (garage API). */
 export type GarageAttentionSummaryWire = {
   totalCount: number;

@@ -1,11 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
-import { buildGarageCardProps, filterMeaningfulGarageSpecHighlights } from "@mototwin/domain";
+import {
+  DEFAULT_USER_LOCAL_SETTINGS,
+  USER_LOCAL_SETTINGS_STORAGE_KEY,
+  buildGarageCardProps,
+  buildGarageDashboardSummary,
+  filterMeaningfulGarageSpecHighlights,
+  mergeUserLocalSettings,
+  normalizeUserLocalSettings,
+} from "@mototwin/domain";
 import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
-import type { GarageVehicleItem } from "@mototwin/types";
+import type { GarageVehicleItem, UserLocalSettings } from "@mototwin/types";
 
 const garageApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
@@ -16,6 +24,10 @@ export default function GaragePage() {
   const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
   const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
+  const [userSettings, setUserSettings] = useState<UserLocalSettings>(() => ({
+    ...DEFAULT_USER_LOCAL_SETTINGS,
+  }));
+  const [settingsSavedNotice, setSettingsSavedNotice] = useState("");
 
   useEffect(() => {
     const loadGarage = async () => {
@@ -73,6 +85,36 @@ export default function GaragePage() {
     }
   }, [hasLoadedCollapsePrefs, isTechnicalSummaryExpanded]);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
+      if (!raw) {
+        setUserSettings({ ...DEFAULT_USER_LOCAL_SETTINGS });
+        return;
+      }
+      setUserSettings(normalizeUserLocalSettings(JSON.parse(raw)));
+    } catch {
+      setUserSettings({ ...DEFAULT_USER_LOCAL_SETTINGS });
+    }
+  }, []);
+
+  const saveUserSettings = (patch: Partial<UserLocalSettings>) => {
+    const next = mergeUserLocalSettings(userSettings, patch);
+    setUserSettings(next);
+    try {
+      localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(next));
+      setSettingsSavedNotice("Настройки сохранены");
+      window.setTimeout(() => setSettingsSavedNotice(""), 1800);
+    } catch {
+      // Ignore local-only settings persistence errors.
+    }
+  };
+
+  const dashboardSummary = useMemo(
+    () => buildGarageDashboardSummary(vehicles),
+    [vehicles]
+  );
+
   return (
     <main
       className="min-h-screen px-6 py-16 text-gray-950"
@@ -89,15 +131,16 @@ export default function GaragePage() {
                 color: productSemanticColors.textSecondary,
               }}
             >
-              MotoTwin | Гараж
+              MotoTwin | Личный гараж
             </div>
             <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">
-              Ваш гараж
+              Мой гараж
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-gray-600 sm:text-lg">
-              Здесь отображаются сохраненные мотоциклы, их профиль и базовые
-              данные для дальнейшего обслуживания, fitment и учета расходов.
+              Все мотоциклы, обслуживание и покупки в одном месте.
             </p>
+            <p className="mt-2 text-sm text-gray-500">Профиль: Гость</p>
+            <p className="mt-1 text-xs text-gray-400">Авторизация пока не реализована</p>
           </div>
 
           <Link
@@ -129,6 +172,116 @@ export default function GaragePage() {
           </div>
         ) : null}
 
+        {!isLoading && !error && vehicles.length > 0 ? (
+          <section
+            className="mb-6 grid gap-3 rounded-2xl border p-4 sm:grid-cols-3"
+            style={{
+              borderColor: productSemanticColors.border,
+              backgroundColor: productSemanticColors.card,
+            }}
+          >
+            <InfoCard
+              label="Мотоциклы"
+              value={String(dashboardSummary.motorcyclesCount)}
+            />
+            <InfoCard
+              label="Требуют внимания"
+              value={String(dashboardSummary.motorcyclesWithAttentionCount)}
+            />
+            <InfoCard
+              label="Активные сигналы внимания"
+              value={String(dashboardSummary.attentionItemsTotalCount)}
+            />
+          </section>
+        ) : null}
+
+        <section
+          className="mb-6 rounded-2xl border p-4"
+          style={{
+            borderColor: productSemanticColors.border,
+            backgroundColor: productSemanticColors.card,
+          }}
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-950">Настройки</h2>
+            {settingsSavedNotice ? (
+              <span className="text-xs font-medium text-gray-500">{settingsSavedNotice}</span>
+            ) : null}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="text-sm text-gray-700">
+              Валюта по умолчанию
+              <select
+                value={userSettings.defaultCurrency}
+                onChange={(e) =>
+                  saveUserSettings({
+                    defaultCurrency: e.target.value as UserLocalSettings["defaultCurrency"],
+                  })
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="RUB">RUB</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </label>
+            <label className="text-sm text-gray-700">
+              Единицы пробега
+              <select
+                value={userSettings.distanceUnit}
+                onChange={(e) =>
+                  saveUserSettings({
+                    distanceUnit: e.target.value as UserLocalSettings["distanceUnit"],
+                  })
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="km">km</option>
+                <option value="mi">mi</option>
+              </select>
+            </label>
+            <label className="text-sm text-gray-700">
+              Формат даты
+              <select
+                value={userSettings.dateFormat}
+                onChange={(e) =>
+                  saveUserSettings({
+                    dateFormat: e.target.value as UserLocalSettings["dateFormat"],
+                  })
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="DD.MM.YYYY">DD.MM.YYYY</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+              </select>
+            </label>
+            <label className="text-sm text-gray-700">
+              Напоминание по умолчанию
+              <select
+                value={String(userSettings.defaultSnoozeDays)}
+                onChange={(e) =>
+                  saveUserSettings({
+                    defaultSnoozeDays: Number(e.target.value) as UserLocalSettings["defaultSnoozeDays"],
+                  })
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="7">7 дней</option>
+                <option value="14">14 дней</option>
+                <option value="30">30 дней</option>
+              </select>
+            </label>
+            <label className="text-sm text-gray-700">
+              Единицы моточасов
+              <input
+                value={userSettings.engineHoursUnit}
+                readOnly
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+              />
+            </label>
+          </div>
+        </section>
+
         {!isLoading && !error && vehicles.length === 0 ? (
           <div
             className="rounded-3xl border p-8 shadow-sm"
@@ -138,11 +291,10 @@ export default function GaragePage() {
             }}
           >
             <h2 className="text-2xl font-semibold tracking-tight">
-              В гараже пока нет мотоциклов
+              Личный гараж пока пуст
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-gray-600">
-              Начните с добавления первого мотоцикла. После этого здесь появится
-              его карточка.
+              Добавьте первый мотоцикл, чтобы начать вести обслуживание.
             </p>
             <div className="mt-8">
               <Link

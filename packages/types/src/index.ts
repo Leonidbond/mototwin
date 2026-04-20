@@ -62,6 +62,7 @@ export type {
   VehicleStateViewModel,
   RideProfileViewModel,
   VehicleTechnicalInfoViewModel,
+  GarageDashboardSummaryViewModel,
   UpdateVehicleStateInput,
   UpdateVehicleProfileInput,
 } from "./vehicle";
@@ -173,6 +174,12 @@ export type {
   NodeContextServiceKitSummary,
   NodeContextViewModel,
 } from "./node-context";
+export type {
+  UserLocalSettings,
+  UserLocalSettingsCurrency,
+  UserLocalSettingsDistanceUnit,
+  UserLocalSettingsDateFormat,
+} from "./user-settings";
 export type {
   GarageCardProps,
   VehicleHeaderProps,

@@ -11,18 +11,25 @@ import {
   View,
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
-import { buildGarageCardProps, filterMeaningfulGarageSpecHighlights } from "@mototwin/domain";
+import {
+  DEFAULT_USER_LOCAL_SETTINGS,
+  buildGarageCardProps,
+  buildGarageDashboardSummary,
+  filterMeaningfulGarageSpecHighlights,
+  mergeUserLocalSettings,
+} from "@mototwin/domain";
 import {
   productSemanticColors as c,
   radiusScale,
   statusSemanticTokens,
 } from "@mototwin/design-tokens";
-import type { GarageVehicleItem } from "@mototwin/types";
+import type { GarageVehicleItem, UserLocalSettings } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
 import {
   readCollapsiblePreference,
   writeCollapsiblePreference,
 } from "../src/ui-collapsible-preferences";
+import { readUserLocalSettings, writeUserLocalSettings } from "../src/ui-user-local-settings";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -32,6 +39,10 @@ export default function HomeScreen() {
   const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
   const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
+  const [userSettings, setUserSettings] = useState<UserLocalSettings>(() => ({
+    ...DEFAULT_USER_LOCAL_SETTINGS,
+  }));
+  const [settingsSavedNotice, setSettingsSavedNotice] = useState("");
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -70,6 +81,12 @@ export default function HomeScreen() {
       setHasLoadedCollapsePrefs(true);
     })();
   }, []);
+  useEffect(() => {
+    void (async () => {
+      const settings = await readUserLocalSettings();
+      setUserSettings(settings);
+    })();
+  }, []);
 
   useEffect(() => {
     if (!hasLoadedCollapsePrefs) return;
@@ -93,6 +110,14 @@ export default function HomeScreen() {
       setIsLoading(false);
     }
   };
+  const updateUserSettings = (patch: Partial<UserLocalSettings>) => {
+    const next = mergeUserLocalSettings(userSettings, patch);
+    setUserSettings(next);
+    void writeUserLocalSettings(next);
+    setSettingsSavedNotice("Настройки сохранены");
+    setTimeout(() => setSettingsSavedNotice(""), 1800);
+  };
+  const dashboardSummary = buildGarageDashboardSummary(vehicles);
 
   const renderVehicleCard = ({ item }: { item: GarageVehicleItem }) => {
     const card = buildGarageCardProps(item);
@@ -249,9 +274,9 @@ export default function HomeScreen() {
 
       {!isLoading && !error && vehicles.length === 0 ? (
         <View style={styles.stateContainer}>
-          <Text style={styles.emptyTitle}>В гараже пока нет мотоциклов</Text>
+          <Text style={styles.emptyTitle}>Личный гараж пока пуст</Text>
           <Text style={styles.stateText}>
-            Начните с добавления первого мотоцикла. После этого здесь появится его карточка.
+            Добавьте первый мотоцикл, чтобы начать вести обслуживание.
           </Text>
           <Pressable
             onPress={() => router.push("/vehicles/new")}
@@ -273,13 +298,81 @@ export default function HomeScreen() {
           renderItem={renderVehicleCard}
           ListHeaderComponent={
             <View style={styles.listHeader}>
-              <Text style={styles.eyebrow}>MotoTwin | Гараж</Text>
-              <Text style={styles.title}>Ваш гараж</Text>
-              <Text style={styles.subtitle}>Мотоциклов: {vehicles.length}</Text>
+              <Text style={styles.eyebrow}>MotoTwin | Личный гараж</Text>
+              <Text style={styles.title}>Мой гараж</Text>
+              <Text style={styles.subtitle}>Все мотоциклы, обслуживание и покупки в одном месте</Text>
+              <Text style={styles.accountHint}>Профиль: Гость</Text>
+              <Text style={styles.accountHintMuted}>Авторизация пока не реализована</Text>
               <Text style={styles.description}>
-                Здесь отображаются сохранённые мотоциклы, их профиль и базовые данные для
-                обслуживания и учёта.
+                Дашборд показывает парк мотоциклов и ключевые сигналы внимания.
               </Text>
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryChip}>
+                  <Text style={styles.summaryChipLabel}>Мотоциклы</Text>
+                  <Text style={styles.summaryChipValue}>{dashboardSummary.motorcyclesCount}</Text>
+                </View>
+                <View style={styles.summaryChip}>
+                  <Text style={styles.summaryChipLabel}>Требуют внимания</Text>
+                  <Text style={styles.summaryChipValue}>
+                    {dashboardSummary.motorcyclesWithAttentionCount}
+                  </Text>
+                </View>
+                <View style={styles.summaryChip}>
+                  <Text style={styles.summaryChipLabel}>Сигналы внимания</Text>
+                  <Text style={styles.summaryChipValue}>
+                    {dashboardSummary.attentionItemsTotalCount}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.settingsBox}>
+                <View style={styles.settingsHeaderRow}>
+                  <Text style={styles.settingsTitle}>Настройки</Text>
+                  {settingsSavedNotice ? (
+                    <Text style={styles.settingsSavedText}>{settingsSavedNotice}</Text>
+                  ) : null}
+                </View>
+                <SettingRow
+                  label="Валюта по умолчанию"
+                  options={["RUB", "USD", "EUR"]}
+                  value={userSettings.defaultCurrency}
+                  onSelect={(value) =>
+                    updateUserSettings({
+                      defaultCurrency: value as UserLocalSettings["defaultCurrency"],
+                    })
+                  }
+                />
+                <SettingRow
+                  label="Единицы пробега"
+                  options={["km", "mi"]}
+                  value={userSettings.distanceUnit}
+                  onSelect={(value) =>
+                    updateUserSettings({
+                      distanceUnit: value as UserLocalSettings["distanceUnit"],
+                    })
+                  }
+                />
+                <SettingRow
+                  label="Формат даты"
+                  options={["DD.MM.YYYY", "YYYY-MM-DD"]}
+                  value={userSettings.dateFormat}
+                  onSelect={(value) =>
+                    updateUserSettings({
+                      dateFormat: value as UserLocalSettings["dateFormat"],
+                    })
+                  }
+                />
+                <SettingRow
+                  label="Напоминание по умолчанию"
+                  options={["7", "14", "30"]}
+                  value={String(userSettings.defaultSnoozeDays)}
+                  onSelect={(value) =>
+                    updateUserSettings({
+                      defaultSnoozeDays: Number(value) as UserLocalSettings["defaultSnoozeDays"],
+                    })
+                  }
+                  optionLabelSuffix=" дней"
+                />
+              </View>
               <Pressable
                 onPress={() => router.push("/vehicles/new")}
                 style={styles.primaryButton}
@@ -292,6 +385,47 @@ export default function HomeScreen() {
       ) : null}
       <StatusBar style="auto" />
     </SafeAreaView>
+  );
+}
+
+function SettingRow({
+  label,
+  options,
+  value,
+  onSelect,
+  optionLabelSuffix = "",
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onSelect: (next: string) => void;
+  optionLabelSuffix?: string;
+}) {
+  return (
+    <View style={styles.settingRow}>
+      <Text style={styles.settingLabel}>{label}</Text>
+      <View style={styles.settingOptionsWrap}>
+        {options.map((option) => {
+          const isActive = option === value;
+          return (
+            <Pressable
+              key={`${label}.${option}`}
+              onPress={() => onSelect(option)}
+              style={({ pressed }) => [
+                styles.settingOptionChip,
+                isActive && styles.settingOptionChipActive,
+                pressed && styles.settingOptionChipPressed,
+              ]}
+            >
+              <Text style={[styles.settingOptionText, isActive && styles.settingOptionTextActive]}>
+                {option}
+                {optionLabelSuffix}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -322,9 +456,19 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 8,
-    fontSize: 15,
-    fontWeight: "600",
-    color: c.textMeta,
+    fontSize: 14,
+    fontWeight: "500",
+    color: c.textSecondary,
+  },
+  accountHint: {
+    marginTop: 6,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  accountHintMuted: {
+    marginTop: 2,
+    fontSize: 11,
+    color: c.textTertiary,
   },
   description: {
     marginTop: 10,
@@ -408,6 +552,89 @@ const styles = StyleSheet.create({
   listHeader: {
     paddingTop: 12,
     paddingBottom: 16,
+  },
+  summaryRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  summaryChip: {
+    minWidth: 110,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  summaryChipLabel: {
+    fontSize: 11,
+    color: c.textMuted,
+  },
+  summaryChipValue: {
+    marginTop: 2,
+    fontSize: 16,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  settingsBox: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.card,
+    padding: 10,
+    gap: 10,
+  },
+  settingsHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  settingsTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  settingsSavedText: {
+    fontSize: 11,
+    color: c.textMuted,
+  },
+  settingRow: {
+    gap: 6,
+  },
+  settingLabel: {
+    fontSize: 12,
+    color: c.textSecondary,
+  },
+  settingOptionsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  settingOptionChip: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 999,
+    backgroundColor: c.cardMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  settingOptionChipActive: {
+    borderColor: c.textPrimary,
+    backgroundColor: c.textPrimary,
+  },
+  settingOptionChipPressed: {
+    opacity: 0.88,
+  },
+  settingOptionText: {
+    fontSize: 12,
+    color: c.textPrimary,
+    fontWeight: "600",
+  },
+  settingOptionTextActive: {
+    color: c.textInverse,
   },
   card: {
     backgroundColor: c.card,

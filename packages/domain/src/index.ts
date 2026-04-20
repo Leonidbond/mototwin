@@ -145,6 +145,15 @@ export {
   buildNodeTreeSectionProps,
   buildServiceLogTimelineProps,
 } from "./component-contract-props";
+export { buildGarageDashboardSummary } from "./garage-dashboard";
+export {
+  DEFAULT_USER_LOCAL_SETTINGS,
+  USER_LOCAL_SETTINGS_STORAGE_KEY,
+  getDefaultCurrencyFromSettings,
+  getDefaultSnoozeDaysFromSettings,
+  mergeUserLocalSettings,
+  normalizeUserLocalSettings,
+} from "./user-settings";
 export {
   buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
