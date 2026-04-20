@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 
 const TOP_LEVEL_NODE_CODES = [
   "ENGINE",
@@ -26,12 +27,8 @@ export async function GET(_: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!vehicle) {
+    const allowed = await isVehicleInCurrentContext(id);
+    if (!allowed) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 

@@ -119,7 +119,7 @@ Implemented in Phase 1:
 Planned next:
 
 - Phase 2A implemented for base Garage/Vehicle routes (list/create/detail/profile update);
-- Phase 2B pending for nested vehicle routes (`node-tree`, `state`, `service-events`, `wishlist`, recommendations, kits);
+- Phase 2B implemented for nested vehicle routes (`node-tree`, `state`, `top-nodes`, `service-events`, `wishlist`, `wishlist/kits`) with `404` on out-of-context vehicle ids;
 - later login/session replacement for demo resolver;
 - later server-side `UserSettings`.
 

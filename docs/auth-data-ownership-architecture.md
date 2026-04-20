@@ -20,7 +20,7 @@ Out of scope in current phase:
 
 - Phase 1 (schema/data ownership foundation) is implemented.
 - Phase 2A (base Garage/Vehicle API ownership scope) is implemented.
-- Phase 2B (nested vehicle routes ownership scope) is pending.
+- Phase 2B (nested vehicle routes ownership scope) is implemented.
 
 ## 2. Current state (as-is)
 
@@ -119,8 +119,28 @@ Justification:
   - `PATCH /api/vehicles/[id]/profile` updates vehicle only inside current context.
 - Security behavior for out-of-scope vehicle ids in base routes: return `404` (no existence leak).
 - Phase 2B deferred:
-  - nested routes (`node-tree`, `state`, `service-events`, `wishlist`, recommendations, kits) remain as-is until dedicated hardening pass.
+  - none.
 - Current user context still resolves to demo user (no login UI yet).
+
+### Phase 2B — Nested `/api/vehicles/[id]` route guards
+
+Implemented:
+
+- shared backend helper for ownership checks by current context;
+- nested routes now verify vehicle ownership before processing:
+  - `node-tree`;
+  - `state`;
+  - `top-nodes`;
+  - `service-events`;
+  - `service-events/[eventId]`;
+  - `wishlist`;
+  - `wishlist/[itemId]`;
+  - `wishlist/kits`.
+- out-of-context vehicle ids return `404`.
+
+Deferred:
+
+- any remaining non-vehicle-global routes can be reviewed in a separate hardening pass if new nested endpoints are added later.
 
 ### Phase 3 — Real auth implementation
 

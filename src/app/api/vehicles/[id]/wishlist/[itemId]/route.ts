@@ -5,6 +5,7 @@ import { z } from "zod";
 import { buildWishlistItemSkuInfo, normalizePartWishlistCostMutationArgs } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
+import { isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 
@@ -123,6 +124,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { id: vehicleId, itemId } = await context.params;
     const json = await request.json();
     const parsed = patchWishlistSchema.parse(json);
+    const allowed = await isVehicleInCurrentContext(vehicleId);
+    if (!allowed) {
+      return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
+    }
 
     if (Object.keys(parsed).length === 0) {
       return NextResponse.json({ error: "Нет полей для обновления" }, { status: 400 });
@@ -284,6 +289,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 export async function DELETE(_: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId, itemId } = await context.params;
+    const allowed = await isVehicleInCurrentContext(vehicleId);
+    if (!allowed) {
+      return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
+    }
 
     const existing = await prisma.partWishlistItem.findFirst({
       where: { id: itemId, vehicleId },

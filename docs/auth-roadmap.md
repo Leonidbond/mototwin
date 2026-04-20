@@ -39,10 +39,11 @@ Future iterations should add:
 - Out-of-scope vehicle ids return `404`.
 - Current-user context still resolves to demo user/garage.
 
-### Phase 2B — Nested vehicle routes ownership filtering (next)
+### Phase 2B — Nested vehicle routes ownership filtering (implemented)
 
-- Scope nested vehicle routes (`node-tree`, `state`, `service-events`, `wishlist`, recommendations, kits).
-- Keep behavior backward-compatible for current visible workflows.
+- Scoped nested vehicle routes (`node-tree`, `state`, `top-nodes`, `service-events`, `wishlist`, `wishlist/kits`) by current-user context.
+- Out-of-context vehicle ids return `404`.
+- Visible behavior for demo-owned vehicles remains backward-compatible.
 
 ### Phase 3 — Auth session layer
 

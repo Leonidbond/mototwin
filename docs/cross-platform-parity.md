@@ -27,6 +27,7 @@ Parity оценивается по core workflows, business outcome и поль�
 - **Auth/ownership note:** both clients remain pre-auth in MVP and must not claim user isolation yet; planned ownership migration is documented in [auth-data-ownership-architecture.md](./auth-data-ownership-architecture.md).
 - **Phase 1 ownership status:** backend now has demo user + demo garage ownership foundation; web/Expo UX remains unchanged and still pre-auth by behavior.
 - **Phase 2A ownership status:** base Garage/Vehicle APIs are scoped to current demo context (garage list, create vehicle, vehicle detail, profile update). Nested vehicle APIs are intentionally deferred to Phase 2B; visible web/Expo behavior stays unchanged.
+- **Phase 2B ownership status:** nested vehicle APIs used by web/Expo detail flows are guarded by current demo context (`node-tree`, `state`, `top-nodes`, `service-events`, `wishlist`, `wishlist kits`). Out-of-context vehicle ids return `404`, while demo-owned flows remain unchanged.
 
 ## 3.2 Add motorcycle
 

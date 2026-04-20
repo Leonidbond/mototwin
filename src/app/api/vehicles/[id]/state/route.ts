@@ -7,6 +7,7 @@ import {
   type NodeMaintenanceRuleView,
 } from "@/lib/maintenance-status";
 import { prisma } from "@/lib/prisma";
+import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 
 type RouteContext = {
   params: Promise<{
@@ -25,10 +26,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const json = await request.json();
     const data = updateVehicleStateSchema.parse(json);
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id },
-      select: { id: true },
-    });
+    const vehicle = await getVehicleInCurrentContext(id, { id: true });
 
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });

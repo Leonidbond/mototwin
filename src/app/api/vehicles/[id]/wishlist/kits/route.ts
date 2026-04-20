@@ -13,6 +13,7 @@ import {
 } from "@mototwin/domain";
 import type { PartWishlistItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
+import { getVehicleInCurrentContext, isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 type RouteContext = {
@@ -158,14 +159,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const body = addKitSchema.parse(await request.json());
     const contextNodeId = body.contextNodeId ? String(body.contextNodeId).trim() : null;
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id: vehicleId },
-      select: {
-        id: true,
-        modelId: true,
-        modelVariantId: true,
-        modelVariant: { select: { year: true } },
-      },
+    const vehicle = await getVehicleInCurrentContext(vehicleId, {
+      id: true,
+      modelId: true,
+      modelVariantId: true,
+      modelVariant: { select: { year: true } },
     });
     if (!vehicle) {
       return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
@@ -341,6 +339,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId } = await context.params;
+    const allowed = await isVehicleInCurrentContext(vehicleId);
+    if (!allowed) {
+      return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
+    }
     const { searchParams } = new URL(request.url);
     const nodeId = searchParams.get("nodeId")?.trim();
     const query = new URLSearchParams();

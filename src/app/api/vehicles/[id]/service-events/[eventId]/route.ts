@@ -7,6 +7,7 @@ import {
   type NodeMaintenanceRuleView,
 } from "@/lib/maintenance-status";
 import { prisma } from "@/lib/prisma";
+import { getVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
 
 type RouteContext = {
   params: Promise<{
@@ -227,10 +228,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { id: vehicleId, eventId } = await context.params;
     const payload = updateServiceEventSchema.parse(await request.json());
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id: vehicleId },
-      select: { id: true, odometer: true },
-    });
+    const vehicle = await getVehicleInCurrentContext(vehicleId, { id: true, odometer: true });
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
@@ -352,10 +350,7 @@ export async function DELETE(_: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId, eventId } = await context.params;
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id: vehicleId },
-      select: { id: true },
-    });
+    const vehicle = await getVehicleInCurrentContext(vehicleId, { id: true });
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }

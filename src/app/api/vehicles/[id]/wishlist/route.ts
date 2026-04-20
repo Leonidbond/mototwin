@@ -8,6 +8,7 @@ import {
 } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
+import { isVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 
@@ -128,12 +129,8 @@ export async function GET(_: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId } = await context.params;
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id: vehicleId },
-      select: { id: true },
-    });
-
-    if (!vehicle) {
+    const allowed = await isVehicleInCurrentContext(vehicleId);
+    if (!allowed) {
       return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
     }
 
@@ -161,12 +158,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const json = await request.json();
     const data = createWishlistSchema.parse(json);
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id: vehicleId },
-      select: { id: true },
-    });
-
-    if (!vehicle) {
+    const allowed = await isVehicleInCurrentContext(vehicleId);
+    if (!allowed) {
       return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
     }
 

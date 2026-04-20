@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createLeafServiceEventInTransaction } from "@/lib/leaf-service-event-transaction";
 import { prisma } from "@/lib/prisma";
+import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 
 type RouteContext = {
   params: Promise<{
@@ -31,10 +32,7 @@ export async function GET(_: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id },
-      select: { id: true, odometer: true },
-    });
+    const vehicle = await getVehicleInCurrentContext(id, { id: true, odometer: true });
 
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
@@ -72,10 +70,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const json = await request.json();
     const data = createServiceEventSchema.parse(json);
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id },
-      select: { id: true, odometer: true },
-    });
+    const vehicle = await getVehicleInCurrentContext(id, { id: true, odometer: true });
 
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
