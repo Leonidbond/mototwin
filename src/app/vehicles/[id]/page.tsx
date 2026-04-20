@@ -50,10 +50,15 @@ import {
   formatExpenseAmountRu,
   buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
+  calculateSnoozeUntilDate,
+  filterAttentionItemsBySnooze,
   buildNodeSubtreeModalViewModel,
   buildTopLevelNodeSummaryViewModel,
   buildNodeTreeItemViewModel,
   buildNodeMaintenancePlanViewModel,
+  formatSnoozeUntilLabel,
+  getAttentionSnoozeFilterLabel,
+  groupAttentionItemsByStatus,
   buildPartWishlistItemViewModel,
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
@@ -77,11 +82,14 @@ import {
   getPartRecommendationWarningLabel,
   getPartSkuViewModelDisplayLines,
   getWishlistItemSkuDisplayLines,
+  isNodeSnoozed,
 } from "@mototwin/domain";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
 import type {
   AttentionItemViewModel,
+  AttentionSnoozeFilter,
+  NodeSnoozeOption,
   EditVehicleProfileFormValues,
   NodeStatus,
   NodeTreeItem,
@@ -122,6 +130,10 @@ type ServiceLogActionNotice = {
   title: string;
   details?: string;
 };
+
+function buildNodeSnoozeStorageKey(vehicleId: string, nodeId: string): string {
+  return `mototwin.nodeSnooze.${vehicleId}.${nodeId}`;
+}
 
 export default function VehiclePage({ params }: VehiclePageProps) {
   const [vehicleId, setVehicleId] = useState("");
@@ -182,8 +194,10 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [nodeContextServiceKitsError, setNodeContextServiceKitsError] = useState("");
   const [nodeContextAddingRecommendedSkuId, setNodeContextAddingRecommendedSkuId] = useState("");
   const [nodeContextAddingKitCode, setNodeContextAddingKitCode] = useState("");
+  const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
   const [hasLoadedDetailCollapsePrefs, setHasLoadedDetailCollapsePrefs] = useState(false);
   const [isAttentionModalOpen, setIsAttentionModalOpen] = useState(false);
+  const [attentionSnoozeFilter, setAttentionSnoozeFilter] = useState<AttentionSnoozeFilter>("all");
   const [wishlistItems, setWishlistItems] = useState<PartWishlistItem[]>([]);
   const [isWishlistLoading, setIsWishlistLoading] = useState(false);
   const [wishlistError, setWishlistError] = useState("");
@@ -349,11 +363,64 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     () => buildAttentionSummaryFromNodeTree(nodeTree),
     [nodeTree]
   );
+  useEffect(() => {
+    if (!vehicleId) {
+      setNodeSnoozeByNodeId({});
+      return;
+    }
+    const candidateNodeIds = Array.from(
+      new Set([
+        ...attentionSummary.items.map((item) => item.nodeId),
+        ...(selectedNodeContextId ? [selectedNodeContextId] : []),
+      ])
+    );
+    if (candidateNodeIds.length === 0) {
+      setNodeSnoozeByNodeId({});
+      return;
+    }
+    const next: Record<string, string | null> = {};
+    try {
+      for (const nodeId of candidateNodeIds) {
+        const key = buildNodeSnoozeStorageKey(vehicleId, nodeId);
+        const raw = localStorage.getItem(key);
+        if (isNodeSnoozed(raw)) {
+          next[nodeId] = raw;
+          continue;
+        }
+        next[nodeId] = null;
+        if (raw) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // Ignore local-only storage failures.
+    }
+    setNodeSnoozeByNodeId(next);
+  }, [vehicleId, attentionSummary.items, selectedNodeContextId]);
 
   const attentionAction = useMemo(
     () => buildAttentionActionViewModel(attentionSummary),
     [attentionSummary]
   );
+  const filteredAttentionItems = useMemo(
+    () =>
+      filterAttentionItemsBySnooze(
+        attentionSummary.items,
+        attentionSnoozeFilter,
+        (nodeId) => nodeSnoozeByNodeId[nodeId] ?? null
+      ),
+    [attentionSummary.items, attentionSnoozeFilter, nodeSnoozeByNodeId]
+  );
+  const filteredAttentionGroups = useMemo(
+    () => groupAttentionItemsByStatus(filteredAttentionItems),
+    [filteredAttentionItems]
+  );
+  const attentionEmptyStateLabel =
+    attentionSnoozeFilter === "unsnoozed"
+      ? "Нет активных узлов без отложенного напоминания"
+      : attentionSnoozeFilter === "snoozed"
+        ? "Нет отложенных узлов"
+        : "Нет узлов, требующих внимания";
   const attentionTok = statusSemanticTokens[attentionAction.semanticKey];
   const attentionBadgeBg =
     attentionAction.totalCount > 0 && attentionTok.accent !== "transparent"
@@ -1446,6 +1513,32 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   };
   const getNodeModeToggleLabel = () =>
     isNodeMaintenanceModeEnabled ? "План обслуживания: вкл" : "Показывать план обслуживания";
+  const setNodeSnoozeOption = useCallback(
+    (nodeId: string, option: NodeSnoozeOption) => {
+      if (!vehicleId) {
+        return;
+      }
+      try {
+        const key = buildNodeSnoozeStorageKey(vehicleId, nodeId);
+        const nextValue = option === "clear" ? null : calculateSnoozeUntilDate(option);
+        if (nextValue) {
+          localStorage.setItem(key, nextValue);
+        } else {
+          localStorage.removeItem(key);
+        }
+        setNodeSnoozeByNodeId((prev) => ({ ...prev, [nodeId]: nextValue }));
+      } catch {
+        // Ignore local-only storage failures.
+      }
+    },
+    [vehicleId]
+  );
+  const selectedNodeSnoozeUntil =
+    selectedNodeContextId ? (nodeSnoozeByNodeId[selectedNodeContextId] ?? null) : null;
+  const selectedNodeSnoozeLabel = formatSnoozeUntilLabel(selectedNodeSnoozeUntil);
+  const canSnoozeSelectedNode =
+    selectedNodeContextViewModel?.effectiveStatus === "OVERDUE" ||
+    selectedNodeContextViewModel?.effectiveStatus === "SOON";
 
   const formatNodeMaintenanceSummaryLine = (
     summary: NodeMaintenancePlanSummaryViewModel | null
@@ -3079,9 +3172,19 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                             <h3 className="text-sm font-medium text-gray-700">
                                               {entry.mainTitle}
                                             </h3>
-                                            <p className="mt-1 text-xs text-gray-500">
-                                              {entry.stateUpdateSubtitle}
-                                            </p>
+                                            {entry.stateUpdateLines.length > 0 ? (
+                                              <div className="mt-1 space-y-1">
+                                                {entry.stateUpdateLines.map((line) => (
+                                                  <p key={`${entry.id}.${line}`} className="text-xs text-gray-500">
+                                                    {line}
+                                                  </p>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <p className="mt-1 text-xs text-gray-500">
+                                                {entry.stateUpdateSubtitle}
+                                              </p>
+                                            )}
                                           </>
                                         ) : (
                                           <>
@@ -3794,6 +3897,24 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   </>
                 ) : null}
               </p>
+              {!isNodeTreeLoading && !nodeTreeError && attentionSummary.totalCount > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(["all", "unsnoozed", "snoozed"] as AttentionSnoozeFilter[]).map((filter) => (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setAttentionSnoozeFilter(filter)}
+                      className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition ${
+                        attentionSnoozeFilter === filter
+                          ? "border-gray-900 bg-gray-900 text-white"
+                          : "border-gray-300 bg-white text-gray-800 hover:bg-gray-50"
+                      }`}
+                    >
+                      {getAttentionSnoozeFilterLabel(filter)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
               {isNodeTreeLoading ? (
                 <p className="mt-6 text-sm text-gray-600">Загрузка дерева узлов…</p>
@@ -3801,13 +3922,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 <p className="mt-6 text-sm" style={{ color: productSemanticColors.error }}>
                   {nodeTreeError}
                 </p>
-              ) : attentionSummary.totalCount === 0 ? (
+              ) : filteredAttentionItems.length === 0 ? (
                 <div className="mt-6 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
-                  Нет узлов, требующих внимания
+                  {attentionEmptyStateLabel}
                 </div>
               ) : (
                 <div className="mt-5 space-y-6">
-                  {attentionSummary.groups.map((group) => (
+                  {filteredAttentionGroups.map((group) => (
                     <section key={group.status}>
                       <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                         {group.sectionTitleRu}
@@ -3818,6 +3939,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                             item.effectiveStatus === "OVERDUE"
                               ? statusSemanticTokens.OVERDUE
                               : statusSemanticTokens.SOON;
+                          const snoozeLabel = formatSnoozeUntilLabel(
+                            nodeSnoozeByNodeId[item.nodeId] ?? null
+                          );
                           return (
                             <li
                               key={item.nodeId}
@@ -3857,6 +3981,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                 </button>
                               ) : item.shortExplanation ? (
                                 <p className="mt-2 text-sm text-gray-600">{item.shortExplanation}</p>
+                              ) : null}
+                              {snoozeLabel ? (
+                                <p className="mt-2 text-xs font-medium text-gray-600">{snoozeLabel}</p>
                               ) : null}
 
                               <div className="mt-3 flex flex-wrap gap-2">
@@ -3919,6 +4046,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     {selectedNodeContextViewModel.shortExplanationLabel}
                   </p>
                 ) : null}
+                {selectedNodeSnoozeLabel ? (
+                  <p className="mt-1 text-xs font-medium text-gray-600">{selectedNodeSnoozeLabel}</p>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
                 {selectedNodeContextViewModel.effectiveStatus ? (
@@ -3950,6 +4080,33 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     {action.label}
                   </button>
                 ))}
+                {canSnoozeSelectedNode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "7d")}
+                      className="inline-flex h-8 items-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50"
+                    >
+                      Отложить на 7 дней
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "30d")}
+                      className="inline-flex h-8 items-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50"
+                    >
+                      Отложить на 30 дней
+                    </button>
+                    {selectedNodeSnoozeLabel ? (
+                      <button
+                        type="button"
+                        onClick={() => setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "clear")}
+                        className="inline-flex h-8 items-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50"
+                      >
+                        Снять отложенное
+                      </button>
+                    ) : null}
+                  </>
+                ) : null}
               </div>
 
               {selectedNodeContextViewModel.maintenancePlan &&

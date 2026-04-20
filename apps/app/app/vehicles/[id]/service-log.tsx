@@ -185,7 +185,15 @@ function StateUpdateCard({
         </Text>
       </View>
       <Text style={[styles.eventTitle, styles.stateUpdateMainTitle]}>{entry.mainTitle}</Text>
-      {entry.stateUpdateSubtitle ? (
+      {entry.stateUpdateLines.length > 0 ? (
+        <View style={styles.stateUpdateLines}>
+          {entry.stateUpdateLines.map((line) => (
+            <Text key={`${entry.id}.${line}`} style={styles.stateUpdateSubtitle}>
+              {line}
+            </Text>
+          ))}
+        </View>
+      ) : entry.stateUpdateSubtitle ? (
         <Text style={styles.stateUpdateSubtitle}>{entry.stateUpdateSubtitle}</Text>
       ) : null}
       <View style={styles.eventMeta}>
@@ -1225,6 +1233,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: c.textMuted,
     lineHeight: 16,
+  },
+  stateUpdateLines: {
+    marginTop: 4,
+    gap: 2,
   },
   eventNode: {
     marginTop: 3,

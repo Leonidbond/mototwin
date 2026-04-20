@@ -82,6 +82,7 @@ export type ServiceLogEntryViewModel = {
    */
   expoServiceNodeLabel: string | null;
   stateUpdateSubtitle: string | null;
+  stateUpdateLines: string[];
   dateLabel: string;
   odometerLabel: string;
   odometerValue: string;

@@ -5,6 +5,7 @@ export type AttentionEffectiveStatus = Extract<NodeStatus, "OVERDUE" | "SOON">;
 
 /** Worst-case status for coloring the attention entry control. */
 export type AttentionActionSeverity = "neutral" | "OVERDUE" | "SOON";
+export type AttentionSnoozeFilter = "all" | "unsnoozed" | "snoozed";
 
 /** Alias for garage / compact indicators (same values as {@link AttentionActionSeverity}). */
 export type AttentionSeverity = AttentionActionSeverity;
@@ -53,4 +54,12 @@ export type AttentionSummaryViewModel = {
   overdueItems: AttentionItemViewModel[];
   soonItems: AttentionItemViewModel[];
   groups: AttentionStatusGroupViewModel[];
+};
+
+export type NodeSnoozeOption = "7d" | "30d" | "clear";
+
+export type NodeSnoozeState = {
+  vehicleId: string;
+  nodeId: string;
+  snoozeUntilIso: string | null;
 };

@@ -87,9 +87,13 @@ export {
 } from "./expense-summary";
 export {
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
+  buildStateUpdateDisplayViewModel,
   buildServiceLogEntryViewModel,
   buildServiceLogMonthlySummary,
+  formatEngineHoursValue,
   formatIsoCalendarDateRu,
+  formatOdometerValue,
+  formatStateValueChange,
   getServiceLogEventKindBadgeLabel,
   groupServiceLogByMonth,
   buildServiceLogTimelineViewModel,
@@ -144,6 +148,8 @@ export {
 export {
   buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
+  filterAttentionItemsBySnooze,
+  getAttentionSnoozeFilterLabel,
   getAttentionActionSeverity,
   getAttentionItemsFromNodeTree,
   getAttentionNodesFromNodeTree,
@@ -151,6 +157,11 @@ export {
   groupAttentionItemsByStatus,
   sortAttentionItemsByPriority,
 } from "./attention";
+export {
+  calculateSnoozeUntilDate,
+  isNodeSnoozed,
+  formatSnoozeUntilLabel,
+} from "./node-snooze";
 export {
   buildGarageAttentionIndicatorViewModel,
   getAttentionSeverityFromStatuses,

@@ -15,11 +15,22 @@ import {
   buildNodeTreeItemViewModel,
   canOpenNodeStatusExplanationModal,
   createServiceLogNodeFilter,
+  filterAttentionItemsBySnooze,
   findNodeTreeItemById,
+  formatSnoozeUntilLabel,
+  getAttentionSnoozeFilterLabel,
+  groupAttentionItemsByStatus,
+  isNodeSnoozed,
 } from "@mototwin/domain";
-import type { AttentionItemViewModel, NodeTreeItem, NodeTreeItemViewModel } from "@mototwin/types";
+import type {
+  AttentionItemViewModel,
+  AttentionSnoozeFilter,
+  NodeTreeItem,
+  NodeTreeItemViewModel,
+} from "@mototwin/types";
 import { productSemanticColors as c, statusSemanticTokens } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
+import { readNodeSnoozePreferences, writeNodeSnoozePreference } from "../../../src/ui-node-snooze-preferences";
 import { buildVehicleServiceLogHref } from "./service-log";
 import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
@@ -34,6 +45,8 @@ export default function AttentionScreen() {
   const [error, setError] = useState("");
   const [statusExplanationNode, setStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
+  const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
+  const [snoozeFilter, setSnoozeFilter] = useState<AttentionSnoozeFilter>("all");
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -68,6 +81,56 @@ export default function AttentionScreen() {
   const summary = useMemo(
     () => buildAttentionSummaryFromNodeTree(nodeTree),
     [nodeTree]
+  );
+  const filteredItems = useMemo(
+    () =>
+      filterAttentionItemsBySnooze(
+        summary.items,
+        snoozeFilter,
+        (nodeId) => nodeSnoozeByNodeId[nodeId] ?? null
+      ),
+    [summary.items, snoozeFilter, nodeSnoozeByNodeId]
+  );
+  const filteredGroups = useMemo(
+    () => groupAttentionItemsByStatus(filteredItems),
+    [filteredItems]
+  );
+  const emptyStateText =
+    snoozeFilter === "unsnoozed"
+      ? "Нет активных узлов без отложенного напоминания"
+      : snoozeFilter === "snoozed"
+        ? "Нет отложенных узлов"
+        : "Нет узлов, требующих внимания";
+  useFocusEffect(
+    useCallback(() => {
+      if (!vehicleId || summary.items.length === 0) {
+        setNodeSnoozeByNodeId({});
+        return;
+      }
+      const nodeIds = summary.items.map((item) => item.nodeId);
+      let isCancelled = false;
+      void (async () => {
+        const loaded = await readNodeSnoozePreferences(vehicleId, nodeIds);
+        const normalized: Record<string, string | null> = {};
+        for (const nodeId of nodeIds) {
+          const value = loaded[nodeId] ?? null;
+          if (isNodeSnoozed(value)) {
+            normalized[nodeId] = value;
+            continue;
+          }
+          normalized[nodeId] = null;
+          if (value) {
+            await writeNodeSnoozePreference(vehicleId, nodeId, null);
+          }
+        }
+        if (!isCancelled) {
+          setNodeSnoozeByNodeId(normalized);
+        }
+      })();
+      return () => {
+        isCancelled = true;
+      };
+    }, [vehicleId, summary.items])
   );
 
   const openServiceLogForItem = (item: AttentionItemViewModel) => {
@@ -157,13 +220,36 @@ export default function AttentionScreen() {
           ) : null}
         </Text>
 
-        {summary.totalCount === 0 ? (
+        {summary.totalCount > 0 ? (
+          <View style={styles.filterRow}>
+            {(["all", "unsnoozed", "snoozed"] as AttentionSnoozeFilter[]).map((filter) => {
+              const isActive = snoozeFilter === filter;
+              return (
+                <Pressable
+                  key={filter}
+                  onPress={() => setSnoozeFilter(filter)}
+                  style={({ pressed }) => [
+                    styles.filterChip,
+                    isActive && styles.filterChipActive,
+                    pressed && styles.filterChipPressed,
+                  ]}
+                >
+                  <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                    {getAttentionSnoozeFilterLabel(filter)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {filteredItems.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>Нет узлов, требующих внимания</Text>
+            <Text style={styles.emptyText}>{emptyStateText}</Text>
           </View>
         ) : (
           <View style={styles.groups}>
-            {summary.groups.map((group) => (
+            {filteredGroups.map((group) => (
               <View key={group.status} style={styles.group}>
                 <Text style={styles.groupTitle}>{group.sectionTitleRu}</Text>
                 {group.items.map((item) => {
@@ -172,6 +258,7 @@ export default function AttentionScreen() {
                       ? statusSemanticTokens.OVERDUE
                       : statusSemanticTokens.SOON;
                   const explLabel = item.shortExplanation;
+                  const snoozeLabel = formatSnoozeUntilLabel(nodeSnoozeByNodeId[item.nodeId] ?? null);
                   return (
                     <View key={item.nodeId} style={styles.card}>
                       {item.topLevelParentName ? (
@@ -199,6 +286,7 @@ export default function AttentionScreen() {
                       ) : explLabel ? (
                         <Text style={styles.shortExpl}>{explLabel}</Text>
                       ) : null}
+                      {snoozeLabel ? <Text style={styles.snoozeLabel}>{snoozeLabel}</Text> : null}
 
                       <View style={styles.actions}>
                         <Pressable
@@ -293,6 +381,22 @@ const styles = StyleSheet.create({
     color: c.textMuted,
     textTransform: "uppercase",
   },
+  filterRow: { marginBottom: 12, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: c.card,
+  },
+  filterChipActive: {
+    borderColor: c.textPrimary,
+    backgroundColor: c.textPrimary,
+  },
+  filterChipPressed: { opacity: 0.88 },
+  filterChipText: { fontSize: 12, fontWeight: "600", color: c.textPrimary },
+  filterChipTextActive: { color: c.textInverse },
   card: {
     borderWidth: 1,
     borderColor: c.border,
@@ -312,6 +416,7 @@ const styles = StyleSheet.create({
   badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 11, fontWeight: "700" },
   shortExpl: { marginTop: 8, fontSize: 14, color: c.textSecondary, lineHeight: 20 },
+  snoozeLabel: { marginTop: 8, fontSize: 12, fontWeight: "600", color: c.textSecondary },
   shortExplLink: {
     marginTop: 8,
     fontSize: 14,

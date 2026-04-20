@@ -28,15 +28,19 @@ import {
   buildVehicleTechnicalInfoViewModel,
   canOpenNodeStatusExplanationModal,
   createServiceLogNodeFilter,
+  calculateSnoozeUntilDate,
   findNodeTreeItemById,
+  formatSnoozeUntilLabel,
   getNodeSubtreeById,
   getTopLevelNodeTreeItems,
+  isNodeSnoozed,
   searchNodeTree,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
   getRecentServiceEventsForNode,
 } from "@mototwin/domain";
 import type {
+  NodeSnoozeOption,
   NodeContextViewModel,
   NodeStatus,
   NodeTreeItem,
@@ -56,6 +60,10 @@ import {
   readCollapsiblePreference,
   writeCollapsiblePreference,
 } from "../../../src/ui-collapsible-preferences";
+import {
+  readNodeSnoozePreferences,
+  writeNodeSnoozePreference,
+} from "../../../src/ui-node-snooze-preferences";
 import { buildVehicleServiceLogHref } from "./service-log";
 import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
@@ -334,6 +342,7 @@ export default function VehicleDetailScreen() {
     useState<NodeTreeItemViewModel | null>(null);
   const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
   const [serviceEventsError, setServiceEventsError] = useState("");
+  const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -582,6 +591,44 @@ export default function VehicleDetailScreen() {
     () => buildAttentionSummaryFromNodeTree(nodeTree),
     [nodeTree]
   );
+  useEffect(() => {
+    if (!vehicleId) {
+      setNodeSnoozeByNodeId({});
+      return;
+    }
+    const candidateNodeIds = Array.from(
+      new Set([
+        ...attentionSummary.items.map((item) => item.nodeId),
+        ...(selectedNodeContextId ? [selectedNodeContextId] : []),
+      ])
+    );
+    if (candidateNodeIds.length === 0) {
+      setNodeSnoozeByNodeId({});
+      return;
+    }
+    let isCancelled = false;
+    void (async () => {
+      const loaded = await readNodeSnoozePreferences(vehicleId, candidateNodeIds);
+      const normalized: Record<string, string | null> = {};
+      for (const nodeId of candidateNodeIds) {
+        const value = loaded[nodeId] ?? null;
+        if (isNodeSnoozed(value)) {
+          normalized[nodeId] = value;
+          continue;
+        }
+        normalized[nodeId] = null;
+        if (value) {
+          await writeNodeSnoozePreference(vehicleId, nodeId, null);
+        }
+      }
+      if (!isCancelled) {
+        setNodeSnoozeByNodeId(normalized);
+      }
+    })();
+    return () => {
+      isCancelled = true;
+    };
+  }, [vehicleId, attentionSummary.items, selectedNodeContextId]);
 
   const attentionAction = useMemo(
     () => buildAttentionActionViewModel(attentionSummary),
@@ -786,8 +833,26 @@ export default function VehicleDetailScreen() {
       addServiceKitFromNodeContext,
     ]
   );
+  const setNodeSnoozeOption = useCallback(
+    async (nodeId: string, option: NodeSnoozeOption) => {
+      if (!vehicleId) {
+        return;
+      }
+      const nextValue = option === "clear" ? null : calculateSnoozeUntilDate(option);
+      await writeNodeSnoozePreference(vehicleId, nodeId, nextValue);
+      setNodeSnoozeByNodeId((prev) => ({ ...prev, [nodeId]: nextValue }));
+    },
+    [vehicleId]
+  );
   const getNodeModeToggleLabel = () =>
     isNodeMaintenanceModeEnabled ? "План обслуживания: вкл" : "Показывать план обслуживания";
+  const selectedNodeSnoozeUntil = selectedNodeContextId
+    ? (nodeSnoozeByNodeId[selectedNodeContextId] ?? null)
+    : null;
+  const selectedNodeSnoozeLabel = formatSnoozeUntilLabel(selectedNodeSnoozeUntil);
+  const canSnoozeSelectedNode =
+    selectedNodeContextViewModel?.effectiveStatus === "OVERDUE" ||
+    selectedNodeContextViewModel?.effectiveStatus === "SOON";
 
   const hasNickname = Boolean(vehicle?.nickname?.trim());
 
@@ -1300,6 +1365,9 @@ export default function VehicleDetailScreen() {
                     <Text style={styles.subtreeModalTitle}>{selectedNodeContextViewModel.nodeName}</Text>
                     <Text style={styles.subtreeModalSubtitle}>{selectedNodeContextViewModel.pathLabel}</Text>
                     <Text style={styles.searchResultCode}>{selectedNodeContextViewModel.nodeCode}</Text>
+                    {selectedNodeSnoozeLabel ? (
+                      <Text style={styles.snoozeLabelText}>{selectedNodeSnoozeLabel}</Text>
+                    ) : null}
                   </View>
                   <Pressable
                     onPress={closeNodeContextModal}
@@ -1325,6 +1393,45 @@ export default function VehicleDetailScreen() {
                         <Text style={styles.searchActionBtnText}>{action.label}</Text>
                       </Pressable>
                     ))}
+                    {canSnoozeSelectedNode ? (
+                      <>
+                        <Pressable
+                          onPress={() =>
+                            void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "7d")
+                          }
+                          style={({ pressed }) => [
+                            styles.searchActionBtn,
+                            pressed && styles.searchActionBtnPressed,
+                          ]}
+                        >
+                          <Text style={styles.searchActionBtnText}>Отложить на 7 дней</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() =>
+                            void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "30d")
+                          }
+                          style={({ pressed }) => [
+                            styles.searchActionBtn,
+                            pressed && styles.searchActionBtnPressed,
+                          ]}
+                        >
+                          <Text style={styles.searchActionBtnText}>Отложить на 30 дней</Text>
+                        </Pressable>
+                        {selectedNodeSnoozeLabel ? (
+                          <Pressable
+                            onPress={() =>
+                              void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "clear")
+                            }
+                            style={({ pressed }) => [
+                              styles.searchActionBtn,
+                              pressed && styles.searchActionBtnPressed,
+                            ]}
+                          >
+                            <Text style={styles.searchActionBtnText}>Снять отложенное</Text>
+                          </Pressable>
+                        ) : null}
+                      </>
+                    ) : null}
                   </View>
 
                   {selectedNodeContextViewModel.maintenancePlan &&
@@ -2367,6 +2474,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 12,
     color: c.textMuted,
+  },
+  snoozeLabelText: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textSecondary,
   },
   subtreeModalCloseBtn: {
     borderRadius: 8,

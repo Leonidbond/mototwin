@@ -3,11 +3,13 @@ import type {
   AttentionActionViewModel,
   AttentionEffectiveStatus,
   AttentionItemViewModel,
+  AttentionSnoozeFilter,
   AttentionStatusGroupViewModel,
   AttentionSummaryViewModel,
   NodeTreeItem,
   StatusSemanticKey,
 } from "@mototwin/types";
+import { isNodeSnoozed } from "./node-snooze";
 import { getNodeStatusLabel } from "./status";
 import {
   getNodeTreeItemReasonShortLine,
@@ -110,6 +112,32 @@ export function sortAttentionItemsByPriority(
   const overdue = items.filter((i) => i.effectiveStatus === "OVERDUE");
   const soon = items.filter((i) => i.effectiveStatus === "SOON");
   return [...overdue, ...soon];
+}
+
+export function getAttentionSnoozeFilterLabel(filter: AttentionSnoozeFilter): string {
+  if (filter === "unsnoozed") {
+    return "Без отложенных";
+  }
+  if (filter === "snoozed") {
+    return "Только отложенные";
+  }
+  return "Все";
+}
+
+export function filterAttentionItemsBySnooze(
+  items: AttentionItemViewModel[],
+  filter: AttentionSnoozeFilter,
+  getSnoozeUntilByNodeId: (nodeId: string) => string | null | undefined,
+  currentDate?: Date | string
+): AttentionItemViewModel[] {
+  if (filter === "all") {
+    return items;
+  }
+  const shouldIncludeSnoozed = filter === "snoozed";
+  return items.filter((item) => {
+    const isSnoozed = isNodeSnoozed(getSnoozeUntilByNodeId(item.nodeId), currentDate);
+    return shouldIncludeSnoozed ? isSnoozed : !isSnoozed;
+  });
 }
 
 export function groupAttentionItemsByStatus(

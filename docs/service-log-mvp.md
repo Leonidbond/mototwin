@@ -65,6 +65,17 @@ After creating `SERVICE` event, clients show:
 - no delete action in Expo timeline row
 - DELETE endpoint rejects non-`SERVICE` events
 
+## STATE_UPDATE display rules
+
+STATE updates are rendered via shared domain formatting (`@mototwin/domain`) on both clients:
+
+- if old + new value known: `Пробег: X → Y км`, `Моточасы: X → Y ч`
+- if only new value known: `Пробег обновлен до Y км`, `Моточасы обновлены до Y ч`
+- if one field is absent, only available field is shown
+- no raw JSON is shown in timeline rows
+
+Web and Expo keep platform-specific layout, but state-change meaning is the same.
+
 ## Status and expense consistency after edit
 
 After `SERVICE` event edit:

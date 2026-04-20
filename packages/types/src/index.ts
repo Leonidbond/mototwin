@@ -1,9 +1,12 @@
 export type { NodeStatus, StatusSemanticKey } from "./status";
 export type {
   AttentionActionSeverity,
+  AttentionSnoozeFilter,
   AttentionSeverity,
   AttentionActionViewModel,
   AttentionEffectiveStatus,
+  NodeSnoozeOption,
+  NodeSnoozeState,
   AttentionItemViewModel,
   AttentionStatusGroupViewModel,
   AttentionSummaryViewModel,

@@ -33,6 +33,18 @@ Node Context action set is built in shared domain and follows safety rules:
 - `Добавить комплект` if kits are available for the node;
 - `Пояснение статуса` when `statusExplanation` exists.
 
+### Snooze reminder (local only)
+
+For nodes with `effectiveStatus` = `OVERDUE` or `SOON`, Node Context provides local reminder actions:
+
+- `Отложить на 7 дней`
+- `Отложить на 30 дней`
+- `Снять отложенное` (shown when active snooze exists)
+
+Snooze state is local-only per `vehicleId + nodeId` and does not touch backend contracts, Prisma, service events, or maintenance calculations.  
+Active snooze is displayed as `Отложено до <date>`.
+Attention view can additionally filter items by snooze state (`Все`, `Без отложенных`, `Только отложенные`) without changing status semantics.
+
 ### Add Service Event prefills from node context
 
 When `Добавить сервисное событие` is opened directly from node context (and related node entry points: tree/search/attention), web and Expo use shared domain helper `createInitialAddServiceEventFromNode`:
