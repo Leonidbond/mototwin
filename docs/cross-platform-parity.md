@@ -26,6 +26,7 @@ Parity оценивается по core workflows, business outcome и поль�
 - **Local settings parity:** both clients expose local Garage settings (currency, distance unit, date format, default snooze days; engine-hours unit fixed to `h`) with shared defaults/normalization in domain. Persistence is local-only (web `localStorage`, Expo local storage helper), no backend sync yet. `defaultCurrency` is wired to wishlist create + add-service-event defaults while preserving item-specific wishlist-install prefill. See [user-settings-mvp.md](./user-settings-mvp.md).
 - **Auth/ownership note:** both clients remain pre-auth in MVP and must not claim user isolation yet; planned ownership migration is documented in [auth-data-ownership-architecture.md](./auth-data-ownership-architecture.md).
 - **Phase 1 ownership status:** backend now has demo user + demo garage ownership foundation; web/Expo UX remains unchanged and still pre-auth by behavior.
+- **Phase 2A ownership status:** base Garage/Vehicle APIs are scoped to current demo context (garage list, create vehicle, vehicle detail, profile update). Nested vehicle APIs are intentionally deferred to Phase 2B; visible web/Expo behavior stays unchanged.
 
 ## 3.2 Add motorcycle
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserContext } from "../../../_shared/current-user-context";
 
 type RouteContext = {
   params: Promise<{
@@ -24,9 +25,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const json = await request.json();
     const data = updateVehicleProfileSchema.parse(json);
+    const currentUser = await getCurrentUserContext();
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id },
+    const vehicle = await prisma.vehicle.findFirst({
+      where: {
+        id,
+        userId: currentUser.userId,
+        garageId: currentUser.garageId,
+      },
       select: { id: true },
     });
 

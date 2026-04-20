@@ -29,10 +29,20 @@ Future iterations should add:
 - Added user/garage ownership foundation and deterministic backfill.
 - Demo current-user context is used internally (no login/register/session yet).
 
-### Phase 2 — API ownership filtering (still pre-auth UI)
+### Phase 2A — Base API ownership filtering (implemented, still pre-auth UI)
 
-- Scope vehicle data access by current-user context.
-- Keep context resolved as demo user until real auth is introduced.
+- Scoped base Garage/Vehicle routes by current-user context:
+  - garage list;
+  - create vehicle;
+  - vehicle detail;
+  - vehicle profile update.
+- Out-of-scope vehicle ids return `404`.
+- Current-user context still resolves to demo user/garage.
+
+### Phase 2B — Nested vehicle routes ownership filtering (next)
+
+- Scope nested vehicle routes (`node-tree`, `state`, `service-events`, `wishlist`, recommendations, kits).
+- Keep behavior backward-compatible for current visible workflows.
 
 ### Phase 3 — Auth session layer
 

@@ -19,7 +19,8 @@ Out of scope in current phase:
 ## 1.1 Phase status
 
 - Phase 1 (schema/data ownership foundation) is implemented.
-- Phase 2+ (broad API ownership filtering and real auth) are pending.
+- Phase 2A (base Garage/Vehicle API ownership scope) is implemented.
+- Phase 2B (nested vehicle routes ownership scope) is pending.
 
 ## 2. Current state (as-is)
 
@@ -111,9 +112,15 @@ Justification:
 
 ### Phase 2 — API ownership filtering
 
-- introduce user-scoped data access in API layer;
-- all vehicle queries filtered by resolved user context;
-- current user context still resolves to demo user (no login UI yet).
+- Phase 2A implemented:
+  - `GET /api/garage` scoped by current user/garage context;
+  - `POST /api/vehicles` writes current user/garage ownership;
+  - `GET /api/vehicles/[id]` returns vehicle only inside current context;
+  - `PATCH /api/vehicles/[id]/profile` updates vehicle only inside current context.
+- Security behavior for out-of-scope vehicle ids in base routes: return `404` (no existence leak).
+- Phase 2B deferred:
+  - nested routes (`node-tree`, `state`, `service-events`, `wishlist`, recommendations, kits) remain as-is until dedicated hardening pass.
+- Current user context still resolves to demo user (no login UI yet).
 
 ### Phase 3 — Real auth implementation
 
@@ -158,6 +165,7 @@ Current Phase 1 usage:
 
 - `GET /api/garage` resolves demo context and loads vehicles by demo `garageId`.
 - `POST /api/vehicles` resolves demo context and writes `userId + garageId`.
+- `GET /api/vehicles/[id]` and `PATCH /api/vehicles/[id]/profile` resolve demo context and enforce ownership match.
 
 ## 9. Security and honesty constraints
 

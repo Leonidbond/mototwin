@@ -118,7 +118,8 @@ Implemented in Phase 1:
 
 Planned next:
 
-- wider API ownership filtering by resolved current-user context;
+- Phase 2A implemented for base Garage/Vehicle routes (list/create/detail/profile update);
+- Phase 2B pending for nested vehicle routes (`node-tree`, `state`, `service-events`, `wishlist`, recommendations, kits);
 - later login/session replacement for demo resolver;
 - later server-side `UserSettings`.
 

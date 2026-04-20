@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserContext } from "../../_shared/current-user-context";
 
 type RouteContext = {
   params: Promise<{
@@ -10,9 +11,14 @@ type RouteContext = {
 export async function GET(_: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
+    const currentUser = await getCurrentUserContext();
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id },
+    const vehicle = await prisma.vehicle.findFirst({
+      where: {
+        id,
+        userId: currentUser.userId,
+        garageId: currentUser.garageId,
+      },
       include: {
         brand: true,
         model: true,

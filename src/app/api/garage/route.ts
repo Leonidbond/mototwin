@@ -9,6 +9,7 @@ export async function GET() {
 
     const vehicles = await prisma.vehicle.findMany({
       where: {
+        userId: currentUser.userId,
         garageId: currentUser.garageId,
       },
       orderBy: {
