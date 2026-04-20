@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  createInitialAddServiceEventFromNode,
   createInitialAddServiceEventFormValues,
   createInitialAddServiceEventFromWishlistItem,
   getNodePathById,
@@ -155,6 +156,36 @@ export default function NewServiceEventScreen() {
           setCurrency(prefill.currency);
           setComment(prefill.comment);
           setInstalledPartsJson(prefill.installedPartsJson);
+        } else if (
+          initialNodeId &&
+          (source === "tree" || source === "attention" || source === "search" || source === "node-context")
+        ) {
+          const selectedInitialNode = getSelectedNodeFromPath(
+            nextTree,
+            getNodePathById(nextTree, initialNodeId) ?? []
+          );
+          if (selectedInitialNode && vehicleData.vehicle) {
+            const prefill = createInitialAddServiceEventFromNode({
+              nodeId: selectedInitialNode.id,
+              nodeCode: selectedInitialNode.code,
+              nodeName: selectedInitialNode.name,
+              vehicle: {
+                odometer: vehicleData.vehicle.odometer,
+                engineHours: vehicleData.vehicle.engineHours ?? null,
+              },
+              currentDateYmd: getTodayDateYmdLocal(),
+            });
+            setServiceType(prefill.serviceType);
+            setEventDate(prefill.eventDate);
+            setOdometer(prefill.odometer);
+            setEngineHours(prefill.engineHours);
+            setCostAmount(prefill.costAmount);
+            setCurrency(prefill.currency);
+            setComment(prefill.comment);
+            setInstalledPartsJson(prefill.installedPartsJson);
+          } else {
+            setInstalledPartsJson("");
+          }
         } else {
           setInstalledPartsJson("");
         }

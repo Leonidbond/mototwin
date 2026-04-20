@@ -33,6 +33,23 @@ Node Context action set is built in shared domain and follows safety rules:
 - `Добавить комплект` if kits are available for the node;
 - `Пояснение статуса` when `statusExplanation` exists.
 
+### Add Service Event prefills from node context
+
+When `Добавить сервисное событие` is opened directly from node context (and related node entry points: tree/search/attention), web and Expo use shared domain helper `createInitialAddServiceEventFromNode`:
+
+- `nodeId` = selected leaf node;
+- `eventDate` = current local date;
+- `odometer` / `engineHours` = current vehicle state;
+- `serviceType` + `comment` = node template from `getServiceEventTemplateForNode`.
+
+Template examples include `ENGINE.LUBE.OIL`, `BRAKES.FRONT.PADS`, `DRIVETRAIN.CHAIN`, `TIRES.FRONT` and other common maintenance nodes.  
+If no node-specific template exists, fallback is:
+
+- service type: `Обслуживание узла`;
+- comment: `Зафиксировано обслуживание узла: <node name>`.
+
+Wishlist `INSTALLED → Добавить сервисное событие` keeps its own wishlist-specific prefill and does not use node template defaults.
+
 ## Entry Points
 
 Node Context is opened from:

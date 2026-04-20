@@ -49,6 +49,112 @@ export type VehicleOdometerStateForServiceEvent = {
   engineHours: number | null;
 };
 
+export type ServiceEventNodeTemplate = {
+  serviceType: string;
+  comment: string;
+};
+
+const FALLBACK_NODE_SERVICE_TYPE_RU = "Обслуживание узла";
+const FALLBACK_NODE_SERVICE_COMMENT_PREFIX_RU = "Зафиксировано обслуживание узла:";
+
+const NODE_SERVICE_EVENT_TEMPLATES: Record<string, ServiceEventNodeTemplate> = {
+  "ENGINE.LUBE.OIL": {
+    serviceType: "Замена масла",
+    comment: "Заменено моторное масло",
+  },
+  "ENGINE.LUBE.FILTER": {
+    serviceType: "Замена масляного фильтра",
+    comment: "Заменен масляный фильтр",
+  },
+  "INTAKE.FILTER": {
+    serviceType: "Замена воздушного фильтра",
+    comment: "Заменен воздушный фильтр",
+  },
+  "ELECTRICS.IGNITION.SPARK": {
+    serviceType: "Замена свечи зажигания",
+    comment: "Заменена свеча зажигания",
+  },
+  "BRAKES.FRONT.PADS": {
+    serviceType: "Замена передних тормозных колодок",
+    comment: "Заменены передние тормозные колодки",
+  },
+  "BRAKES.REAR.PADS": {
+    serviceType: "Замена задних тормозных колодок",
+    comment: "Заменены задние тормозные колодки",
+  },
+  "BRAKES.FLUID": {
+    serviceType: "Замена тормозной жидкости",
+    comment: "Заменена тормозная жидкость",
+  },
+  "DRIVETRAIN.CHAIN": {
+    serviceType: "Обслуживание цепи",
+    comment: "Проверка, очистка, смазка и натяжение цепи",
+  },
+  "DRIVETRAIN.FRONT_SPROCKET": {
+    serviceType: "Замена ведущей звезды",
+    comment: "Заменена ведущая звезда",
+  },
+  "DRIVETRAIN.REAR_SPROCKET": {
+    serviceType: "Замена ведомой звезды",
+    comment: "Заменена ведомая звезда",
+  },
+  "TIRES.FRONT": {
+    serviceType: "Замена передней шины",
+    comment: "Заменена передняя шина",
+  },
+  "TIRES.REAR": {
+    serviceType: "Замена задней шины",
+    comment: "Заменена задняя шина",
+  },
+  "COOLING.LIQUID": {
+    serviceType: "Замена охлаждающей жидкости",
+    comment: "Заменена охлаждающая жидкость",
+  },
+  "SUSPENSION.FRONT.OIL": {
+    serviceType: "Замена масла в вилке",
+    comment: "Заменено масло в передней вилке",
+  },
+  "ELECTRICS.BATTERY": {
+    serviceType: "Замена аккумулятора",
+    comment: "Заменен аккумулятор",
+  },
+};
+
+export function getServiceEventTemplateForNode(nodeCode: string): ServiceEventNodeTemplate | null {
+  const normalizedCode = nodeCode.trim().toUpperCase();
+  if (!normalizedCode) {
+    return null;
+  }
+  const template = NODE_SERVICE_EVENT_TEMPLATES[normalizedCode];
+  return template ?? null;
+}
+
+type CreateInitialAddServiceEventFromNodeArgs = {
+  nodeId: string;
+  nodeCode: string;
+  nodeName: string;
+  vehicle: VehicleOdometerStateForServiceEvent;
+  currentDateYmd?: string;
+};
+
+export function createInitialAddServiceEventFromNode(
+  args: CreateInitialAddServiceEventFromNodeArgs
+): AddServiceEventFormValues {
+  const base = createInitialAddServiceEventFormValues();
+  const template = getServiceEventTemplateForNode(args.nodeCode);
+  const fallbackNodeName = args.nodeName.trim() || "узел";
+  return {
+    ...base,
+    nodeId: args.nodeId.trim(),
+    eventDate: args.currentDateYmd ?? getTodayDateYmdLocal(),
+    odometer: String(args.vehicle.odometer),
+    engineHours: args.vehicle.engineHours != null ? String(args.vehicle.engineHours) : "",
+    serviceType: template?.serviceType ?? FALLBACK_NODE_SERVICE_TYPE_RU,
+    comment:
+      template?.comment ?? `${FALLBACK_NODE_SERVICE_COMMENT_PREFIX_RU} ${fallbackNodeName}`,
+  };
+}
+
 export function buildAddServiceEventCommentFromWishlistItem(item: PartWishlistItem): string {
   const lines = [
     `${WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU} ${item.title}`,

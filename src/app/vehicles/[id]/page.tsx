@@ -15,6 +15,7 @@ import {
   buildVehicleTechnicalInfoViewModel,
   vehicleDetailFromApiRecord,
   createInitialAddServiceEventFormValues,
+  createInitialAddServiceEventFromNode,
   createInitialAddServiceEventFromWishlistItem,
   createInitialEditVehicleProfileFormValues,
   createInitialVehicleStateFormValues,
@@ -848,16 +849,32 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   };
 
   const openAddServiceEventFromLeafNode = (leafNodeId: string) => {
+    if (!vehicle) {
+      setServiceEventFormError("Не удалось загрузить данные мотоцикла.");
+      return;
+    }
     const nodePath = findNodePathById(nodeTree, leafNodeId);
+    const leafNode = findNodeTreeItemById(nodeTree, leafNodeId);
 
-    if (!nodePath) {
+    if (!nodePath || !leafNode) {
       setServiceEventFormError("Не удалось определить путь узла.");
       return;
     }
 
+    const values = createInitialAddServiceEventFromNode({
+      nodeId: leafNode.id,
+      nodeCode: leafNode.code,
+      nodeName: leafNode.name,
+      vehicle: {
+        odometer: vehicle.odometer,
+        engineHours: vehicle.engineHours,
+      },
+      currentDateYmd: todayDate,
+    });
+
     setServiceEventFormError("");
     setServiceEventFormSuccess("");
-    setInstalledPartsJson("");
+    applyAddServiceEventFormValues(values);
     setSelectedNodePath(nodePath);
     setIsAddServiceEventModalOpen(true);
   };

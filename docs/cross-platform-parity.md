@@ -64,7 +64,7 @@ Parity оценивается по core workflows, business outcome и поль�
 - **Web:** implemented via modal form
 - **Expo:** implemented route form (`vehicles/[id]/service-events/new`)
 - **Parity status:** aligned
-- **Notes:** both enforce leaf-node-only servicing and use same backend validations.
+- **Notes:** both enforce leaf-node-only servicing and use same backend validations. For node-origin opening (Node Context/tree/search/attention), both clients prefill via shared `@mototwin/domain` helpers `getServiceEventTemplateForNode` + `createInitialAddServiceEventFromNode` (node template `serviceType/comment`, current date, current odometer/engine hours). Wishlist `INSTALLED` prefill remains wishlist-specific and unchanged.
 
 ## 3.6 Update vehicle state
 

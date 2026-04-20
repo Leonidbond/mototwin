@@ -112,6 +112,8 @@ export type { VehicleOdometerStateForServiceEvent } from "./forms";
 export {
   getTodayDateYmdLocal,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
+  getServiceEventTemplateForNode,
+  createInitialAddServiceEventFromNode,
   buildAddServiceEventCommentFromWishlistItem,
   buildWishlistInstalledPartsJsonString,
   createInitialAddServiceEventFromWishlistItem,
