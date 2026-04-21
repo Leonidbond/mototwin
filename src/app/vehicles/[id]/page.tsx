@@ -18,7 +18,7 @@ import {
   createInitialAddServiceEventFromNode,
   createInitialAddServiceEventFromWishlistItem,
   createInitialEditServiceEventValues,
-  createInitialEditVehicleProfileFormValues,
+  buildInitialVehicleProfileFormValues,
   createInitialVehicleStateFormValues,
   createServiceLogNodeFilter,
   findNodePathById,
@@ -36,13 +36,14 @@ import {
   getStatusExplanationTriggeredByLabel,
   normalizeAddServiceEventPayload,
   normalizeEditServiceEventPayload,
-  normalizeEditVehicleProfilePayload,
+  normalizeVehicleProfileFormValues,
   normalizeVehicleStatePayload,
   RIDE_LOAD_TYPE_OPTIONS,
   RIDE_RIDING_STYLE_OPTIONS,
   RIDE_USAGE_INTENSITY_OPTIONS,
   RIDE_USAGE_TYPE_OPTIONS,
   validateAddServiceEventFormValues,
+  validateVehicleProfileFormValues,
   validateVehicleStateFormValues,
   isServiceLogTimelineQueryActive,
   buildExpenseSummaryFromServiceEvents,
@@ -235,8 +236,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileFormError, setProfileFormError] = useState("");
+  const [profileFormSuccess, setProfileFormSuccess] = useState("");
+  const [isMovingToTrash, setIsMovingToTrash] = useState(false);
+  const [moveToTrashError, setMoveToTrashError] = useState("");
   const [profileForm, setProfileForm] = useState<EditVehicleProfileFormValues>(() =>
-    createInitialEditVehicleProfileFormValues()
+    buildInitialVehicleProfileFormValues()
   );
   const [isEditingVehicleState, setIsEditingVehicleState] = useState(false);
   const [vehicleStateOdometer, setVehicleStateOdometer] = useState("");
@@ -253,6 +257,13 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   );
   const [comment, setComment] = useState("");
   const [installedPartsJson, setInstalledPartsJson] = useState("");
+  useEffect(() => {
+    if (!profileFormSuccess) {
+      return;
+    }
+    const timer = window.setTimeout(() => setProfileFormSuccess(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [profileFormSuccess]);
   const todayDate = getTodayDateString();
   const nodeSelectLevels = useMemo(() => {
     return getNodeSelectLevels(nodeTree, selectedNodePath);
@@ -1602,6 +1613,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                     type="button"
                     onClick={() => toggleNodeExpansion(node.id)}
                     className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition hover:bg-gray-50"
+                    title={isExpanded ? "Свернуть ветку" : "Развернуть ветку"}
                     aria-label={isExpanded ? "Свернуть ветку" : "Развернуть ветку"}
                   >
                     {isExpanded ? "−" : "+"}
@@ -1656,44 +1668,64 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
             <div className="flex shrink-0 items-center gap-2">
               {node.effectiveStatus ? (
-                <button
-                  type="button"
-                  onClick={() => openServiceLogFromTreeContext(node)}
-                  className="inline-flex h-7 cursor-pointer items-center rounded-full border px-2.5 text-xs font-medium transition hover:ring-2 hover:ring-gray-300 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-400"
-                  style={getStatusBadgeStyle(node.effectiveStatus)}
-                  title="Показать записи журнала по этому узлу"
-                  aria-label={`Открыть журнал обслуживания по узлу «${node.name}»`}
-                >
-                  {node.statusLabel}
-                </button>
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => openServiceLogFromTreeContext(node)}
+                    className="inline-flex h-7 cursor-pointer items-center rounded-full border px-2.5 text-xs font-medium transition hover:ring-2 hover:ring-gray-300 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-400"
+                    style={getStatusBadgeStyle(node.effectiveStatus)}
+                    title="Журнал"
+                    aria-label={`Открыть журнал обслуживания по узлу «${node.name}»`}
+                  >
+                    {node.statusLabel}
+                  </button>
+                  <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                    Журнал
+                  </span>
+                </div>
               ) : null}
               {node.canAddServiceEvent ? (
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => openAddServiceEventFromTreeContext(node.id)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                    aria-label="Добавить сервисное событие"
+                    title="Добавить сервисное событие"
+                  >
+                    +
+                  </button>
+                  <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                    Добавить сервисное событие
+                  </span>
+                </div>
+              ) : null}
+              <div className="group relative">
                 <button
                   type="button"
-                  onClick={() => openAddServiceEventFromTreeContext(node.id)}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                  aria-label="Добавить сервисное событие"
-                  title="Добавить сервисное событие"
+                  onClick={() => openWishlistFromTreeContext(node.id)}
+                  className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
+                  title="Добавить в список покупок"
                 >
-                  +
+                  В список
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => openWishlistFromTreeContext(node.id)}
-                className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
-                title="Добавить в список покупок"
-              >
-                В список
-              </button>
-              <button
-                type="button"
-                onClick={() => openNodeContextModal(node.id)}
-                className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
-                title="Открыть контекст узла"
-              >
-                Контекст
-              </button>
+                <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                  Добавить в список покупок
+                </span>
+              </div>
+              <div className="group relative">
+                <button
+                  type="button"
+                  onClick={() => openNodeContextModal(node.id)}
+                  className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
+                  title="Открыть контекст узла"
+                >
+                  Контекст
+                </button>
+                <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                  Открыть контекст узла
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -1737,7 +1769,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
 
     setProfileForm(
-      createInitialEditVehicleProfileFormValues({
+      buildInitialVehicleProfileFormValues({
         nickname: vehicle.nickname || "",
         vin: vehicle.vin || "",
         usageType: (vehicle.rideProfile?.usageType || "MIXED") as EditVehicleProfileFormValues["usageType"],
@@ -1749,6 +1781,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       })
     );
     setProfileFormError("");
+    setProfileFormSuccess("");
     setIsEditProfileModalOpen(true);
   };
 
@@ -1757,19 +1790,26 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       setProfileFormError("Не удалось определить мотоцикл.");
       return;
     }
+    const validation = validateVehicleProfileFormValues(profileForm);
+    if (validation.errors.length > 0) {
+      setProfileFormError(validation.errors[0]);
+      return;
+    }
 
     try {
       setIsSavingProfile(true);
       setProfileFormError("");
+      setProfileFormSuccess("");
 
       const data = await vehicleDetailApi.updateVehicleProfile(
         vehicleId,
-        normalizeEditVehicleProfilePayload(profileForm)
+        normalizeVehicleProfileFormValues(profileForm)
       );
 
       const updated = data.vehicle as unknown as VehicleDetailApiRecord;
       setVehicle(vehicleDetailFromApiRecord(updated));
       setIsEditProfileModalOpen(false);
+      setProfileFormSuccess("Мотоцикл обновлен");
     } catch (saveError) {
       console.error(saveError);
       setProfileFormError(
@@ -1779,6 +1819,34 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       );
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const moveVehicleToTrash = async () => {
+    if (!vehicleId) {
+      setMoveToTrashError("Не удалось определить мотоцикл.");
+      return;
+    }
+    const confirmed = window.confirm(
+      "Переместить мотоцикл на Свалку?\n\nОн исчезнет из гаража, но его можно будет восстановить на странице «Свалка»."
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      setIsMovingToTrash(true);
+      setMoveToTrashError("");
+      await vehicleDetailApi.moveVehicleToTrash(vehicleId);
+      window.location.assign("/garage");
+    } catch (requestError) {
+      console.error(requestError);
+      setMoveToTrashError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Не удалось переместить мотоцикл на Свалку."
+      );
+    } finally {
+      setIsMovingToTrash(false);
     }
   };
 
@@ -2004,31 +2072,67 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 <h1 className="min-w-0 flex-1 text-4xl font-semibold tracking-tight text-gray-950 sm:text-5xl">
                   {detailViewModel?.displayName || title}
                 </h1>
-                <button
-                  type="button"
-                  onClick={() => setIsAttentionModalOpen(true)}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition hover:opacity-95"
-                  style={{
-                    borderColor: attentionTok.border,
-                    backgroundColor: attentionTok.background,
-                    color: attentionTok.foreground,
-                  }}
-                >
-                  Требует внимания
-                  <span
-                    className="rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+                <div className="flex shrink-0 items-center gap-2">
+                  <div className="group relative">
+                    <button
+                      type="button"
+                      onClick={openEditProfileModal}
+                      title="Редактировать"
+                      aria-label="Редактировать"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-900 transition hover:bg-gray-100"
+                    >
+                      <EditIcon />
+                    </button>
+                    <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                      Редактировать
+                    </span>
+                  </div>
+                  <div className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => void moveVehicleToTrash()}
+                      disabled={isMovingToTrash}
+                      title="На свалку"
+                      aria-label="На свалку"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-300 bg-rose-50 text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <TrashIcon />
+                    </button>
+                    <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                      На свалку
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAttentionModalOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition hover:opacity-95"
                     style={{
-                      backgroundColor: attentionBadgeBg,
-                      color:
-                        attentionAction.totalCount > 0
-                          ? attentionTok.foreground
-                          : productSemanticColors.textMuted,
+                      borderColor: attentionTok.border,
+                      backgroundColor: attentionTok.background,
+                      color: attentionTok.foreground,
                     }}
                   >
-                    {attentionSummary.totalCount}
-                  </span>
-                </button>
+                    Требует внимания
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+                      style={{
+                        backgroundColor: attentionBadgeBg,
+                        color:
+                          attentionAction.totalCount > 0
+                            ? attentionTok.foreground
+                            : productSemanticColors.textMuted,
+                      }}
+                    >
+                      {attentionSummary.totalCount}
+                    </span>
+                  </button>
+                </div>
               </div>
+              {moveToTrashError ? (
+                <p className="mt-3 text-sm" style={{ color: productSemanticColors.error }}>
+                  {moveToTrashError}
+                </p>
+              ) : null}
 
               <p className="mt-3 text-base leading-7 text-gray-600">
                 {(
@@ -2151,13 +2255,6 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                       <span className="text-sm text-gray-500" aria-hidden>
                         {isUsageProfileSectionExpanded ? "▾" : "▸"}
                       </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={openEditProfileModal}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
-                    >
-                      Редактировать профиль
                     </button>
                   </div>
 
@@ -3165,20 +3262,34 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                                           </span>
                                           {!isStateUpdate ? (
                                             <div className="flex items-center gap-3">
-                                              <button
-                                                type="button"
-                                                onClick={() => openEditServiceEventFromLog(entry.id)}
-                                                className="text-xs font-medium text-gray-700 underline decoration-dotted underline-offset-2 transition hover:text-gray-950"
-                                              >
-                                                Редактировать
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => void deleteServiceEventFromLog(entry.id)}
-                                                className="text-xs font-medium text-red-700 underline decoration-dotted underline-offset-2 transition hover:text-red-900"
-                                              >
-                                                Удалить
-                                              </button>
+                                              <div className="group relative">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openEditServiceEventFromLog(entry.id)}
+                                                  title="Редактировать"
+                                                  aria-label="Редактировать"
+                                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-gray-950"
+                                                >
+                                                  <EditIcon />
+                                                </button>
+                                                <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                                                  Редактировать
+                                                </span>
+                                              </div>
+                                              <div className="group relative">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => void deleteServiceEventFromLog(entry.id)}
+                                                  title="Удалить"
+                                                  aria-label="Удалить"
+                                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100 hover:text-rose-900"
+                                                >
+                                                  <TrashIcon />
+                                                </button>
+                                                <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                                                  Удалить
+                                                </span>
+                                              </div>
                                             </div>
                                           ) : null}
                                         </div>
@@ -4510,7 +4621,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
           <div className="w-full max-w-3xl rounded-3xl border border-gray-200 bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-xl font-semibold tracking-tight text-gray-950">
-                Редактировать профиль
+                Редактировать мотоцикл
               </h2>
               <button
                 type="button"
@@ -4523,6 +4634,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
             </div>
 
             <div className="max-h-[72vh] overflow-y-auto px-6 py-6">
+              <p className="mb-3 text-sm text-gray-500">
+                Пробег и моточасы обновляются через действие «Обновить состояние».
+              </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <InputField label="Название в гараже">
                   <input
@@ -4650,6 +4764,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
           </div>
         </div>
       ) : null}
+      {profileFormSuccess ? (
+        <div className="fixed bottom-5 right-5 z-[70] rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 shadow">
+          {profileFormSuccess}
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -4679,6 +4798,27 @@ function InfoCard({ label, value }: { label: string; value: string }) {
       </div>
       <div className="mt-2 text-sm font-semibold text-gray-950">{value}</div>
     </div>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <title>Редактировать</title>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <title>Удалить</title>
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+    </svg>
   );
 }
 

@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildAttentionActionViewModel,
@@ -67,6 +68,7 @@ import {
 import { buildVehicleServiceLogHref } from "./service-log";
 import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
+import { ActionIconButton } from "../../components/action-icon-button";
 
 function getStatusColors(status: NodeStatus | null) {
   const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
@@ -245,37 +247,27 @@ function NodeRow({
 
         <View style={styles.nodeRowActions}>
           {onAddToWishlist ? (
-            <Pressable
+            <ActionIconButton
               onPress={() => onAddToWishlist(rowNode.id)}
-              style={({ pressed }) => [
-                styles.wishlistTreeButton,
-                pressed && styles.wishlistTreeButtonPressed,
-              ]}
-              hitSlop={6}
-            >
-              <Text style={styles.wishlistTreeButtonText}>В список</Text>
-            </Pressable>
+              accessibilityLabel={`Добавить узел ${rowNode.name} в список покупок`}
+              variant="subtle"
+              icon={<MaterialIcons name="shopping-cart" size={15} color={c.textSecondary} />}
+            />
           ) : null}
           {onOpenContext ? (
-            <Pressable
+            <ActionIconButton
               onPress={() => onOpenContext(rowNode.id)}
-              style={({ pressed }) => [
-                styles.wishlistTreeButton,
-                pressed && styles.wishlistTreeButtonPressed,
-              ]}
-              hitSlop={6}
-            >
-              <Text style={styles.wishlistTreeButtonText}>Контекст</Text>
-            </Pressable>
+              accessibilityLabel={`Открыть контекст узла ${rowNode.name}`}
+              variant="subtle"
+              icon={<MaterialIcons name="open-in-new" size={15} color={c.textSecondary} />}
+            />
           ) : null}
           {rowNode.canAddServiceEvent ? (
-            <Pressable
+            <ActionIconButton
               onPress={() => treeItemContract.onRequestAddServiceEvent?.()}
-              style={({ pressed }) => [styles.addLeafButton, pressed && styles.addLeafButtonPressed]}
-              hitSlop={8}
-            >
-              <Text style={styles.addLeafButtonText}>+</Text>
-            </Pressable>
+              accessibilityLabel={`Добавить сервисное событие для узла ${rowNode.name}`}
+              icon={<MaterialIcons name="build-circle" size={16} color={c.textSecondary} />}
+            />
           ) : null}
         </View>
       </Pressable>
@@ -343,6 +335,7 @@ export default function VehicleDetailScreen() {
   const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
   const [serviceEventsError, setServiceEventsError] = useState("");
   const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
+  const [isMovingToTrash, setIsMovingToTrash] = useState(false);
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -853,6 +846,34 @@ export default function VehicleDetailScreen() {
   const canSnoozeSelectedNode =
     selectedNodeContextViewModel?.effectiveStatus === "OVERDUE" ||
     selectedNodeContextViewModel?.effectiveStatus === "SOON";
+  const moveVehicleToTrash = useCallback(() => {
+    if (!vehicleId || isMovingToTrash) {
+      return;
+    }
+    Alert.alert("Переместить мотоцикл на Свалку?", "Его можно будет восстановить в разделе Свалка.", [
+      { text: "Отмена", style: "cancel" },
+      {
+        text: "Переместить",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            try {
+              setIsMovingToTrash(true);
+              await createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).moveVehicleToTrash(
+                vehicleId
+              );
+              router.replace("/");
+            } catch (requestError) {
+              console.error(requestError);
+              setError("Не удалось переместить мотоцикл на Свалку.");
+            } finally {
+              setIsMovingToTrash(false);
+            }
+          })();
+        },
+      },
+    ]);
+  }, [apiBaseUrl, isMovingToTrash, router, vehicleId]);
 
   const hasNickname = Boolean(vehicle?.nickname?.trim());
 
@@ -916,6 +937,20 @@ export default function VehicleDetailScreen() {
           )}
           <View style={styles.titleRow}>
             <Text style={styles.title}>{detailViewModel.displayName}</Text>
+            <View style={styles.titleActionsRow}>
+              <ActionIconButton
+                onPress={() => router.push(`/vehicles/${vehicleId}/profile`)}
+                accessibilityLabel="Редактировать профиль мотоцикла"
+                icon={<MaterialIcons name="edit" size={16} color={c.textMeta} />}
+              />
+              <ActionIconButton
+                onPress={moveVehicleToTrash}
+                accessibilityLabel="Переместить мотоцикл на Свалку"
+                variant="danger"
+                disabled={isMovingToTrash}
+                icon={<MaterialIcons name="delete-outline" size={16} color={c.error} />}
+              />
+            </View>
             <Pressable
               onPress={() => router.push(`/vehicles/${vehicleId}/attention`)}
               style={({ pressed }) => [
@@ -954,10 +989,13 @@ export default function VehicleDetailScreen() {
           <View style={styles.stateHeaderRow}>
             <Text style={styles.stateHeading}>Текущее состояние</Text>
             <Pressable
-              style={({ pressed }) => [styles.inlineActionButton, pressed && styles.inlineActionButtonPressed]}
+              style={({ pressed }) => [
+                styles.stateTextActionButton,
+                pressed && styles.stateTextActionButtonPressed,
+              ]}
               onPress={() => router.push(`/vehicles/${vehicleId}/state`)}
             >
-              <Text style={styles.inlineActionButtonText}>Обновить</Text>
+              <Text style={styles.stateTextActionButtonText}>Обновить</Text>
             </Pressable>
           </View>
           <View style={styles.stateMetricsRow}>
@@ -984,15 +1022,6 @@ export default function VehicleDetailScreen() {
             >
               <Text style={styles.secondarySectionTitle}>Профиль эксплуатации</Text>
               <Text style={styles.sectionChevron}>{isRideProfileExpanded ? "▾" : "▸"}</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.inlineActionButton,
-                pressed && styles.inlineActionButtonPressed,
-              ]}
-              onPress={() => router.push(`/vehicles/${vehicleId}/profile`)}
-            >
-              <Text style={styles.inlineActionButtonText}>Редактировать</Text>
             </Pressable>
           </View>
           {isRideProfileExpanded ? (
@@ -1174,29 +1203,36 @@ export default function VehicleDetailScreen() {
         {/* Node tree */}
         <View>
           <Text style={styles.sectionHeader}>Состояние узлов</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.maintenanceModeToggle,
-              isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleActive,
-              pressed && styles.maintenanceModeTogglePressed,
-            ]}
-            onPress={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
-          >
-            <Text
-              style={[
-                styles.maintenanceModeToggleText,
-                isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleTextActive,
+          <View style={styles.sectionActionsRow}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.maintenanceModeToggle,
+                isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleActive,
+                pressed && styles.maintenanceModeTogglePressed,
               ]}
+              onPress={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
             >
-              {getNodeModeToggleLabel()}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.sectionJournalButton, pressed && styles.sectionJournalButtonPressed]}
-            onPress={() => router.push(`/vehicles/${vehicleId}/service-log`)}
-          >
-            <Text style={styles.sectionJournalButtonText}>Журнал обслуживания</Text>
-          </Pressable>
+              <Text
+                style={[
+                  styles.maintenanceModeToggleText,
+                  isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleTextActive,
+                ]}
+              >
+                {getNodeModeToggleLabel()}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.sectionJournalButton,
+                pressed && styles.sectionJournalButtonPressed,
+              ]}
+              onPress={() => router.push(`/vehicles/${vehicleId}/service-log`)}
+              accessibilityRole="button"
+              accessibilityLabel="Журнал обслуживания"
+            >
+              <Text style={styles.sectionJournalButtonText}>Журнал обслуживания</Text>
+            </Pressable>
+          </View>
           <Text style={styles.sectionSubheader}>
             {isNodeMaintenanceModeEnabled
               ? "В режиме плана показываются сроки и интервалы обслуживания прямо в дереве узлов."
@@ -1257,16 +1293,21 @@ export default function VehicleDetailScreen() {
                     </Pressable>
                     <View style={styles.searchActionsRow}>
                       {buildNodeSearchResultActions(result).map((action) => (
-                        <Pressable
+                        <ActionIconButton
                           key={`${result.nodeId}.${action.key}`}
                           onPress={() => handleSearchResultAction(action.key, result)}
-                          style={({ pressed }) => [
-                            styles.searchActionBtn,
-                            pressed && styles.searchActionBtnPressed,
-                          ]}
-                        >
-                          <Text style={styles.searchActionBtnText}>{action.label}</Text>
-                        </Pressable>
+                          accessibilityLabel={`${action.label}: ${result.nodeName}`}
+                          variant="subtle"
+                          icon={
+                            action.key === "open" ? (
+                              <MaterialIcons name="open-in-new" size={15} color={c.textMeta} />
+                            ) : action.key === "service_log" ? (
+                              <MaterialIcons name="history" size={15} color={c.textMeta} />
+                            ) : (
+                              <MaterialIcons name="shopping-cart" size={15} color={c.textMeta} />
+                            )
+                          }
+                        />
                       ))}
                     </View>
                   </View>
@@ -1382,30 +1423,36 @@ export default function VehicleDetailScreen() {
                 <ScrollView contentContainerStyle={styles.subtreeModalBody} keyboardShouldPersistTaps="handled">
                   <View style={styles.searchActionsRow}>
                     {selectedNodeContextViewModel.actions.map((action) => (
-                      <Pressable
+                      <ActionIconButton
                         key={action.key}
                         onPress={() => handleNodeContextAction(action.key)}
-                        style={({ pressed }) => [
-                          styles.searchActionBtn,
-                          pressed && styles.searchActionBtnPressed,
-                        ]}
-                      >
-                        <Text style={styles.searchActionBtnText}>{action.label}</Text>
-                      </Pressable>
+                        accessibilityLabel={action.label}
+                        variant="subtle"
+                        icon={
+                          action.key === "journal" ? (
+                            <MaterialIcons name="history" size={15} color={c.textMeta} />
+                          ) : action.key === "add_service_event" ? (
+                            <MaterialIcons name="build-circle" size={15} color={c.textMeta} />
+                          ) : action.key === "add_wishlist" ? (
+                            <MaterialIcons name="shopping-cart" size={15} color={c.textMeta} />
+                          ) : action.key === "add_kit" ? (
+                            <MaterialIcons name="inventory-2" size={15} color={c.textMeta} />
+                          ) : (
+                            <MaterialIcons name="help-outline" size={15} color={c.textMeta} />
+                          )
+                        }
+                      />
                     ))}
                     {canSnoozeSelectedNode ? (
                       <>
-                        <Pressable
+                        <ActionIconButton
                           onPress={() =>
                             void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "7d")
                           }
-                          style={({ pressed }) => [
-                            styles.searchActionBtn,
-                            pressed && styles.searchActionBtnPressed,
-                          ]}
-                        >
-                          <Text style={styles.searchActionBtnText}>Отложить на 7 дней</Text>
-                        </Pressable>
+                          accessibilityLabel="Отложить напоминание на 7 дней"
+                          variant="subtle"
+                          icon={<MaterialIcons name="snooze" size={15} color={c.textMeta} />}
+                        />
                         <Pressable
                           onPress={() =>
                             void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "30d")
@@ -1495,17 +1542,13 @@ export default function VehicleDetailScreen() {
                           </Text>
                           <Text style={styles.searchResultPath}>{rec.recommendationLabel}</Text>
                         </View>
-                        <Pressable
+                        <ActionIconButton
                           onPress={() => void addRecommendedSkuToWishlistFromNodeContext(rec)}
-                          style={({ pressed }) => [
-                            styles.searchActionBtn,
-                            pressed && styles.searchActionBtnPressed,
-                          ]}
-                        >
-                          <Text style={styles.searchActionBtnText}>
-                            {nodeContextAddingRecommendedSkuId === rec.skuId ? "..." : "В список"}
-                          </Text>
-                        </Pressable>
+                          accessibilityLabel="Добавить рекомендованный SKU в список покупок"
+                          disabled={nodeContextAddingRecommendedSkuId === rec.skuId}
+                          variant="subtle"
+                          icon={<MaterialIcons name="shopping-cart" size={15} color={c.textMeta} />}
+                        />
                       </View>
                     ))}
                   </View>
@@ -1529,17 +1572,13 @@ export default function VehicleDetailScreen() {
                           <Text style={styles.searchResultTitle}>{kit.title}</Text>
                           <Text style={styles.searchResultPath}>{kit.description}</Text>
                         </View>
-                        <Pressable
+                        <ActionIconButton
                           onPress={() => void addServiceKitFromNodeContext(kit)}
-                          style={({ pressed }) => [
-                            styles.searchActionBtn,
-                            pressed && styles.searchActionBtnPressed,
-                          ]}
-                        >
-                          <Text style={styles.searchActionBtnText}>
-                            {nodeContextAddingKitCode === kit.code ? "..." : "Добавить"}
-                          </Text>
-                        </Pressable>
+                          accessibilityLabel="Добавить комплект обслуживания в список покупок"
+                          disabled={nodeContextAddingKitCode === kit.code}
+                          variant="subtle"
+                          icon={<MaterialIcons name="inventory-2" size={15} color={c.textMeta} />}
+                        />
                       </View>
                     ))}
                   </View>
@@ -1743,6 +1782,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: c.textPrimary,
   },
+  titleActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   attentionPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1801,6 +1845,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   inlineActionButton: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: c.borderStrong,
     borderRadius: 999,
@@ -1811,10 +1859,21 @@ const styles = StyleSheet.create({
   inlineActionButtonPressed: {
     backgroundColor: c.divider,
   },
-  inlineActionButtonText: {
+  stateTextActionButton: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: c.card,
+  },
+  stateTextActionButtonPressed: {
+    backgroundColor: c.divider,
+  },
+  stateTextActionButtonText: {
     fontSize: 12,
+    fontWeight: "700",
     color: c.textMeta,
-    fontWeight: "600",
   },
   stateMetricsRow: {
     flexDirection: "row",
@@ -2098,8 +2157,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: c.textMeta,
   },
-  maintenanceModeToggle: {
+  sectionActionsRow: {
     marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  maintenanceModeToggle: {
     alignSelf: "flex-start",
     borderRadius: 10,
     borderWidth: 1,
@@ -2124,20 +2189,21 @@ const styles = StyleSheet.create({
     color: c.textInverse,
   },
   sectionJournalButton: {
-    marginTop: 8,
     alignSelf: "flex-start",
-    backgroundColor: c.primaryAction,
     borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   sectionJournalButtonPressed: {
     opacity: 0.9,
   },
   sectionJournalButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
-    color: c.textInverse,
+    color: c.textMeta,
   },
   sectionSubheader: {
     marginTop: 4,

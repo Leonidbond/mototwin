@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   PART_WISHLIST_STATUS_ORDER,
@@ -26,6 +27,7 @@ import type { PartWishlistItemStatus, PartWishlistItemViewModel } from "@mototwi
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { buildServiceEventNewFromWishlistHref, buildVehicleWishlistNewHref } from "./hrefs";
+import { ActionIconButton } from "../../../components/action-icon-button";
 
 export default function VehicleWishlistScreen() {
   const router = useRouter();
@@ -254,16 +256,13 @@ export default function VehicleWishlistScreen() {
                             {getPartWishlistStatusLabelRu(item.status)}
                           </Text>
                         </Pressable>
-                        <Pressable
+                        <ActionIconButton
                           onPress={() => confirmDelete(item)}
                           disabled={isBusy}
-                          style={({ pressed }) => [
-                            styles.deleteBtn,
-                            pressed && !isBusy && styles.deleteBtnPressed,
-                          ]}
-                        >
-                          <Text style={styles.deleteBtnText}>Удалить</Text>
-                        </Pressable>
+                          accessibilityLabel="Удалить позицию"
+                          variant="danger"
+                          icon={<MaterialIcons name="delete-outline" size={16} color={c.error} />}
+                        />
                       </View>
                       {isBusy ? (
                         <View style={styles.busyRow}>
@@ -392,15 +391,5 @@ const styles = StyleSheet.create({
   },
   statusBtnPressed: { opacity: 0.88 },
   statusBtnText: { fontSize: 13, fontWeight: "600", color: c.textPrimary },
-  deleteBtn: {
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: c.errorBorder,
-    backgroundColor: c.errorSurface,
-  },
-  deleteBtnPressed: { opacity: 0.9 },
-  deleteBtnText: { fontSize: 13, fontWeight: "600", color: c.error },
   busyRow: { marginTop: 8, alignItems: "flex-start" },
 });

@@ -3,7 +3,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -11,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildGarageCardProps,
@@ -28,6 +28,7 @@ import {
   readCollapsiblePreference,
   writeCollapsiblePreference,
 } from "../src/ui-collapsible-preferences";
+import { ActionIconButton } from "./components/action-icon-button";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -38,7 +39,6 @@ export default function HomeScreen() {
   const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
-  const [activeTrashVehicleId, setActiveTrashVehicleId] = useState("");
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -103,36 +103,6 @@ export default function HomeScreen() {
     }
   };
   const dashboardSummary = buildGarageDashboardSummary(vehicles);
-
-  const moveVehicleToTrash = (vehicle: GarageVehicleItem) => {
-    Alert.alert(
-      "Переместить мотоцикл на Свалку?",
-      "Он исчезнет из гаража, но его можно будет восстановить позже.",
-      [
-        { text: "Отмена", style: "cancel" },
-        {
-          text: "Переместить",
-          style: "destructive",
-          onPress: () => {
-            void (async () => {
-              try {
-                setActiveTrashVehicleId(vehicle.id);
-                const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
-                await endpoints.moveVehicleToTrash(vehicle.id);
-                setVehicles((prev) => prev.filter((item) => item.id !== vehicle.id));
-                setTrashCount((prev) => prev + 1);
-              } catch (requestError) {
-                console.error(requestError);
-                setError("Не удалось переместить мотоцикл на Свалку.");
-              } finally {
-                setActiveTrashVehicleId("");
-              }
-            })();
-          },
-        },
-      ]
-    );
-  };
 
   const renderVehicleCard = ({ item }: { item: GarageVehicleItem }) => {
     const card = buildGarageCardProps(item);
@@ -261,21 +231,6 @@ export default function HomeScreen() {
             )
           ) : null}
         </View>
-        <View style={styles.cardActionsRow}>
-          <Pressable
-            onPress={() => moveVehicleToTrash(item)}
-            disabled={activeTrashVehicleId === item.id}
-            style={({ pressed }) => [
-              styles.trashButton,
-              pressed && styles.trashButtonPressed,
-              activeTrashVehicleId === item.id && styles.trashButtonDisabled,
-            ]}
-          >
-            <Text style={styles.trashButtonText}>
-              {activeTrashVehicleId === item.id ? "..." : "Переместить на свалку"}
-            </Text>
-          </Pressable>
-        </View>
       </View>
     );
   };
@@ -338,27 +293,20 @@ export default function HomeScreen() {
               <View style={styles.headerTopRow}>
                 <Text style={styles.title}>Мой гараж</Text>
               </View>
-              <Pressable
-                onPress={() => router.push("/trash")}
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  styles.trashLinkButton,
-                  pressed && styles.profileIconButtonPressed,
-                ]}
-              >
-                <Text style={styles.secondaryButtonText}>Свалка ({trashCount})</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => router.push("/profile")}
-                style={({ pressed }) => [
-                  styles.profileIconButton,
-                  pressed && styles.profileIconButtonPressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Открыть профиль"
-              >
-                <Text style={styles.profileIconText}>👤</Text>
-              </Pressable>
+              <View style={styles.headerActionsRow}>
+                <ActionIconButton
+                  onPress={() => router.push("/trash")}
+                  accessibilityLabel={`Открыть Свалку (${trashCount})`}
+                  variant="subtle"
+                  icon={<MaterialIcons name="delete-outline" size={18} color={c.textMeta} />}
+                />
+                <ActionIconButton
+                  onPress={() => router.push("/profile")}
+                  accessibilityLabel="Открыть профиль"
+                  icon={<MaterialIcons name="person-outline" size={18} color={c.textMeta} />}
+                />
+              </View>
+              <Text style={styles.trashCounterText}>Свалка: {trashCount}</Text>
               <Text style={styles.subtitle}>Все мотоциклы, обслуживание и покупки в одном месте</Text>
               <Text style={styles.accountHint}>Профиль: Гость</Text>
               <Text style={styles.accountHintMuted}>Авторизация пока не реализована</Text>
@@ -458,28 +406,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
-  profileIconButton: {
-    width: 40,
-    height: 40,
+  headerActionsRow: {
     marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    backgroundColor: c.card,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    gap: 8,
   },
   profileIconButtonPressed: {
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
-  profileIconText: {
-    fontSize: 18,
+  trashCounterText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: c.textMuted,
   },
   errorTitle: {
     fontSize: 20,
@@ -543,9 +483,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  trashLinkButton: {
-    marginTop: 8,
-  },
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 28,
@@ -586,29 +523,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
-  },
-  cardActionsRow: {
-    marginTop: 10,
-    alignItems: "flex-end",
-  },
-  trashButton: {
-    borderWidth: 1,
-    borderColor: "#fecaca",
-    backgroundColor: "#fff1f2",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  trashButtonPressed: {
-    opacity: 0.9,
-  },
-  trashButtonDisabled: {
-    opacity: 0.6,
-  },
-  trashButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#be123c",
   },
   cardCaption: {
     fontSize: 12,

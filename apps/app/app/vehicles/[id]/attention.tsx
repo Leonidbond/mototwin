@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildAttentionSummaryFromNodeTree,
@@ -34,6 +35,7 @@ import { readNodeSnoozePreferences, writeNodeSnoozePreference } from "../../../s
 import { buildVehicleServiceLogHref } from "./service-log";
 import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
+import { ActionIconButton } from "../../components/action-icon-button";
 
 export default function AttentionScreen() {
   const router = useRouter();
@@ -289,41 +291,30 @@ export default function AttentionScreen() {
                       {snoozeLabel ? <Text style={styles.snoozeLabel}>{snoozeLabel}</Text> : null}
 
                       <View style={styles.actions}>
-                        <Pressable
+                        <ActionIconButton
                           onPress={() => openServiceLogForItem(item)}
-                          style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
-                        >
-                          <Text style={styles.actionBtnText}>Журнал по узлу</Text>
-                        </Pressable>
+                          accessibilityLabel="Журнал по узлу"
+                          variant="subtle"
+                          icon={<MaterialIcons name="history" size={16} color={c.textPrimary} />}
+                        />
                         {item.canAddServiceEvent ? (
-                          <Pressable
+                          <ActionIconButton
                             onPress={() => openAddServiceForItem(item)}
-                            style={({ pressed }) => [
-                              styles.actionBtnSecondary,
-                              pressed && styles.actionBtnPressed,
-                            ]}
-                          >
-                            <Text style={styles.actionBtnTextSecondary}>Добавить сервис</Text>
-                          </Pressable>
+                            accessibilityLabel="Добавить сервисное событие"
+                            icon={<MaterialIcons name="build-circle" size={16} color={c.textPrimary} />}
+                          />
                         ) : null}
-                        <Pressable
+                        <ActionIconButton
                           onPress={() => openWishlistForItem(item)}
-                          style={({ pressed }) => [
-                            styles.actionBtnSecondary,
-                            pressed && styles.actionBtnPressed,
-                          ]}
-                        >
-                          <Text style={styles.actionBtnTextSecondary}>В список покупок</Text>
-                        </Pressable>
-                        <Pressable
+                          accessibilityLabel="Добавить в список покупок"
+                          icon={<MaterialIcons name="shopping-cart" size={16} color={c.textPrimary} />}
+                        />
+                        <ActionIconButton
                           onPress={() => openNodeContextForItem(item)}
-                          style={({ pressed }) => [
-                            styles.actionBtnSecondary,
-                            pressed && styles.actionBtnPressed,
-                          ]}
-                        >
-                          <Text style={styles.actionBtnTextSecondary}>Контекст узла</Text>
-                        </Pressable>
+                          accessibilityLabel="Открыть контекст узла"
+                          variant="subtle"
+                          icon={<MaterialIcons name="open-in-new" size={16} color={c.textPrimary} />}
+                        />
                       </View>
                     </View>
                   );
@@ -425,23 +416,5 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   actions: { marginTop: 12, flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  actionBtn: {
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    backgroundColor: c.card,
-  },
-  actionBtnSecondary: {
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    backgroundColor: c.chipBackground,
-  },
   actionBtnPressed: { opacity: 0.88 },
-  actionBtnText: { fontSize: 13, fontWeight: "600", color: c.textPrimary },
-  actionBtnTextSecondary: { fontSize: 13, fontWeight: "600", color: c.textPrimary },
 });

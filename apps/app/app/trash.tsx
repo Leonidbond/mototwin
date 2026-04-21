@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildTrashedVehicleViewModel } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
@@ -103,15 +104,19 @@ export default function TrashScreen() {
                 onPress={() => void restore(item.id)}
                 disabled={busyVehicleId === item.id}
                 style={styles.restoreButton}
+                accessibilityRole="button"
+                accessibilityLabel="Восстановить"
               >
-                <Text style={styles.restoreButtonText}>Восстановить</Text>
+                <MaterialIcons name="undo" size={14} color="#15803d" />
               </Pressable>
               <Pressable
                 onPress={() => permanentlyDelete(item.id)}
                 disabled={busyVehicleId === item.id}
                 style={styles.deleteButton}
+                accessibilityRole="button"
+                accessibilityLabel="Удалить окончательно"
               >
-                <Text style={styles.deleteButtonText}>Удалить окончательно</Text>
+                <MaterialIcons name="delete-outline" size={14} color="#be123c" />
               </Pressable>
             </View>
           </View>
@@ -151,6 +156,10 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 11, color: c.textMuted },
   actionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
   restoreButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: "#86efac",
     backgroundColor: "#f0fdf4",
@@ -158,8 +167,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
-  restoreButtonText: { fontSize: 12, fontWeight: "600", color: "#15803d" },
   deleteButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: "#fecaca",
     backgroundColor: "#fff1f2",
@@ -167,5 +179,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
-  deleteButtonText: { fontSize: 12, fontWeight: "600", color: "#be123c" },
 });

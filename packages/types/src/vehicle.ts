@@ -178,6 +178,12 @@ export type UpdateVehicleProfileInput = {
   rideProfile: VehicleRideProfile;
 };
 
+export type UpdateVehicleProfilePayload = UpdateVehicleProfileInput;
+
+export type UpdateVehicleProfileResult = {
+  vehicle: VehicleDetail;
+};
+
 export type BrandItem = {
   id: string;
   name: string;

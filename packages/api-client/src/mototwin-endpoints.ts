@@ -230,7 +230,7 @@ export function createMotoTwinEndpoints(client: ApiClient) {
 
     updateVehicleProfile(vehicleId: string, input: UpdateVehicleProfileInput) {
       return client.request<UpdateVehicleProfileResponse>(
-        `/api/vehicles/${vehicleId}/profile`,
+        `/api/vehicles/${vehicleId}`,
         {
           method: "PATCH",
           body: JSON.stringify(input),

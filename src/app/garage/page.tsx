@@ -20,8 +20,6 @@ export default function GaragePage() {
   const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
   const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
-  const [actionNotice, setActionNotice] = useState("");
-  const [activeTrashVehicleId, setActiveTrashVehicleId] = useState("");
   const [trashCount, setTrashCount] = useState(0);
 
   const loadGarage = useCallback(async () => {
@@ -43,26 +41,6 @@ export default function GaragePage() {
       setIsLoading(false);
     }
   }, []);
-
-  const moveVehicleToTrash = async (vehicle: GarageVehicleItem) => {
-    const confirmMessage = `Переместить мотоцикл на Свалку?\n\nОн исчезнет из гаража, но его можно будет восстановить позже на странице "Свалка".`;
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-    try {
-      setActiveTrashVehicleId(vehicle.id);
-      await garageApi.moveVehicleToTrash(vehicle.id);
-      setVehicles((prev) => prev.filter((item) => item.id !== vehicle.id));
-      setTrashCount((prev) => prev + 1);
-      setActionNotice("Мотоцикл перемещен на Свалку");
-      window.setTimeout(() => setActionNotice(""), 2000);
-    } catch (trashError) {
-      console.error(trashError);
-      setError("Не удалось переместить мотоцикл на Свалку.");
-    } finally {
-      setActiveTrashVehicleId("");
-    }
-  };
 
   useEffect(() => {
     void loadGarage();
@@ -165,7 +143,7 @@ export default function GaragePage() {
               aria-label="Открыть профиль"
               title="Профиль"
             >
-              <span aria-hidden>👤</span>
+              <ProfileIcon />
             </Link>
             <Link
               href="/onboarding"
@@ -218,12 +196,6 @@ export default function GaragePage() {
               value={String(dashboardSummary.attentionItemsTotalCount)}
             />
           </section>
-        ) : null}
-
-        {actionNotice ? (
-          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
-            {actionNotice}
-          </div>
         ) : null}
 
         {!isLoading && !error && vehicles.length === 0 ? (
@@ -379,19 +351,6 @@ export default function GaragePage() {
                   </div>
                 </div>
 
-                <div className="mt-5 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void moveVehicleToTrash(vehicle)}
-                    disabled={activeTrashVehicleId === vehicle.id}
-                    className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {activeTrashVehicleId === vehicle.id
-                      ? "Перемещаем..."
-                      : "Переместить на свалку"}
-                  </button>
-                </div>
-
                 <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-4">
                   <button
                     type="button"
@@ -457,5 +416,14 @@ function SpecCard({ label, value }: { label: string; value: string }) {
       </div>
       <div className="mt-2 text-sm font-medium text-gray-950">{value}</div>
     </div>
+  );
+}
+
+function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
   );
 }

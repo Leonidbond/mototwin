@@ -5,7 +5,7 @@ import type {
   RideStyle,
   RideUsageIntensity,
   RideUsageType,
-  UpdateVehicleProfileInput,
+  UpdateVehicleProfilePayload,
   UpdateVehicleStateInput,
 } from "./vehicle";
 
@@ -46,7 +46,9 @@ export type EditVehicleProfileFormValues = {
   usageIntensity: RideUsageIntensity;
 };
 
-export type EditVehicleProfilePayload = UpdateVehicleProfileInput;
+export type VehicleProfileFormValues = EditVehicleProfileFormValues;
+
+export type EditVehicleProfilePayload = UpdateVehicleProfilePayload;
 
 export type AddMotorcycleFormValues = {
   brandId: string;

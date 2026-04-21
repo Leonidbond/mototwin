@@ -61,6 +61,8 @@
 - Seed includes safe repair step for mismatched `Vehicle.userId` vs `Garage.ownerUserId`.
 - Runtime API ownership reads use ownership predicate directly in final vehicle read query.
 - Active Garage routes exclude trashed vehicles; Trash routes read vehicles with `trashedAt != null`.
+- Profile edit route (`PATCH /api/vehicles/[id]`) updates only `nickname`, `vin`, and `RideProfile` fields.
+- `odometer`/`engineHours` are updated only by state-update flow (`PATCH /api/vehicles/[id]/state` with `STATE_UPDATE` event side effect).
 
 ### Node hierarchy
 

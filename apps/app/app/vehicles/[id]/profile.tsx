@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -12,12 +13,13 @@ import {
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
-  createInitialEditVehicleProfileFormValues,
-  normalizeEditVehicleProfilePayload,
+  buildInitialVehicleProfileFormValues,
+  normalizeVehicleProfileFormValues,
   RIDE_LOAD_TYPE_OPTIONS,
   RIDE_RIDING_STYLE_OPTIONS,
   RIDE_USAGE_INTENSITY_OPTIONS,
   RIDE_USAGE_TYPE_OPTIONS,
+  validateVehicleProfileFormValues,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -39,7 +41,7 @@ const USAGE_INTENSITIES = RIDE_USAGE_INTENSITY_OPTIONS as Array<{
   label: string;
 }>;
 
-const profileDefaults = createInitialEditVehicleProfileFormValues({
+const profileDefaults = buildInitialVehicleProfileFormValues({
   ridingStyle: "CALM",
 });
 const DEFAULT_RIDE_PROFILE: VehicleRideProfile = {
@@ -120,7 +122,12 @@ export default function EditVehicleProfileScreen() {
       loadType,
       usageIntensity,
     };
-    const input = normalizeEditVehicleProfilePayload(profileValues);
+    const validation = validateVehicleProfileFormValues(profileValues);
+    if (validation.errors.length > 0) {
+      setError(validation.errors[0]);
+      return;
+    }
+    const input = normalizeVehicleProfileFormValues(profileValues);
 
     try {
       setIsSaving(true);
@@ -128,6 +135,7 @@ export default function EditVehicleProfileScreen() {
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
       await endpoints.updateVehicleProfile(vehicleId, input);
+      Alert.alert("Готово", "Мотоцикл обновлен");
       router.replace(`/vehicles/${vehicleId}`);
     } catch (requestError) {
       console.error(requestError);
@@ -159,6 +167,9 @@ export default function EditVehicleProfileScreen() {
           <Text style={styles.cardTitle}>Профиль мотоцикла</Text>
           <Text style={styles.cardSubtitle}>
             Можно изменить никнейм, VIN и профиль эксплуатации.
+          </Text>
+          <Text style={styles.cardHint}>
+            Пробег и моточасы обновляются через действие «Обновить состояние».
           </Text>
 
           <Field label="Никнейм">
@@ -316,6 +327,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: c.textMuted,
     lineHeight: 18,
+  },
+  cardHint: {
+    marginTop: 4,
+    fontSize: 12,
+    color: c.textMuted,
+    lineHeight: 16,
   },
   field: {
     marginTop: 12,

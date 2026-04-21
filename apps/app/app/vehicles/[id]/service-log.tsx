@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import type {
   ServiceEventItem,
@@ -30,6 +31,7 @@ import {
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
+import { ActionIconButton } from "../../components/action-icon-button";
 
 function readSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) {
@@ -153,12 +155,18 @@ function ServiceCard({
         </Text>
       ) : null}
       <View style={styles.rowActions}>
-        <Pressable onPress={onEdit} hitSlop={6}>
-          <Text style={styles.editAction}>Редактировать</Text>
-        </Pressable>
-        <Pressable onPress={onDelete} hitSlop={6}>
-          <Text style={styles.deleteAction}>Удалить</Text>
-        </Pressable>
+        <ActionIconButton
+          onPress={onEdit}
+          accessibilityLabel="Редактировать сервисное событие"
+          variant="subtle"
+          icon={<MaterialIcons name="edit" size={15} color={c.textSecondary} />}
+        />
+        <ActionIconButton
+          onPress={onDelete}
+          accessibilityLabel="Удалить сервисное событие"
+          variant="danger"
+          icon={<MaterialIcons name="delete-outline" size={15} color={c.error} />}
+        />
       </View>
     </View>
   );
@@ -1289,22 +1297,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: c.successStrong,
   },
-  editAction: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: "600",
-    color: c.textSecondary,
-    textDecorationLine: "underline",
-  },
-  deleteAction: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: "600",
-    color: c.error,
-    textDecorationLine: "underline",
-  },
   rowActions: {
     flexDirection: "row",
-    gap: 14,
+    marginTop: 10,
+    gap: 8,
   },
 });

@@ -7,6 +7,7 @@ import type {
   EditVehicleProfileFormValues,
   EditVehicleProfilePayload,
   FormValidationResult,
+  VehicleProfileFormValues,
   PartWishlistItem,
   ServiceEventItem,
   UpdateVehicleStateFormValues,
@@ -470,6 +471,12 @@ export function createInitialEditVehicleProfileFormValues(
   };
 }
 
+export function buildInitialVehicleProfileFormValues(
+  defaults?: Partial<VehicleProfileFormValues>
+): VehicleProfileFormValues {
+  return createInitialEditVehicleProfileFormValues(defaults);
+}
+
 export function normalizeEditVehicleProfilePayload(
   values: EditVehicleProfileFormValues
 ): EditVehicleProfilePayload {
@@ -485,10 +492,41 @@ export function normalizeEditVehicleProfilePayload(
   };
 }
 
+export function normalizeVehicleProfileFormValues(
+  values: VehicleProfileFormValues
+): EditVehicleProfilePayload {
+  const nickname = values.nickname.trim().slice(0, 80) || null;
+  const vinRaw = values.vin.trim().toUpperCase();
+  const vin = vinRaw ? vinRaw.slice(0, 32) : null;
+  return {
+    nickname,
+    vin,
+    rideProfile: {
+      usageType: values.usageType,
+      ridingStyle: values.ridingStyle,
+      loadType: values.loadType,
+      usageIntensity: values.usageIntensity,
+    },
+  };
+}
+
 export function validateEditVehicleProfileFormValues(
-  _values: EditVehicleProfileFormValues
+  values: EditVehicleProfileFormValues
 ): FormValidationResult {
-  return { errors: [] };
+  const errors: string[] = [];
+  if (values.nickname.trim().length > 80) {
+    errors.push("Название в гараже должно быть не длиннее 80 символов.");
+  }
+  if (values.vin.trim().length > 32) {
+    errors.push("VIN должен быть не длиннее 32 символов.");
+  }
+  return { errors };
+}
+
+export function validateVehicleProfileFormValues(
+  values: VehicleProfileFormValues
+): FormValidationResult {
+  return validateEditVehicleProfileFormValues(values);
 }
 
 export function createInitialAddMotorcycleFormValues(

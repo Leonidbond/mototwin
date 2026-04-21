@@ -35,6 +35,7 @@ Current MVP scope:
    - odometer/engine hours;
    - collapsible usage profile;
    - collapsible technical summary.
+   - secondary action `Редактировать` (opens vehicle detail/profile edit flow).
 4. Profile entry point:
    - user/profile icon in Garage header (top-right);
    - opens dedicated Profile page/screen.
@@ -57,6 +58,7 @@ When no motorcycles exist:
 - Route: `src/app/garage/page.tsx`.
 - Dashboard header and summary shown above existing cards.
 - Existing card navigation to vehicle detail is unchanged.
+- Vehicle profile edits are initiated from vehicle detail and can be reached from garage card `Редактировать`.
 - Garage settings block removed; settings are moved to `/profile`.
 - Active list excludes trashed vehicles.
 - Garage delete flow is now move-to-trash flow.

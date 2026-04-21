@@ -109,27 +109,62 @@ export default function TrashPage() {
                 </p>
               </div>
               <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void restoreVehicle(item.id)}
-                  disabled={busyVehicleId === item.id}
-                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700"
-                >
-                  Восстановить
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void permanentlyDeleteVehicle(item.id)}
-                  disabled={busyVehicleId === item.id}
-                  className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"
-                >
-                  Удалить окончательно
-                </button>
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => void restoreVehicle(item.id)}
+                    disabled={busyVehicleId === item.id}
+                    title="Восстановить"
+                    aria-label="Восстановить"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700"
+                  >
+                    <RestoreIcon />
+                  </button>
+                  <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                    Восстановить
+                  </span>
+                </div>
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => void permanentlyDeleteVehicle(item.id)}
+                    disabled={busyVehicleId === item.id}
+                    title="Удалить окончательно"
+                    aria-label="Удалить окончательно"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-300 bg-rose-50 text-rose-700"
+                  >
+                    <TrashIcon />
+                  </button>
+                  <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                    Удалить окончательно
+                  </span>
+                </div>
               </div>
             </section>
           ))}
         </div>
       </div>
     </main>
+  );
+}
+
+function RestoreIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <title>Восстановить</title>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h9a7 7 0 1 1 0 14h-2" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <title>Удалить окончательно</title>
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+    </svg>
   );
 }

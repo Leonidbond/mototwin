@@ -8,6 +8,7 @@ import type {
   GarageVehicleItem,
   ModelItem,
   ModelVariantItem,
+  UpdateVehicleProfileResult,
   VehicleTrashInfo,
   VehicleDetail,
 } from "./vehicle";
@@ -58,9 +59,7 @@ export type UpdateVehicleStateResponse = {
   };
 };
 
-export type UpdateVehicleProfileResponse = {
-  vehicle: VehicleDetail;
-};
+export type UpdateVehicleProfileResponse = UpdateVehicleProfileResult;
 
 export type BrandsResponse = {
   brands: BrandItem[];

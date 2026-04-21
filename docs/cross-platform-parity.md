@@ -32,6 +32,8 @@ Parity оценивается по core workflows, business outcome и поль�
 - **Phase 2D hardening status:** both clients use the same explicit dev-switcher gate (`NODE_ENV !== "production"` + `MOTOTWIN_ENABLE_DEV_USER_SWITCHER=true`) for switcher visibility and dev-header override behavior.
 - **Resolver hardening parity:** both clients now depend on the same read-only server context resolver contract (no request-path auto-bootstrap); missing seeded context returns controlled API errors on both platforms.
 - **Trash parity:** both clients support soft-delete flow to **`Свалка`** (move-to-trash from Garage, list trashed vehicles, restore, permanent delete with explicit confirmation). Active Garage list excludes trashed vehicles on both clients.
+- **Vehicle profile edit parity:** both clients support editing nickname/VIN/ride profile with the same backend contract (`PATCH /api/vehicles/[id]`) and keep odometer/engine-hours restricted to Update State flow.
+- **Action icon parity:** web is canonical for secondary/entity action semantics. Expo now mirrors icon-only actions for Garage header entry points, Vehicle Detail node-tree/search/context quick actions, Service Log edit/delete, Trash restore/permanent delete, and Wishlist destructive secondary action. Web icon-only actions provide `title`/`aria-label` hover/focus hints; Expo icon-only actions provide `accessibilityLabel` and keep destructive confirmations as text alerts.
 
 ## 3.2 Add motorcycle
 
