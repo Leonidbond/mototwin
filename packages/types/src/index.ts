@@ -180,6 +180,13 @@ export type {
   UserLocalSettingsDistanceUnit,
   UserLocalSettingsDateFormat,
 } from "./user-settings";
+export type { DevUserOption } from "./dev-user";
+export {
+  DEFAULT_DEV_USER_EMAIL,
+  DEV_USER_HEADER_NAME,
+  DEV_USER_OPTIONS,
+  DEV_USER_STORAGE_KEY,
+} from "./dev-user";
 export type {
   GarageCardProps,
   VehicleHeaderProps,

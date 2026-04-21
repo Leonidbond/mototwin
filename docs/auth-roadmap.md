@@ -3,6 +3,7 @@
 Detailed ownership architecture and migration strategy:
 
 - [auth-data-ownership-architecture.md](./auth-data-ownership-architecture.md)
+- [auth-implementation-plan.md](./auth-implementation-plan.md)
 
 ## Current state
 
@@ -45,10 +46,22 @@ Future iterations should add:
 - Out-of-context vehicle ids return `404`.
 - Visible behavior for demo-owned vehicles remains backward-compatible.
 
-### Phase 3 — Auth session layer
+### Phase 2C — Dev-only user switcher for QA (implemented, development-only)
 
-- Introduce session/auth provider.
-- Add protected API access checks by owner scope.
+- Added development-only user switcher on web + Expo Garage settings.
+- Seed now includes deterministic test users/garages for isolation checks.
+- API current-user resolver accepts dev header in development only.
+- Production continues pre-auth demo fallback behavior (no dev switching).
+
+### Phase 3 — Auth session layer (planned)
+
+- See detailed rollout in [auth-implementation-plan.md](./auth-implementation-plan.md):
+  - Phase 3A: auth decision + contracts;
+  - Phase 3B: web auth;
+  - Phase 3C: Expo auth;
+  - Phase 3D: replace demo resolver with session/token resolver;
+  - Phase 3E: settings sync;
+  - Phase 3F: account UI.
 
 ### Phase 4 — UI account flows
 

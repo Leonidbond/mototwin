@@ -1,3 +1,5 @@
+import { DEV_USER_HEADER_NAME, DEV_USER_STORAGE_KEY } from "@mototwin/types";
+
 export type ApiClientConfig = {
   baseUrl: string;
 };
@@ -56,10 +58,12 @@ export class ApiClient {
   }
 
   async request<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
+    const devUserHeader = this.getDevUserHeaderValue();
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
+        ...(devUserHeader ? { [DEV_USER_HEADER_NAME]: devUserHeader } : {}),
         ...(init?.headers || {}),
       },
     });
@@ -70,6 +74,38 @@ export class ApiClient {
     }
 
     return (await response.json()) as TResponse;
+  }
+
+  private getDevUserHeaderValue(): string | null {
+    if (process.env.NODE_ENV === "production") {
+      return null;
+    }
+
+    const fromGlobal =
+      typeof globalThis === "object" &&
+      globalThis != null &&
+      "__MOTOTWIN_DEV_USER_EMAIL__" in globalThis
+        ? Reflect.get(globalThis, "__MOTOTWIN_DEV_USER_EMAIL__")
+        : null;
+
+    if (typeof fromGlobal === "string" && fromGlobal.trim().length > 0) {
+      return fromGlobal.trim().toLowerCase();
+    }
+
+    if (typeof localStorage === "undefined") {
+      return null;
+    }
+
+    try {
+      const raw = localStorage.getItem(DEV_USER_STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+      const trimmed = raw.trim().toLowerCase();
+      return trimmed.length > 0 ? trimmed : null;
+    } catch {
+      return null;
+    }
   }
 }
 

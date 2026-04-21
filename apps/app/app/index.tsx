@@ -12,24 +12,21 @@ import {
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
-  DEFAULT_USER_LOCAL_SETTINGS,
   buildGarageCardProps,
   buildGarageDashboardSummary,
   filterMeaningfulGarageSpecHighlights,
-  mergeUserLocalSettings,
 } from "@mototwin/domain";
 import {
   productSemanticColors as c,
   radiusScale,
   statusSemanticTokens,
 } from "@mototwin/design-tokens";
-import type { GarageVehicleItem, UserLocalSettings } from "@mototwin/types";
+import type { GarageVehicleItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
 import {
   readCollapsiblePreference,
   writeCollapsiblePreference,
 } from "../src/ui-collapsible-preferences";
-import { readUserLocalSettings, writeUserLocalSettings } from "../src/ui-user-local-settings";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -39,10 +36,6 @@ export default function HomeScreen() {
   const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
   const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
-  const [userSettings, setUserSettings] = useState<UserLocalSettings>(() => ({
-    ...DEFAULT_USER_LOCAL_SETTINGS,
-  }));
-  const [settingsSavedNotice, setSettingsSavedNotice] = useState("");
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -81,12 +74,6 @@ export default function HomeScreen() {
       setHasLoadedCollapsePrefs(true);
     })();
   }, []);
-  useEffect(() => {
-    void (async () => {
-      const settings = await readUserLocalSettings();
-      setUserSettings(settings);
-    })();
-  }, []);
 
   useEffect(() => {
     if (!hasLoadedCollapsePrefs) return;
@@ -109,13 +96,6 @@ export default function HomeScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
-  const updateUserSettings = (patch: Partial<UserLocalSettings>) => {
-    const next = mergeUserLocalSettings(userSettings, patch);
-    setUserSettings(next);
-    void writeUserLocalSettings(next);
-    setSettingsSavedNotice("Настройки сохранены");
-    setTimeout(() => setSettingsSavedNotice(""), 1800);
   };
   const dashboardSummary = buildGarageDashboardSummary(vehicles);
 
@@ -266,6 +246,9 @@ export default function HomeScreen() {
           {__DEV__ ? (
             <Text style={styles.hintText}>Текущий API: {apiBaseUrl}</Text>
           ) : null}
+          <Pressable onPress={() => router.push("/profile")} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>Профиль</Text>
+          </Pressable>
           <Pressable onPress={retryLoadGarage} style={styles.retryButton}>
             <Text style={styles.retryButtonText}>Повторить</Text>
           </Pressable>
@@ -278,6 +261,9 @@ export default function HomeScreen() {
           <Text style={styles.stateText}>
             Добавьте первый мотоцикл, чтобы начать вести обслуживание.
           </Text>
+          <Pressable onPress={() => router.push("/profile")} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>Профиль</Text>
+          </Pressable>
           <Pressable
             onPress={() => router.push("/vehicles/new")}
             style={styles.primaryButton}
@@ -299,7 +285,20 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <View style={styles.listHeader}>
               <Text style={styles.eyebrow}>MotoTwin | Личный гараж</Text>
-              <Text style={styles.title}>Мой гараж</Text>
+              <View style={styles.headerTopRow}>
+                <Text style={styles.title}>Мой гараж</Text>
+              </View>
+              <Pressable
+                onPress={() => router.push("/profile")}
+                style={({ pressed }) => [
+                  styles.profileIconButton,
+                  pressed && styles.profileIconButtonPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Открыть профиль"
+              >
+                <Text style={styles.profileIconText}>👤</Text>
+              </Pressable>
               <Text style={styles.subtitle}>Все мотоциклы, обслуживание и покупки в одном месте</Text>
               <Text style={styles.accountHint}>Профиль: Гость</Text>
               <Text style={styles.accountHintMuted}>Авторизация пока не реализована</Text>
@@ -324,55 +323,6 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
-              <View style={styles.settingsBox}>
-                <View style={styles.settingsHeaderRow}>
-                  <Text style={styles.settingsTitle}>Настройки</Text>
-                  {settingsSavedNotice ? (
-                    <Text style={styles.settingsSavedText}>{settingsSavedNotice}</Text>
-                  ) : null}
-                </View>
-                <SettingRow
-                  label="Валюта по умолчанию"
-                  options={["RUB", "USD", "EUR"]}
-                  value={userSettings.defaultCurrency}
-                  onSelect={(value) =>
-                    updateUserSettings({
-                      defaultCurrency: value as UserLocalSettings["defaultCurrency"],
-                    })
-                  }
-                />
-                <SettingRow
-                  label="Единицы пробега"
-                  options={["km", "mi"]}
-                  value={userSettings.distanceUnit}
-                  onSelect={(value) =>
-                    updateUserSettings({
-                      distanceUnit: value as UserLocalSettings["distanceUnit"],
-                    })
-                  }
-                />
-                <SettingRow
-                  label="Формат даты"
-                  options={["DD.MM.YYYY", "YYYY-MM-DD"]}
-                  value={userSettings.dateFormat}
-                  onSelect={(value) =>
-                    updateUserSettings({
-                      dateFormat: value as UserLocalSettings["dateFormat"],
-                    })
-                  }
-                />
-                <SettingRow
-                  label="Напоминание по умолчанию"
-                  options={["7", "14", "30"]}
-                  value={String(userSettings.defaultSnoozeDays)}
-                  onSelect={(value) =>
-                    updateUserSettings({
-                      defaultSnoozeDays: Number(value) as UserLocalSettings["defaultSnoozeDays"],
-                    })
-                  }
-                  optionLabelSuffix=" дней"
-                />
-              </View>
               <Pressable
                 onPress={() => router.push("/vehicles/new")}
                 style={styles.primaryButton}
@@ -385,47 +335,6 @@ export default function HomeScreen() {
       ) : null}
       <StatusBar style="auto" />
     </SafeAreaView>
-  );
-}
-
-function SettingRow({
-  label,
-  options,
-  value,
-  onSelect,
-  optionLabelSuffix = "",
-}: {
-  label: string;
-  options: string[];
-  value: string;
-  onSelect: (next: string) => void;
-  optionLabelSuffix?: string;
-}) {
-  return (
-    <View style={styles.settingRow}>
-      <Text style={styles.settingLabel}>{label}</Text>
-      <View style={styles.settingOptionsWrap}>
-        {options.map((option) => {
-          const isActive = option === value;
-          return (
-            <Pressable
-              key={`${label}.${option}`}
-              onPress={() => onSelect(option)}
-              style={({ pressed }) => [
-                styles.settingOptionChip,
-                isActive && styles.settingOptionChipActive,
-                pressed && styles.settingOptionChipPressed,
-              ]}
-            >
-              <Text style={[styles.settingOptionText, isActive && styles.settingOptionTextActive]}>
-                {option}
-                {optionLabelSuffix}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
   );
 }
 
@@ -482,6 +391,35 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
     color: c.textSecondary,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  profileIconButton: {
+    width: 40,
+    height: 40,
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  profileIconButtonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  profileIconText: {
+    fontSize: 18,
   },
   errorTitle: {
     fontSize: 20,
@@ -577,64 +515,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: c.textPrimary,
-  },
-  settingsBox: {
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: 12,
-    backgroundColor: c.card,
-    padding: 10,
-    gap: 10,
-  },
-  settingsHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  settingsTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: c.textPrimary,
-  },
-  settingsSavedText: {
-    fontSize: 11,
-    color: c.textMuted,
-  },
-  settingRow: {
-    gap: 6,
-  },
-  settingLabel: {
-    fontSize: 12,
-    color: c.textSecondary,
-  },
-  settingOptionsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  settingOptionChip: {
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    borderRadius: 999,
-    backgroundColor: c.cardMuted,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  settingOptionChipActive: {
-    borderColor: c.textPrimary,
-    backgroundColor: c.textPrimary,
-  },
-  settingOptionChipPressed: {
-    opacity: 0.88,
-  },
-  settingOptionText: {
-    fontSize: 12,
-    color: c.textPrimary,
-    fontWeight: "600",
-  },
-  settingOptionTextActive: {
-    color: c.textInverse,
   },
   card: {
     backgroundColor: c.card,

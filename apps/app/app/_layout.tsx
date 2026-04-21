@@ -16,6 +16,12 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="profile"
+        options={{
+          title: "Профиль",
+        }}
+      />
+      <Stack.Screen
         name="vehicles/[id]/index"
         options={{
           title: "Мотоцикл",

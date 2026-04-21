@@ -155,6 +155,11 @@ export {
   normalizeUserLocalSettings,
 } from "./user-settings";
 export {
+  getDevUserOptions,
+  isDevLoginEnabled,
+  normalizeDevUserEmail,
+} from "./dev-user";
+export {
   buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
   filterAttentionItemsBySnooze,

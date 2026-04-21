@@ -2,7 +2,7 @@
 
 ## Scope
 
-Local user settings are available in Garage settings placeholder on web and Expo.
+Local user settings are available on dedicated Profile page/screen on web and Expo.
 
 Current MVP limitations:
 
@@ -30,7 +30,7 @@ Shared storage key constant:
 
 ## Current integration
 
-- Settings are editable and persisted in Garage dashboard settings section on both platforms.
+- Settings are editable and persisted in Profile page/screen on both platforms.
 - `Валюта по умолчанию` is used as default currency in:
   - wishlist create form;
   - add service event form (direct add and node-context add).
@@ -42,6 +42,11 @@ Shared storage key constant:
 - server-side profile settings;
 - cross-device sync;
 - migration runner for multi-user account profiles.
+
+## Dev-only switcher placement
+
+- Development-only user switcher is displayed in Profile under "Разработка".
+- It is hidden in production builds and must not be treated as authentication.
 
 ## Future migration after auth
 

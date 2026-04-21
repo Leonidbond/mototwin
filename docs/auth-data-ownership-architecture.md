@@ -138,6 +138,20 @@ Implemented:
   - `wishlist/kits`.
 - out-of-context vehicle ids return `404`.
 
+### Phase 2C — Dev-only context switch for QA (implemented)
+
+Implemented:
+
+- development-only resolver override via request header `x-mototwin-dev-user-email`;
+- header is honored only in development mode and only for seeded dev users;
+- web + Expo Garage expose local dev-only user switcher for QA isolation checks;
+- ownership guards remain unchanged (`404` for out-of-context resources).
+
+Safety notes:
+
+- this is not authentication and not a production security control;
+- production ignores dev header and continues pre-auth demo fallback behavior.
+
 Deferred:
 
 - any remaining non-vehicle-global routes can be reviewed in a separate hardening pass if new nested endpoints are added later.
@@ -147,6 +161,7 @@ Deferred:
 - add login/register/session;
 - replace demo user resolver with session user resolver;
 - keep existing ownership filtering logic, only user-context source changes.
+- detailed implementation sequence is defined in [auth-implementation-plan.md](./auth-implementation-plan.md) (Phase 3A-3F).
 
 ### Phase 4 — Account settings sync
 
@@ -175,6 +190,7 @@ Planned internal helper:
 Behavior:
 
 - pre-auth phase: returns demo user + demo garage context;
+- dev-only QA phase: in development, resolver may switch to seeded test users by dev header;
 - post-auth phase: resolves from session provider.
 
 Rule after Phase 2:
@@ -219,6 +235,7 @@ Current Phase 1 usage:
 ## 13. Related docs
 
 - [auth-roadmap.md](./auth-roadmap.md)
+- [auth-implementation-plan.md](./auth-implementation-plan.md)
 - [garage-dashboard-mvp.md](./garage-dashboard-mvp.md)
 - [data-model.md](./data-model.md)
 - [cross-platform-parity.md](./cross-platform-parity.md)

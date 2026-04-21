@@ -1076,8 +1076,54 @@ async function upsertDemoCatalogVehicle(input: {
   });
 }
 
+async function upsertOwnedVehicle(input: {
+  userId: string;
+  garageId: string;
+  nickname: string;
+  brandId: string;
+  modelId: string;
+  modelVariantId: string;
+  odometer: number;
+}) {
+  const existing = await prisma.vehicle.findFirst({
+    where: {
+      userId: input.userId,
+      nickname: input.nickname,
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    await prisma.vehicle.update({
+      where: { id: existing.id },
+      data: {
+        garageId: input.garageId,
+        brandId: input.brandId,
+        modelId: input.modelId,
+        modelVariantId: input.modelVariantId,
+        odometer: input.odometer,
+      },
+    });
+    return;
+  }
+
+  await prisma.vehicle.create({
+    data: {
+      userId: input.userId,
+      garageId: input.garageId,
+      brandId: input.brandId,
+      modelId: input.modelId,
+      modelVariantId: input.modelVariantId,
+      nickname: input.nickname,
+      odometer: input.odometer,
+      engineHours: null,
+      vin: null,
+    },
+  });
+}
+
 async function main() {
-  const testUser = await prisma.user.upsert({
+  const demoUser = await prisma.user.upsert({
     where: { email: "demo@mototwin.local" },
     update: {
       displayName: "Demo User",
@@ -1093,14 +1139,66 @@ async function main() {
   const demoGarage = await prisma.garage.upsert({
     where: {
       ownerUserId_title: {
-        ownerUserId: testUser.id,
+        ownerUserId: demoUser.id,
         title: "Мой гараж",
       },
     },
     update: {},
     create: {
-      ownerUserId: testUser.id,
+      ownerUserId: demoUser.id,
       title: "Мой гараж",
+    },
+  });
+
+  const userA = await prisma.user.upsert({
+    where: { email: "user-a@mototwin.local" },
+    update: {
+      displayName: "Test User A",
+      passwordHash: null,
+    },
+    create: {
+      email: "user-a@mototwin.local",
+      displayName: "Test User A",
+      passwordHash: null,
+    },
+  });
+  const garageA = await prisma.garage.upsert({
+    where: {
+      ownerUserId_title: {
+        ownerUserId: userA.id,
+        title: "Гараж A",
+      },
+    },
+    update: {},
+    create: {
+      ownerUserId: userA.id,
+      title: "Гараж A",
+    },
+  });
+
+  const userB = await prisma.user.upsert({
+    where: { email: "user-b@mototwin.local" },
+    update: {
+      displayName: "Test User B",
+      passwordHash: null,
+    },
+    create: {
+      email: "user-b@mototwin.local",
+      displayName: "Test User B",
+      passwordHash: null,
+    },
+  });
+  const garageB = await prisma.garage.upsert({
+    where: {
+      ownerUserId_title: {
+        ownerUserId: userB.id,
+        title: "Гараж B",
+      },
+    },
+    update: {},
+    create: {
+      ownerUserId: userB.id,
+      title: "Гараж B",
     },
   });
 
@@ -1109,19 +1207,19 @@ async function main() {
       garageId: null,
     },
     data: {
-      userId: testUser.id,
+      userId: demoUser.id,
       garageId: demoGarage.id,
     },
   });
 
   await prisma.subscription.upsert({
-    where: { userId: testUser.id },
+    where: { userId: demoUser.id },
     update: {
       planType: "FREE",
       status: "ACTIVE",
     },
     create: {
-      userId: testUser.id,
+      userId: demoUser.id,
       planType: "FREE",
       status: "ACTIVE",
     },
@@ -1269,7 +1367,7 @@ async function main() {
   let qaDemoCatalogVehicles = 0;
   if (variantR12502023) {
     await upsertDemoCatalogVehicle({
-      userId: testUser.id,
+      userId: demoUser.id,
       garageId: demoGarage.id,
       nickname: "QA — BMW R 1250 GS 2023",
       brandId: bmw.id,
@@ -1282,7 +1380,7 @@ async function main() {
   }
   if (variant6902022) {
     await upsertDemoCatalogVehicle({
-      userId: testUser.id,
+      userId: demoUser.id,
       garageId: demoGarage.id,
       nickname: "QA — KTM 690 Enduro R 2022",
       brandId: ktm.id,
@@ -1292,6 +1390,30 @@ async function main() {
     qaDemoCatalogVehicles += 1;
   } else {
     console.warn("[seed] QA demo vehicle skipped: 690 Enduro R 2022 variant not found");
+  }
+
+  if (variantR12502023) {
+    await upsertOwnedVehicle({
+      userId: userA.id,
+      garageId: garageA.id,
+      nickname: "Test A — BMW R 1250 GS 2023",
+      brandId: bmw.id,
+      modelId: r1250gs.id,
+      modelVariantId: variantR12502023.id,
+      odometer: 4100,
+    });
+  }
+
+  if (variant6902022) {
+    await upsertOwnedVehicle({
+      userId: userB.id,
+      garageId: garageB.id,
+      nickname: "Test B — KTM 690 Enduro R 2022",
+      brandId: ktm.id,
+      modelId: enduro690.id,
+      modelVariantId: variant6902022.id,
+      odometer: 5200,
+    });
   }
 
   const nodesForSeed = nodeTaxonomy.map(([code, name], index) => {
@@ -1514,8 +1636,12 @@ async function main() {
   console.log("Seed completed");
   console.log({
     brands: ["BMW", "KTM"],
-    testUserEmail: testUser.email,
+    demoUserEmail: demoUser.email,
+    userAEmail: userA.email,
+    userBEmail: userB.email,
     demoGarageId: demoGarage.id,
+    garageAId: garageA.id,
+    garageBId: garageB.id,
     seededNodes: seededNodes.length,
     topLevelNodes: topLevelNodes.length,
     topNodeStates: topNodeStateRows.length,
