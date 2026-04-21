@@ -15,6 +15,7 @@ Scope:
 - Ownership foundations are in place: `User` + `Garage` + vehicle scoping.
 - Base and nested vehicle APIs are already ownership-filtered.
 - `getCurrentUserContext()` currently resolves demo user/garage.
+- `UserSettings` persistence is already implemented server-side (`UserSettings` model + `/api/user-settings`).
 - Real auth/session is not implemented yet.
 
 ## 2.1 Development-only user switcher (implemented for QA)
@@ -25,7 +26,9 @@ Scope:
   - web: `localStorage`;
   - Expo: local file persistence helper.
 - API client sends `x-mototwin-dev-user-email` only in development.
-- Backend resolves current context from this header only in development.
+- Backend resolves current context from this header only when explicit dev flag is enabled:
+  - `NODE_ENV !== "production"`
+  - `MOTOTWIN_ENABLE_DEV_USER_SWITCHER=true`
 - Production ignores dev header and keeps pre-auth demo fallback behavior.
 - This is not real auth and not a security boundary.
 
@@ -148,6 +151,7 @@ Why not overbuild roles yet:
 - verify credentials;
 - issue session (web cookie session, Expo token session);
 - return/resolve current user context for API layer.
+- load existing server `UserSettings` for authenticated profile/settings UX.
 
 ### Logout
 
@@ -182,6 +186,8 @@ Why not overbuild roles yet:
 Current:
 
 - `getCurrentUserContext()` returns demo context.
+- pre-auth resolver is hardened with controlled errors and read-only lookup logic.
+- request path does not auto-create user/garage/settings.
 
 Target:
 
@@ -194,6 +200,8 @@ Dev fallback:
 
 - optional demo context only in explicit dev mode;
 - must be disabled in production.
+- invalid dev override input should fail fast with controlled `400` (not silent fallback).
+- missing seeded context should fail with controlled initialization error (not implicit upsert).
 
 ## 7. Demo-user migration options
 
@@ -230,16 +238,17 @@ Recommended MVP path:
 
 Current:
 
-- settings are local on device.
+- server `UserSettings` is already primary profile persistence.
+- clients also keep local cache/fallback per user identity.
 
 Target:
 
-- add server `UserSettings` per user;
-- sync on login/startup.
+- bind existing `UserSettings` to authenticated session identity source;
+- define deterministic local-cache merge behavior during auth rollout.
 
 Conflict policy for MVP:
 
-1. first authenticated login with empty server settings -> upload local defaults/current values;
+1. first authenticated login with empty server settings -> optional upload from local cache defaults/current values;
 2. if server settings exist -> server wins by default;
 3. optional one-time "apply local settings" action can be added later.
 
@@ -276,11 +285,13 @@ Conflict policy for MVP:
 
 - switch `getCurrentUserContext()` from demo resolver to auth resolver;
 - preserve existing ownership guards and `404` behavior.
+- keep canonical ownership source `garage.ownerUserId` (with `Vehicle.userId` treated as transitional/denormalized field until cleanup migration).
+- resolver replacement must stay read-only: user creation belongs to explicit registration/migration flows, not token parsing path.
 
-### Phase 3E — Settings sync
+### Phase 3E — Settings session integration
 
-- introduce server `UserSettings`;
-- implement login-time sync policy.
+- keep existing server `UserSettings`;
+- implement login-time/local-cache merge policy.
 
 ### Phase 3F — Account UI
 

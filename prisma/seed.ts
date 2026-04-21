@@ -1202,6 +1202,39 @@ async function main() {
     },
   });
 
+  const inconsistentVehicles = await prisma.vehicle.findMany({
+    where: {
+      garageId: {
+        not: null,
+      },
+    },
+    select: {
+      id: true,
+      userId: true,
+      garage: {
+        select: {
+          ownerUserId: true,
+        },
+      },
+    },
+  });
+
+  let repairedVehicleOwnershipCount = 0;
+  for (const vehicle of inconsistentVehicles) {
+    const ownerUserId = vehicle.garage?.ownerUserId;
+    if (!ownerUserId) {
+      continue;
+    }
+    if (vehicle.userId === ownerUserId) {
+      continue;
+    }
+    await prisma.vehicle.update({
+      where: { id: vehicle.id },
+      data: { userId: ownerUserId },
+    });
+    repairedVehicleOwnershipCount += 1;
+  }
+
   await prisma.userSettings.upsert({
     where: { userId: demoUser.id },
     update: {},
@@ -1679,6 +1712,7 @@ async function main() {
     demoGarageId: demoGarage.id,
     garageAId: garageA.id,
     garageBId: garageB.id,
+    repairedVehicleOwnershipCount,
     seededNodes: seededNodes.length,
     topLevelNodes: topLevelNodes.length,
     topNodeStates: topNodeStateRows.length,

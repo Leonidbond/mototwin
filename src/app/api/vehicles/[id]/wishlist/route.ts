@@ -9,6 +9,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
 import { isVehicleInCurrentContext } from "../../../_shared/vehicle-context";
+import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 
@@ -147,6 +148,10 @@ export async function GET(_: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ items });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to fetch wishlist:", error);
     return NextResponse.json({ error: "Не удалось загрузить список покупок." }, { status: 500 });
   }
@@ -244,6 +249,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ item: toWire(created) });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     if (error instanceof z.ZodError) {
       const msg =
         error.issues.map((i) => i.message).join("; ") || "Некорректное тело запроса";

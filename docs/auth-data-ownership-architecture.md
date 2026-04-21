@@ -21,13 +21,16 @@ Out of scope in current phase:
 - Phase 1 (schema/data ownership foundation) is implemented.
 - Phase 2A (base Garage/Vehicle API ownership scope) is implemented.
 - Phase 2B (nested vehicle routes ownership scope) is implemented.
+- Phase 2D (context + ownership hardening) is implemented.
 
 ## 2. Current state (as-is)
 
 - MotoTwin currently behaves as single-user/demo-local MVP.
 - Garage already acts as a personal dashboard (`Мой гараж`).
 - Real auth (login/register/session) is not implemented.
-- Local settings are stored client-side and are not account-bound yet.
+- `UserSettings` is implemented server-side and scoped per user.
+- Profile settings API is implemented: `GET/PATCH /api/user-settings`.
+- Local settings are now cache/fallback layer on clients (not primary persistence).
 - Existing APIs are not fully enforced by user isolation semantics yet.
 
 ## 3. Target concepts (to-be)
@@ -87,6 +90,7 @@ Justification:
 - `distanceUnit`
 - `dateFormat`
 - `defaultSnoozeDays`
+- implemented as DB-backed per-user settings in current pre-auth foundation.
 
 ## 5. Recommended MVP direction (before auth)
 
@@ -150,7 +154,26 @@ Implemented:
 Safety notes:
 
 - this is not authentication and not a production security control;
-- production ignores dev header and continues pre-auth demo fallback behavior.
+- production rejects dev header with controlled error and continues pre-auth demo fallback only when header is absent.
+
+### Phase 2D — Current-user/ownership hardening (implemented)
+
+Implemented:
+
+- explicit gate for dev override:
+  - `NODE_ENV !== "production"`
+  - `MOTOTWIN_ENABLE_DEV_USER_SWITCHER=true`
+- `getCurrentUserContext()` now returns controlled typed errors for invalid dev header flows;
+- resolver is read-only on request path (no implicit user/garage/settings creation);
+- API routes map context errors to controlled JSON responses (no raw stack exposure);
+- ownership checks use canonical path `vehicle.garageId -> garage.ownerUserId`;
+- seed repairs safe mismatch cases where `vehicle.userId` drifted from `garage.ownerUserId`.
+
+Notes:
+
+- `Vehicle.userId` remains transitional/denormalized for compatibility.
+- Canonical runtime ownership source is garage ownership.
+- Missing seeded context is a controlled initialization error (suggests running `prisma seed`) rather than runtime auto-bootstrap.
 
 Deferred:
 
@@ -163,10 +186,10 @@ Deferred:
 - keep existing ownership filtering logic, only user-context source changes.
 - detailed implementation sequence is defined in [auth-implementation-plan.md](./auth-implementation-plan.md) (Phase 3A-3F).
 
-### Phase 4 — Account settings sync
+### Phase 4 — Account settings session integration
 
-- introduce server `UserSettings` reads/writes;
-- migrate local client settings into `UserSettings`;
+- reuse existing server `UserSettings` as authenticated source of truth;
+- finalize login/session-time merge strategy for existing local caches;
 - define conflict strategy (first-login merge, server-wins/client-wins policy).
 
 ### Phase 5 — Optional multi-garage / sharing
@@ -190,8 +213,14 @@ Planned internal helper:
 Behavior:
 
 - pre-auth phase: returns demo user + demo garage context;
-- dev-only QA phase: in development, resolver may switch to seeded test users by dev header;
+- dev-only QA phase: resolver accepts seeded dev header only when explicit flag is enabled;
 - post-auth phase: resolves from session provider.
+
+Pre-auth runtime contract:
+
+- context resolver does not mutate ownership data;
+- demo/dev bootstrap data is created by seed only;
+- missing user/garage/settings are explicit controlled errors.
 
 Rule after Phase 2:
 
@@ -214,14 +243,14 @@ Current Phase 1 usage:
 - Phase 1: no mandatory UI changes; Garage remains user home dashboard.
 - Phase 2: no visible behavior changes expected for demo user.
 - Phase 3: Garage/account surfaces can show real user identity from auth session.
-- Local account settings remain client-side until Phase 4 settings sync.
+- Server `UserSettings` is primary in current pre-auth profile surface; local cache remains fallback.
 
 ## 11. Main risks
 
 1. Existing seed data breakage during ownership backfill.
 2. Orphan vehicles without garage/user mapping.
 3. API endpoints accidentally missing ownership scope after Phase 2.
-4. Local settings migration conflicts during Phase 4.
+4. Local cache merge/conflict handling during auth-session rollout.
 5. Multi-device consistency differences before server settings sync.
 
 ## 12. Acceptance criteria for future implementation
@@ -232,7 +261,17 @@ Current Phase 1 usage:
 - API layer can enforce user-scoped vehicle access through user context.
 - No login UI is exposed until explicit auth phase is started.
 
-## 13. Related docs
+## 13. Nested vehicle route guardrail checklist
+
+For every new `/api/vehicles/[id]/**` route:
+
+1. Call `getVehicleInCurrentContext()` (or equivalent scoped ownership guard) first.
+2. Filter child entities by `vehicleId` in addition to route params.
+3. Return `404` for non-owned/missing vehicle resources.
+4. Keep global catalog/reference routes public only when they do not access vehicle-specific data.
+5. Do not perform unscoped `findUnique({ where: { id } })` as a final vehicle read after guard checks.
+
+## 14. Related docs
 
 - [auth-roadmap.md](./auth-roadmap.md)
 - [auth-implementation-plan.md](./auth-implementation-plan.md)

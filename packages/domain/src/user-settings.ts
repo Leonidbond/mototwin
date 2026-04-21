@@ -8,6 +8,14 @@ import type {
 
 export const USER_LOCAL_SETTINGS_STORAGE_KEY = "mototwin.userLocalSettings";
 
+export function getUserSettingsStorageKey(userIdentity?: string | null): string {
+  const normalizedIdentity = typeof userIdentity === "string" ? userIdentity.trim().toLowerCase() : "";
+  if (!normalizedIdentity) {
+    return USER_LOCAL_SETTINGS_STORAGE_KEY;
+  }
+  return `${USER_LOCAL_SETTINGS_STORAGE_KEY}.${normalizedIdentity}`;
+}
+
 export const DEFAULT_USER_LOCAL_SETTINGS: UserLocalSettings = {
   defaultCurrency: "RUB",
   distanceUnit: "km",

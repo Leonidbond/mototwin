@@ -1,4 +1,8 @@
-import { DEV_USER_HEADER_NAME, DEV_USER_STORAGE_KEY } from "@mototwin/types";
+import {
+  DEV_USER_HEADER_NAME,
+  DEV_USER_STORAGE_KEY,
+  DEV_USER_SWITCHER_ENV_FLAG,
+} from "@mototwin/types";
 
 export type ApiClientConfig = {
   baseUrl: string;
@@ -77,7 +81,7 @@ export class ApiClient {
   }
 
   private getDevUserHeaderValue(): string | null {
-    if (process.env.NODE_ENV === "production") {
+    if (!isDevUserOverrideEnabled()) {
       return null;
     }
 
@@ -107,6 +111,13 @@ export class ApiClient {
       return null;
     }
   }
+}
+
+function isDevUserOverrideEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+  return process.env[DEV_USER_SWITCHER_ENV_FLAG] === "true";
 }
 
 export function createApiClient(config: ApiClientConfig): ApiClient {

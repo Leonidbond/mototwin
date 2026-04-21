@@ -6,6 +6,7 @@ import { buildWishlistItemSkuInfo, normalizePartWishlistCostMutationArgs } from 
 import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
 import { isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
+import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 
@@ -276,6 +277,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ item: toWire(updated) });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     if (error instanceof z.ZodError) {
       const msg =
         error.issues.map((i) => i.message).join("; ") || "Некорректное тело запроса";
@@ -309,6 +314,10 @@ export async function DELETE(_: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to delete wishlist item:", error);
     return NextResponse.json({ error: "Не удалось удалить позицию списка." }, { status: 500 });
   }

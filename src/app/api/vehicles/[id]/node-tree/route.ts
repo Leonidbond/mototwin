@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadVehicleNodeTreeJson } from "@/lib/vehicle-node-tree-internal";
 import { prisma } from "@/lib/prisma";
 import { isVehicleInCurrentContext } from "../../../_shared/vehicle-context";
+import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
 
 type RouteContext = {
   params: Promise<{
@@ -22,6 +23,10 @@ export async function GET(_: NextRequest, context: RouteContext) {
     }
     return NextResponse.json({ nodeTree: result.nodeTree });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to fetch node tree:", error);
     return NextResponse.json(
       { error: "Failed to fetch node tree" },

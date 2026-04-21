@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createLeafServiceEventInTransaction } from "@/lib/leaf-service-event-transaction";
 import { prisma } from "@/lib/prisma";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
+import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
 
 type RouteContext = {
   params: Promise<{
@@ -56,6 +57,10 @@ export async function GET(_: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ serviceEvents });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to fetch service events:", error);
     return NextResponse.json(
       { error: "Failed to fetch service events" },
@@ -147,6 +152,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ serviceEvent }, { status: 201 });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", issues: error.issues },

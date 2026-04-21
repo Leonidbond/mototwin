@@ -8,6 +8,7 @@ import {
 } from "@/lib/maintenance-status";
 import { prisma } from "@/lib/prisma";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
+import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
 
 type RouteContext = {
   params: Promise<{
@@ -211,6 +212,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ vehicle: updatedVehicle });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", issues: error.issues },

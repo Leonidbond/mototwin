@@ -13,7 +13,10 @@ import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { DEFAULT_DEV_USER_EMAIL, type UserLocalSettings } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
 import { readDevUserSelection, writeDevUserSelection } from "../src/ui-dev-user-selection";
-import { readUserLocalSettings, writeUserLocalSettings } from "../src/ui-user-local-settings";
+import {
+  readUserLocalSettingsForIdentity,
+  writeUserLocalSettingsForIdentity,
+} from "../src/ui-user-local-settings";
 
 function buildProfileData(selectedDevUserEmail: string) {
   const option = getDevUserOptions().find((item) => item.email === selectedDevUserEmail);
@@ -42,6 +45,10 @@ export default function ProfileScreen() {
     () => apiProfile ?? buildProfileData(selectedDevUserEmail),
     [apiProfile, selectedDevUserEmail]
   );
+  const resolvedProfileIdentity = useMemo(() => {
+    const identity = apiProfile?.email ?? selectedDevUserEmail;
+    return identity?.trim().toLowerCase() || null;
+  }, [apiProfile?.email, selectedDevUserEmail]);
 
   const loadProfileAndSettings = async () => {
     const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
@@ -63,10 +70,10 @@ export default function ProfileScreen() {
           : "Не указана",
         garageTitle: profileResponse.profile.garageTitle,
       });
-      await writeUserLocalSettings(resolvedSettings);
+      await writeUserLocalSettingsForIdentity(resolvedSettings, profileResponse.profile.email);
       setSettingsError("");
     } catch {
-      const fallback = await readUserLocalSettings();
+      const fallback = await readUserLocalSettingsForIdentity(resolvedProfileIdentity);
       setUserSettings(fallback);
       setSettingsError("Не удалось загрузить настройки с сервера, использован локальный кэш.");
     }
@@ -89,7 +96,7 @@ export default function ProfileScreen() {
       const response = await endpoints.updateUserSettings(next);
       const resolved = mergeUserLocalSettings(DEFAULT_USER_LOCAL_SETTINGS, response.settings);
       setUserSettings(resolved);
-      await writeUserLocalSettings(resolved);
+      await writeUserLocalSettingsForIdentity(resolved, resolvedProfileIdentity);
       setSettingsError("");
       setSettingsSavedNotice("Настройки сохранены");
       setTimeout(() => setSettingsSavedNotice(""), 1800);

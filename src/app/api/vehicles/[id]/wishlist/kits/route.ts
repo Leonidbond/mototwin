@@ -14,6 +14,7 @@ import {
 import type { PartWishlistItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import { getVehicleInCurrentContext, isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
+import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 type RouteContext = {
@@ -322,6 +323,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ result });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: error.issues.map((issue) => issue.message).join("; ") || "Некорректный запрос" },
@@ -357,6 +362,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const body = await kits.json();
     return NextResponse.json(body, { status: kits.status });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to load service kits for wishlist:", error);
     return NextResponse.json(
       { error: "Не удалось загрузить комплекты обслуживания." },

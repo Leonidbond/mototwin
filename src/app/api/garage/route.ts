@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { computeGarageAttentionByVehicleId } from "@/lib/vehicle-node-tree-internal";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserContext } from "../_shared/current-user-context";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "../_shared/current-user-context";
 
 export async function GET() {
   try {
@@ -9,8 +12,10 @@ export async function GET() {
 
     const vehicles = await prisma.vehicle.findMany({
       where: {
-        userId: currentUser.userId,
         garageId: currentUser.garageId,
+        garage: {
+          ownerUserId: currentUser.userId,
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -43,6 +48,10 @@ export async function GET() {
 
     return NextResponse.json({ vehicles: vehiclesPayload });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to fetch garage:", error);
     return NextResponse.json(
       { error: "Failed to fetch garage" },

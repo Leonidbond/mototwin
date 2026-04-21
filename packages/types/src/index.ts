@@ -190,6 +190,7 @@ export {
   DEV_USER_HEADER_NAME,
   DEV_USER_OPTIONS,
   DEV_USER_STORAGE_KEY,
+  DEV_USER_SWITCHER_ENV_FLAG,
 } from "./dev-user";
 export type {
   GarageCardProps,

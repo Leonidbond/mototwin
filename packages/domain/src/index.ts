@@ -149,6 +149,7 @@ export { buildGarageDashboardSummary } from "./garage-dashboard";
 export {
   DEFAULT_USER_SETTINGS,
   DEFAULT_USER_LOCAL_SETTINGS,
+  getUserSettingsStorageKey,
   USER_LOCAL_SETTINGS_STORAGE_KEY,
   getDefaultCurrencyFromSettings,
   getDefaultSnoozeDaysFromSettings,
@@ -160,6 +161,7 @@ export {
 } from "./user-settings";
 export {
   getDevUserOptions,
+  isDevUserSwitcherEnabled,
   isDevLoginEnabled,
   normalizeDevUserEmail,
 } from "./dev-user";

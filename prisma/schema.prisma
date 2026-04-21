@@ -212,6 +212,7 @@ model Vehicle {
 
   @@index([userId])
   @@index([garageId])
+  @@index([garageId, userId])
   @@index([brandId, modelId, modelVariantId])
   @@map("vehicles")
 }

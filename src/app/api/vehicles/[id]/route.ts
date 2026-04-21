@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserContext } from "../../_shared/current-user-context";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "../../_shared/current-user-context";
 
 type RouteContext = {
   params: Promise<{
@@ -16,8 +19,10 @@ export async function GET(_: Request, context: RouteContext) {
     const vehicle = await prisma.vehicle.findFirst({
       where: {
         id,
-        userId: currentUser.userId,
         garageId: currentUser.garageId,
+        garage: {
+          ownerUserId: currentUser.userId,
+        },
       },
       include: {
         brand: true,
@@ -33,6 +38,10 @@ export async function GET(_: Request, context: RouteContext) {
 
     return NextResponse.json({ vehicle });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to fetch vehicle:", error);
     return NextResponse.json(
       { error: "Failed to fetch vehicle" },

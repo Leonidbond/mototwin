@@ -10,8 +10,10 @@ export async function getVehicleInCurrentContext<TSelect extends Prisma.VehicleS
   return prisma.vehicle.findFirst({
     where: {
       id: vehicleId,
-      userId: currentUser.userId,
       garageId: currentUser.garageId,
+      garage: {
+        ownerUserId: currentUser.userId,
+      },
     },
     select,
   });

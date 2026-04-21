@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
+  getUserSettingsStorageKey,
   USER_LOCAL_SETTINGS_STORAGE_KEY,
   normalizeUserLocalSettings,
 } from "@mototwin/domain";
@@ -11,14 +12,23 @@ const FILE_PATH =
     ? `${FileSystem.documentDirectory}mototwin-user-local-settings.json`
     : null;
 
-async function readRawSettings(): Promise<unknown> {
+async function readRawSettings(userIdentity?: string | null): Promise<unknown> {
+  const scopedKey = getUserSettingsStorageKey(userIdentity);
+  const fallbackKey = USER_LOCAL_SETTINGS_STORAGE_KEY;
+  const keysToTry = scopedKey === fallbackKey ? [fallbackKey] : [scopedKey, fallbackKey];
   if (typeof localStorage !== "undefined") {
-    try {
-      const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
+    for (const key of keysToTry) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+          continue;
+        }
+        return JSON.parse(raw);
+      } catch {
+        continue;
+      }
     }
+    return null;
   }
   if (!FILE_PATH) {
     return null;
@@ -35,10 +45,13 @@ async function readRawSettings(): Promise<unknown> {
   }
 }
 
-async function writeRawSettings(value: UserLocalSettings): Promise<void> {
+async function writeRawSettings(value: UserLocalSettings, userIdentity?: string | null): Promise<void> {
+  const scopedKey = getUserSettingsStorageKey(userIdentity);
   if (typeof localStorage !== "undefined") {
     try {
-      localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(value));
+      const serialized = JSON.stringify(value);
+      localStorage.setItem(scopedKey, serialized);
+      localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, serialized);
     } catch {
       // Ignore local-only settings persistence errors.
     }
@@ -59,6 +72,20 @@ export async function readUserLocalSettings(): Promise<UserLocalSettings> {
   return normalizeUserLocalSettings(raw ?? DEFAULT_USER_LOCAL_SETTINGS);
 }
 
+export async function readUserLocalSettingsForIdentity(
+  userIdentity?: string | null
+): Promise<UserLocalSettings> {
+  const raw = await readRawSettings(userIdentity);
+  return normalizeUserLocalSettings(raw ?? DEFAULT_USER_LOCAL_SETTINGS);
+}
+
 export async function writeUserLocalSettings(next: UserLocalSettings): Promise<void> {
   await writeRawSettings(normalizeUserLocalSettings(next));
+}
+
+export async function writeUserLocalSettingsForIdentity(
+  next: UserLocalSettings,
+  userIdentity?: string | null
+): Promise<void> {
+  await writeRawSettings(normalizeUserLocalSettings(next), userIdentity);
 }

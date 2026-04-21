@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isVehicleInCurrentContext } from "../../../_shared/vehicle-context";
+import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
 
 const TOP_LEVEL_NODE_CODES = [
   "ENGINE",
@@ -68,6 +69,10 @@ export async function GET(_: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ topNodes: filteredTopNodes });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to fetch top nodes:", error);
     return NextResponse.json(
       { error: "Failed to fetch top nodes" },

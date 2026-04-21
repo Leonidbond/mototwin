@@ -23,6 +23,7 @@
 
 - `User` has many `Vehicle`.
 - `User` has many `Garage`.
+- `User` has optional 1:1 `UserSettings` (`userId` unique).
 - `User.email` is nullable unique (transitional pre-auth ownership mode).
 - `User.displayName` is optional.
 - `Subscription` is optional 1:1 to `User` (`userId` unique).
@@ -33,6 +34,13 @@
 - `Garage` belongs to `User` via `ownerUserId`.
 - `Garage` has many `Vehicle`.
 - Current pre-auth runtime uses stable demo garage title `Мой гараж`.
+
+### UserSettings
+
+- `UserSettings` belongs to `User` via unique `userId` (1:1).
+- Stores `defaultCurrency`, `distanceUnit`, `engineHoursUnit`, `dateFormat`, `defaultSnoozeDays`.
+- Runtime reads/writes are done via `/api/user-settings` and scoped through current user context.
+- Local client storage is fallback/cache only; DB is primary source when API is available.
 
 ### Brand / Model / ModelVariant
 
@@ -46,6 +54,10 @@
 - `Vehicle` links to `User`, optional `Garage`, `Brand`, `Model`, `ModelVariant`.
 - `RideProfile` is effectively 1:1 with `Vehicle` via unique `vehicleId`.
 - `Vehicle` also links to `ServiceEvent`, `NodeState`, `TopNodeState`.
+- Ownership canonical source: `Vehicle.garageId -> Garage.ownerUserId`.
+- `Vehicle.userId` is transitional/denormalized compatibility field and should match `Garage.ownerUserId`.
+- Seed includes safe repair step for mismatched `Vehicle.userId` vs `Garage.ownerUserId`.
+- Runtime API ownership reads use ownership predicate directly in final vehicle read query.
 
 ### Node hierarchy
 
@@ -81,6 +93,7 @@
 
 - `User 1:N Vehicle`
 - `User 1:N Garage`
+- `User 1:1 UserSettings` (optional in schema, seed-initialized for demo/dev users)
 - `Garage 1:N Vehicle`
 - `Vehicle 1:1 RideProfile` (optional, enforced by unique)
 - `Vehicle 1:N ServiceEvent`
@@ -107,6 +120,8 @@ Computed and aggregated statuses are returned by backend node-tree endpoint.
 - `TopNodeState` and `NodeState` coexist (migration compatibility).
 - `STATE_UPDATE` log entry still requires `nodeId` due to schema requirement.
 - No separate audit actor model in `ServiceEvent` yet.
+- `UserSettings` stores values as strings at DB layer; allowed value set is currently enforced in API/domain validation (enum/check DB hardening is deferred).
+- `UserSettings` bootstrap is seed-driven; request-path context resolver does not auto-create missing rows.
 
 ## 7. Ownership transition status
 
@@ -115,13 +130,14 @@ Implemented in Phase 1:
 - `Garage` model and relation to `User`;
 - `Vehicle.garageId` relation (nullable transitional field);
 - demo user + demo garage seeding and backfill path for missing `garageId`.
+- `Vehicle.userId` remains transitional; runtime guards rely on garage ownership and validate invariant consistency.
 
 Planned next:
 
 - Phase 2A implemented for base Garage/Vehicle routes (list/create/detail/profile update);
 - Phase 2B implemented for nested vehicle routes (`node-tree`, `state`, `top-nodes`, `service-events`, `wishlist`, `wishlist/kits`) with `404` on out-of-context vehicle ids;
 - later login/session replacement for demo resolver;
-- later server-side `UserSettings`.
+- later auth-session integration for already implemented server-side `UserSettings`.
 
 Reference:
 

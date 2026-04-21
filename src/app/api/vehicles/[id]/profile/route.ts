@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserContext } from "../../../_shared/current-user-context";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "../../../_shared/current-user-context";
 
 type RouteContext = {
   params: Promise<{
@@ -30,8 +33,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const vehicle = await prisma.vehicle.findFirst({
       where: {
         id,
-        userId: currentUser.userId,
         garageId: currentUser.garageId,
+        garage: {
+          ownerUserId: currentUser.userId,
+        },
       },
       select: { id: true },
     });
@@ -72,6 +77,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ vehicle: updatedVehicle });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", issues: error.issues },

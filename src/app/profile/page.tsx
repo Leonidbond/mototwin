@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
+  getUserSettingsStorageKey,
   getDevUserOptions,
   isDevLoginEnabled,
   mergeUserLocalSettings,
@@ -50,6 +51,41 @@ export default function ProfilePage() {
   const [selectedDevUserEmail, setSelectedDevUserEmail] = useState(DEFAULT_DEV_USER_EMAIL);
   const [apiProfile, setApiProfile] = useState<ProfileViewModel | null>(null);
 
+  const getResolvedProfileEmail = (fromApi?: ProfileViewModel | null): string | null => {
+    if (fromApi?.email) {
+      return fromApi.email.trim().toLowerCase();
+    }
+    if (selectedDevUserEmail) {
+      return selectedDevUserEmail.trim().toLowerCase();
+    }
+    return null;
+  };
+
+  const readCachedSettingsForIdentity = (identity?: string | null): UserLocalSettings | null => {
+    const scopedKey = getUserSettingsStorageKey(identity);
+    const fallbackKey = USER_LOCAL_SETTINGS_STORAGE_KEY;
+    const keysToTry = scopedKey === fallbackKey ? [fallbackKey] : [scopedKey, fallbackKey];
+    for (const key of keysToTry) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+          continue;
+        }
+        return normalizeUserLocalSettings(JSON.parse(raw));
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  };
+
+  const writeCachedSettingsForIdentity = (identity: string | null | undefined, settings: UserLocalSettings) => {
+    const scopedKey = getUserSettingsStorageKey(identity);
+    const normalized = normalizeUserLocalSettings(settings);
+    localStorage.setItem(scopedKey, JSON.stringify(normalized));
+    localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
+  };
+
   const devLoginEnabled = isDevLoginEnabled();
   const devUserOptions = getDevUserOptions();
   const profile = useMemo(
@@ -73,17 +109,13 @@ export default function ProfilePage() {
           : "Не указана",
         garageTitle: profileResponse.profile.garageTitle,
       });
-      localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(resolved));
+      writeCachedSettingsForIdentity(profileResponse.profile.email, resolved);
       setSettingsError("");
     } catch {
-      try {
-        const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
-        if (!raw) {
-          setUserSettings({ ...DEFAULT_USER_LOCAL_SETTINGS });
-          return;
-        }
-        setUserSettings(normalizeUserLocalSettings(JSON.parse(raw)));
-      } catch {
+      const cached = readCachedSettingsForIdentity(getResolvedProfileEmail(apiProfile));
+      if (cached) {
+        setUserSettings(cached);
+      } else {
         setUserSettings({ ...DEFAULT_USER_LOCAL_SETTINGS });
       }
       setSettingsError("Не удалось загрузить настройки из сервера, использован локальный кэш.");
@@ -115,9 +147,8 @@ export default function ProfilePage() {
       const updated = await profileApi.updateUserSettings(next);
       const resolved = normalizeUserLocalSettings(updated.settings);
       setUserSettings(resolved);
-      localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(resolved));
+      writeCachedSettingsForIdentity(getResolvedProfileEmail(apiProfile), resolved);
       setSettingsError("");
-      localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(next));
       setSettingsSavedNotice("Настройки сохранены");
       window.setTimeout(() => setSettingsSavedNotice(""), 1800);
     } catch {

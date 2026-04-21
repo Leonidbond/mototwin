@@ -10,8 +10,12 @@ Detailed ownership architecture and migration strategy:
 - Authorization is **not implemented**.
 - Product currently behaves as single-user/demo/local-account semantics.
 - Garage UI is framed as personal space, but data access is still pre-auth MVP mode.
-- Local Garage settings are stored per-device only and are not user-profile data yet.
+- Profile `UserSettings` are persisted server-side per user (`UserSettings` model + `/api/user-settings`), with local cache/fallback on clients.
 - Phase 1 ownership foundation is implemented (User/Garage + demo ownership context).
+- Phase 2A base route scoping is implemented.
+- Phase 2B nested route scoping is implemented.
+- Phase 2C dev-only switcher is implemented.
+- Phase 2D/2E auth foundation hardening is implemented.
 
 ## Target direction
 
@@ -48,10 +52,33 @@ Future iterations should add:
 
 ### Phase 2C — Dev-only user switcher for QA (implemented, development-only)
 
-- Added development-only user switcher on web + Expo Garage settings.
+- Added development-only user switcher on web + Expo Profile settings.
 - Seed now includes deterministic test users/garages for isolation checks.
-- API current-user resolver accepts dev header in development only.
-- Production continues pre-auth demo fallback behavior (no dev switching).
+- API current-user resolver accepts dev header only when explicitly enabled:
+  - `NODE_ENV !== "production"`
+  - `MOTOTWIN_ENABLE_DEV_USER_SWITCHER=true`
+- Production keeps pre-auth demo fallback only when dev header is absent; dev header is rejected with controlled error.
+
+### Phase 2D — Auth foundation hardening (implemented)
+
+- `getCurrentUserContext()` hardened with typed controlled errors and read-only context resolution.
+- Invalid dev header now returns controlled `400` JSON error (no silent fallback in QA mode).
+- Ownership checks now rely on canonical garage ownership (`vehicle.garageId -> garage.ownerUserId`) with invariant validation.
+- Seed repairs safe ownership drift where `vehicle.userId` mismatches `garage.ownerUserId`.
+- `UserSettings` remains API-validated and resilient to invalid stored values via normalization.
+
+### Phase 2F — UserSettings DB-backed profile settings (implemented)
+
+- `UserSettings` persisted per user in DB.
+- `/api/user-settings` (`GET`/`PATCH`) is ownership-scoped through current user context.
+- Web and Expo use server settings as source of truth with local cache/fallback for resilience.
+
+### Phase 2E — Resolver read-only hardening (implemented)
+
+- Removed request-path auto-provisioning for `User` / `Garage` / `UserSettings` from current-user resolver.
+- Missing current user/garage/settings now return controlled initialization errors (`503`) with guidance to run seed.
+- Vehicle context read now uses ownership predicate in the final data read query (`findFirst` with ownership `where`).
+- Seed remains the only source of demo/dev context bootstrap data.
 
 ### Phase 3 — Auth session layer (planned)
 
@@ -60,7 +87,7 @@ Future iterations should add:
   - Phase 3B: web auth;
   - Phase 3C: Expo auth;
   - Phase 3D: replace demo resolver with session/token resolver;
-  - Phase 3E: settings sync;
+  - Phase 3E: auth session integration + optional conflict policy for existing local cache;
   - Phase 3F: account UI.
 
 ### Phase 4 — UI account flows

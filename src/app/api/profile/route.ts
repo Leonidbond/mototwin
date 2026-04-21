@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserContext } from "../_shared/current-user-context";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "../_shared/current-user-context";
 
 export async function GET() {
   try {
@@ -33,6 +36,10 @@ export async function GET() {
       },
     });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to load profile:", error);
     return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });
   }

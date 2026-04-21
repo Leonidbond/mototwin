@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { DEFAULT_USER_SETTINGS, normalizeUserSettings } from "@mototwin/domain";
+import { normalizeUserSettings } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserContext } from "../_shared/current-user-context";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "../_shared/current-user-context";
 
 const userSettingsPatchSchema = z
   .object({
@@ -17,13 +20,8 @@ const userSettingsPatchSchema = z
 export async function GET() {
   try {
     const currentUser = await getCurrentUserContext();
-    const settings = await prisma.userSettings.upsert({
+    const settings = await prisma.userSettings.findUnique({
       where: { userId: currentUser.userId },
-      update: {},
-      create: {
-        userId: currentUser.userId,
-        ...DEFAULT_USER_SETTINGS,
-      },
       select: {
         defaultCurrency: true,
         distanceUnit: true,
@@ -32,9 +30,19 @@ export async function GET() {
         defaultSnoozeDays: true,
       },
     });
+    if (!settings) {
+      return NextResponse.json(
+        { error: "User settings are not initialized. Run prisma seed." },
+        { status: 503 }
+      );
+    }
 
     return NextResponse.json({ settings: normalizeUserSettings(settings) });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to load user settings:", error);
     return NextResponse.json({ error: "Failed to load user settings" }, { status: 500 });
   }
@@ -53,13 +61,8 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const existing = await prisma.userSettings.upsert({
+    const existing = await prisma.userSettings.findUnique({
       where: { userId: currentUser.userId },
-      update: {},
-      create: {
-        userId: currentUser.userId,
-        ...DEFAULT_USER_SETTINGS,
-      },
       select: {
         defaultCurrency: true,
         distanceUnit: true,
@@ -68,6 +71,12 @@ export async function PATCH(request: Request) {
         defaultSnoozeDays: true,
       },
     });
+    if (!existing) {
+      return NextResponse.json(
+        { error: "User settings are not initialized. Run prisma seed." },
+        { status: 503 }
+      );
+    }
 
     const merged = normalizeUserSettings({ ...existing, ...parsed.data });
 
@@ -85,6 +94,10 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ settings: normalizeUserSettings(updated) });
   } catch (error) {
+    const currentUserContextError = toCurrentUserContextErrorResponse(error);
+    if (currentUserContextError) {
+      return currentUserContextError;
+    }
     console.error("Failed to update user settings:", error);
     return NextResponse.json({ error: "Failed to update user settings" }, { status: 500 });
   }
