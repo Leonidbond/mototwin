@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   SafeAreaView,
@@ -775,12 +776,22 @@ export default function VehicleDetailScreen() {
       }
       try {
         setNodeContextAddingKitCode(kit.code);
-        await createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).addServiceKitToWishlist(
+        const response = await createMotoTwinEndpoints(
+          createApiClient({ baseUrl: apiBaseUrl })
+        ).addServiceKitToWishlist(
           vehicleId,
           { kitCode: kit.code, contextNodeId: selectedNodeContextId }
         );
+        Alert.alert(
+          "Комплект добавлен",
+          `Добавлено: ${response.result.createdItems.length}\nПропущено: ${response.result.skippedItems.length}`
+        );
       } catch (e) {
-        console.error(e);
+        const message =
+          e instanceof Error && e.message.trim().length > 0
+            ? e.message
+            : "Не удалось добавить позиции комплекта.";
+        Alert.alert("Ошибка", message);
       } finally {
         setNodeContextAddingKitCode("");
       }
@@ -1426,6 +1437,7 @@ export default function VehicleDetailScreen() {
                       <ActionIconButton
                         key={action.key}
                         onPress={() => handleNodeContextAction(action.key)}
+                        disabled={action.key === "add_kit" && Boolean(nodeContextAddingKitCode)}
                         accessibilityLabel={action.label}
                         variant="subtle"
                         icon={

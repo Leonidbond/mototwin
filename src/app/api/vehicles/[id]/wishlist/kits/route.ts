@@ -40,6 +40,48 @@ const wishlistSkuSelect = {
   },
 } as const;
 
+function buildNoItemsAddedReason(
+  skippedItems: Array<{ reason: string; message: string }>
+): string {
+  if (skippedItems.length === 0) {
+    return "Нет доступных позиций для добавления.";
+  }
+
+  const duplicateCount = skippedItems.filter(
+    (item) => item.reason === "DUPLICATE_ACTIVE_ITEM"
+  ).length;
+  const missingNodeCount = skippedItems.filter(
+    (item) => item.reason === "MISSING_NODE"
+  ).length;
+  const nonLeafCount = skippedItems.filter(
+    (item) => item.reason === "NON_LEAF_NODE"
+  ).length;
+  const noMatchedSkuCount = skippedItems.filter(
+    (item) => item.reason === "NO_MATCHED_SKU"
+  ).length;
+
+  const reasons: string[] = [];
+  if (duplicateCount > 0) {
+    reasons.push(`уже есть в активном списке: ${duplicateCount}`);
+  }
+  if (missingNodeCount > 0) {
+    reasons.push(`узел не найден: ${missingNodeCount}`);
+  }
+  if (nonLeafCount > 0) {
+    reasons.push(`узел не конечный (не leaf): ${nonLeafCount}`);
+  }
+  if (noMatchedSkuCount > 0) {
+    reasons.push(`не найден подходящий SKU: ${noMatchedSkuCount}`);
+  }
+
+  if (reasons.length > 0) {
+    return `Причины: ${reasons.join("; ")}.`;
+  }
+
+  const firstMessage = skippedItems[0]?.message?.trim();
+  return firstMessage || "Нет доступных позиций для добавления.";
+}
+
 function toWire(row: {
   id: string;
   vehicleId: string;
@@ -315,8 +357,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     };
 
     if (result.createdItems.length === 0) {
+      const detailedReason = buildNoItemsAddedReason(result.skippedItems);
       return NextResponse.json(
-        { error: "Не удалось добавить позиции комплекта.", result },
+        { error: `Не удалось добавить позиции комплекта. ${detailedReason}`, result },
         { status: 400 }
       );
     }

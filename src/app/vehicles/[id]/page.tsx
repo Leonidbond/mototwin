@@ -1462,10 +1462,18 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       setWishlistNotice(
         `Комплект добавлен: ${res.result.createdItems.length} создано, ${res.result.skippedItems.length} пропущено.`
       );
-    } catch (e) {
-      setNodeContextServiceKitsError(
-        e instanceof Error ? e.message : "Не удалось добавить комплект обслуживания."
+      window.alert(
+        `Комплект добавлен.\nДобавлено: ${res.result.createdItems.length}\nПропущено: ${res.result.skippedItems.length}`
       );
+    } catch (e) {
+      const message =
+        e instanceof Error && e.message.trim().length > 0
+          ? e.message
+          : "Не удалось добавить комплект обслуживания.";
+      setNodeContextServiceKitsError(
+        message
+      );
+      window.alert(message);
     } finally {
       setNodeContextAddingKitCode("");
     }
@@ -1684,30 +1692,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   </span>
                 </div>
               ) : null}
-              {node.canAddServiceEvent ? (
-                <div className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => openAddServiceEventFromTreeContext(node.id)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                    aria-label="Добавить сервисное событие"
-                    title="Добавить сервисное событие"
-                  >
-                    +
-                  </button>
-                  <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-                    Добавить сервисное событие
-                  </span>
-                </div>
-              ) : null}
               <div className="group relative">
                 <button
                   type="button"
                   onClick={() => openWishlistFromTreeContext(node.id)}
-                  className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50"
                   title="Добавить в список покупок"
+                  aria-label="Добавить в список покупок"
                 >
-                  В список
+                  <WishlistIcon />
                 </button>
                 <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
                   Добавить в список покупок
@@ -1717,15 +1710,32 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 <button
                   type="button"
                   onClick={() => openNodeContextModal(node.id)}
-                  className="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50"
                   title="Открыть контекст узла"
+                  aria-label="Открыть контекст узла"
                 >
-                  Контекст
+                  <OpenContextIcon />
                 </button>
                 <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
                   Открыть контекст узла
                 </span>
               </div>
+              {node.canAddServiceEvent ? (
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => openAddServiceEventFromTreeContext(node.id)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition hover:bg-gray-50"
+                    aria-label="Добавить сервисное событие"
+                    title="Добавить сервисное событие"
+                  >
+                    <ServiceEventIcon />
+                  </button>
+                  <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                    Добавить сервисное событие
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -2734,14 +2744,26 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                             </button>
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {buildNodeSearchResultActions(result).map((action) => (
-                                <button
-                                  key={`${result.nodeId}.${action.key}`}
-                                  type="button"
-                                  onClick={() => handleSearchResultAction(action.key, result)}
-                                  className="inline-flex h-7 items-center rounded-md border border-gray-300 px-2.5 text-[11px] font-medium text-gray-700 transition hover:bg-gray-50"
-                                >
-                                  {action.label}
-                                </button>
+                                <div key={`${result.nodeId}.${action.key}`} className="group relative">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSearchResultAction(action.key, result)}
+                                    aria-label={`${action.label}: ${result.nodeName}`}
+                                    title={action.label}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 text-gray-700 transition hover:bg-gray-50"
+                                  >
+                                    {action.key === "open" ? (
+                                      <OpenContextIcon />
+                                    ) : action.key === "service_log" ? (
+                                      <HistoryIcon />
+                                    ) : (
+                                      <WishlistIcon />
+                                    )}
+                                  </button>
+                                  <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                                    {action.label}
+                                  </span>
+                                </div>
                               ))}
                             </div>
                           </div>
@@ -4200,14 +4222,31 @@ export default function VehiclePage({ params }: VehiclePageProps) {
             <div className="max-h-[74vh] space-y-4 overflow-y-auto px-6 py-6">
               <div className="flex flex-wrap gap-2">
                 {selectedNodeContextViewModel.actions.map((action) => (
-                  <button
-                    key={action.key}
-                    type="button"
-                    onClick={() => handleNodeContextAction(action.key)}
-                    className="inline-flex h-8 items-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50"
-                  >
-                    {action.label}
-                  </button>
+                  <div key={action.key} className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => handleNodeContextAction(action.key)}
+                      disabled={action.key === "add_kit" && Boolean(nodeContextAddingKitCode)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-800 transition hover:bg-gray-50"
+                      title={action.label}
+                      aria-label={action.label}
+                    >
+                      {action.key === "journal" ? (
+                        <HistoryIcon />
+                      ) : action.key === "add_service_event" ? (
+                        <ServiceEventIcon />
+                      ) : action.key === "add_wishlist" ? (
+                        <WishlistIcon />
+                      ) : action.key === "add_kit" ? (
+                        <KitIcon />
+                      ) : (
+                        <InfoIcon />
+                      )}
+                    </button>
+                    <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                      {action.label}
+                    </span>
+                  </div>
                 ))}
                 {canSnoozeSelectedNode ? (
                   <>
@@ -4818,6 +4857,70 @@ function TrashIcon() {
       <path d="M3 6h18" />
       <path d="M8 6V4h8v2" />
       <path d="M19 6l-1 14H6L5 6" />
+    </svg>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function ServiceEventIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+      <circle cx="12" cy="12" r="10" fill="currentColor" />
+      <path
+        d="M8.1 6.3a4.8 4.8 0 0 1 6 6l3.7 3.7-1.4 1.4-3.7-3.7a4.8 4.8 0 0 1-6-6l2.9 2.9h2.1l1.1-1.1V7.4L8.1 6.3Z"
+        fill="#ffffff"
+      />
+    </svg>
+  );
+}
+
+function WishlistIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="9" cy="20" r="1" />
+      <circle cx="18" cy="20" r="1" />
+      <path d="M3 4h2l2.4 10.5a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 7H7" />
+    </svg>
+  );
+}
+
+function OpenContextIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 3h7v7" />
+      <path d="M10 14 21 3" />
+      <path d="M21 14v7h-7" />
+      <path d="M3 10V3h7" />
+      <path d="M3 21l8-8" />
+    </svg>
+  );
+}
+
+function KitIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 7 12 3l9 4-9 4-9-4Z" />
+      <path d="M3 7v10l9 4 9-4V7" />
+      <path d="M12 11v10" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 10v6" />
+      <circle cx="12" cy="7" r="1" fill="currentColor" stroke="none" />
     </svg>
   );
 }

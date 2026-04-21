@@ -15,6 +15,9 @@
     ],
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "ios": {
+      "bundleIdentifier": "com.anonymous.mototwin-app"
+    }
   }
 }
