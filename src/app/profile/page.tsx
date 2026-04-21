@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
   getDevUserOptions,
@@ -15,7 +16,7 @@ import { productSemanticColors } from "@mototwin/design-tokens";
 import {
   DEFAULT_DEV_USER_EMAIL,
   DEV_USER_STORAGE_KEY,
-  type UserLocalSettings,
+  type UserLocalSettings
 } from "@mototwin/types";
 
 type ProfileViewModel = {
@@ -25,7 +26,12 @@ type ProfileViewModel = {
   garageTitle: string;
 };
 
-function buildProfileViewModel(selectedDevUserEmail: string): ProfileViewModel {
+const profileApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+
+function buildProfileViewModel(selectedDevUserEmail: string, fromApi?: ProfileViewModel): ProfileViewModel {
+  if (fromApi) {
+    return fromApi;
+  }
   const option = getDevUserOptions().find((item) => item.email === selectedDevUserEmail);
   return {
     displayName: option?.label ?? "Владелец",
@@ -40,26 +46,52 @@ export default function ProfilePage() {
     ...DEFAULT_USER_LOCAL_SETTINGS,
   }));
   const [settingsSavedNotice, setSettingsSavedNotice] = useState("");
+  const [settingsError, setSettingsError] = useState("");
   const [selectedDevUserEmail, setSelectedDevUserEmail] = useState(DEFAULT_DEV_USER_EMAIL);
+  const [apiProfile, setApiProfile] = useState<ProfileViewModel | null>(null);
 
   const devLoginEnabled = isDevLoginEnabled();
   const devUserOptions = getDevUserOptions();
   const profile = useMemo(
-    () => buildProfileViewModel(selectedDevUserEmail),
-    [selectedDevUserEmail]
+    () => buildProfileViewModel(selectedDevUserEmail, apiProfile ?? undefined),
+    [apiProfile, selectedDevUserEmail]
   );
 
-  useEffect(() => {
+  const loadSettings = async () => {
     try {
-      const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
-      if (!raw) {
-        setUserSettings({ ...DEFAULT_USER_LOCAL_SETTINGS });
-        return;
-      }
-      setUserSettings(normalizeUserLocalSettings(JSON.parse(raw)));
+      const [settingsResponse, profileResponse] = await Promise.all([
+        profileApi.getUserSettings(),
+        profileApi.getProfile(),
+      ]);
+      const resolved = normalizeUserLocalSettings(settingsResponse.settings);
+      setUserSettings(resolved);
+      setApiProfile({
+        displayName: profileResponse.profile.displayName,
+        email: profileResponse.profile.email,
+        registeredAtLabel: profileResponse.profile.createdAt
+          ? new Date(profileResponse.profile.createdAt).toLocaleDateString("ru-RU")
+          : "Не указана",
+        garageTitle: profileResponse.profile.garageTitle,
+      });
+      localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(resolved));
+      setSettingsError("");
     } catch {
-      setUserSettings({ ...DEFAULT_USER_LOCAL_SETTINGS });
+      try {
+        const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
+        if (!raw) {
+          setUserSettings({ ...DEFAULT_USER_LOCAL_SETTINGS });
+          return;
+        }
+        setUserSettings(normalizeUserLocalSettings(JSON.parse(raw)));
+      } catch {
+        setUserSettings({ ...DEFAULT_USER_LOCAL_SETTINGS });
+      }
+      setSettingsError("Не удалось загрузить настройки из сервера, использован локальный кэш.");
     }
+  };
+
+  useEffect(() => {
+    void loadSettings();
   }, []);
 
   useEffect(() => {
@@ -76,15 +108,20 @@ export default function ProfilePage() {
     }
   }, [devLoginEnabled]);
 
-  const saveUserSettings = (patch: Partial<UserLocalSettings>) => {
+  const saveUserSettings = async (patch: Partial<UserLocalSettings>) => {
     const next = mergeUserLocalSettings(userSettings, patch);
     setUserSettings(next);
     try {
+      const updated = await profileApi.updateUserSettings(next);
+      const resolved = normalizeUserLocalSettings(updated.settings);
+      setUserSettings(resolved);
+      localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(resolved));
+      setSettingsError("");
       localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(next));
       setSettingsSavedNotice("Настройки сохранены");
       window.setTimeout(() => setSettingsSavedNotice(""), 1800);
     } catch {
-      // Ignore local-only settings persistence errors.
+      setSettingsError("Не удалось сохранить настройки на сервере.");
     }
   };
 
@@ -97,6 +134,8 @@ export default function ProfilePage() {
       // Ignore local-only settings persistence errors.
     }
     Reflect.set(window, "__MOTOTWIN_DEV_USER_EMAIL__", normalized);
+    setApiProfile(null);
+    void loadSettings();
   };
 
   return (
@@ -148,6 +187,9 @@ export default function ProfilePage() {
               <span className="text-xs font-medium text-gray-500">{settingsSavedNotice}</span>
             ) : null}
           </div>
+          {settingsError ? (
+            <p className="mb-3 text-xs text-rose-600">{settingsError}</p>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm text-gray-700">
               Валюта по умолчанию
@@ -234,7 +276,9 @@ export default function ProfilePage() {
               Активный dev-пользователь
               <select
                 value={selectedDevUserEmail}
-                onChange={(e) => saveDevUser(e.target.value)}
+                onChange={(e) => {
+                  saveDevUser(e.target.value);
+                }}
                 className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
               >
                 {devUserOptions.map((option) => (

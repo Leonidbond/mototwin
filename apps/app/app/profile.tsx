@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { SafeAreaView, ScrollView, StyleSheet, Text, Pressable, View } from "react-native";
+import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
   getDevUserOptions,
@@ -10,6 +11,7 @@ import {
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { DEFAULT_DEV_USER_EMAIL, type UserLocalSettings } from "@mototwin/types";
+import { getApiBaseUrl } from "../src/api-base-url";
 import { readDevUserSelection, writeDevUserSelection } from "../src/ui-dev-user-selection";
 import { readUserLocalSettings, writeUserLocalSettings } from "../src/ui-user-local-settings";
 
@@ -25,36 +27,82 @@ function buildProfileData(selectedDevUserEmail: string) {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const apiBaseUrl = getApiBaseUrl();
   const [userSettings, setUserSettings] = useState<UserLocalSettings>({
     ...DEFAULT_USER_LOCAL_SETTINGS,
   });
   const [settingsSavedNotice, setSettingsSavedNotice] = useState("");
+  const [settingsError, setSettingsError] = useState("");
   const [selectedDevUserEmail, setSelectedDevUserEmail] = useState(DEFAULT_DEV_USER_EMAIL);
+  const [apiProfile, setApiProfile] = useState<ReturnType<typeof buildProfileData> | null>(null);
 
   const devLoginEnabled = isDevLoginEnabled();
   const devUserOptions = getDevUserOptions();
-  const profile = useMemo(() => buildProfileData(selectedDevUserEmail), [selectedDevUserEmail]);
+  const profile = useMemo(
+    () => apiProfile ?? buildProfileData(selectedDevUserEmail),
+    [apiProfile, selectedDevUserEmail]
+  );
+
+  const loadProfileAndSettings = async () => {
+    const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+    try {
+      const [settingsResponse, profileResponse] = await Promise.all([
+        endpoints.getUserSettings(),
+        endpoints.getProfile(),
+      ]);
+      const resolvedSettings = mergeUserLocalSettings(
+        DEFAULT_USER_LOCAL_SETTINGS,
+        settingsResponse.settings
+      );
+      setUserSettings(resolvedSettings);
+      setApiProfile({
+        displayName: profileResponse.profile.displayName,
+        email: profileResponse.profile.email,
+        createdAtLabel: profileResponse.profile.createdAt
+          ? new Date(profileResponse.profile.createdAt).toLocaleDateString("ru-RU")
+          : "Не указана",
+        garageTitle: profileResponse.profile.garageTitle,
+      });
+      await writeUserLocalSettings(resolvedSettings);
+      setSettingsError("");
+    } catch {
+      const fallback = await readUserLocalSettings();
+      setUserSettings(fallback);
+      setSettingsError("Не удалось загрузить настройки с сервера, использован локальный кэш.");
+    }
+  };
 
   useEffect(() => {
     void (async () => {
-      setUserSettings(await readUserLocalSettings());
       if (devLoginEnabled) {
         setSelectedDevUserEmail(await readDevUserSelection());
       }
+      await loadProfileAndSettings();
     })();
   }, [devLoginEnabled]);
 
-  const updateUserSettings = (patch: Partial<UserLocalSettings>) => {
+  const updateUserSettings = async (patch: Partial<UserLocalSettings>) => {
     const next = mergeUserLocalSettings(userSettings, patch);
     setUserSettings(next);
-    void writeUserLocalSettings(next);
-    setSettingsSavedNotice("Настройки сохранены");
-    setTimeout(() => setSettingsSavedNotice(""), 1800);
+    try {
+      const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+      const response = await endpoints.updateUserSettings(next);
+      const resolved = mergeUserLocalSettings(DEFAULT_USER_LOCAL_SETTINGS, response.settings);
+      setUserSettings(resolved);
+      await writeUserLocalSettings(resolved);
+      setSettingsError("");
+      setSettingsSavedNotice("Настройки сохранены");
+      setTimeout(() => setSettingsSavedNotice(""), 1800);
+    } catch {
+      setSettingsError("Не удалось сохранить настройки на сервере.");
+    }
   };
 
   const updateDevUser = async (email: string) => {
     const selected = await writeDevUserSelection(normalizeDevUserEmail(email));
     setSelectedDevUserEmail(selected);
+    setApiProfile(null);
+    await loadProfileAndSettings();
   };
 
   return (
@@ -83,12 +131,13 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>Настройки</Text>
             {settingsSavedNotice ? <Text style={styles.savedText}>{settingsSavedNotice}</Text> : null}
           </View>
+          {settingsError ? <Text style={styles.errorText}>{settingsError}</Text> : null}
           <SettingRow
             label="Валюта по умолчанию"
             options={["RUB", "USD", "EUR"]}
             value={userSettings.defaultCurrency}
             onSelect={(value) =>
-              updateUserSettings({
+              void updateUserSettings({
                 defaultCurrency: value as UserLocalSettings["defaultCurrency"],
               })
             }
@@ -98,7 +147,7 @@ export default function ProfileScreen() {
             options={["km", "mi"]}
             value={userSettings.distanceUnit}
             onSelect={(value) =>
-              updateUserSettings({
+              void updateUserSettings({
                 distanceUnit: value as UserLocalSettings["distanceUnit"],
               })
             }
@@ -108,7 +157,7 @@ export default function ProfileScreen() {
             options={["DD.MM.YYYY", "YYYY-MM-DD"]}
             value={userSettings.dateFormat}
             onSelect={(value) =>
-              updateUserSettings({
+              void updateUserSettings({
                 dateFormat: value as UserLocalSettings["dateFormat"],
               })
             }
@@ -118,7 +167,7 @@ export default function ProfileScreen() {
             options={["7", "14", "30"]}
             value={String(userSettings.defaultSnoozeDays)}
             onSelect={(value) =>
-              updateUserSettings({
+              void updateUserSettings({
                 defaultSnoozeDays: Number(value) as UserLocalSettings["defaultSnoozeDays"],
               })
             }
@@ -228,6 +277,7 @@ const styles = StyleSheet.create({
   settingsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: c.textPrimary },
   savedText: { fontSize: 11, color: c.textMuted },
+  errorText: { fontSize: 11, color: "#be123c" },
   infoRow: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   infoLabel: { fontSize: 13, color: c.textMuted },
   infoValue: { fontSize: 13, fontWeight: "600", color: c.textPrimary, flexShrink: 1, textAlign: "right" },

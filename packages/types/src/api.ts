@@ -10,6 +10,7 @@ import type {
   ModelVariantItem,
   VehicleDetail,
 } from "./vehicle";
+import type { UserSettings } from "./user-settings";
 import type { NodeTreeItem } from "./node";
 
 /** Backend often returns `{ error: string }` on 4xx/5xx. */
@@ -106,4 +107,17 @@ export type ServiceKitsResponse = {
 
 export type AddServiceKitToWishlistResponse = {
   result: AddServiceKitToWishlistResult;
+};
+
+export type ProfileResponse = {
+  profile: {
+    displayName: string;
+    email: string;
+    createdAt: string | null;
+    garageTitle: string;
+  };
+};
+
+export type UserSettingsResponse = {
+  settings: UserSettings;
 };

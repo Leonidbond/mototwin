@@ -1,5 +1,6 @@
 import type {
   UserLocalSettings,
+  UserSettings,
   UserLocalSettingsCurrency,
   UserLocalSettingsDateFormat,
   UserLocalSettingsDistanceUnit,
@@ -13,6 +14,10 @@ export const DEFAULT_USER_LOCAL_SETTINGS: UserLocalSettings = {
   engineHoursUnit: "h",
   dateFormat: "DD.MM.YYYY",
   defaultSnoozeDays: 7,
+};
+
+export const DEFAULT_USER_SETTINGS: UserSettings = {
+  ...DEFAULT_USER_LOCAL_SETTINGS,
 };
 
 function isCurrency(value: unknown): value is UserLocalSettingsCurrency {
@@ -51,12 +56,59 @@ export function normalizeUserLocalSettings(value: unknown): UserLocalSettings {
   };
 }
 
+export function normalizeUserSettings(value: unknown): UserSettings {
+  return normalizeUserLocalSettings(value);
+}
+
 export function mergeUserLocalSettings(
   current: UserLocalSettings,
   patch: Partial<UserLocalSettings>
 ): UserLocalSettings {
   const normalizedCurrent = normalizeUserLocalSettings(current);
   return normalizeUserLocalSettings({ ...normalizedCurrent, ...patch });
+}
+
+export function mergeUserSettings(
+  current: UserSettings,
+  patch: Partial<UserSettings>
+): UserSettings {
+  return mergeUserLocalSettings(current, patch);
+}
+
+export function validateUserSettings(value: unknown): {
+  ok: boolean;
+  error?: string;
+  settings?: UserSettings;
+} {
+  const settings = normalizeUserSettings(value);
+  const raw = value as Record<string, unknown> | null;
+  if (raw && typeof raw === "object") {
+    if (
+      "defaultCurrency" in raw &&
+      !isCurrency(raw.defaultCurrency)
+    ) {
+      return { ok: false, error: "Недопустимое значение валюты." };
+    }
+    if (
+      "distanceUnit" in raw &&
+      !isDistanceUnit(raw.distanceUnit)
+    ) {
+      return { ok: false, error: "Недопустимое значение единицы пробега." };
+    }
+    if (
+      "engineHoursUnit" in raw &&
+      raw.engineHoursUnit !== "h"
+    ) {
+      return { ok: false, error: "Недопустимое значение единицы моточасов." };
+    }
+    if ("dateFormat" in raw && !isDateFormat(raw.dateFormat)) {
+      return { ok: false, error: "Недопустимое значение формата даты." };
+    }
+    if ("defaultSnoozeDays" in raw && !isSnoozeDays(raw.defaultSnoozeDays)) {
+      return { ok: false, error: "Недопустимое значение интервала напоминаний." };
+    }
+  }
+  return { ok: true, settings };
 }
 
 export function getDefaultCurrencyFromSettings(settings: UserLocalSettings): UserLocalSettingsCurrency {

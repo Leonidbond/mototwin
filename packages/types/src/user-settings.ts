@@ -11,3 +11,7 @@ export type UserLocalSettings = {
   dateFormat: UserLocalSettingsDateFormat;
   defaultSnoozeDays: 7 | 14 | 30;
 };
+
+export type UserSettings = UserLocalSettings;
+
+export type UserSettingsPayload = Partial<UserSettings>;

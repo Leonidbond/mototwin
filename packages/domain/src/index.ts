@@ -147,12 +147,16 @@ export {
 } from "./component-contract-props";
 export { buildGarageDashboardSummary } from "./garage-dashboard";
 export {
+  DEFAULT_USER_SETTINGS,
   DEFAULT_USER_LOCAL_SETTINGS,
   USER_LOCAL_SETTINGS_STORAGE_KEY,
   getDefaultCurrencyFromSettings,
   getDefaultSnoozeDaysFromSettings,
+  mergeUserSettings,
   mergeUserLocalSettings,
+  normalizeUserSettings,
   normalizeUserLocalSettings,
+  validateUserSettings,
 } from "./user-settings";
 export {
   getDevUserOptions,

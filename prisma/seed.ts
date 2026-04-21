@@ -1202,6 +1202,43 @@ async function main() {
     },
   });
 
+  await prisma.userSettings.upsert({
+    where: { userId: demoUser.id },
+    update: {},
+    create: {
+      userId: demoUser.id,
+      defaultCurrency: "RUB",
+      distanceUnit: "km",
+      engineHoursUnit: "h",
+      dateFormat: "DD.MM.YYYY",
+      defaultSnoozeDays: 7,
+    },
+  });
+  await prisma.userSettings.upsert({
+    where: { userId: userA.id },
+    update: {},
+    create: {
+      userId: userA.id,
+      defaultCurrency: "RUB",
+      distanceUnit: "km",
+      engineHoursUnit: "h",
+      dateFormat: "DD.MM.YYYY",
+      defaultSnoozeDays: 7,
+    },
+  });
+  await prisma.userSettings.upsert({
+    where: { userId: userB.id },
+    update: {},
+    create: {
+      userId: userB.id,
+      defaultCurrency: "RUB",
+      distanceUnit: "km",
+      engineHoursUnit: "h",
+      dateFormat: "DD.MM.YYYY",
+      defaultSnoozeDays: 7,
+    },
+  });
+
   await prisma.vehicle.updateMany({
     where: {
       garageId: null,

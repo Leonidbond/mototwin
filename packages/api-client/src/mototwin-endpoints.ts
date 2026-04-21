@@ -16,8 +16,11 @@ import type {
   PartSkuDetailResponse,
   PartSkusResponse,
   PartSkuSearchFilters,
+  ProfileResponse,
   ServiceEventsResponse,
   ServiceKitsResponse,
+  UserSettingsPayload,
+  UserSettingsResponse,
   UpdatePartWishlistItemInput,
   UpdateVehicleProfileInput,
   UpdateVehicleProfileResponse,
@@ -38,6 +41,21 @@ import type { ApiClient } from "./fetcher";
  */
 export function createMotoTwinEndpoints(client: ApiClient) {
   return {
+    getProfile() {
+      return client.request<ProfileResponse>("/api/profile");
+    },
+
+    getUserSettings() {
+      return client.request<UserSettingsResponse>("/api/user-settings");
+    },
+
+    updateUserSettings(input: UserSettingsPayload) {
+      return client.request<UserSettingsResponse>("/api/user-settings", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      });
+    },
+
     getGarageVehicles() {
       return client.request<GarageVehiclesResponse>("/api/garage");
     },

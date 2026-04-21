@@ -125,6 +125,8 @@ export type {
   PartRecommendationsResponse,
   ServiceKitsResponse,
   AddServiceKitToWishlistResponse,
+  ProfileResponse,
+  UserSettingsResponse,
 } from "./api";
 export type {
   PartSkuSearchFilters,
@@ -176,6 +178,8 @@ export type {
 } from "./node-context";
 export type {
   UserLocalSettings,
+  UserSettings,
+  UserSettingsPayload,
   UserLocalSettingsCurrency,
   UserLocalSettingsDistanceUnit,
   UserLocalSettingsDateFormat,

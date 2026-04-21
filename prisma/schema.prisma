@@ -85,10 +85,27 @@ model User {
   updatedAt     DateTime      @updatedAt
 
   subscription  Subscription?
+  settings      UserSettings?
   vehicles      Vehicle[]
   garages       Garage[]
 
   @@map("users")
+}
+
+model UserSettings {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  defaultCurrency   String   @default("RUB")
+  distanceUnit      String   @default("km")
+  engineHoursUnit   String   @default("h")
+  dateFormat        String   @default("DD.MM.YYYY")
+  defaultSnoozeDays Int      @default(7)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
 }
 
 model Garage {
