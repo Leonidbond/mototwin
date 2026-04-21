@@ -4,13 +4,15 @@ import { getCurrentUserContext } from "./current-user-context";
 
 export async function getVehicleInCurrentContext<TSelect extends Prisma.VehicleSelect>(
   vehicleId: string,
-  select: TSelect
+  select: TSelect,
+  options?: { includeTrashed?: boolean }
 ) {
   const currentUser = await getCurrentUserContext();
   return prisma.vehicle.findFirst({
     where: {
       id: vehicleId,
       garageId: currentUser.garageId,
+      ...(options?.includeTrashed ? {} : { trashedAt: null }),
       garage: {
         ownerUserId: currentUser.userId,
       },

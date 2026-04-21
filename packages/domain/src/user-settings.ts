@@ -4,6 +4,7 @@ import type {
   UserLocalSettingsCurrency,
   UserLocalSettingsDateFormat,
   UserLocalSettingsDistanceUnit,
+  VehicleTrashRetentionDays,
 } from "@mototwin/types";
 
 export const USER_LOCAL_SETTINGS_STORAGE_KEY = "mototwin.userLocalSettings";
@@ -22,6 +23,7 @@ export const DEFAULT_USER_LOCAL_SETTINGS: UserLocalSettings = {
   engineHoursUnit: "h",
   dateFormat: "DD.MM.YYYY",
   defaultSnoozeDays: 7,
+  vehicleTrashRetentionDays: 30,
 };
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -44,6 +46,10 @@ function isSnoozeDays(value: unknown): value is UserLocalSettings["defaultSnooze
   return value === 7 || value === 14 || value === 30;
 }
 
+function isVehicleTrashRetentionDays(value: unknown): value is VehicleTrashRetentionDays {
+  return value === 7 || value === 14 || value === 30 || value === 60 || value === 90;
+}
+
 export function normalizeUserLocalSettings(value: unknown): UserLocalSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { ...DEFAULT_USER_LOCAL_SETTINGS };
@@ -61,6 +67,9 @@ export function normalizeUserLocalSettings(value: unknown): UserLocalSettings {
     defaultSnoozeDays: isSnoozeDays(raw.defaultSnoozeDays)
       ? raw.defaultSnoozeDays
       : DEFAULT_USER_LOCAL_SETTINGS.defaultSnoozeDays,
+    vehicleTrashRetentionDays: isVehicleTrashRetentionDays(raw.vehicleTrashRetentionDays)
+      ? raw.vehicleTrashRetentionDays
+      : DEFAULT_USER_LOCAL_SETTINGS.vehicleTrashRetentionDays,
   };
 }
 
@@ -115,6 +124,12 @@ export function validateUserSettings(value: unknown): {
     if ("defaultSnoozeDays" in raw && !isSnoozeDays(raw.defaultSnoozeDays)) {
       return { ok: false, error: "Недопустимое значение интервала напоминаний." };
     }
+    if (
+      "vehicleTrashRetentionDays" in raw &&
+      !isVehicleTrashRetentionDays(raw.vehicleTrashRetentionDays)
+    ) {
+      return { ok: false, error: "Недопустимое значение срока хранения на Свалке." };
+    }
   }
   return { ok: true, settings };
 }
@@ -127,4 +142,10 @@ export function getDefaultSnoozeDaysFromSettings(
   settings: UserLocalSettings
 ): UserLocalSettings["defaultSnoozeDays"] {
   return normalizeUserLocalSettings(settings).defaultSnoozeDays;
+}
+
+export function getVehicleTrashRetentionDaysFromSettings(
+  settings: UserLocalSettings
+): VehicleTrashRetentionDays {
+  return normalizeUserLocalSettings(settings).vehicleTrashRetentionDays;
 }

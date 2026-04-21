@@ -107,6 +107,13 @@ export {
   vehicleDetailFromApiRecord,
 } from "./vehicle-view-models";
 export {
+  calculateTrashExpiresAt,
+  getTrashDaysRemaining,
+  formatTrashRetentionLabel,
+  isVehicleTrashed,
+  buildTrashedVehicleViewModel,
+} from "./vehicle-trash";
+export {
   RIDE_USAGE_TYPE_OPTIONS,
   RIDE_RIDING_STYLE_OPTIONS,
   RIDE_LOAD_TYPE_OPTIONS,
@@ -153,6 +160,7 @@ export {
   USER_LOCAL_SETTINGS_STORAGE_KEY,
   getDefaultCurrencyFromSettings,
   getDefaultSnoozeDaysFromSettings,
+  getVehicleTrashRetentionDaysFromSettings,
   mergeUserSettings,
   mergeUserLocalSettings,
   normalizeUserSettings,

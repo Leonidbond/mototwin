@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
-} from "../../_shared/current-user-context";
+} from "../../../_shared/current-user-context";
 
 type RouteContext = {
   params: Promise<{
@@ -11,19 +11,30 @@ type RouteContext = {
   }>;
 };
 
-export async function GET(_: Request, context: RouteContext) {
+export async function POST(_: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
     const currentUser = await getCurrentUserContext();
-
     const vehicle = await prisma.vehicle.findFirst({
       where: {
         id,
         garageId: currentUser.garageId,
-        trashedAt: null,
+        trashedAt: { not: null },
         garage: {
           ownerUserId: currentUser.userId,
         },
+      },
+      select: { id: true },
+    });
+    if (!vehicle) {
+      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    }
+
+    const restored = await prisma.vehicle.update({
+      where: { id: vehicle.id },
+      data: {
+        trashedAt: null,
+        trashExpiresAt: null,
       },
       include: {
         brand: true,
@@ -32,21 +43,13 @@ export async function GET(_: Request, context: RouteContext) {
         rideProfile: true,
       },
     });
-
-    if (!vehicle) {
-      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({ vehicle });
+    return NextResponse.json({ vehicle: restored });
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;
     }
-    console.error("Failed to fetch vehicle:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch vehicle" },
-      { status: 500 }
-    );
+    console.error("Failed to restore vehicle:", error);
+    return NextResponse.json({ error: "Failed to restore vehicle" }, { status: 500 });
   }
 }

@@ -1245,6 +1245,7 @@ async function main() {
       engineHoursUnit: "h",
       dateFormat: "DD.MM.YYYY",
       defaultSnoozeDays: 7,
+      vehicleTrashRetentionDays: 30,
     },
   });
   await prisma.userSettings.upsert({
@@ -1257,6 +1258,7 @@ async function main() {
       engineHoursUnit: "h",
       dateFormat: "DD.MM.YYYY",
       defaultSnoozeDays: 7,
+      vehicleTrashRetentionDays: 30,
     },
   });
   await prisma.userSettings.upsert({
@@ -1269,6 +1271,7 @@ async function main() {
       engineHoursUnit: "h",
       dateFormat: "DD.MM.YYYY",
       defaultSnoozeDays: 7,
+      vehicleTrashRetentionDays: 30,
     },
   });
 

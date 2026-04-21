@@ -100,6 +100,7 @@ model UserSettings {
   engineHoursUnit   String   @default("h")
   dateFormat        String   @default("DD.MM.YYYY")
   defaultSnoozeDays Int      @default(7)
+  vehicleTrashRetentionDays Int @default(30)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -189,6 +190,8 @@ model Vehicle {
   id             String       @id @default(cuid())
   userId         String
   garageId       String?
+  trashedAt      DateTime?
+  trashExpiresAt DateTime?
   brandId        String
   modelId        String
   modelVariantId String
@@ -212,6 +215,9 @@ model Vehicle {
 
   @@index([userId])
   @@index([garageId])
+  @@index([trashedAt])
+  @@index([trashExpiresAt])
+  @@index([garageId, trashedAt])
   @@index([garageId, userId])
   @@index([brandId, modelId, modelVariantId])
   @@map("vehicles")

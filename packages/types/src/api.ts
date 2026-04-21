@@ -8,6 +8,7 @@ import type {
   GarageVehicleItem,
   ModelItem,
   ModelVariantItem,
+  VehicleTrashInfo,
   VehicleDetail,
 } from "./vehicle";
 import type { UserSettings } from "./user-settings";
@@ -120,4 +121,17 @@ export type ProfileResponse = {
 
 export type UserSettingsResponse = {
   settings: UserSettings;
+};
+
+export type VehicleTrashListResponse = {
+  vehicles: Array<GarageVehicleItem & VehicleTrashInfo>;
+};
+
+export type VehicleTrashMutationResponse = {
+  vehicle: GarageVehicleItem & VehicleTrashInfo;
+};
+
+export type VehicleTrashDeleteResponse = {
+  deleted: true;
+  vehicleId: string;
 };

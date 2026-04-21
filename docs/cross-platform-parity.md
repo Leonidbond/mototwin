@@ -31,6 +31,7 @@ Parity оценивается по core workflows, business outcome и поль�
 - **Phase 2C dev-only QA status:** in development, both web and Expo support a local **Dev-only user switcher** (`Demo User`, `Test User A`, `Test User B`) on Profile surface that changes API context via development header. This is explicitly non-production and non-auth behavior.
 - **Phase 2D hardening status:** both clients use the same explicit dev-switcher gate (`NODE_ENV !== "production"` + `MOTOTWIN_ENABLE_DEV_USER_SWITCHER=true`) for switcher visibility and dev-header override behavior.
 - **Resolver hardening parity:** both clients now depend on the same read-only server context resolver contract (no request-path auto-bootstrap); missing seeded context returns controlled API errors on both platforms.
+- **Trash parity:** both clients support soft-delete flow to **`Свалка`** (move-to-trash from Garage, list trashed vehicles, restore, permanent delete with explicit confirmation). Active Garage list excludes trashed vehicles on both clients.
 
 ## 3.2 Add motorcycle
 

@@ -174,6 +174,8 @@ export function vehicleDetailFromApiRecord(record: VehicleDetailApiRecord): Vehi
     vin: record.vin,
     odometer: record.odometer,
     engineHours: record.engineHours,
+    trashedAt: record.trashedAt ?? null,
+    trashExpiresAt: record.trashExpiresAt ?? null,
     rideProfile: record.rideProfile,
     modelVariant: mv
       ? {

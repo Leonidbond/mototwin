@@ -14,6 +14,9 @@ const userSettingsPatchSchema = z
     engineHoursUnit: z.literal("h").optional(),
     dateFormat: z.enum(["DD.MM.YYYY", "YYYY-MM-DD"]).optional(),
     defaultSnoozeDays: z.union([z.literal(7), z.literal(14), z.literal(30)]).optional(),
+    vehicleTrashRetentionDays: z
+      .union([z.literal(7), z.literal(14), z.literal(30), z.literal(60), z.literal(90)])
+      .optional(),
   })
   .strict();
 
@@ -28,6 +31,7 @@ export async function GET() {
         engineHoursUnit: true,
         dateFormat: true,
         defaultSnoozeDays: true,
+        vehicleTrashRetentionDays: true,
       },
     });
     if (!settings) {
@@ -69,6 +73,7 @@ export async function PATCH(request: Request) {
         engineHoursUnit: true,
         dateFormat: true,
         defaultSnoozeDays: true,
+        vehicleTrashRetentionDays: true,
       },
     });
     if (!existing) {
@@ -89,6 +94,7 @@ export async function PATCH(request: Request) {
         engineHoursUnit: true,
         dateFormat: true,
         defaultSnoozeDays: true,
+        vehicleTrashRetentionDays: true,
       },
     });
 

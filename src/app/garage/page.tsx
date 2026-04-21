@@ -20,13 +20,20 @@ export default function GaragePage() {
   const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
   const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
+  const [actionNotice, setActionNotice] = useState("");
+  const [activeTrashVehicleId, setActiveTrashVehicleId] = useState("");
+  const [trashCount, setTrashCount] = useState(0);
 
   const loadGarage = useCallback(async () => {
     try {
       setIsLoading(true);
       setError("");
-      const data = await garageApi.getGarageVehicles();
+      const [data, trashData] = await Promise.all([
+        garageApi.getGarageVehicles(),
+        garageApi.getTrashedVehicles(),
+      ]);
       setVehicles(data.vehicles ?? []);
+      setTrashCount(trashData.vehicles?.length ?? 0);
     } catch (err) {
       console.error(err);
       setError(
@@ -36,6 +43,26 @@ export default function GaragePage() {
       setIsLoading(false);
     }
   }, []);
+
+  const moveVehicleToTrash = async (vehicle: GarageVehicleItem) => {
+    const confirmMessage = `Переместить мотоцикл на Свалку?\n\nОн исчезнет из гаража, но его можно будет восстановить позже на странице "Свалка".`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+    try {
+      setActiveTrashVehicleId(vehicle.id);
+      await garageApi.moveVehicleToTrash(vehicle.id);
+      setVehicles((prev) => prev.filter((item) => item.id !== vehicle.id));
+      setTrashCount((prev) => prev + 1);
+      setActionNotice("Мотоцикл перемещен на Свалку");
+      window.setTimeout(() => setActionNotice(""), 2000);
+    } catch (trashError) {
+      console.error(trashError);
+      setError("Не удалось переместить мотоцикл на Свалку.");
+    } finally {
+      setActiveTrashVehicleId("");
+    }
+  };
 
   useEffect(() => {
     void loadGarage();
@@ -121,6 +148,13 @@ export default function GaragePage() {
 
           <div className="flex flex-col items-end gap-2">
             <Link
+              href="/trash"
+              className="rounded-xl border px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-white"
+              style={{ borderColor: productSemanticColors.borderStrong }}
+            >
+              Свалка ({trashCount})
+            </Link>
+            <Link
               href="/profile"
               className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border text-lg shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow"
               style={{
@@ -184,6 +218,12 @@ export default function GaragePage() {
               value={String(dashboardSummary.attentionItemsTotalCount)}
             />
           </section>
+        ) : null}
+
+        {actionNotice ? (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
+            {actionNotice}
+          </div>
         ) : null}
 
         {!isLoading && !error && vehicles.length === 0 ? (
@@ -337,6 +377,19 @@ export default function GaragePage() {
                       )
                     ) : null}
                   </div>
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void moveVehicleToTrash(vehicle)}
+                    disabled={activeTrashVehicleId === vehicle.id}
+                    className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {activeTrashVehicleId === vehicle.id
+                      ? "Перемещаем..."
+                      : "Переместить на свалку"}
+                  </button>
                 </div>
 
                 <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-4">

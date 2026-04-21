@@ -18,6 +18,7 @@ Current MVP limitations:
 - `Единицы моточасов`: `h` (allowed: `h`)
 - `Формат даты`: `DD.MM.YYYY` (allowed: `DD.MM.YYYY`, `YYYY-MM-DD`)
 - `Напоминание по умолчанию`: `7` (allowed days: `7`, `14`, `30`)
+- `Срок хранения мотоцикла на Свалке`: `30` (allowed days: `7`, `14`, `30`, `60`, `90`)
 
 ## Persistence
 
@@ -34,6 +35,7 @@ Current MVP limitations:
   - add service event form (direct add and node-context add).
 - Existing wishlist-`INSTALLED` prefill keeps item-specific currency when it is present.
 - Demo/Test users in dev switcher have independent settings rows in DB.
+- `vehicleTrashRetentionDays` controls `trashExpiresAt` on move-to-trash action.
 
 ## Not implemented yet
 

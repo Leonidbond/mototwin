@@ -34,6 +34,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       where: {
         id,
         garageId: currentUser.garageId,
+        trashedAt: null,
         garage: {
           ownerUserId: currentUser.userId,
         },

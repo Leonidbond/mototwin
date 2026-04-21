@@ -39,6 +39,7 @@
 
 - `UserSettings` belongs to `User` via unique `userId` (1:1).
 - Stores `defaultCurrency`, `distanceUnit`, `engineHoursUnit`, `dateFormat`, `defaultSnoozeDays`.
+- Stores `vehicleTrashRetentionDays` for trash retention policy.
 - Runtime reads/writes are done via `/api/user-settings` and scoped through current user context.
 - Local client storage is fallback/cache only; DB is primary source when API is available.
 
@@ -52,12 +53,14 @@
 ### Vehicle / RideProfile
 
 - `Vehicle` links to `User`, optional `Garage`, `Brand`, `Model`, `ModelVariant`.
+- `Vehicle` has soft-delete fields: `trashedAt`, `trashExpiresAt`.
 - `RideProfile` is effectively 1:1 with `Vehicle` via unique `vehicleId`.
 - `Vehicle` also links to `ServiceEvent`, `NodeState`, `TopNodeState`.
 - Ownership canonical source: `Vehicle.garageId -> Garage.ownerUserId`.
 - `Vehicle.userId` is transitional/denormalized compatibility field and should match `Garage.ownerUserId`.
 - Seed includes safe repair step for mismatched `Vehicle.userId` vs `Garage.ownerUserId`.
 - Runtime API ownership reads use ownership predicate directly in final vehicle read query.
+- Active Garage routes exclude trashed vehicles; Trash routes read vehicles with `trashedAt != null`.
 
 ### Node hierarchy
 
@@ -96,6 +99,7 @@
 - `User 1:1 UserSettings` (optional in schema, seed-initialized for demo/dev users)
 - `Garage 1:N Vehicle`
 - `Vehicle 1:1 RideProfile` (optional, enforced by unique)
+- `Vehicle` soft-delete timeline: active (`trashedAt = null`) or trashed (`trashedAt != null`).
 - `Vehicle 1:N ServiceEvent`
 - `Vehicle 1:N NodeState`
 - `Vehicle 1:N TopNodeState`
@@ -122,6 +126,7 @@ Computed and aggregated statuses are returned by backend node-tree endpoint.
 - No separate audit actor model in `ServiceEvent` yet.
 - `UserSettings` stores values as strings at DB layer; allowed value set is currently enforced in API/domain validation (enum/check DB hardening is deferred).
 - `UserSettings` bootstrap is seed-driven; request-path context resolver does not auto-create missing rows.
+- Expired trashed vehicles are not auto-deleted in current MVP step (no scheduler/background cleanup yet).
 
 ## 7. Ownership transition status
 

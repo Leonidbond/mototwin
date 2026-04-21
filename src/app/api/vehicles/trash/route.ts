@@ -5,26 +5,18 @@ import {
   toCurrentUserContextErrorResponse,
 } from "../../_shared/current-user-context";
 
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
-
-export async function GET(_: Request, context: RouteContext) {
+export async function GET() {
   try {
-    const { id } = await context.params;
     const currentUser = await getCurrentUserContext();
-
-    const vehicle = await prisma.vehicle.findFirst({
+    const vehicles = await prisma.vehicle.findMany({
       where: {
-        id,
         garageId: currentUser.garageId,
-        trashedAt: null,
+        trashedAt: { not: null },
         garage: {
           ownerUserId: currentUser.userId,
         },
       },
+      orderBy: [{ trashedAt: "desc" }],
       include: {
         brand: true,
         model: true,
@@ -32,21 +24,13 @@ export async function GET(_: Request, context: RouteContext) {
         rideProfile: true,
       },
     });
-
-    if (!vehicle) {
-      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({ vehicle });
+    return NextResponse.json({ vehicles });
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;
     }
-    console.error("Failed to fetch vehicle:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch vehicle" },
-      { status: 500 }
-    );
+    console.error("Failed to fetch trashed vehicles:", error);
+    return NextResponse.json({ error: "Failed to fetch trashed vehicles" }, { status: 500 });
   }
 }

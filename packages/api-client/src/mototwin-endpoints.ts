@@ -19,6 +19,9 @@ import type {
   ProfileResponse,
   ServiceEventsResponse,
   ServiceKitsResponse,
+  VehicleTrashDeleteResponse,
+  VehicleTrashListResponse,
+  VehicleTrashMutationResponse,
   UserSettingsPayload,
   UserSettingsResponse,
   UpdatePartWishlistItemInput,
@@ -58,6 +61,28 @@ export function createMotoTwinEndpoints(client: ApiClient) {
 
     getGarageVehicles() {
       return client.request<GarageVehiclesResponse>("/api/garage");
+    },
+
+    getTrashedVehicles() {
+      return client.request<VehicleTrashListResponse>("/api/vehicles/trash");
+    },
+
+    moveVehicleToTrash(vehicleId: string) {
+      return client.request<VehicleTrashMutationResponse>(`/api/vehicles/${vehicleId}/trash`, {
+        method: "POST",
+      });
+    },
+
+    restoreVehicleFromTrash(vehicleId: string) {
+      return client.request<VehicleTrashMutationResponse>(`/api/vehicles/${vehicleId}/restore`, {
+        method: "POST",
+      });
+    },
+
+    permanentlyDeleteVehicle(vehicleId: string) {
+      return client.request<VehicleTrashDeleteResponse>(`/api/vehicles/${vehicleId}/trash`, {
+        method: "DELETE",
+      });
     },
 
     getVehicleDetail(vehicleId: string) {

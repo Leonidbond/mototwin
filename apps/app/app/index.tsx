@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -36,6 +37,8 @@ export default function HomeScreen() {
   const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
   const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
+  const [trashCount, setTrashCount] = useState(0);
+  const [activeTrashVehicleId, setActiveTrashVehicleId] = useState("");
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -46,7 +49,9 @@ export default function HomeScreen() {
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
         const data = await endpoints.getGarageVehicles();
+        const trashData = await endpoints.getTrashedVehicles();
         setVehicles(data.vehicles || []);
+        setTrashCount(trashData.vehicles?.length ?? 0);
       } catch (requestError) {
         console.error(requestError);
         setError("Не удалось загрузить гараж. Проверьте подключение к backend.");
@@ -98,6 +103,36 @@ export default function HomeScreen() {
     }
   };
   const dashboardSummary = buildGarageDashboardSummary(vehicles);
+
+  const moveVehicleToTrash = (vehicle: GarageVehicleItem) => {
+    Alert.alert(
+      "Переместить мотоцикл на Свалку?",
+      "Он исчезнет из гаража, но его можно будет восстановить позже.",
+      [
+        { text: "Отмена", style: "cancel" },
+        {
+          text: "Переместить",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                setActiveTrashVehicleId(vehicle.id);
+                const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+                await endpoints.moveVehicleToTrash(vehicle.id);
+                setVehicles((prev) => prev.filter((item) => item.id !== vehicle.id));
+                setTrashCount((prev) => prev + 1);
+              } catch (requestError) {
+                console.error(requestError);
+                setError("Не удалось переместить мотоцикл на Свалку.");
+              } finally {
+                setActiveTrashVehicleId("");
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
 
   const renderVehicleCard = ({ item }: { item: GarageVehicleItem }) => {
     const card = buildGarageCardProps(item);
@@ -226,6 +261,21 @@ export default function HomeScreen() {
             )
           ) : null}
         </View>
+        <View style={styles.cardActionsRow}>
+          <Pressable
+            onPress={() => moveVehicleToTrash(item)}
+            disabled={activeTrashVehicleId === item.id}
+            style={({ pressed }) => [
+              styles.trashButton,
+              pressed && styles.trashButtonPressed,
+              activeTrashVehicleId === item.id && styles.trashButtonDisabled,
+            ]}
+          >
+            <Text style={styles.trashButtonText}>
+              {activeTrashVehicleId === item.id ? "..." : "Переместить на свалку"}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     );
   };
@@ -288,6 +338,16 @@ export default function HomeScreen() {
               <View style={styles.headerTopRow}>
                 <Text style={styles.title}>Мой гараж</Text>
               </View>
+              <Pressable
+                onPress={() => router.push("/trash")}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  styles.trashLinkButton,
+                  pressed && styles.profileIconButtonPressed,
+                ]}
+              >
+                <Text style={styles.secondaryButtonText}>Свалка ({trashCount})</Text>
+              </Pressable>
               <Pressable
                 onPress={() => router.push("/profile")}
                 style={({ pressed }) => [
@@ -483,6 +543,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  trashLinkButton: {
+    marginTop: 8,
+  },
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 28,
@@ -523,6 +586,29 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
+  },
+  cardActionsRow: {
+    marginTop: 10,
+    alignItems: "flex-end",
+  },
+  trashButton: {
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    backgroundColor: "#fff1f2",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  trashButtonPressed: {
+    opacity: 0.9,
+  },
+  trashButtonDisabled: {
+    opacity: 0.6,
+  },
+  trashButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#be123c",
   },
   cardCaption: {
     fontSize: 12,

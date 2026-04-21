@@ -38,6 +38,12 @@ Current MVP scope:
 4. Profile entry point:
    - user/profile icon in Garage header (top-right);
    - opens dedicated Profile page/screen.
+5. Trash entry point:
+   - action/link `Свалка` in Garage header.
+6. Vehicle removal behavior:
+   - Garage card action **"Переместить на свалку"** performs soft-delete;
+   - vehicle disappears from Garage active list;
+   - restore/permanent delete is performed on `Свалка` page/screen.
 
 ## Empty state
 
@@ -52,6 +58,8 @@ When no motorcycles exist:
 - Dashboard header and summary shown above existing cards.
 - Existing card navigation to vehicle detail is unchanged.
 - Garage settings block removed; settings are moved to `/profile`.
+- Active list excludes trashed vehicles.
+- Garage delete flow is now move-to-trash flow.
 
 ## Expo
 
@@ -59,6 +67,7 @@ When no motorcycles exist:
 - Same dashboard semantics with mobile-friendly header and summary chips.
 - Existing card navigation and collapsible behavior are unchanged.
 - Garage has profile entry action that navigates to `profile` screen.
+- Garage has `Свалка` entry action that navigates to `trash` screen.
 
 ## Shared layer
 

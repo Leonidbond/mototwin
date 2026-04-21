@@ -285,6 +285,26 @@ export default function ProfilePage() {
               </select>
             </label>
             <label className="text-sm text-gray-700">
+              Срок хранения мотоцикла на Свалке
+              <select
+                value={String(userSettings.vehicleTrashRetentionDays)}
+                onChange={(e) =>
+                  saveUserSettings({
+                    vehicleTrashRetentionDays: Number(
+                      e.target.value
+                    ) as UserLocalSettings["vehicleTrashRetentionDays"],
+                  })
+                }
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="7">7 дней</option>
+                <option value="14">14 дней</option>
+                <option value="30">30 дней</option>
+                <option value="60">60 дней</option>
+                <option value="90">90 дней</option>
+              </select>
+            </label>
+            <label className="text-sm text-gray-700">
               Единицы моточасов
               <input
                 value={userSettings.engineHoursUnit}

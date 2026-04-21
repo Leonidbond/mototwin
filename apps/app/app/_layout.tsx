@@ -22,6 +22,12 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="trash"
+        options={{
+          title: "Свалка",
+        }}
+      />
+      <Stack.Screen
         name="vehicles/[id]/index"
         options={{
           title: "Мотоцикл",

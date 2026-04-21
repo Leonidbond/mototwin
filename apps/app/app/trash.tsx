@@ -1,0 +1,171 @@
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
+import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { buildTrashedVehicleViewModel } from "@mototwin/domain";
+import { productSemanticColors as c } from "@mototwin/design-tokens";
+import { getApiBaseUrl } from "../src/api-base-url";
+
+export default function TrashScreen() {
+  const router = useRouter();
+  const apiBaseUrl = getApiBaseUrl();
+  const [items, setItems] = useState<Array<ReturnType<typeof buildTrashedVehicleViewModel>>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyVehicleId, setBusyVehicleId] = useState("");
+
+  const loadTrash = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+      const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+      const response = await endpoints.getTrashedVehicles();
+      setItems((response.vehicles ?? []).map((item) => buildTrashedVehicleViewModel(item)));
+    } catch (requestError) {
+      console.error(requestError);
+      setError("Не удалось загрузить Свалку.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    void loadTrash();
+  }, [loadTrash]);
+
+  const restore = async (vehicleId: string) => {
+    try {
+      setBusyVehicleId(vehicleId);
+      const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+      await endpoints.restoreVehicleFromTrash(vehicleId);
+      setItems((prev) => prev.filter((item) => item.id !== vehicleId));
+    } catch (requestError) {
+      console.error(requestError);
+      setError("Не удалось восстановить мотоцикл.");
+    } finally {
+      setBusyVehicleId("");
+    }
+  };
+
+  const permanentlyDelete = (vehicleId: string) => {
+    Alert.alert("Удалить мотоцикл окончательно?", "Это действие нельзя отменить", [
+      { text: "Отмена", style: "cancel" },
+      {
+        text: "Удалить",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            try {
+              setBusyVehicleId(vehicleId);
+              const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+              await endpoints.permanentlyDeleteVehicle(vehicleId);
+              setItems((prev) => prev.filter((item) => item.id !== vehicleId));
+            } catch (requestError) {
+              console.error(requestError);
+              setError("Не удалось удалить мотоцикл окончательно.");
+            } finally {
+              setBusyVehicleId("");
+            }
+          })();
+        },
+      },
+    ]);
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Свалка</Text>
+        <Text style={styles.subtitle}>
+          Здесь хранятся удаленные мотоциклы перед окончательным удалением
+        </Text>
+        <Pressable onPress={() => router.push("/")} style={styles.backButton}>
+          <Text style={styles.backButtonText}>Вернуться в гараж</Text>
+        </Pressable>
+
+        {isLoading ? <Text style={styles.stateText}>Загрузка Свалки...</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {!isLoading && !error && items.length === 0 ? (
+          <Text style={styles.stateText}>На Свалке пусто</Text>
+        ) : null}
+
+        {items.map((item) => (
+          <View key={item.id} style={styles.card}>
+            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.cardSubtitle}>{item.subtitle}</Text>
+            <Text style={styles.metaText}>Перемещен: {item.trashedAtLabel}</Text>
+            <Text style={styles.metaText}>
+              Хранение до: {item.expiresAtLabel}{" "}
+              {item.isExpired ? "(Срок хранения истек)" : item.daysRemaining != null ? `(${item.daysRemaining} дн.)` : ""}
+            </Text>
+            <View style={styles.actionsRow}>
+              <Pressable
+                onPress={() => void restore(item.id)}
+                disabled={busyVehicleId === item.id}
+                style={styles.restoreButton}
+              >
+                <Text style={styles.restoreButtonText}>Восстановить</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => permanentlyDelete(item.id)}
+                disabled={busyVehicleId === item.id}
+                style={styles.deleteButton}
+              >
+                <Text style={styles.deleteButtonText}>Удалить окончательно</Text>
+              </Pressable>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: c.canvas },
+  content: { padding: 16, gap: 10, paddingBottom: 24 },
+  title: { fontSize: 24, fontWeight: "700", color: c.textPrimary },
+  subtitle: { fontSize: 13, color: c.textSecondary },
+  backButton: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: c.card,
+  },
+  backButtonText: { fontSize: 12, fontWeight: "600", color: c.textMeta },
+  stateText: { fontSize: 13, color: c.textSecondary },
+  errorText: { fontSize: 13, color: c.error },
+  card: {
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.card,
+    padding: 12,
+    gap: 4,
+  },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: c.textPrimary },
+  cardSubtitle: { fontSize: 12, color: c.textSecondary },
+  metaText: { fontSize: 11, color: c.textMuted },
+  actionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+  restoreButton: {
+    borderWidth: 1,
+    borderColor: "#86efac",
+    backgroundColor: "#f0fdf4",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  restoreButtonText: { fontSize: 12, fontWeight: "600", color: "#15803d" },
+  deleteButton: {
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    backgroundColor: "#fff1f2",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  deleteButtonText: { fontSize: 12, fontWeight: "600", color: "#be123c" },
+});

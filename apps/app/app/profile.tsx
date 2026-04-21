@@ -180,6 +180,19 @@ export default function ProfileScreen() {
             }
             optionLabelSuffix=" дней"
           />
+          <SettingRow
+            label="Срок хранения мотоцикла на Свалке"
+            options={["7", "14", "30", "60", "90"]}
+            value={String(userSettings.vehicleTrashRetentionDays)}
+            onSelect={(value) =>
+              void updateUserSettings({
+                vehicleTrashRetentionDays: Number(
+                  value
+                ) as UserLocalSettings["vehicleTrashRetentionDays"],
+              })
+            }
+            optionLabelSuffix=" дней"
+          />
           <InfoRow label="Единицы моточасов" value={userSettings.engineHoursUnit} />
         </View>
 

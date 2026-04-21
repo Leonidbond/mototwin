@@ -60,6 +60,8 @@ export type {
   VehicleSummaryViewModel,
   VehicleDetailViewModel,
   VehicleStateViewModel,
+  VehicleTrashInfo,
+  TrashedVehicleViewModel,
   RideProfileViewModel,
   VehicleTechnicalInfoViewModel,
   GarageDashboardSummaryViewModel,
@@ -127,6 +129,9 @@ export type {
   AddServiceKitToWishlistResponse,
   ProfileResponse,
   UserSettingsResponse,
+  VehicleTrashListResponse,
+  VehicleTrashMutationResponse,
+  VehicleTrashDeleteResponse,
 } from "./api";
 export type {
   PartSkuSearchFilters,
@@ -180,6 +185,7 @@ export type {
   UserLocalSettings,
   UserSettings,
   UserSettingsPayload,
+  VehicleTrashRetentionDays,
   UserLocalSettingsCurrency,
   UserLocalSettingsDistanceUnit,
   UserLocalSettingsDateFormat,

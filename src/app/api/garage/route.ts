@@ -13,6 +13,7 @@ export async function GET() {
     const vehicles = await prisma.vehicle.findMany({
       where: {
         garageId: currentUser.garageId,
+        trashedAt: null,
         garage: {
           ownerUserId: currentUser.userId,
         },

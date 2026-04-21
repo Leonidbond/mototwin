@@ -73,6 +73,8 @@ export type GarageVehicleItem = {
   odometer: number;
   vin: string | null;
   engineHours: number | null;
+  trashedAt?: string | null;
+  trashExpiresAt?: string | null;
   brand: {
     name: string;
   };
@@ -106,6 +108,8 @@ export type VehicleDetail = VehicleSummary & {
   vin: string | null;
   odometer: number;
   engineHours: number | null;
+  trashedAt?: string | null;
+  trashExpiresAt?: string | null;
   rideProfile: VehicleRideProfile | null;
   modelVariant?: {
     year?: number | null;
@@ -130,6 +134,8 @@ export type VehicleDetailApiRecord = {
   vin: string | null;
   odometer: number;
   engineHours: number | null;
+  trashedAt?: string | null;
+  trashExpiresAt?: string | null;
   brand: { name: string };
   model: { name: string };
   modelVariant: {
@@ -144,6 +150,21 @@ export type VehicleDetailApiRecord = {
     stockSprockets: string | null;
   } | null;
   rideProfile: VehicleRideProfile | null;
+};
+
+export type VehicleTrashInfo = {
+  trashedAt: string;
+  trashExpiresAt: string;
+};
+
+export type TrashedVehicleViewModel = {
+  id: string;
+  title: string;
+  subtitle: string;
+  trashedAtLabel: string;
+  expiresAtLabel: string;
+  daysRemaining: number | null;
+  isExpired: boolean;
 };
 
 export type UpdateVehicleStateInput = {
