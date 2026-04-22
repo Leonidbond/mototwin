@@ -74,6 +74,7 @@ import {
   buildPartRecommendationGroupsForDisplay,
   clearPartWishlistFormSkuSelection,
   buildServiceKitPreview,
+  buildTopNodeOverviewCards,
   getServiceKitPreviewItemStatusLabel,
   formatPartSkuSearchResultMetaLineRu,
   getPartRecommendationGroupTitle,
@@ -112,6 +113,8 @@ import type {
   PartWishlistFormValues,
   PartWishlistItem,
   PartSkuViewModel,
+  TopNodeOverviewCard,
+  TopServiceNodeItem,
 } from "@mototwin/types";
 
 const vehicleDetailApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
@@ -143,8 +146,12 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false);
   const [serviceEventsError, setServiceEventsError] = useState("");
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [nodeTreeError, setNodeTreeError] = useState("");
+  const [isTopServiceNodesLoading, setIsTopServiceNodesLoading] = useState(false);
+  const [topServiceNodesError, setTopServiceNodesError] = useState("");
+  const [isFullNodeTreeOpen, setIsFullNodeTreeOpen] = useState(false);
   const [isExpenseDetailsModalOpen, setIsExpenseDetailsModalOpen] = useState(false);
   const [isAddServiceEventModalOpen, setIsAddServiceEventModalOpen] = useState(false);
   const [isCreatingServiceEvent, setIsCreatingServiceEvent] = useState(false);
@@ -323,6 +330,25 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         minQueryLength: 2,
       }),
     [topLevelNodeViewModels, debouncedNodeSearchQuery]
+  );
+  const topNodeStatusByCode = useMemo(() => {
+    const statusByCode = new Map<string, NodeStatus | null>();
+    const stack = [...nodeTree];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) {
+        continue;
+      }
+      statusByCode.set(current.code, current.effectiveStatus ?? null);
+      if (current.children.length > 0) {
+        stack.push(...current.children);
+      }
+    }
+    return statusByCode;
+  }, [nodeTree]);
+  const topNodeOverviewCards = useMemo<TopNodeOverviewCard[]>(
+    () => buildTopNodeOverviewCards(topServiceNodes, topNodeStatusByCode),
+    [topServiceNodes, topNodeStatusByCode]
   );
 
   const expenseSummary = useMemo(
@@ -813,6 +839,25 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
   }, [vehicleId]);
 
+  const loadTopServiceNodes = useCallback(async () => {
+    try {
+      setIsTopServiceNodesLoading(true);
+      setTopServiceNodesError("");
+      const data = await vehicleDetailApi.getTopServiceNodes();
+      setTopServiceNodes(data.nodes ?? []);
+    } catch (topNodesLoadError) {
+      console.error(topNodesLoadError);
+      setTopServiceNodesError(
+        topNodesLoadError instanceof Error
+          ? topNodesLoadError.message
+          : "Не удалось загрузить основные узлы."
+      );
+      setTopServiceNodes([]);
+    } finally {
+      setIsTopServiceNodesLoading(false);
+    }
+  }, []);
+
   const loadWishlist = useCallback(async () => {
     if (!vehicleId) {
       return;
@@ -1071,7 +1116,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         savedItem = res.item;
       }
 
-      await Promise.all([loadWishlist(), loadServiceEvents(), loadNodeTree()]);
+      await Promise.all([loadWishlist(), loadServiceEvents(), loadNodeTree(), loadTopServiceNodes()]);
       closeWishlistModal();
 
       if (
@@ -1216,7 +1261,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         status,
         nodeId: sourceNodeId,
       });
-      await Promise.all([loadWishlist(), loadServiceEvents(), loadNodeTree()]);
+      await Promise.all([loadWishlist(), loadServiceEvents(), loadNodeTree(), loadTopServiceNodes()]);
       const becameInstalled =
         res.item.status === "INSTALLED" &&
         isWishlistTransitionToInstalled(previousStatus, res.item.status);
@@ -1614,8 +1659,9 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
 
     void loadNodeTree();
+    void loadTopServiceNodes();
     void loadWishlist();
-  }, [vehicleId, loadNodeTree, loadWishlist]);
+  }, [vehicleId, loadNodeTree, loadTopServiceNodes, loadWishlist]);
 
   const openVehicleStateEditor = () => {
     if (!vehicle) {
@@ -1762,7 +1808,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
           : currentVehicle
       );
       setIsEditingVehicleState(false);
-      await Promise.all([loadNodeTree(), loadServiceEvents(), loadWishlist()]);
+      await Promise.all([loadNodeTree(), loadServiceEvents(), loadWishlist(), loadTopServiceNodes()]);
     } catch (saveError) {
       console.error(saveError);
       setVehicleStateError(
@@ -1843,7 +1889,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         details: "Статусы и расходы обновлены",
       });
       resetServiceEventForm();
-      await Promise.all([loadServiceEvents(), loadNodeTree(), loadWishlist()]);
+      await Promise.all([loadServiceEvents(), loadNodeTree(), loadWishlist(), loadTopServiceNodes()]);
       setIsAddServiceEventModalOpen(false);
     } catch (createError) {
       console.error(createError);
@@ -2335,18 +2381,20 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
             <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <h2 className="text-2xl font-semibold tracking-tight text-gray-950">Дерево узлов</h2>
+                <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
+                  Состояние основных узлов
+                </h2>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
+                    onClick={() => setIsFullNodeTreeOpen((prev) => !prev)}
                     className={`inline-flex h-10 items-center justify-center rounded-xl border px-4 text-sm font-medium transition ${
-                      isNodeMaintenanceModeEnabled
+                      isFullNodeTreeOpen
                         ? "border-gray-900 bg-gray-900 text-white hover:bg-gray-800"
                         : "border-gray-300 text-gray-900 hover:bg-gray-50"
                     }`}
                   >
-                    {getNodeModeToggleLabel()}
+                    {isFullNodeTreeOpen ? "Скрыть полное дерево" : "Все узлы →"}
                   </button>
                   <button
                     type="button"
@@ -2357,24 +2405,62 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   </button>
                 </div>
               </div>
+              <p className="mt-2 text-sm text-gray-600">
+                Краткая сводка по основным узлам. Детальная структура доступна в полном дереве.
+              </p>
 
-              {isNodeTreeLoading ? (
+              {isTopServiceNodesLoading ? (
+                <p className="mt-4 text-sm text-gray-600">Загрузка основных узлов...</p>
+              ) : null}
+              {!isTopServiceNodesLoading && topServiceNodesError ? (
+                <p className="mt-4 text-sm" style={{ color: productSemanticColors.error }}>
+                  {topServiceNodesError}
+                </p>
+              ) : null}
+              {!isTopServiceNodesLoading && !topServiceNodesError && topNodeOverviewCards.length > 0 ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {topNodeOverviewCards.map((card) => (
+                    <article
+                      key={card.key}
+                      className="rounded-2xl border border-gray-200 bg-gray-50/80 px-4 py-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <TopNodeOverviewIcon nodeKey={card.key} />
+                        <h3 className="text-sm font-semibold text-gray-900">{card.title}</h3>
+                      </div>
+                      <div className="mt-2">
+                        <span
+                          className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs font-medium ${
+                            card.status ? "" : "border-gray-300 bg-white text-gray-600"
+                          }`}
+                          style={card.status ? getStatusBadgeStyle(card.status) : undefined}
+                        >
+                          {card.statusLabel}
+                        </span>
+                        <p className="mt-2 text-xs text-gray-600">{card.details}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
+
+              {isFullNodeTreeOpen && isNodeTreeLoading ? (
                 <p className="mt-4 text-sm text-gray-600">Загрузка дерева узлов...</p>
               ) : null}
 
-              {!isNodeTreeLoading && nodeTreeError ? (
+              {isFullNodeTreeOpen && !isNodeTreeLoading && nodeTreeError ? (
                 <p className="mt-4 text-sm" style={{ color: productSemanticColors.error }}>
                   {nodeTreeError}
                 </p>
               ) : null}
 
-              {!isNodeTreeLoading && !nodeTreeError && nodeTree.length === 0 ? (
+              {isFullNodeTreeOpen && !isNodeTreeLoading && !nodeTreeError && nodeTree.length === 0 ? (
                 <p className="mt-4 text-sm text-gray-600">
                   Дерево узлов пока не найдено.
                 </p>
               ) : null}
 
-              {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
+              {isFullNodeTreeOpen && !isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
                 <div className="mt-5 space-y-4">
                   <div className="space-y-2">
                     <label
@@ -4220,6 +4306,59 @@ function InfoIcon() {
       <circle cx="12" cy="7" r="1" fill="currentColor" stroke="none" />
     </svg>
   );
+}
+
+function TopNodeOverviewIcon({ nodeKey }: { nodeKey: TopNodeOverviewCard["key"] }) {
+  switch (nodeKey) {
+    case "engine":
+      return (
+        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="4" y="8" width="9" height="8" rx="2" />
+          <path d="M13 10h4l3 3-3 3h-4" />
+        </svg>
+      );
+    case "brakes":
+      return (
+        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="11" cy="12" r="6" />
+          <path d="M17 8h3v8h-3" />
+          <circle cx="11" cy="12" r="2" />
+        </svg>
+      );
+    case "tires":
+      return (
+        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="12" cy="12" r="4" />
+        </svg>
+      );
+    case "chain":
+      return (
+        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M7 9h3a2 2 0 0 1 0 4H8" />
+          <path d="M17 15h-3a2 2 0 0 1 0-4h2" />
+          <path d="M10 13h4" />
+        </svg>
+      );
+    case "electrics":
+      return (
+        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="4" y="7" width="16" height="10" rx="2" />
+          <path d="M10 10l-2 3h3l-1 3 4-5h-3l1-2Z" />
+        </svg>
+      );
+    case "suspension":
+      return (
+        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M7 5h10" />
+          <path d="M7 19h10" />
+          <path d="M8 7l8 10" />
+          <path d="M8 17l8-10" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 }
 
 function SpecCard({ label, value }: { label: string; value: string }) {

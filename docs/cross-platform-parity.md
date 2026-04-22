@@ -48,6 +48,7 @@ Parity оценивается по core workflows, business outcome и поль�
 - **Expo:** implemented (`vehicles/[id]/index`)
 - **Parity status:** mostly aligned
 - **Notes:** both expose identity/state/profile/technical/node-tree context; web uses larger single-page modal orchestration. Blocks **«Профиль эксплуатации»** and **«Техническая сводка»** are collapsible on both clients and persist local UI state only with per-vehicle keys (`vehicleDetail.<vehicleId>.usageProfile.expanded`, `vehicleDetail.<vehicleId>.technicalSummary.expanded`), default: expanded.
+- **Overview top-nodes:** both clients now show compact overview cards (6 groups) powered by TOP-12 service nodes (`/api/nodes/top`) and keep full tree access as separate expandable flow (`Все узлы →`) without removing existing full-tree business logic.
 
 ## 3.4 Service log
 

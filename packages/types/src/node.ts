@@ -215,3 +215,20 @@ export type TopServiceNodeItem = {
   serviceGroup: string | null;
   topNodeOrder: number | null;
 };
+
+export type TopNodeOverviewGroupKey =
+  | "engine"
+  | "brakes"
+  | "tires"
+  | "chain"
+  | "electrics"
+  | "suspension";
+
+export type TopNodeOverviewCard = {
+  key: TopNodeOverviewGroupKey;
+  title: string;
+  status: NodeStatus | null;
+  statusLabel: string;
+  details: string;
+  nodeCodes: string[];
+};

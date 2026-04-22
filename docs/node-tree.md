@@ -296,3 +296,29 @@ Advanced (сохранены в техдереве, но скрыты из MVP):
 - `CHASSIS.FRAME`
 - `CHASSIS.SUBFRAME`
 - `ELECTRICS.SENSORS`
+
+## TOP-12 -> Overview-6 mapping
+
+На overview-странице мотоцикла используется компактный слой из 6 агрегированных карточек.
+Источник данных для него — строго `TOP-12` узлы (`isTopNode=true`, endpoint `/api/nodes/top`).
+
+- `engine` / Двигатель:
+  - `ENGINE.LUBE.OIL`
+  - `ENGINE.LUBE.FILTER`
+  - `INTAKE.FILTER`
+  - `ELECTRICS.IGNITION.SPARK`
+- `brakes` / Тормоза:
+  - `BRAKES.FRONT.PADS`
+  - `BRAKES.REAR.PADS`
+  - `BRAKES.FLUID`
+- `tires` / Шины:
+  - `TIRES.FRONT`
+  - `TIRES.REAR`
+- `chain` / Цепь / звезды:
+  - `DRIVETRAIN.CHAIN`
+  - `DRIVETRAIN.FRONT_SPROCKET`
+  - `DRIVETRAIN.REAR_SPROCKET`
+- `electrics` / Электрика:
+  - резервная карточка overview; в текущем TOP-12 отдельных кодов нет
+- `suspension` / Подвеска:
+  - резервная карточка overview; в текущем TOP-12 отдельных кодов нет

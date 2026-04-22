@@ -21,6 +21,7 @@ import {
   buildNodeContextViewModel,
   buildNodeSearchResultActions,
   buildNodeSubtreeModalViewModel,
+  buildTopNodeOverviewCards,
   buildTopLevelNodeSummaryViewModel,
   buildNodeMaintenancePlanViewModel,
   buildRideProfileViewModel,
@@ -52,6 +53,8 @@ import type {
   PartRecommendationViewModel,
   ServiceEventItem,
   ServiceKitViewModel,
+  TopNodeOverviewCard,
+  TopServiceNodeItem,
   VehicleDetail,
 } from "@mototwin/types";
 import { productSemanticColors as c, statusSemanticTokens } from "@mototwin/design-tokens";
@@ -78,6 +81,27 @@ function getStatusColors(status: NodeStatus | null) {
 function getNodeAccentColor(status: NodeStatus | null) {
   const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
   return tokens.accent;
+}
+
+function getTopOverviewIconName(
+  key: TopNodeOverviewCard["key"]
+) {
+  switch (key) {
+    case "engine":
+      return "settings";
+    case "brakes":
+      return "disc-full";
+    case "tires":
+      return "trip-origin";
+    case "chain":
+      return "link";
+    case "electrics":
+      return "battery-charging-full";
+    case "suspension":
+      return "linear-scale";
+    default:
+      return "build";
+  }
 }
 
 // ─── Expandable node row ──────────────────────────────────────────────────────
@@ -305,10 +329,14 @@ export default function VehicleDetailScreen() {
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [nodeTreeError, setNodeTreeError] = useState("");
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
+  const [isTopServiceNodesLoading, setIsTopServiceNodesLoading] = useState(false);
+  const [topServiceNodesError, setTopServiceNodesError] = useState("");
+  const [isFullNodeTreeOpen, setIsFullNodeTreeOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isRideProfileExpanded, setIsRideProfileExpanded] = useState(true);
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(true);
@@ -350,6 +378,7 @@ export default function VehicleDetailScreen() {
     setIsLoading(true);
     setError("");
     setNodeTreeError("");
+    setTopServiceNodesError("");
     setServiceEvents([]);
 
     try {
@@ -360,6 +389,7 @@ export default function VehicleDetailScreen() {
       setError("Не удалось загрузить данные мотоцикла.");
       setVehicle(null);
       setNodeTree([]);
+      setTopServiceNodes([]);
       setServiceEvents([]);
       setIsLoading(false);
       return;
@@ -368,9 +398,11 @@ export default function VehicleDetailScreen() {
     setIsLoading(false);
 
     setIsNodeTreeLoading(true);
-    const [nodesResult, eventsResult] = await Promise.allSettled([
+    setIsTopServiceNodesLoading(true);
+    const [nodesResult, eventsResult, topNodesResult] = await Promise.allSettled([
       endpoints.getNodeTree(vehicleId),
       endpoints.getServiceEvents(vehicleId),
+      endpoints.getTopServiceNodes(),
     ]);
 
     if (nodesResult.status === "fulfilled") {
@@ -389,7 +421,17 @@ export default function VehicleDetailScreen() {
       setServiceEvents([]);
     }
 
+    if (topNodesResult.status === "fulfilled") {
+      setTopServiceNodes(topNodesResult.value.nodes ?? []);
+      setTopServiceNodesError("");
+    } else {
+      console.error(topNodesResult.reason);
+      setTopServiceNodes([]);
+      setTopServiceNodesError("Не удалось загрузить основные узлы.");
+    }
+
     setIsNodeTreeLoading(false);
+    setIsTopServiceNodesLoading(false);
   }, [apiBaseUrl, vehicleId]);
 
   useFocusEffect(
@@ -568,6 +610,25 @@ export default function VehicleDetailScreen() {
         minQueryLength: 2,
       }),
     [topLevelNodeViewModels, debouncedNodeSearchQuery]
+  );
+  const topNodeStatusByCode = useMemo(() => {
+    const statusByCode = new Map<string, NodeStatus | null>();
+    const stack = [...nodeTree];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) {
+        continue;
+      }
+      statusByCode.set(current.code, current.effectiveStatus ?? null);
+      if (current.children.length > 0) {
+        stack.push(...current.children);
+      }
+    }
+    return statusByCode;
+  }, [nodeTree]);
+  const topNodeOverviewCards = useMemo<TopNodeOverviewCard[]>(
+    () => buildTopNodeOverviewCards(topServiceNodes, topNodeStatusByCode),
+    [topServiceNodes, topNodeStatusByCode]
   );
 
   const attentionSummary = useMemo(
@@ -1082,23 +1143,23 @@ export default function VehicleDetailScreen() {
 
         {/* Node tree */}
         <View>
-          <Text style={styles.sectionHeader}>Состояние узлов</Text>
+          <Text style={styles.sectionHeader}>Состояние основных узлов</Text>
           <View style={styles.sectionActionsRow}>
             <Pressable
               style={({ pressed }) => [
                 styles.maintenanceModeToggle,
-                isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleActive,
+                isFullNodeTreeOpen && styles.maintenanceModeToggleActive,
                 pressed && styles.maintenanceModeTogglePressed,
               ]}
-              onPress={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
+              onPress={() => setIsFullNodeTreeOpen((prev) => !prev)}
             >
               <Text
                 style={[
                   styles.maintenanceModeToggleText,
-                  isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleTextActive,
+                  isFullNodeTreeOpen && styles.maintenanceModeToggleTextActive,
                 ]}
               >
-                {getNodeModeToggleLabel()}
+                {isFullNodeTreeOpen ? "Скрыть дерево" : "Все узлы →"}
               </Text>
             </Pressable>
             <Pressable
@@ -1114,10 +1175,51 @@ export default function VehicleDetailScreen() {
             </Pressable>
           </View>
           <Text style={styles.sectionSubheader}>
-            {isNodeMaintenanceModeEnabled
-              ? "В режиме плана показываются сроки и интервалы обслуживания прямо в дереве узлов."
-              : "Разверните нужный узел, чтобы проверить статус и быстро добавить обслуживание для leaf-элемента."}
+            Краткая сводка по основным узлам. Детальная структура доступна в полном дереве.
           </Text>
+          {isTopServiceNodesLoading ? (
+            <Text style={styles.treeLoadingText}>Загрузка основных узлов...</Text>
+          ) : null}
+          {topServiceNodesError ? (
+            <View style={styles.treeErrorBox}>
+              <Text style={styles.treeErrorText}>{topServiceNodesError}</Text>
+            </View>
+          ) : null}
+          {!isTopServiceNodesLoading && !topServiceNodesError && topNodeOverviewCards.length > 0 ? (
+            <View style={styles.topOverviewGrid}>
+              {topNodeOverviewCards.map((card) => (
+                <View key={card.key} style={styles.topOverviewCard}>
+                  <View style={styles.topOverviewTitleRow}>
+                    <MaterialIcons name={getTopOverviewIconName(card.key)} size={18} color={c.textPrimary} />
+                    <Text style={styles.topOverviewTitle}>{card.title}</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.badge,
+                      card.status
+                        ? {
+                            backgroundColor: getStatusColors(card.status).bg,
+                            borderColor: getStatusColors(card.status).border,
+                          }
+                        : styles.topOverviewUnknownBadge,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        card.status ? { color: getStatusColors(card.status).text } : styles.topOverviewUnknownBadgeText,
+                      ]}
+                    >
+                      {card.statusLabel}
+                    </Text>
+                  </View>
+                  <Text style={styles.topOverviewMeta}>{card.details}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {isFullNodeTreeOpen ? (
+            <>
           <Text style={styles.searchLabel}>Поиск по узлам</Text>
           <TextInput
             style={styles.searchInput}
@@ -1268,6 +1370,8 @@ export default function VehicleDetailScreen() {
             <View style={styles.emptyNodes}>
               <Text style={styles.emptyNodesText}>Данные о состоянии узлов отсутствуют</Text>
             </View>
+          ) : null}
+            </>
           ) : null}
         </View>
       </ScrollView>
@@ -2093,6 +2197,46 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 13,
     lineHeight: 18,
+    color: c.textMuted,
+  },
+  topOverviewGrid: {
+    marginTop: 6,
+    marginBottom: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  topOverviewCard: {
+    minWidth: "47%",
+    flexGrow: 1,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.chipBackground,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  topOverviewTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  topOverviewTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: c.textPrimary,
+    flexShrink: 1,
+  },
+  topOverviewMeta: {
+    fontSize: 11,
+    color: c.textMuted,
+  },
+  topOverviewUnknownBadge: {
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+  },
+  topOverviewUnknownBadgeText: {
     color: c.textMuted,
   },
   searchLabel: {
