@@ -31,6 +31,11 @@ type FlatNode = {
   parentId: string | null;
 };
 
+type CatalogNodeRow = FlatNode & {
+  isServiceRelevant: boolean;
+  isMvpVisible: boolean;
+};
+
 export type MaintenanceTreeNode = {
   id: string;
   code: string;
@@ -77,6 +82,36 @@ export type CatalogNodeContext = {
   topLevelNodes: FlatNode[];
 };
 
+function filterNodesForMvp(rows: CatalogNodeRow[]): FlatNode[] {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const includedIds = new Set<string>();
+
+  for (const row of rows) {
+    if (!row.isServiceRelevant || !row.isMvpVisible) {
+      continue;
+    }
+    let current: CatalogNodeRow | undefined = row;
+    while (current) {
+      includedIds.add(current.id);
+      if (!current.parentId) {
+        break;
+      }
+      current = byId.get(current.parentId);
+    }
+  }
+
+  return rows
+    .filter((row) => includedIds.has(row.id))
+    .map(({ id, code, name, level, displayOrder, parentId }) => ({
+      id,
+      code,
+      name,
+      level,
+      displayOrder,
+      parentId,
+    }));
+}
+
 function getNodeMaintenanceRuleModel(prisma: PrismaClient) {
   return (prisma as typeof prisma & {
     nodeMaintenanceRule?: {
@@ -85,8 +120,14 @@ function getNodeMaintenanceRuleModel(prisma: PrismaClient) {
   }).nodeMaintenanceRule;
 }
 
-export async function loadCatalogNodeContext(prisma: PrismaClient): Promise<CatalogNodeContext> {
+export async function loadCatalogNodeContext(
+  prisma: PrismaClient,
+  options: { mvpOnly?: boolean } = {}
+): Promise<CatalogNodeContext> {
   const nodes = await prisma.node.findMany({
+    where: {
+      isActive: true,
+    },
     orderBy: [{ level: "asc" }, { displayOrder: "asc" }, { code: "asc" }],
     select: {
       id: true,
@@ -95,6 +136,8 @@ export async function loadCatalogNodeContext(prisma: PrismaClient): Promise<Cata
       level: true,
       displayOrder: true,
       parentId: true,
+      isServiceRelevant: true,
+      isMvpVisible: true,
     },
   });
 
@@ -110,16 +153,17 @@ export async function loadCatalogNodeContext(prisma: PrismaClient): Promise<Cata
     }
     return node;
   });
+  const effectiveNodes = options.mvpOnly ? filterNodesForMvp(remappedNodes) : remappedNodes;
 
   const parentNodeIds = new Set<string>();
-  for (const node of remappedNodes) {
+  for (const node of effectiveNodes) {
     if (node.parentId) {
       parentNodeIds.add(node.parentId);
     }
   }
 
   const leafNodeIds = new Set<string>();
-  for (const node of remappedNodes) {
+  for (const node of effectiveNodes) {
     if (!parentNodeIds.has(node.id)) {
       leafNodeIds.add(node.id);
     }
@@ -163,7 +207,7 @@ export async function loadCatalogNodeContext(prisma: PrismaClient): Promise<Cata
   );
 
   const childrenByParentId = new Map<string, FlatNode[]>();
-  for (const node of remappedNodes) {
+  for (const node of effectiveNodes) {
     if (!node.parentId) {
       continue;
     }
@@ -176,7 +220,7 @@ export async function loadCatalogNodeContext(prisma: PrismaClient): Promise<Cata
     children.sort((a, b) => a.displayOrder - b.displayOrder);
   }
 
-  const topLevelNodes = remappedNodes
+  const topLevelNodes = effectiveNodes
     .filter(
       (node) =>
         node.level === 1 &&
@@ -374,7 +418,7 @@ export async function loadVehicleNodeTreeJson(
     return { error: "Vehicle not found", status: 404 };
   }
 
-  const ctx = await loadCatalogNodeContext(prisma);
+  const ctx = await loadCatalogNodeContext(prisma, { mvpOnly: true });
 
   const [nodeStates, serviceEvents] = await Promise.all([
     prisma.nodeState.findMany({

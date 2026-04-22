@@ -13,7 +13,7 @@ import type {
   VehicleDetail,
 } from "./vehicle";
 import type { UserSettings } from "./user-settings";
-import type { NodeTreeItem } from "./node";
+import type { MvpServiceNodeGroup, NodeTreeItem, TopServiceNodeItem } from "./node";
 
 /** Backend often returns `{ error: string }` on 4xx/5xx. */
 export type MotoTwinApiErrorBody = {
@@ -30,6 +30,14 @@ export type VehicleDetailResponse = {
 
 export type VehicleNodeTreeResponse = {
   nodeTree: NodeTreeItem[];
+};
+
+export type MvpServiceNodesResponse = {
+  groups: MvpServiceNodeGroup[];
+};
+
+export type TopServiceNodesResponse = {
+  nodes: TopServiceNodeItem[];
 };
 
 export type ServiceEventsResponse = {

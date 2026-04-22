@@ -62,6 +62,7 @@ const nodeTaxonomy = [
   ["COOLING", "Охлаждение"],
   ["COOLING.AIR", "Воздушное (если есть элементы)"],
   ["COOLING.LIQUID", "Жидкостное"],
+  ["COOLING.LIQUID.COOLANT", "Охлаждающая жидкость"],
   ["COOLING.LIQUID.RADIATOR", "Радиаторы/крышка"],
   ["COOLING.LIQUID.PUMP", "Помпа/крыльчатка/сальники"],
   ["COOLING.LIQUID.HOSES", "Патрубки/хомуты"],
@@ -84,6 +85,7 @@ const nodeTaxonomy = [
   ["ELECTRICS.IGNITION.COIL", "Катушка"],
   ["ELECTRICS.IGNITION.SPARK", "Свеча/колпачок"],
   ["ELECTRICS.WIRING", "Проводка/жгуты/разъёмы"],
+  ["ELECTRICS.SENSORS", "Датчики двигателя / общие датчики"],
   ["ELECTRICS.LIGHTS", "Свет"],
   ["ELECTRICS.LIGHTS.HEAD", "Фара"],
   ["ELECTRICS.LIGHTS.TAIL", "Задний фонарь"],
@@ -142,6 +144,7 @@ const nodeTaxonomy = [
   ["TIRES.REAR", "Задняя шина/камера"],
   ["TIRES.RIMLOCK", "Буксаторы/ободная лента"],
   ["BRAKES", "Тормоза"],
+  ["BRAKES.ABS", "ABS / датчики ABS"],
   ["BRAKES.FRONT", "Передний тормоз"],
   ["BRAKES.FRONT.MASTER", "Главный цилиндр/рычаг"],
   ["BRAKES.FRONT.CALIPER", "Суппорт (перед)"],
@@ -173,20 +176,117 @@ const nodeTaxonomy = [
   ["CONTROLS.CABLES", "Тросы/рубашки (общие)"],
 ] as const;
 
-const topLevelNodeCodes = [
-  "ENGINE",
-  "FUEL",
-  "COOLING",
-  "EXHAUST",
-  "ELECTRICS",
-  "CHASSIS",
-  "STEERING",
-  "SUSPENSION",
-  "WHEELS",
-  "BRAKES",
-  "DRIVETRAIN",
-  "CONTROLS",
-] as const;
+const nodeTopFlagsByCode = new Map<string, { isTopNode: boolean; topNodeOrder: number | null }>([
+  ["ENGINE.LUBE.OIL", { isTopNode: true, topNodeOrder: 10 }],
+  ["ENGINE.LUBE.FILTER", { isTopNode: true, topNodeOrder: 20 }],
+  ["INTAKE.FILTER", { isTopNode: true, topNodeOrder: 30 }],
+  ["ELECTRICS.IGNITION.SPARK", { isTopNode: true, topNodeOrder: 40 }],
+  ["BRAKES.FRONT.PADS", { isTopNode: true, topNodeOrder: 50 }],
+  ["BRAKES.REAR.PADS", { isTopNode: true, topNodeOrder: 60 }],
+  ["BRAKES.FLUID", { isTopNode: true, topNodeOrder: 70 }],
+  ["DRIVETRAIN.CHAIN", { isTopNode: true, topNodeOrder: 80 }],
+  ["DRIVETRAIN.FRONT_SPROCKET", { isTopNode: true, topNodeOrder: 90 }],
+  ["DRIVETRAIN.REAR_SPROCKET", { isTopNode: true, topNodeOrder: 91 }],
+  ["TIRES.FRONT", { isTopNode: true, topNodeOrder: 100 }],
+  ["TIRES.REAR", { isTopNode: true, topNodeOrder: 110 }],
+]);
+
+const nodeServiceFlagsByCode = new Map<
+  string,
+  {
+    isServiceRelevant: boolean;
+    isMvpVisible: boolean;
+    isAdvanced: boolean;
+    serviceGroup: string | null;
+  }
+>([
+  ["ENGINE.LUBE.OIL", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.LUBE.FILTER", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "ENGINE_SERVICE" }],
+  ["ELECTRICS.IGNITION.SPARK", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "ENGINE_SERVICE" }],
+  ["INTAKE.FILTER", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "INTAKE_FUEL" }],
+  ["FUEL.LINES", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "INTAKE_FUEL" }],
+  ["FUEL.PUMP", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "INTAKE_FUEL" }],
+  ["FUEL.CARB", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "INTAKE_FUEL" }],
+  ["FUEL.EFI", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "INTAKE_FUEL" }],
+  ["COOLING.LIQUID.COOLANT", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "COOLING" }],
+  ["COOLING.LIQUID.RADIATOR", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "COOLING" }],
+  ["COOLING.LIQUID.PUMP", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "COOLING" }],
+  ["COOLING.LIQUID.HOSES", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "COOLING" }],
+  ["COOLING.LIQUID.THERMOSTAT", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "COOLING" }],
+  ["BRAKES.FRONT.PADS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BRAKES" }],
+  ["BRAKES.REAR.PADS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BRAKES" }],
+  ["BRAKES.FRONT.DISC", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BRAKES" }],
+  ["BRAKES.REAR.DISC", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BRAKES" }],
+  ["BRAKES.FLUID", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BRAKES" }],
+  ["BRAKES.FRONT.CALIPER", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BRAKES" }],
+  ["BRAKES.REAR.CALIPER", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BRAKES" }],
+  ["BRAKES.ABS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BRAKES" }],
+  ["DRIVETRAIN.CHAIN", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CHAIN_DRIVE" }],
+  ["DRIVETRAIN.FRONT_SPROCKET", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CHAIN_DRIVE" }],
+  ["DRIVETRAIN.REAR_SPROCKET", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CHAIN_DRIVE" }],
+  ["DRIVETRAIN.CHAIN_GUIDE", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CHAIN_DRIVE" }],
+  ["DRIVETRAIN.SWINGARM_SLIDER", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CHAIN_DRIVE" }],
+  ["DRIVETRAIN.TENSIONERS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CHAIN_DRIVE" }],
+  ["TIRES.FRONT", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "TIRES" }],
+  ["TIRES.REAR", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "TIRES" }],
+  ["TIRES.RIMLOCK", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "TIRES" }],
+  ["WHEELS.FRONT.BEARINGS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "WHEELS" }],
+  ["WHEELS.REAR.BEARINGS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "WHEELS" }],
+  ["WHEELS.FRONT.SPOKES", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "WHEELS" }],
+  ["WHEELS.REAR.SPOKES", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "WHEELS" }],
+  ["SUSPENSION.FRONT.FORK", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "FRONT_SUSPENSION" }],
+  ["SUSPENSION.FRONT.SEALS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "FRONT_SUSPENSION" }],
+  ["SUSPENSION.FRONT.OIL", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "FRONT_SUSPENSION" }],
+  ["SUSPENSION.FRONT.BUSHINGS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "FRONT_SUSPENSION" }],
+  ["SUSPENSION.REAR.SHOCK", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "REAR_SUSPENSION" }],
+  ["SUSPENSION.REAR.LINKAGE", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "REAR_SUSPENSION" }],
+  ["SUSPENSION.REAR.SWINGARM", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "REAR_SUSPENSION" }],
+  ["SUSPENSION.REAR.BEARINGS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "REAR_SUSPENSION" }],
+  ["ELECTRICS.BATTERY", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "ELECTRICS" }],
+  ["ELECTRICS.CHARGING", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "ELECTRICS" }],
+  ["ELECTRICS.IGNITION", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "ELECTRICS" }],
+  ["ELECTRICS.LIGHTS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "ELECTRICS" }],
+  ["ELECTRICS.FUSES", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "ELECTRICS" }],
+  ["ELECTRICS.WIRING", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "ELECTRICS" }],
+  ["ELECTRICS.SENSORS", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ELECTRICS" }],
+  ["CONTROLS.THROTTLE", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CONTROLS" }],
+  ["CONTROLS.CLUTCH", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CONTROLS" }],
+  ["CONTROLS.FRONT_BRAKE", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CONTROLS" }],
+  ["CONTROLS.REAR_BRAKE", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CONTROLS" }],
+  ["CONTROLS.SHIFTER", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CONTROLS" }],
+  ["CONTROLS.FOOTPEG", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CONTROLS" }],
+  ["CONTROLS.CABLES", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "CONTROLS" }],
+  ["STEERING.HANDLEBAR", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "STEERING" }],
+  ["STEERING.GRIPS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "STEERING" }],
+  ["STEERING.HEADSET", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "STEERING" }],
+  ["STEERING.HEADSET.BEARINGS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "STEERING" }],
+  ["STEERING.TRIPLES", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "STEERING" }],
+  ["EXHAUST.HEADER", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "EXHAUST" }],
+  ["EXHAUST.MUFFLER", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "EXHAUST" }],
+  ["EXHAUST.MOUNTS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "EXHAUST" }],
+  ["EXHAUST.SENSOR", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "EXHAUST" }],
+  ["CHASSIS.SEAT", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BODY_PROTECTION" }],
+  ["CHASSIS.PLASTICS", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BODY_PROTECTION" }],
+  ["CHASSIS.PROTECTION", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BODY_PROTECTION" }],
+  ["CHASSIS.PROTECTION.SKID", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BODY_PROTECTION" }],
+  ["CHASSIS.PROTECTION.RADIATOR", { isServiceRelevant: true, isMvpVisible: true, isAdvanced: false, serviceGroup: "BODY_PROTECTION" }],
+  ["ENGINE.TOPEND.CYLINDER", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.TOPEND.PISTON", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.TOPEND.RINGS", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.TOPEND.HEAD", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.TOPEND.VALVES", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.TOPEND.CAM", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.BOTTOMEND.CRANK", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.BOTTOMEND.BEARINGS", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.GEARBOX.GEARS", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ENGINE.GEARBOX.SHIFT", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ENGINE_SERVICE" }],
+  ["ELECTRICS.CHARGING.STATOR", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ELECTRICS" }],
+  ["ELECTRICS.IGNITION.CDI_ECU", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ELECTRICS" }],
+  ["ELECTRICS.DASH.SPEED", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ELECTRICS" }],
+  ["ELECTRICS.DASH.NEUTRAL", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "ELECTRICS" }],
+  ["CHASSIS.FRAME", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "BODY_PROTECTION" }],
+  ["CHASSIS.SUBFRAME", { isServiceRelevant: true, isMvpVisible: false, isAdvanced: true, serviceGroup: "BODY_PROTECTION" }],
+]);
 
 const maintenanceRuleSeed = [
   {
@@ -1493,6 +1593,16 @@ async function main() {
     const segments = code.split(".");
     const parentCode =
       segments.length > 1 ? segments.slice(0, segments.length - 1).join(".") : null;
+    const serviceFlags = nodeServiceFlagsByCode.get(code) ?? {
+      isServiceRelevant: true,
+      isMvpVisible: false,
+      isAdvanced: false,
+      serviceGroup: null,
+    };
+    const topFlags = nodeTopFlagsByCode.get(code) ?? {
+      isTopNode: false,
+      topNodeOrder: null,
+    };
 
     return {
       code,
@@ -1500,6 +1610,8 @@ async function main() {
       parentCode,
       level: segments.length,
       displayOrder: index + 1,
+      ...serviceFlags,
+      ...topFlags,
     };
   });
 
@@ -1513,6 +1625,12 @@ async function main() {
           level: node.level,
           displayOrder: node.displayOrder,
           isActive: true,
+          isServiceRelevant: node.isServiceRelevant,
+          isMvpVisible: node.isMvpVisible,
+          isAdvanced: node.isAdvanced,
+          isTopNode: node.isTopNode,
+          topNodeOrder: node.topNodeOrder,
+          serviceGroup: node.serviceGroup,
         },
         create: {
           code: node.code,
@@ -1521,6 +1639,12 @@ async function main() {
           level: node.level,
           displayOrder: node.displayOrder,
           isActive: true,
+          isServiceRelevant: node.isServiceRelevant,
+          isMvpVisible: node.isMvpVisible,
+          isAdvanced: node.isAdvanced,
+          isTopNode: node.isTopNode,
+          topNodeOrder: node.topNodeOrder,
+          serviceGroup: node.serviceGroup,
         },
       })
     )
@@ -1550,6 +1674,12 @@ async function main() {
           level: node.level,
           displayOrder: node.displayOrder,
           isActive: true,
+          isServiceRelevant: node.isServiceRelevant,
+          isMvpVisible: node.isMvpVisible,
+          isAdvanced: node.isAdvanced,
+          isTopNode: node.isTopNode,
+          topNodeOrder: node.topNodeOrder,
+          serviceGroup: node.serviceGroup,
         },
       })
     )
@@ -1559,6 +1689,25 @@ async function main() {
   const partCatalogQaStats = await seedPartCatalogQaFromJson(nodeIdByCode);
 
   const validNodeCodes = new Set(nodesForSeed.map((node) => node.code));
+  const legacyDuplicateNodeCodes = ["engine_oil", "chain_drive"] as const;
+
+  await prisma.node.updateMany({
+    where: {
+      code: {
+        in: [...legacyDuplicateNodeCodes],
+      },
+    },
+    data: {
+      isActive: false,
+      isServiceRelevant: false,
+      isMvpVisible: false,
+      isAdvanced: false,
+      isTopNode: false,
+      topNodeOrder: null,
+      serviceGroup: null,
+    },
+  });
+
   const legacyNodes = await prisma.node.findMany({
     where: {
       code: {
@@ -1589,6 +1738,9 @@ async function main() {
           id: {
             in: legacyNodeIds,
           },
+          code: {
+            notIn: [...legacyDuplicateNodeCodes],
+          },
           serviceEvents: {
             none: {},
           },
@@ -1617,16 +1769,15 @@ async function main() {
 
   const refreshedTopLevelNodes = await prisma.node.findMany({
     where: {
-      code: {
-        in: [...topLevelNodeCodes],
-      },
-      level: 1,
-      parentId: null,
+      isTopNode: true,
+      isActive: true,
     },
     select: {
       id: true,
       code: true,
+      topNodeOrder: true,
     },
+    orderBy: [{ topNodeOrder: "asc" }, { code: "asc" }],
   });
 
   const validTopLevelNodeIds = refreshedTopLevelNodes.map((node) => node.id);

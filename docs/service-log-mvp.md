@@ -9,6 +9,11 @@ Service Log stores and shows two event kinds:
 
 Both web and Expo show grouped timeline, filters, sorting, and expense rollups from `SERVICE` cost fields.
 
+Node source for add/filter flows:
+
+- primary: `GET /api/nodes/mvp-service` (MVP-visible service nodes only)
+- compatibility fallback: `GET /api/vehicles/[id]/node-tree` (full technical tree)
+
 ## Dedicated page/screen
 
 Service Log is now page/screen-first UX on both clients:

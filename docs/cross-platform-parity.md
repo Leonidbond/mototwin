@@ -93,10 +93,10 @@ Parity оценивается по core workflows, business outcome и поль�
 
 ## 3.8 Node status semantics
 
-- **Web:** consumes `node-tree` payload
-- **Expo:** consumes same payload
+- **Web:** consumes MVP node source (`/api/nodes/mvp-service`) for user-facing service-node actions; legacy `node-tree` remains compatibility fallback
+- **Expo:** same behavior
 - **Parity status:** aligned
-- **Notes:** `effectiveStatus`, explanation semantics and severity ordering are shared.
+- **Notes:** for status calculation surfaces (`effectiveStatus`/explanations/severity), legacy `node-tree` semantics remain shared and unchanged.
 
 ## 3.8.1 «Требует внимания» (MVP)
 

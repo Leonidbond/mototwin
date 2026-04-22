@@ -34,6 +34,9 @@ export type {
   NodeTreeSearchResultViewModel,
   NodeTreeSearchActionKey,
   NodeTreeSearchActionViewModel,
+  MvpServiceNodeItem,
+  MvpServiceNodeGroup,
+  TopServiceNodeItem,
 } from "./node";
 export type {
   ServiceEventKind,
@@ -114,6 +117,8 @@ export type {
   GarageVehiclesResponse,
   VehicleDetailResponse,
   VehicleNodeTreeResponse,
+  MvpServiceNodesResponse,
+  TopServiceNodesResponse,
   ServiceEventsResponse,
   CreateServiceEventResponse,
   UpdateServiceEventResponse,

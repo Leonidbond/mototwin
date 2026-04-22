@@ -254,6 +254,13 @@ model Node {
   level         Int
   displayOrder  Int
   isActive      Boolean        @default(true)
+  isServiceRelevant Boolean    @default(true)
+  isMvpVisible   Boolean       @default(false)
+  isAdvanced     Boolean       @default(false)
+  isTopNode      Boolean       @default(false)
+  topNodeOrder   Int?
+  serviceGroup   String?
+  defaultServiceOperations String[] @default([])
   createdAt     DateTime       @default(now())
 
   parent        Node?          @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: SetNull)

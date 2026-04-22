@@ -189,3 +189,29 @@ export type NodeTreeSearchActionViewModel = {
   key: NodeTreeSearchActionKey;
   label: string;
 };
+
+export type MvpServiceNodeItem = {
+  id: string;
+  code: string;
+  name: string;
+  level: number;
+  parentId: string | null;
+  displayOrder: number;
+};
+
+export type MvpServiceNodeGroup = {
+  code: string;
+  name: string;
+  nodes: MvpServiceNodeItem[];
+};
+
+export type TopServiceNodeItem = {
+  id: string;
+  code: string;
+  name: string;
+  parentId: string | null;
+  level: number;
+  displayOrder: number;
+  serviceGroup: string | null;
+  topNodeOrder: number | null;
+};

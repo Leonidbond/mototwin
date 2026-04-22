@@ -1,14 +1,18 @@
-# MotoTwin Node Tree (Current DB Snapshot)
+# MotoTwin Node Tree
 
-This document reflects the **current active `Node` dictionary in DB** (`Node.isActive = true`), with full hierarchy and current labels/codes.
+Документ фиксирует два среза:
 
-## Hierarchy Rules
+- полное техническое дерево `Node` в БД (иерархия сохранена)
+- MVP-представление для UI через `GET /api/nodes/mvp-service`
+
+## Hierarchy Rules (DB)
 
 - each node has `code`, `name`, `parentId`, `level`, `displayOrder`
+- service flags: `isServiceRelevant`, `isMvpVisible`, `isAdvanced`, `serviceGroup`
 - hierarchy is stored by `parentId` (self-relation), not only by code prefix
 - order below follows `displayOrder`, then `code`
 
-## Current Node Tree
+## Full Technical Tree (DB)
 
 - Двигатель (`ENGINE`)
   - Верх двигателя (`ENGINE.TOPEND`)
@@ -40,8 +44,6 @@ This document reflects the **current active `Node` dictionary in DB** (`Node.isA
     - Стартер/реле/бендикс (если есть) (`ENGINE.START.STARTER`)
     - Кикстартер (если есть) (`ENGINE.START.KICK`)
   - Крепления двигателя/опоры (`ENGINE.MOUNTS`)
-- Масло двигателя (`engine_oil`)
-- Цепь и звезды (`chain_drive`)
 - Топливная система (`FUEL`)
   - Бак/крышка/клапаны (`FUEL.TANK`)
   - Топливные шланги/фильтр/кран (`FUEL.LINES`)
@@ -170,5 +172,127 @@ This document reflects the **current active `Node` dictionary in DB** (`Node.isA
 
 ## Notes
 
-- This is a live DB snapshot, not a static seed-only contract.
-- If taxonomy changes in DB (seed/update scripts), this doc should be regenerated.
+- Legacy дублеры `engine_oil` и `chain_drive` сохраняются в БД только как исторические записи и помечаются:
+  - `isActive = false`
+  - `isServiceRelevant = false`
+  - `isMvpVisible = false`
+  - `isAdvanced = false`
+  - `serviceGroup = null`
+- Это live snapshot, а не только seed-контракт.
+- При изменении taxonomy/seed этот документ нужно обновлять.
+
+## MVP Service Tree (UI contract)
+
+Источник для UI: `GET /api/nodes/mvp-service`
+
+Фильтр:
+
+- `isActive = true`
+- `isServiceRelevant = true`
+- `isMvpVisible = true`
+
+Группы и узлы (текущий MVP baseline):
+
+- `ENGINE_SERVICE` — Двигатель и масло
+  - `ENGINE.LUBE.OIL`
+  - `ENGINE.LUBE.FILTER`
+  - `ELECTRICS.IGNITION.SPARK`
+- `INTAKE_FUEL` — Впуск и топливо
+  - `INTAKE.FILTER`
+  - `FUEL.LINES`
+  - `FUEL.PUMP`
+  - `FUEL.CARB`
+  - `FUEL.EFI`
+- `COOLING` — Охлаждение
+  - `COOLING.LIQUID.COOLANT`
+  - `COOLING.LIQUID.RADIATOR`
+  - `COOLING.LIQUID.PUMP`
+  - `COOLING.LIQUID.HOSES`
+  - `COOLING.LIQUID.THERMOSTAT`
+- `BRAKES` — Тормоза
+  - `BRAKES.ABS`
+  - `BRAKES.FRONT.CALIPER`
+  - `BRAKES.FRONT.PADS`
+  - `BRAKES.FRONT.DISC`
+  - `BRAKES.REAR.CALIPER`
+  - `BRAKES.REAR.PADS`
+  - `BRAKES.REAR.DISC`
+  - `BRAKES.FLUID`
+- `CHAIN_DRIVE` — Цепь и звезды
+  - `DRIVETRAIN.CHAIN`
+  - `DRIVETRAIN.FRONT_SPROCKET`
+  - `DRIVETRAIN.REAR_SPROCKET`
+  - `DRIVETRAIN.CHAIN_GUIDE`
+  - `DRIVETRAIN.SWINGARM_SLIDER`
+  - `DRIVETRAIN.TENSIONERS`
+- `TIRES` — Шины
+  - `TIRES.FRONT`
+  - `TIRES.REAR`
+  - `TIRES.RIMLOCK`
+- `WHEELS` — Колеса
+  - `WHEELS.FRONT.SPOKES`
+  - `WHEELS.FRONT.BEARINGS`
+  - `WHEELS.REAR.SPOKES`
+  - `WHEELS.REAR.BEARINGS`
+- `FRONT_SUSPENSION` — Передняя подвеска
+  - `SUSPENSION.FRONT.FORK`
+  - `SUSPENSION.FRONT.SEALS`
+  - `SUSPENSION.FRONT.BUSHINGS`
+  - `SUSPENSION.FRONT.OIL`
+- `REAR_SUSPENSION` — Задняя подвеска
+  - `SUSPENSION.REAR.SHOCK`
+  - `SUSPENSION.REAR.LINKAGE`
+  - `SUSPENSION.REAR.SWINGARM`
+  - `SUSPENSION.REAR.BEARINGS`
+- `ELECTRICS` — Электрика
+  - `ELECTRICS.BATTERY`
+  - `ELECTRICS.FUSES`
+  - `ELECTRICS.CHARGING`
+  - `ELECTRICS.IGNITION`
+  - `ELECTRICS.WIRING`
+  - `ELECTRICS.LIGHTS`
+- `CONTROLS` — Органы управления
+  - `CONTROLS.THROTTLE`
+  - `CONTROLS.CLUTCH`
+  - `CONTROLS.FRONT_BRAKE`
+  - `CONTROLS.REAR_BRAKE`
+  - `CONTROLS.SHIFTER`
+  - `CONTROLS.FOOTPEG`
+  - `CONTROLS.CABLES`
+- `STEERING` — Рулевое
+  - `STEERING.HANDLEBAR`
+  - `STEERING.GRIPS`
+  - `STEERING.HEADSET`
+  - `STEERING.HEADSET.BEARINGS`
+  - `STEERING.TRIPLES`
+- `EXHAUST` — Выпуск
+  - `EXHAUST.HEADER`
+  - `EXHAUST.MUFFLER`
+  - `EXHAUST.MOUNTS`
+  - `EXHAUST.SENSOR`
+- `BODY_PROTECTION` — Кузов и защита
+  - `CHASSIS.SEAT`
+  - `CHASSIS.PLASTICS`
+  - `CHASSIS.PROTECTION`
+  - `CHASSIS.PROTECTION.SKID`
+  - `CHASSIS.PROTECTION.RADIATOR`
+
+Advanced (сохранены в техдереве, но скрыты из MVP):
+
+- `ENGINE.TOPEND.CYLINDER`
+- `ENGINE.TOPEND.PISTON`
+- `ENGINE.TOPEND.RINGS`
+- `ENGINE.TOPEND.HEAD`
+- `ENGINE.TOPEND.VALVES`
+- `ENGINE.TOPEND.CAM`
+- `ENGINE.BOTTOMEND.CRANK`
+- `ENGINE.BOTTOMEND.BEARINGS`
+- `ENGINE.GEARBOX.GEARS`
+- `ENGINE.GEARBOX.SHIFT`
+- `ELECTRICS.CHARGING.STATOR`
+- `ELECTRICS.IGNITION.CDI_ECU`
+- `ELECTRICS.DASH.SPEED`
+- `ELECTRICS.DASH.NEUTRAL`
+- `CHASSIS.FRAME`
+- `CHASSIS.SUBFRAME`
+- `ELECTRICS.SENSORS`

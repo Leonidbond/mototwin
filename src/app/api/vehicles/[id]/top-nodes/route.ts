@@ -1,22 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getTopServiceNodes } from "@/lib/top-service-nodes";
 import { isVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
-
-const TOP_LEVEL_NODE_CODES = [
-  "ENGINE",
-  "FUEL",
-  "COOLING",
-  "EXHAUST",
-  "ELECTRICS",
-  "CHASSIS",
-  "STEERING",
-  "SUSPENSION",
-  "WHEELS",
-  "BRAKES",
-  "DRIVETRAIN",
-  "CONTROLS",
-] as const;
 
 type RouteContext = {
   params: Promise<{
@@ -33,8 +19,16 @@ export async function GET(_: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
+    const topServiceNodes = await getTopServiceNodes(prisma);
+    const topNodeOrderById = new Map(
+      topServiceNodes.map((node) => [node.id, node.topNodeOrder ?? Number.MAX_SAFE_INTEGER])
+    );
+    const topNodeIds = new Set(topServiceNodes.map((node) => node.id));
+
     const topNodes = await prisma.topNodeState.findMany({
-      where: { vehicleId: id },
+      where: {
+        vehicleId: id,
+      },
       orderBy: {
         node: {
           displayOrder: "asc",
@@ -57,15 +51,16 @@ export async function GET(_: NextRequest, context: RouteContext) {
         },
       },
     });
-
-    const filteredTopNodes = topNodes.filter(
-      (topNode) =>
-        topNode.node.level === 1 &&
-        topNode.node.parentId === null &&
-        TOP_LEVEL_NODE_CODES.includes(
-          topNode.node.code as (typeof TOP_LEVEL_NODE_CODES)[number]
-        )
-    );
+    const filteredTopNodes = topNodes
+      .filter((item) => topNodeIds.has(item.node.id))
+      .sort((a, b) => {
+        const left = topNodeOrderById.get(a.node.id) ?? Number.MAX_SAFE_INTEGER;
+        const right = topNodeOrderById.get(b.node.id) ?? Number.MAX_SAFE_INTEGER;
+        if (left !== right) {
+          return left - right;
+        }
+        return a.node.code.localeCompare(b.node.code);
+      });
 
     return NextResponse.json({ topNodes: filteredTopNodes });
   } catch (error) {
