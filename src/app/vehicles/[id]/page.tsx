@@ -1,15 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   buildNodeTreeSectionProps,
   canOpenNodeStatusExplanationModal,
   buildRideProfileViewModel,
-  buildServiceLogTimelineProps,
-  getServiceLogEventKindBadgeLabel,
-  SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
   buildVehicleHeaderProps,
   buildVehicleStateViewModel,
   buildVehicleTechnicalInfoViewModel,
@@ -45,9 +43,7 @@ import {
   validateAddServiceEventFormValues,
   validateVehicleProfileFormValues,
   validateVehicleStateFormValues,
-  isServiceLogTimelineQueryActive,
   buildExpenseSummaryFromServiceEvents,
-  filterPaidServiceEvents,
   formatExpenseAmountRu,
   buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
@@ -106,10 +102,6 @@ import type {
   NodeContextViewModel,
   SelectedNodePath,
   ServiceEventItem,
-  ServiceEventsFilters,
-  ServiceEventsSortDirection,
-  ServiceEventsSortField,
-  ServiceLogNodeFilter,
   VehicleDetail,
   VehicleDetailApiRecord,
   AddServiceEventFormValues,
@@ -141,6 +133,8 @@ function buildNodeSnoozeStorageKey(vehicleId: string, nodeId: string): string {
 }
 
 export default function VehiclePage({ params }: VehiclePageProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [vehicleId, setVehicleId] = useState("");
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -148,39 +142,20 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
   const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false);
   const [serviceEventsError, setServiceEventsError] = useState("");
-  const [serviceEventsFilters, setServiceEventsFilters] = useState<ServiceEventsFilters>({
-    dateFrom: "",
-    dateTo: "",
-    eventKind: "",
-    serviceType: "",
-    node: "",
-  });
-  const [serviceEventsSort, setServiceEventsSort] = useState<{
-    field: ServiceEventsSortField;
-    direction: ServiceEventsSortDirection;
-  }>({
-    field: "eventDate",
-    direction: "desc",
-  });
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [nodeTreeError, setNodeTreeError] = useState("");
-  const [isServiceLogModalOpen, setIsServiceLogModalOpen] = useState(false);
-  const [serviceLogNodeFilter, setServiceLogNodeFilter] =
-    useState<ServiceLogNodeFilter | null>(null);
+  const [isExpenseDetailsModalOpen, setIsExpenseDetailsModalOpen] = useState(false);
   const [isAddServiceEventModalOpen, setIsAddServiceEventModalOpen] = useState(false);
   const [isCreatingServiceEvent, setIsCreatingServiceEvent] = useState(false);
   const [editingServiceEventId, setEditingServiceEventId] = useState<string | null>(null);
   const [serviceEventFormError, setServiceEventFormError] = useState("");
-  const [serviceEventFormSuccess, setServiceEventFormSuccess] = useState("");
   const [serviceLogActionNotice, setServiceLogActionNotice] =
     useState<ServiceLogActionNotice | null>(null);
   const [selectedNodePath, setSelectedNodePath] = useState<SelectedNodePath>([]);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
-  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
-  const [isExpenseSectionExpanded, setIsExpenseSectionExpanded] = useState(false);
   const [isUsageProfileSectionExpanded, setIsUsageProfileSectionExpanded] = useState(true);
   const [isTechnicalSummarySectionExpanded, setIsTechnicalSummarySectionExpanded] = useState(true);
   const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
@@ -281,25 +256,6 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     selectedFinalNode && selectedPathChildren.length === 0
   );
 
-  const serviceEventsByMonth = useMemo(() => {
-    return buildServiceLogTimelineProps(
-      serviceEvents,
-      serviceEventsFilters,
-      serviceEventsSort,
-      "default",
-      serviceLogNodeFilter?.nodeIds ?? null
-    ).monthGroups;
-  }, [serviceEvents, serviceEventsFilters, serviceEventsSort, serviceLogNodeFilter]);
-
-  const isServiceLogQueryActive = useMemo(
-    () =>
-      isServiceLogTimelineQueryActive(
-        serviceEventsFilters,
-        serviceEventsSort,
-        serviceLogNodeFilter
-      ),
-    [serviceEventsFilters, serviceEventsSort, serviceLogNodeFilter]
-  );
 
   const { roots: nodeTreeViewModel } = useMemo(
     () => buildNodeTreeSectionProps(nodeTree),
@@ -738,70 +694,6 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       });
   }, [isWishlistModalOpen, vehicleId, wishlistForm.nodeId]);
 
-  const hasAnyPaidServiceEventsInDataset = useMemo(
-    () => filterPaidServiceEvents(serviceEvents).length > 0,
-    [serviceEvents]
-  );
-
-  const updateServiceEventsFilter = (
-    field: keyof ServiceEventsFilters,
-    value: string
-  ) => {
-    setServiceEventsFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const toggleServiceEventsSort = (field: ServiceEventsSortField) => {
-    setServiceEventsSort((prev) => {
-      if (prev.field === field) {
-        return {
-          field,
-          direction: prev.direction === "asc" ? "desc" : "asc",
-        };
-      }
-
-      return {
-        field,
-        direction: field === "eventDate" ? "desc" : "asc",
-      };
-    });
-  };
-
-  const getServiceEventsSortIndicator = (field: ServiceEventsSortField) => {
-    if (serviceEventsSort.field !== field) {
-      return "↕";
-    }
-    return serviceEventsSort.direction === "asc" ? "↑" : "↓";
-  };
-
-  const resetServiceEventsFilters = () => {
-    setServiceEventsFilters({
-      dateFrom: "",
-      dateTo: "",
-      eventKind: "",
-      serviceType: "",
-      node: "",
-      paidOnly: undefined,
-    });
-    setServiceEventsSort({
-      field: "eventDate",
-      direction: "desc",
-    });
-    setServiceLogNodeFilter(null);
-  };
-
-  const setPaidOnlyFilter = (paidOnly: boolean) => {
-    setServiceEventsFilters((prev) => ({
-      ...prev,
-      paidOnly: paidOnly ? true : undefined,
-    }));
-  };
-
-  const clearPaidOnlyFilter = () => {
-    setPaidOnlyFilter(false);
-  };
 
   useEffect(() => {
     if (!serviceLogActionNotice) {
@@ -815,14 +707,8 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     };
   }, [serviceLogActionNotice]);
 
-  const openServiceLogModalWithPaidExpenses = () => {
-    setPaidOnlyFilter(true);
-    setIsServiceLogModalOpen(true);
-  };
-
   const openServiceLogModalFull = () => {
-    setPaidOnlyFilter(false);
-    setIsServiceLogModalOpen(true);
+    router.push(`/vehicles/${vehicleId}/service-log`);
   };
 
   const openServiceLogFilteredByNode = (node: NodeTreeItemViewModel) => {
@@ -830,12 +716,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     if (!raw) {
       return;
     }
-    setServiceLogNodeFilter(createServiceLogNodeFilter(raw));
-    setIsServiceLogModalOpen(true);
-  };
-
-  const clearServiceLogNodeFilter = () => {
-    setServiceLogNodeFilter(null);
+    const filter = createServiceLogNodeFilter(raw);
+    const q = new URLSearchParams();
+    q.set("nodeIds", filter.nodeIds.join(","));
+    q.set("nodeLabel", filter.displayLabel);
+    router.push(`/vehicles/${vehicleId}/service-log?${q.toString()}`);
   };
 
   useEffect(() => {
@@ -863,6 +748,19 @@ export default function VehiclePage({ params }: VehiclePageProps) {
 
     loadVehicle();
   }, [params]);
+
+  useEffect(() => {
+    const shouldOpen = searchParams.get("openServiceEventModal");
+    if (shouldOpen !== "1") {
+      return;
+    }
+    const editServiceEventId = searchParams.get("editServiceEventId");
+    if (editServiceEventId) {
+      openEditServiceEventFromLog(editServiceEventId);
+      return;
+    }
+    openCreateServiceEventModal();
+  }, [searchParams, serviceEvents]);
 
   const loadServiceEvents = useCallback(async () => {
     if (!vehicleId) {
@@ -992,7 +890,6 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     values.currency = readDefaultCurrencySetting();
 
     setServiceEventFormError("");
-    setServiceEventFormSuccess("");
     setEditingServiceEventId(null);
     applyAddServiceEventFormValues(values);
     setSelectedNodePath(nodePath);
@@ -1013,7 +910,6 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       return;
     }
     setServiceEventFormError("");
-    setServiceEventFormSuccess("");
     setEditingServiceEventId(null);
     const values = createInitialAddServiceEventFromWishlistItem(
       item,
@@ -1038,49 +934,10 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
 
     setServiceEventFormError("");
-    setServiceEventFormSuccess("");
     setEditingServiceEventId(serviceEvent.id);
     applyAddServiceEventFormValues(createInitialEditServiceEventValues(serviceEvent));
     setSelectedNodePath(nodePath);
     setIsAddServiceEventModalOpen(true);
-  };
-
-  const deleteServiceEventFromLog = async (eventId: string) => {
-    const serviceEvent = serviceEvents.find((candidate) => candidate.id === eventId);
-    if (!serviceEvent || serviceEvent.eventKind === "STATE_UPDATE") {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Удалить сервисное событие?\nЭто может изменить статус узла и суммы расходов."
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setServiceEventFormError("");
-      setServiceEventFormSuccess("");
-      await vehicleDetailApi.deleteServiceEvent(vehicleId, eventId);
-      if (editingServiceEventId === eventId) {
-        setIsAddServiceEventModalOpen(false);
-        resetServiceEventForm();
-      }
-      await Promise.all([loadServiceEvents(), loadNodeTree(), loadWishlist()]);
-      setServiceEventFormSuccess("Сервисное событие удалено.");
-      setServiceLogActionNotice({
-        tone: "success",
-        title: "Сервисное событие удалено",
-        details: "Статусы и расходы обновлены",
-      });
-    } catch (deleteError) {
-      console.error(deleteError);
-      setServiceEventFormError("Не удалось удалить сервисное событие.");
-      setServiceLogActionNotice({
-        tone: "error",
-        title: "Не удалось удалить сервисное событие",
-      });
-    }
   };
 
   const openServiceLogForAttentionItem = (item: AttentionItemViewModel) => {
@@ -1089,9 +946,11 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       return;
     }
     setIsAttentionModalOpen(false);
-    setPaidOnlyFilter(false);
-    setServiceLogNodeFilter(createServiceLogNodeFilter(raw));
-    setIsServiceLogModalOpen(true);
+    const filter = createServiceLogNodeFilter(raw);
+    const q = new URLSearchParams();
+    q.set("nodeIds", filter.nodeIds.join(","));
+    q.set("nodeLabel", filter.displayLabel);
+    router.push(`/vehicles/${vehicleId}/service-log?${q.toString()}`);
   };
 
   const openAddServiceFromAttentionItem = (item: AttentionItemViewModel) => {
@@ -1927,14 +1786,12 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const openCreateServiceEventModal = () => {
     resetServiceEventForm();
     setServiceEventFormError("");
-    setServiceEventFormSuccess("");
     setIsAddServiceEventModalOpen(true);
   };
 
   const handleSubmitServiceEvent = async () => {
     try {
       setServiceEventFormError("");
-      setServiceEventFormSuccess("");
 
       if (!vehicleId) {
         setServiceEventFormError("Не удалось определить мотоцикл.");
@@ -1978,9 +1835,6 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         );
       }
 
-      setServiceEventFormSuccess(
-        editingServiceEventId ? "Сервисное событие обновлено." : "Сервисное событие добавлено."
-      );
       setServiceLogActionNotice({
         tone: "success",
         title: editingServiceEventId
@@ -2326,173 +2180,6 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   ) : null}
                 </div>
               </div>
-            </section>
-
-            <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
-              <button
-                type="button"
-                aria-expanded={isExpenseSectionExpanded}
-                onClick={() => setIsExpenseSectionExpanded((prev) => !prev)}
-                className="flex w-full items-start gap-3 rounded-xl text-left transition hover:bg-gray-50/80 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-300 -m-1 p-1"
-              >
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-semibold tracking-tight text-gray-950">
-                    Расходы на обслуживание
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-600">
-                    {isServiceEventsLoading
-                      ? "Загрузка данных журнала…"
-                      : serviceEventsError
-                        ? "Не удалось загрузить расходы."
-                        : expenseSummary.paidEventCount === 0
-                          ? "Расходы пока не указаны"
-                          : `${expenseSummary.paidEventCount} ${
-                              expenseSummary.paidEventCount === 1
-                                ? "запись с суммой"
-                                : "записей с суммой"
-                            }`}
-                  </p>
-                </div>
-                <span className="shrink-0 pt-1 text-base text-gray-500 tabular-nums" aria-hidden>
-                  {isExpenseSectionExpanded ? "▾" : "▸"}
-                </span>
-              </button>
-
-              {isExpenseSectionExpanded ? (
-                <>
-                  {expenseSummary.paidEventCount > 0 ? (
-                    <div className="mt-4 flex flex-wrap justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={openServiceLogModalWithPaidExpenses}
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
-                      >
-                        Детали расходов
-                      </button>
-                    </div>
-                  ) : null}
-                  <p className="mt-3 text-xs text-gray-500">
-                    Сводка по полям стоимости в сервисных записях. Валюты не суммируются между
-                    собой.
-                  </p>
-
-                  {isServiceEventsLoading ? (
-                    <p className="mt-4 text-sm text-gray-600">Загрузка данных журнала…</p>
-                  ) : serviceEventsError ? (
-                    <p className="mt-4 text-sm" style={{ color: productSemanticColors.error }}>
-                      Не удалось загрузить расходы: проверьте журнал обслуживания.
-                    </p>
-                  ) : expenseSummary.paidEventCount === 0 ? (
-                    <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-3 text-sm text-gray-600">
-                      <p className="font-medium text-gray-900">Расходы пока не указаны</p>
-                      <p className="mt-1 text-xs leading-5 text-gray-600">
-                        Добавьте сумму и валюту при создании сервисного события — здесь появятся итоги
-                        по каждой валюте и за текущий месяц.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="mt-4 space-y-4 text-sm">
-                      <div className="flex flex-wrap gap-x-6 gap-y-2">
-                        <div>
-                          <span className="text-gray-500">Записей с суммой</span>
-                          <p className="font-semibold text-gray-950">
-                            {expenseSummary.paidEventCount}
-                          </p>
-                        </div>
-                        {expenseSummary.latestPaidEvent ? (
-                          <div className="min-w-0 flex-1">
-                            <span className="text-gray-500">Последняя оплаченная</span>
-                            <p className="font-medium text-gray-950">
-                              {formatIsoCalendarDateRu(expenseSummary.latestPaidEvent.eventDate)} ·{" "}
-                              {expenseSummary.latestPaidEvent.serviceType}
-                            </p>
-                            <p className="text-xs text-gray-600">
-                              {formatExpenseAmountRu(expenseSummary.latestPaidEvent.totalAmount)}{" "}
-                              {expenseSummary.latestPaidEvent.currency} ·{" "}
-                              {expenseSummary.latestPaidEvent.nodeLabel}
-                            </p>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                          Всего по валютам
-                        </p>
-                        <ul className="mt-2 space-y-1">
-                          {expenseSummary.totalsByCurrency.map((row) => (
-                            <li
-                              key={row.currency}
-                              className="flex justify-between gap-4 text-gray-900"
-                            >
-                              <span>{row.currency}</span>
-                              <span className="font-medium tabular-nums">
-                                {formatExpenseAmountRu(row.totalAmount)} {row.currency}
-                                <span className="ml-2 text-xs font-normal text-gray-500">
-                                  ({row.paidEventCount}{" "}
-                                  {row.paidEventCount === 1 ? "запись" : "записей"})
-                                </span>
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {expenseSummary.currentMonthTotalsByCurrency.length > 0 ? (
-                        <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2.5">
-                          <p className="text-xs font-medium text-gray-600">
-                            Текущий месяц ({expenseSummary.currentMonthLabel})
-                          </p>
-                          <ul className="mt-1 space-y-0.5">
-                            {expenseSummary.currentMonthTotalsByCurrency.map((row) => (
-                              <li
-                                key={row.currency}
-                                className="flex justify-between text-sm text-gray-900"
-                              >
-                                <span>{row.currency}</span>
-                                <span className="font-medium tabular-nums">
-                                  {formatExpenseAmountRu(row.totalAmount)} {row.currency}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-gray-500">
-                          В {expenseSummary.currentMonthLabel} платных сервисных записей пока нет.
-                        </p>
-                      )}
-
-                      {expenseSummary.byMonth.length > 1 ? (
-                        <details className="rounded-lg border border-gray-100 bg-white">
-                          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-gray-700">
-                            По месяцам ({expenseSummary.byMonth.length})
-                          </summary>
-                          <div className="border-t border-gray-100 px-3 py-2 text-xs text-gray-600">
-                            <ul className="space-y-2">
-                              {expenseSummary.byMonth.slice(0, 6).map((m) => (
-                                <li key={m.monthKey}>
-                                  <span className="font-medium text-gray-800">{m.monthLabel}</span>
-                                  <span className="text-gray-600">
-                                    {" "}
-                                    —{" "}
-                                    {m.totalsByCurrency
-                                      .map(
-                                        (t) =>
-                                          `${formatExpenseAmountRu(t.totalAmount)} ${t.currency}`
-                                      )
-                                      .join(" · ")}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </details>
-                      ) : null}
-                    </div>
-                  )}
-                </>
-              ) : null}
             </section>
 
             <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
@@ -2895,524 +2582,134 @@ export default function VehiclePage({ params }: VehiclePageProps) {
         </div>
       ) : null}
 
-      {isServiceLogModalOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center px-4 py-6 sm:items-center"
-          style={{ backgroundColor: productSemanticColors.overlayModal }}
-        >
-          <div className="w-full max-w-6xl rounded-3xl border border-gray-200 bg-white shadow-xl">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
-              <div>
-                <h2 className="text-xl font-semibold tracking-tight text-gray-950">
-                  Журнал обслуживания
-                </h2>
-                <p className="mt-1 text-xs text-gray-500">
-                  История сервисных операций и обновлений состояния
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={openCreateServiceEventModal}
-                  className="inline-flex h-9 items-center justify-center rounded-lg bg-gray-950 px-3.5 text-sm font-medium text-white transition hover:bg-gray-800"
-                >
-                  Добавить сервисное событие
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsServiceLogModalOpen(false)}
-                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-                >
-                  Закрыть
-                </button>
-              </div>
+      {isExpenseDetailsModalOpen ? (
+        <div className="fixed inset-0 z-[55] flex items-start justify-center bg-black/45 px-4 py-6 sm:items-center">
+          <div className="w-full max-w-3xl rounded-3xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                Расходы на обслуживание
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsExpenseDetailsModalOpen(false)}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+              >
+                Закрыть
+              </button>
             </div>
 
             <div className="max-h-[72vh] overflow-y-auto px-6 py-6">
-              {serviceLogNodeFilter ? (
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
-                  <p className="text-gray-900">
-                    <span className="font-medium text-gray-950">Фильтр по узлу: </span>
-                    {serviceLogNodeFilter.displayLabel}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={clearServiceLogNodeFilter}
-                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-white"
-                  >
-                    Сбросить фильтр
-                  </button>
-                </div>
-              ) : null}
-
-              {serviceEventsFilters.paidOnly === true ? (
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-amber-50/80 px-4 py-3 text-sm">
-                  <p className="text-gray-900">
-                    <span className="font-medium text-gray-950">Показаны события с расходами</span>
-                    <span className="text-gray-600"> — только записи с суммой &gt; 0 и валютой.</span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={clearPaidOnlyFilter}
-                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-                  >
-                    Сбросить фильтр
-                  </button>
-                </div>
-              ) : null}
-
-              {serviceEventFormSuccess ? (
-                <p
-                  className="mb-4 rounded-xl border px-3 py-2 text-sm"
-                  style={{
-                    borderColor: productSemanticColors.successBorder,
-                    backgroundColor: productSemanticColors.successSurface,
-                    color: productSemanticColors.successText,
-                  }}
-                >
-                  {serviceEventFormSuccess}
-                </p>
-              ) : null}
-
-              {serviceLogActionNotice ? (
-                <div
-                  className="mb-4 flex items-start justify-between gap-3 rounded-xl border px-3 py-2 text-sm"
-                  style={{
-                    borderColor:
-                      serviceLogActionNotice.tone === "success"
-                        ? productSemanticColors.successBorder
-                        : productSemanticColors.errorBorder,
-                    backgroundColor:
-                      serviceLogActionNotice.tone === "success"
-                        ? productSemanticColors.successSurface
-                        : productSemanticColors.errorSurface,
-                    color:
-                      serviceLogActionNotice.tone === "success"
-                        ? productSemanticColors.successText
-                        : productSemanticColors.error,
-                  }}
-                >
-                  <div>
-                    <p className="font-medium">{serviceLogActionNotice.title}</p>
-                    {serviceLogActionNotice.details ? (
-                      <p className="mt-0.5 text-xs">{serviceLogActionNotice.details}</p>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setServiceLogActionNotice(null)}
-                    className="text-xs underline decoration-dotted underline-offset-2"
-                  >
-                    Скрыть
-                  </button>
-                </div>
-              ) : null}
+              <p className="text-xs text-gray-500">
+                Сводка по полям стоимости в сервисных записях. Валюты не суммируются между
+                собой.
+              </p>
 
               {isServiceEventsLoading ? (
-                <p className="text-sm text-gray-600">Загрузка журнала обслуживания...</p>
-              ) : null}
-
-              {!isServiceEventsLoading && serviceEventsError ? (
-                <p className="text-sm" style={{ color: productSemanticColors.error }}>
-                  {serviceEventsError}
+                <p className="mt-4 text-sm text-gray-600">Загрузка данных журнала…</p>
+              ) : serviceEventsError ? (
+                <p className="mt-4 text-sm" style={{ color: productSemanticColors.error }}>
+                  Не удалось загрузить расходы: проверьте журнал обслуживания.
                 </p>
-              ) : null}
-
-              {!isServiceEventsLoading &&
-              !serviceEventsError &&
-              serviceEvents.length === 0 ? (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                  <p className="font-medium text-gray-900">Журнал пуст</p>
-                  <p className="mt-1">
-                    Сервисные записи появятся здесь после первого обслуживания.
+              ) : expenseSummary.paidEventCount === 0 ? (
+                <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-3 text-sm text-gray-600">
+                  <p className="font-medium text-gray-900">Расходы пока не указаны</p>
+                  <p className="mt-1 text-xs leading-5 text-gray-600">
+                    Добавьте сумму и валюту при создании сервисного события — здесь появятся
+                    итоги по каждой валюте и за текущий месяц.
                   </p>
                 </div>
-              ) : null}
-
-              {!isServiceEventsLoading &&
-              !serviceEventsError &&
-              serviceEvents.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-3">
-                    <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-12">
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-2">
-                      Дата с
-                      <input
-                        type="date"
-                        value={serviceEventsFilters.dateFrom}
-                        onChange={(event) =>
-                          updateServiceEventsFilter("dateFrom", event.target.value)
-                        }
-                        className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                      />
-                    </label>
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-2">
-                      Дата по
-                      <input
-                        type="date"
-                        value={serviceEventsFilters.dateTo}
-                        onChange={(event) =>
-                          updateServiceEventsFilter("dateTo", event.target.value)
-                        }
-                        className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                      />
-                    </label>
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-3">
-                      Узел
-                      <input
-                        value={serviceEventsFilters.node}
-                        onChange={(event) =>
-                          updateServiceEventsFilter("node", event.target.value)
-                        }
-                        placeholder="Первые буквы узла"
-                        className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                      />
-                    </label>
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-2">
-                      Тип записи
-                      <select
-                        value={serviceEventsFilters.eventKind}
-                        onChange={(event) =>
-                          updateServiceEventsFilter("eventKind", event.target.value)
-                        }
-                        className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                      >
-                        <option value="">Все</option>
-                        <option value="SERVICE">Сервис</option>
-                        <option value="STATE_UPDATE">Обновление состояния</option>
-                      </select>
-                    </label>
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-2">
-                      Тип сервиса
-                      <input
-                        value={serviceEventsFilters.serviceType}
-                        onChange={(event) =>
-                          updateServiceEventsFilter("serviceType", event.target.value)
-                        }
-                        placeholder="Текст типа сервиса"
-                        className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                      />
-                    </label>
-                    <div className="flex items-end lg:col-span-1">
-                      <button
-                        type="button"
-                        onClick={resetServiceEventsFilters}
-                        disabled={!isServiceLogQueryActive}
-                        className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Сбросить
-                      </button>
+              ) : (
+                <div className="mt-4 space-y-4 text-sm">
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    <div>
+                      <span className="text-gray-500">Записей с суммой</span>
+                      <p className="font-semibold text-gray-950">{expenseSummary.paidEventCount}</p>
                     </div>
-                    </div>
-                    <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-xs font-medium text-gray-600">
-                      <input
-                        type="checkbox"
-                        checked={serviceEventsFilters.paidOnly === true}
-                        onChange={(event) => setPaidOnlyFilter(event.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      Только события с расходами
-                    </label>
-                  </div>
-
-                  <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-                    <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                      <button
-                        type="button"
-                        onClick={() => toggleServiceEventsSort("eventDate")}
-                        className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
-                      >
-                        Дата {getServiceEventsSortIndicator("eventDate")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleServiceEventsSort("eventKind")}
-                        className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
-                      >
-                        Тип {getServiceEventsSortIndicator("eventKind")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleServiceEventsSort("serviceType")}
-                        className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
-                      >
-                        Сервис {getServiceEventsSortIndicator("serviceType")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleServiceEventsSort("node")}
-                        className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
-                      >
-                        Узел {getServiceEventsSortIndicator("node")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleServiceEventsSort("odometer")}
-                        className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
-                      >
-                        Пробег {getServiceEventsSortIndicator("odometer")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleServiceEventsSort("engineHours")}
-                        className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
-                      >
-                        Моточасы {getServiceEventsSortIndicator("engineHours")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleServiceEventsSort("cost")}
-                        className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
-                      >
-                        Стоимость {getServiceEventsSortIndicator("cost")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleServiceEventsSort("comment")}
-                        className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
-                      >
-                        Комментарий {getServiceEventsSortIndicator("comment")}
-                      </button>
-                    </div>
-
-                    {serviceEventsByMonth.length === 0 ? (
-                      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
-                        <p className="font-medium text-gray-900">
-                          {serviceEventsFilters.paidOnly === true && !hasAnyPaidServiceEventsInDataset
-                            ? "Расходов пока нет"
-                            : "Ничего не найдено"}
+                    {expenseSummary.latestPaidEvent ? (
+                      <div className="min-w-0 flex-1">
+                        <span className="text-gray-500">Последняя оплаченная</span>
+                        <p className="font-medium text-gray-950">
+                          {formatIsoCalendarDateRu(expenseSummary.latestPaidEvent.eventDate)} ·{" "}
+                          {expenseSummary.latestPaidEvent.serviceType}
                         </p>
-                        <p className="mt-1">
-                          {serviceEventsFilters.paidOnly === true && !hasAnyPaidServiceEventsInDataset
-                            ? "Нет сервисных записей с суммой больше нуля и указанной валютой. Добавьте стоимость при создании события."
-                            : serviceLogNodeFilter
-                              ? `Для узла «${serviceLogNodeFilter.displayLabel}» в журнале нет записей с учётом текущих фильтров. Сбросьте фильтр по узлу или измените условия.`
-                              : "По текущим фильтрам нет записей. Измените условия или сбросьте фильтры."}
+                        <p className="text-xs text-gray-600">
+                          {formatExpenseAmountRu(expenseSummary.latestPaidEvent.totalAmount)}{" "}
+                          {expenseSummary.latestPaidEvent.currency} ·{" "}
+                          {expenseSummary.latestPaidEvent.nodeLabel}
                         </p>
                       </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {serviceEventsByMonth.map((group) => (
-                          <section key={group.monthKey} className="space-y-3">
-                            <div className="sticky top-0 z-[1] -mx-1 px-1 py-1">
-                              <div className="inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold capitalize tracking-tight text-gray-700">
-                                {group.label}
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2 text-xs">
-                              {group.summary.serviceCount > 0 ? (
-                                <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
-                                  Обслуживание: {group.summary.serviceCount}
-                                </span>
-                              ) : null}
-                              {group.summary.stateUpdateCount > 0 ? (
-                                <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
-                                  Обновления состояния: {group.summary.stateUpdateCount}
-                                </span>
-                              ) : null}
-                              {group.summary.costLabel ? (
-                                <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">
-                                  Расходы: {group.summary.costLabel}
-                                </span>
-                              ) : null}
-                            </div>
+                    ) : null}
+                  </div>
 
-                            <div className="space-y-4">
-                              {group.entries.map((entry) => {
-                                const isStateUpdate = entry.eventKind === "STATE_UPDATE";
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Всего по валютам
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {expenseSummary.totalsByCurrency.map((row) => (
+                        <li key={row.currency} className="flex justify-between gap-4 text-gray-900">
+                          <span>{row.currency}</span>
+                          <span className="font-medium tabular-nums">
+                            {formatExpenseAmountRu(row.totalAmount)} {row.currency}
+                            <span className="ml-2 text-xs font-normal text-gray-500">
+                              ({row.paidEventCount} {row.paidEventCount === 1 ? "запись" : "записей"})
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-                                return (
-                                  <article key={entry.id} className="relative pl-10">
-                                    <div
-                                      className="absolute left-4 top-0 bottom-0 w-px"
-                                      style={{ backgroundColor: productSemanticColors.border }}
-                                    />
-                                    <div
-                                      className="absolute left-[9px] top-6 h-3 w-3 rounded-full border-2"
-                                      style={{
-                                        borderColor: isStateUpdate
-                                          ? productSemanticColors.timelineStateBorder
-                                          : productSemanticColors.timelineServiceBorder,
-                                        backgroundColor: isStateUpdate
-                                          ? productSemanticColors.timelineStateFill
-                                          : productSemanticColors.timelineServiceFill,
-                                      }}
-                                    />
-
-                                    <div
-                                      className={`rounded-2xl border px-4 py-3 sm:px-5 ${
-                                        isStateUpdate ? "" : "shadow-sm"
-                                      }`}
-                                      style={{
-                                        borderColor: productSemanticColors.border,
-                                        backgroundColor: isStateUpdate
-                                          ? productSemanticColors.cardMuted
-                                          : productSemanticColors.card,
-                                      }}
-                                    >
-                                      <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2">
-                                          <span
-                                            className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-tight"
-                                            style={
-                                              isStateUpdate
-                                                ? {
-                                                    borderColor: productSemanticColors.borderStrong,
-                                                    backgroundColor: productSemanticColors.divider,
-                                                    color: productSemanticColors.textMuted,
-                                                  }
-                                                : {
-                                                    borderColor: productSemanticColors.indigoSoftBorder,
-                                                    backgroundColor: productSemanticColors.serviceBadgeBg,
-                                                    color: productSemanticColors.serviceBadgeText,
-                                                  }
-                                            }
-                                          >
-                                            {getServiceLogEventKindBadgeLabel(entry.eventKind)}
-                                          </span>
-                                          <span className="text-xs text-gray-500">
-                                            {entry.dateLabel}
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                          <span
-                                            className={`text-xs ${
-                                              isStateUpdate ? "text-gray-500" : "text-gray-600"
-                                            }`}
-                                          >
-                                            {entry.secondaryTitle}
-                                          </span>
-                                          {!isStateUpdate ? (
-                                            <div className="flex items-center gap-3">
-                                              <div className="group relative">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => openEditServiceEventFromLog(entry.id)}
-                                                  title="Редактировать"
-                                                  aria-label="Редактировать"
-                                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-gray-950"
-                                                >
-                                                  <EditIcon />
-                                                </button>
-                                                <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-                                                  Редактировать
-                                                </span>
-                                              </div>
-                                              <div className="group relative">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => void deleteServiceEventFromLog(entry.id)}
-                                                  title="Удалить"
-                                                  aria-label="Удалить"
-                                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100 hover:text-rose-900"
-                                                >
-                                                  <TrashIcon />
-                                                </button>
-                                                <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-                                                  Удалить
-                                                </span>
-                                              </div>
-                                            </div>
-                                          ) : null}
-                                        </div>
-                                      </div>
-
-                                      <div className="mt-2">
-                                        {isStateUpdate ? (
-                                          <>
-                                            <h3 className="text-sm font-medium text-gray-700">
-                                              {entry.mainTitle}
-                                            </h3>
-                                            {entry.stateUpdateLines.length > 0 ? (
-                                              <div className="mt-1 space-y-1">
-                                                {entry.stateUpdateLines.map((line) => (
-                                                  <p key={`${entry.id}.${line}`} className="text-xs text-gray-500">
-                                                    {line}
-                                                  </p>
-                                                ))}
-                                              </div>
-                                            ) : (
-                                              <p className="mt-1 text-xs text-gray-500">
-                                                {entry.stateUpdateSubtitle}
-                                              </p>
-                                            )}
-                                          </>
-                                        ) : (
-                                          <>
-                                            <h3 className="text-base font-semibold text-gray-950">
-                                              {entry.mainTitle}
-                                            </h3>
-                                            {entry.wishlistOriginLabelRu ? (
-                                              <p className="mt-0.5 text-xs text-gray-500">
-                                                {entry.wishlistOriginLabelRu}
-                                              </p>
-                                            ) : null}
-                                          </>
-                                        )}
-                                      </div>
-
-                                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                                        <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">
-                                          {entry.odometerLabel}: {entry.odometerValue}
-                                        </span>
-                                        {entry.engineHoursValue !== null ? (
-                                          <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">
-                                            {entry.engineHoursLabel}: {entry.engineHoursValue}
-                                          </span>
-                                        ) : null}
-                                        {!isStateUpdate &&
-                                        entry.costAmount !== null &&
-                                        entry.costCurrency ? (
-                                          <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">
-                                            {entry.costLabel}: {entry.costAmount}{" "}
-                                            {entry.costCurrency}
-                                          </span>
-                                        ) : null}
-                                      </div>
-
-                                      {entry.comment ? (
-                                        <div className="mt-3 border-t border-gray-100 pt-3">
-                                          <p
-                                            className={`text-sm ${isStateUpdate ? "text-gray-500" : "text-gray-700"}`}
-                                          >
-                                            {expandedComments[entry.id]
-                                              ? entry.comment
-                                              : `${entry.comment.slice(0, SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS)}${entry.comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS ? "..." : ""}`}
-                                          </p>
-                                          {entry.comment.length >
-                                          SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS ? (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                setExpandedComments((prev) => ({
-                                                  ...prev,
-                                                  [entry.id]: !prev[entry.id],
-                                                }))
-                                              }
-                                              className="mt-1 text-xs font-medium text-gray-600 underline decoration-dotted underline-offset-2 transition hover:text-gray-900"
-                                            >
-                                              {expandedComments[entry.id]
-                                                ? "Скрыть"
-                                                : "Показать"}
-                                            </button>
-                                          ) : null}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  </article>
-                                );
-                              })}
-                            </div>
-                          </section>
+                  {expenseSummary.currentMonthTotalsByCurrency.length > 0 ? (
+                    <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2.5">
+                      <p className="text-xs font-medium text-gray-600">
+                        Текущий месяц ({expenseSummary.currentMonthLabel})
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {expenseSummary.currentMonthTotalsByCurrency.map((row) => (
+                          <li key={row.currency} className="flex justify-between text-sm text-gray-900">
+                            <span>{row.currency}</span>
+                            <span className="font-medium tabular-nums">
+                              {formatExpenseAmountRu(row.totalAmount)} {row.currency}
+                            </span>
+                          </li>
                         ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      В {expenseSummary.currentMonthLabel} платных сервисных записей пока нет.
+                    </p>
+                  )}
+
+                  {expenseSummary.byMonth.length > 1 ? (
+                    <details className="rounded-lg border border-gray-100 bg-white">
+                      <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-gray-700">
+                        По месяцам ({expenseSummary.byMonth.length})
+                      </summary>
+                      <div className="border-t border-gray-100 px-3 py-2 text-xs text-gray-600">
+                        <ul className="space-y-2">
+                          {expenseSummary.byMonth.slice(0, 6).map((m) => (
+                            <li key={m.monthKey}>
+                              <span className="font-medium text-gray-800">{m.monthLabel}</span>
+                              <span className="text-gray-600">
+                                {" "}
+                                —{" "}
+                                {m.totalsByCurrency
+                                  .map((t) => `${formatExpenseAmountRu(t.totalAmount)} ${t.currency}`)
+                                  .join(" · ")}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                    )}
-                  </div>
+                    </details>
+                  ) : null}
                 </div>
-                ) : null}
-              </div>
+              )}
             </div>
           </div>
+        </div>
       ) : null}
 
       {isAddServiceEventModalOpen ? (

@@ -100,6 +100,8 @@ export type {
   ServiceLogFilters,
   ServiceLogSortState,
   ServiceLogNodeFilter,
+  ServiceLogPeriodFilter,
+  ServiceLogFilterState,
   NodeStatusClickTarget,
   ServiceLogEntryVisualKind,
   ServiceLogEntryDateStyle,

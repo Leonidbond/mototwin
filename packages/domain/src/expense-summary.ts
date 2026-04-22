@@ -221,3 +221,66 @@ export function formatExpenseAmountRu(amount: number): string {
     minimumFractionDigits: 0,
   }).format(amount);
 }
+
+export function getCurrentExpenseMonthKey(now: Date = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+export function parseExpenseMonthKey(monthKey: string): { year: number; month: number } | null {
+  const matched = /^(\d{4})-(\d{2})$/.exec(monthKey);
+  if (!matched) {
+    return null;
+  }
+  const year = Number(matched[1]);
+  const month = Number(matched[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return null;
+  }
+  return { year, month };
+}
+
+export function formatExpenseMonthLabelRu(monthKey: string): string {
+  const parsed = parseExpenseMonthKey(monthKey);
+  if (!parsed) {
+    return monthKey;
+  }
+  const dt = new Date(parsed.year, parsed.month - 1, 1);
+  const label = dt.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  return label.slice(0, 1).toUpperCase() + label.slice(1);
+}
+
+export function getExpenseMonthDateRange(monthKey: string): { dateFrom: string; dateTo: string } {
+  const parsed = parseExpenseMonthKey(monthKey);
+  if (!parsed) {
+    const current = getCurrentExpenseMonthKey();
+    return getExpenseMonthDateRange(current);
+  }
+  const from = new Date(parsed.year, parsed.month - 1, 1);
+  const next = new Date(parsed.year, parsed.month, 1);
+  return {
+    dateFrom: from.toISOString().slice(0, 10),
+    dateTo: next.toISOString().slice(0, 10),
+  };
+}
+
+export function addMonthsToExpenseMonthKey(monthKey: string, delta: number): string {
+  const parsed = parseExpenseMonthKey(monthKey);
+  const base = parsed
+    ? new Date(parsed.year, parsed.month - 1, 1)
+    : new Date();
+  base.setMonth(base.getMonth() + delta);
+  return getCurrentExpenseMonthKey(base);
+}
+
+export function filterEventsByExpenseMonth(
+  serviceEvents: ServiceEventItem[],
+  monthKey: string
+): ServiceEventItem[] {
+  const { dateFrom, dateTo } = getExpenseMonthDateRange(monthKey);
+  return serviceEvents.filter((event) => {
+    const date = event.eventDate.slice(0, 10);
+    return date >= dateFrom && date < dateTo;
+  });
+}

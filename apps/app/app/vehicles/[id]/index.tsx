@@ -17,7 +17,6 @@ import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
-  buildExpenseSummaryFromServiceEvents,
   buildNodeTreeSectionProps,
   buildNodeContextViewModel,
   buildNodeSearchResultActions,
@@ -37,7 +36,6 @@ import {
   getTopLevelNodeTreeItems,
   isNodeSnoozed,
   searchNodeTree,
-  formatExpenseAmountRu,
   formatIsoCalendarDateRu,
   getRecentServiceEventsForNode,
 } from "@mototwin/domain";
@@ -70,6 +68,7 @@ import { buildVehicleServiceLogHref } from "./service-log";
 import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 import { ActionIconButton } from "../../components/action-icon-button";
+import { AppHelpFab } from "../../../src/components/app-help-fab";
 
 function getStatusColors(status: NodeStatus | null) {
   const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
@@ -330,11 +329,9 @@ export default function VehicleDetailScreen() {
   const [nodeContextAddingRecommendedSkuId, setNodeContextAddingRecommendedSkuId] = useState("");
   const [nodeContextAddingKitCode, setNodeContextAddingKitCode] = useState("");
   const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
-  const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
   const [statusExplanationNode, setStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
   const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
-  const [serviceEventsError, setServiceEventsError] = useState("");
   const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
   const [isMovingToTrash, setIsMovingToTrash] = useState(false);
 
@@ -354,7 +351,6 @@ export default function VehicleDetailScreen() {
     setError("");
     setNodeTreeError("");
     setServiceEvents([]);
-    setServiceEventsError("");
 
     try {
       const detailData = await endpoints.getVehicleDetail(vehicleId);
@@ -388,11 +384,9 @@ export default function VehicleDetailScreen() {
 
     if (eventsResult.status === "fulfilled") {
       setServiceEvents(eventsResult.value.serviceEvents ?? []);
-      setServiceEventsError("");
     } else {
       console.error(eventsResult.reason);
       setServiceEvents([]);
-      setServiceEventsError("Не удалось загрузить журнал.");
     }
 
     setIsNodeTreeLoading(false);
@@ -574,11 +568,6 @@ export default function VehicleDetailScreen() {
         minQueryLength: 2,
       }),
     [topLevelNodeViewModels, debouncedNodeSearchQuery]
-  );
-
-  const expenseSummary = useMemo(
-    () => buildExpenseSummaryFromServiceEvents(serviceEvents),
-    [serviceEvents]
   );
 
   const attentionSummary = useMemo(
@@ -1074,126 +1063,6 @@ export default function VehicleDetailScreen() {
           </View>
         ) : null}
 
-        <View style={styles.expenseCard}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.expenseHeaderPressable,
-              pressed && styles.expenseHeaderPressablePressed,
-            ]}
-            onPress={() => setIsExpenseExpanded((prev) => !prev)}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: isExpenseExpanded }}
-          >
-            <View style={styles.expenseHeaderTextCol}>
-              <Text style={styles.expenseTitle}>Расходы на обслуживание</Text>
-              <Text style={styles.expenseCollapsedMeta}>
-                {isNodeTreeLoading
-                  ? "Загрузка данных журнала…"
-                  : serviceEventsError
-                    ? "Не удалось загрузить расходы."
-                    : expenseSummary.paidEventCount === 0
-                      ? "Расходы пока не указаны"
-                      : `${expenseSummary.paidEventCount} ${
-                          expenseSummary.paidEventCount === 1
-                            ? "запись с суммой"
-                            : "записей с суммой"
-                        }`}
-              </Text>
-            </View>
-            <Text style={styles.sectionChevron}>{isExpenseExpanded ? "▾" : "▸"}</Text>
-          </Pressable>
-          {isExpenseExpanded ? (
-            <>
-              {expenseSummary.paidEventCount > 0 ? (
-                <View style={styles.expenseExpandedActions}>
-                  <Pressable
-                    onPress={() =>
-                      router.push(`/vehicles/${vehicleId}/service-log?paidOnly=1`)
-                    }
-                    style={({ pressed }) => [
-                      styles.expenseDetailsLink,
-                      pressed && styles.expenseDetailsLinkPressed,
-                    ]}
-                  >
-                    <Text style={styles.expenseDetailsLinkText}>Детали расходов</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-              <Text style={styles.expenseHint}>
-                Сводка по стоимости в сервисных записях. Валюты не суммируются между собой.
-              </Text>
-              {serviceEventsError ? (
-                <Text style={styles.expenseErrorText}>{serviceEventsError}</Text>
-              ) : null}
-              {isNodeTreeLoading ? (
-                <Text style={styles.expenseMuted}>Загрузка данных журнала…</Text>
-              ) : serviceEventsError ? null : expenseSummary.paidEventCount === 0 ? (
-                <View style={styles.expenseEmptyBox}>
-                  <Text style={styles.expenseEmptyTitle}>Расходы пока не указаны</Text>
-                  <Text style={styles.expenseEmptyText}>
-                    Добавьте сумму и валюту при создании сервисного события — здесь появятся итоги
-                    по каждой валюте и за текущий месяц.
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.expenseBody}>
-                  <View style={styles.expenseStatRow}>
-                    <Text style={styles.expenseStatLabel}>Записей с суммой</Text>
-                    <Text style={styles.expenseStatValue}>{expenseSummary.paidEventCount}</Text>
-                  </View>
-                  {expenseSummary.latestPaidEvent ? (
-                    <View style={styles.expenseLatestBlock}>
-                      <Text style={styles.expenseStatLabel}>Последняя оплаченная</Text>
-                      <Text style={styles.expenseLatestMain}>
-                        {formatIsoCalendarDateRu(expenseSummary.latestPaidEvent.eventDate)} ·{" "}
-                        {expenseSummary.latestPaidEvent.serviceType}
-                      </Text>
-                      <Text style={styles.expenseLatestMeta}>
-                        {formatExpenseAmountRu(expenseSummary.latestPaidEvent.totalAmount)}{" "}
-                        {expenseSummary.latestPaidEvent.currency} ·{" "}
-                        {expenseSummary.latestPaidEvent.nodeLabel}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <Text style={styles.expenseSubheading}>Всего по валютам</Text>
-                  {expenseSummary.totalsByCurrency.map((row) => (
-                    <View key={row.currency} style={styles.expenseCurrencyRow}>
-                      <Text style={styles.expenseCurrencyCode}>{row.currency}</Text>
-                      <Text style={styles.expenseCurrencyAmount}>
-                        {formatExpenseAmountRu(row.totalAmount)} {row.currency}
-                        <Text style={styles.expenseCurrencyCount}>
-                          {" "}
-                          ({row.paidEventCount}{" "}
-                          {row.paidEventCount === 1 ? "запись" : "записей"})
-                        </Text>
-                      </Text>
-                    </View>
-                  ))}
-                  {expenseSummary.currentMonthTotalsByCurrency.length > 0 ? (
-                    <View style={styles.expenseMonthBox}>
-                      <Text style={styles.expenseMonthTitle}>
-                        Текущий месяц ({expenseSummary.currentMonthLabel})
-                      </Text>
-                      {expenseSummary.currentMonthTotalsByCurrency.map((row) => (
-                        <View key={row.currency} style={styles.expenseCurrencyRow}>
-                          <Text style={styles.expenseCurrencyCode}>{row.currency}</Text>
-                          <Text style={styles.expenseCurrencyAmount}>
-                            {formatExpenseAmountRu(row.totalAmount)} {row.currency}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : (
-                    <Text style={styles.expenseMuted}>
-                      В {expenseSummary.currentMonthLabel} платных сервисных записей пока нет.
-                    </Text>
-                  )}
-                </View>
-              )}
-            </>
-          ) : null}
-        </View>
-
         <View style={styles.secondarySectionCard}>
           <Pressable
             style={({ pressed }) => [
@@ -1595,6 +1464,7 @@ export default function VehicleDetailScreen() {
                     ))}
                   </View>
                 </ScrollView>
+                <AppHelpFab />
               </>
             ) : null}
           </View>
@@ -1704,6 +1574,7 @@ export default function VehicleDetailScreen() {
                     ))
                   )}
                 </ScrollView>
+                <AppHelpFab />
               </>
             ) : null}
           </View>
@@ -2578,7 +2449,7 @@ const styles = StyleSheet.create({
   subtreeModalBody: {
     paddingHorizontal: 8,
     paddingVertical: 8,
-    paddingBottom: 16,
+    paddingBottom: 88,
   },
 
   // Badge

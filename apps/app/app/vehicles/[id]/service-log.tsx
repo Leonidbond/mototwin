@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +14,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import type {
+  NodeTreeItem,
   ServiceEventItem,
   ServiceEventsFilters,
   ServiceEventsSortDirection,
@@ -22,8 +24,18 @@ import type {
   ServiceLogNodeFilter,
 } from "@mototwin/types";
 import {
+  buildExpenseSummaryFromServiceEvents,
   buildServiceLogTimelineProps,
   filterPaidServiceEvents,
+  filterPaidServiceExpenseEvents,
+  formatExpenseAmountRu,
+  formatExpenseMonthLabelRu,
+  formatIsoCalendarDateRu,
+  getCurrentExpenseMonthKey,
+  getExpenseMonthDateRange,
+  addMonthsToExpenseMonthKey,
+  getNodeAndDescendantIds,
+  getTopLevelNodeTreeItems,
   getServiceLogEventKindBadgeLabel,
   isServiceLogTimelineQueryActive,
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
@@ -83,7 +95,8 @@ function parsePaidOnlyFromParams(
 export function buildVehicleServiceLogHref(
   vehicleId: string,
   nodeFilter: ServiceLogNodeFilter | null,
-  paidOnly: boolean
+  paidOnly: boolean,
+  options?: { expandExpenses?: boolean; month?: string }
 ): string {
   const q: string[] = [];
   if (nodeFilter?.nodeIds.length) {
@@ -93,6 +106,12 @@ export function buildVehicleServiceLogHref(
   }
   if (paidOnly) {
     q.push("paidOnly=1");
+  }
+  if (options?.expandExpenses) {
+    q.push("expandExpenses=1");
+  }
+  if (options?.month) {
+    q.push(`month=${options.month}`);
   }
   return `/vehicles/${vehicleId}/service-log${q.length ? `?${q.join("&")}` : ""}`;
 }
@@ -123,7 +142,23 @@ function ServiceCard({
           {getServiceLogEventKindBadgeLabel(entry.eventKind)}
         </Text>
       </View>
-      <Text style={styles.eventTitle}>{entry.mainTitle}</Text>
+      <View style={styles.serviceCardHeaderRow}>
+        <Text style={styles.eventTitle}>{entry.mainTitle}</Text>
+        <View style={styles.rowActionsTop}>
+          <ActionIconButton
+            onPress={onEdit}
+            accessibilityLabel="Редактировать сервисное событие"
+            variant="subtle"
+            icon={<MaterialIcons name="edit" size={15} color={c.textSecondary} />}
+          />
+          <ActionIconButton
+            onPress={onDelete}
+            accessibilityLabel="Удалить сервисное событие"
+            variant="danger"
+            icon={<MaterialIcons name="delete-outline" size={15} color={c.error} />}
+          />
+        </View>
+      </View>
       {entry.wishlistOriginLabelRu ? (
         <Text style={styles.wishlistOriginLabel}>{entry.wishlistOriginLabelRu}</Text>
       ) : null}
@@ -154,20 +189,6 @@ function ServiceCard({
           {entry.costAmount.toLocaleString("ru-RU")} {entry.costCurrency}
         </Text>
       ) : null}
-      <View style={styles.rowActions}>
-        <ActionIconButton
-          onPress={onEdit}
-          accessibilityLabel="Редактировать сервисное событие"
-          variant="subtle"
-          icon={<MaterialIcons name="edit" size={15} color={c.textSecondary} />}
-        />
-        <ActionIconButton
-          onPress={onDelete}
-          accessibilityLabel="Удалить сервисное событие"
-          variant="danger"
-          icon={<MaterialIcons name="delete-outline" size={15} color={c.error} />}
-        />
-      </View>
     </View>
   );
 }
@@ -280,6 +301,7 @@ function MonthGroup({
           return (
             <View key={entry.id} style={styles.timelineItem}>
               <View style={styles.timelineRail}>
+                <View style={styles.timelineLine} />
                 <View
                   style={[
                     styles.timelineDot,
@@ -322,10 +344,13 @@ export default function ServiceLogScreen() {
     nodeLabel?: string;
     paidOnly?: string;
     feedback?: string;
+    expandExpenses?: string;
+    month?: string;
   }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
 
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
+  const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState<ServiceEventsFilters>({
@@ -339,6 +364,11 @@ export default function ServiceLogScreen() {
   const [sortDirection, setSortDirection] = useState<ServiceEventsSortDirection>("desc");
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
+  const [isExpenseMonthPickerOpen, setIsExpenseMonthPickerOpen] = useState(false);
+  const expenseMonthWheelRef = useRef<ScrollView | null>(null);
+  const [expenseMonthKey, setExpenseMonthKey] = useState<string>(getCurrentExpenseMonthKey());
+  const [expenseSectionFilter, setExpenseSectionFilter] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{
     tone: "success" | "error";
     title: string;
@@ -356,6 +386,39 @@ export default function ServiceLogScreen() {
     () => parsePaidOnlyFromParams(params.paidOnly),
     [params.paidOnly]
   );
+  const expandExpensesActive = useMemo(
+    () => parsePaidOnlyFromParams(params.expandExpenses),
+    [params.expandExpenses]
+  );
+  const monthFromParams = useMemo(
+    () => readSearchParam(params.month),
+    [params.month]
+  );
+
+  useEffect(() => {
+    if (expandExpensesActive) {
+      setIsExpenseExpanded(true);
+    }
+  }, [expandExpensesActive]);
+
+  useEffect(() => {
+    const raw = (monthFromParams ?? "").toLowerCase();
+    if (/^\d{4}-\d{2}$/.test(raw)) {
+      setExpenseMonthKey(raw);
+    }
+  }, [monthFromParams]);
+
+  useEffect(() => {
+    const range = getExpenseMonthDateRange(expenseMonthKey);
+    const inclusiveTo = new Date(`${range.dateTo}T00:00:00.000Z`);
+    inclusiveTo.setUTCDate(inclusiveTo.getUTCDate() - 1);
+    setFilters((prev) => ({
+      ...prev,
+      dateFrom: range.dateFrom,
+      dateTo: inclusiveTo.toISOString().slice(0, 10),
+      paidOnly: true,
+    }));
+  }, [expenseMonthKey]);
 
   useEffect(() => {
     const feedback = typeof params.feedback === "string" ? params.feedback : "";
@@ -393,15 +456,26 @@ export default function ServiceLogScreen() {
   const effectiveFilters = useMemo(
     (): ServiceEventsFilters => ({
       ...filters,
-      paidOnly: paidOnlyActive ? true : undefined,
+      paidOnly: paidOnlyActive || isExpenseExpanded ? true : undefined,
     }),
-    [filters, paidOnlyActive]
+    [filters, paidOnlyActive, isExpenseExpanded]
   );
 
   const hasAnyPaidInEvents = useMemo(
     () => filterPaidServiceEvents(events).length > 0,
     [events]
   );
+  const topLevelNodes = useMemo(() => getTopLevelNodeTreeItems(nodeTree), [nodeTree]);
+  const expenseSectionNodeIds = useMemo(() => {
+    if (!expenseSectionFilter) {
+      return null;
+    }
+    const section = topLevelNodes.find((node) => node.id === expenseSectionFilter);
+    if (!section) {
+      return null;
+    }
+    return getNodeAndDescendantIds(section);
+  }, [expenseSectionFilter, topLevelNodes]);
 
   const load = useCallback(async () => {
       if (!vehicleId) {
@@ -415,9 +489,12 @@ export default function ServiceLogScreen() {
         setError("");
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
-        const data = await endpoints.getServiceEvents(vehicleId);
-        const nextEvents = data.serviceEvents ?? [];
-        setEvents(nextEvents);
+        const [data, tree] = await Promise.all([
+          endpoints.getServiceEvents(vehicleId),
+          endpoints.getNodeTree(vehicleId),
+        ]);
+        setEvents(data.serviceEvents ?? []);
+        setNodeTree(tree.nodeTree ?? []);
       } catch (err) {
         console.error(err);
         setError("Не удалось загрузить журнал обслуживания.");
@@ -442,9 +519,9 @@ export default function ServiceLogScreen() {
           direction: sortDirection,
         },
         "compact",
-        nodeSubtreeFilter?.nodeIds ?? null
+        expenseSectionNodeIds ?? nodeSubtreeFilter?.nodeIds ?? null
       ).monthGroups,
-    [events, effectiveFilters, sortField, sortDirection, nodeSubtreeFilter]
+    [events, effectiveFilters, sortField, sortDirection, nodeSubtreeFilter, expenseSectionNodeIds]
   );
   const hasActiveFilters = useMemo(
     () =>
@@ -458,6 +535,62 @@ export default function ServiceLogScreen() {
       ),
     [effectiveFilters, sortField, sortDirection, nodeSubtreeFilter]
   );
+
+  const paidEventsForDashboard = useMemo(() => {
+    const ids = new Set(visibleGroups.flatMap((group) => group.entries.map((entry) => entry.id)));
+    return filterPaidServiceExpenseEvents(events.filter((event) => ids.has(event.id))).sort(
+      (a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime()
+    );
+  }, [events, visibleGroups]);
+  const dashboardSummary = useMemo(
+    () => buildExpenseSummaryFromServiceEvents(paidEventsForDashboard),
+    [paidEventsForDashboard]
+  );
+  const sectionBreakdown = useMemo(() => {
+    const topLevelById = new Map(topLevelNodes.map((node) => [node.id, node]));
+    const bySection = new Map<string, { sectionId: string | null; label: string; amount: number; currency: string }>();
+    for (const event of paidEventsForDashboard) {
+      const topLevel =
+        event.node?.topLevelNodeId && topLevelById.has(event.node.topLevelNodeId)
+          ? topLevelById.get(event.node.topLevelNodeId)!
+          : null;
+      const key = `${topLevel?.id ?? "none"}:${event.currency}`;
+      const prev = bySection.get(key) ?? {
+        sectionId: topLevel?.id ?? null,
+        label: topLevel?.name ?? "Без раздела",
+        amount: 0,
+        currency: event.currency ?? "",
+      };
+      bySection.set(key, { ...prev, amount: prev.amount + (event.costAmount ?? 0) });
+    }
+    return Array.from(bySection.values()).sort((a, b) => b.amount - a.amount).slice(0, 4);
+  }, [paidEventsForDashboard, topLevelNodes]);
+  const expenseMonthOptions = useMemo(() => {
+    const base = new Date();
+    const options: string[] = [];
+    for (let offset = -24; offset <= 24; offset += 1) {
+      const next = new Date(base.getFullYear(), base.getMonth() + offset, 1);
+      const y = next.getFullYear();
+      const m = String(next.getMonth() + 1).padStart(2, "0");
+      options.push(`${y}-${m}`);
+    }
+    return options.sort().reverse();
+  }, []);
+  const expenseMonthItemHeight = 40;
+
+  useEffect(() => {
+    if (!isExpenseMonthPickerOpen || !expenseMonthWheelRef.current) {
+      return;
+    }
+    const index = expenseMonthOptions.findIndex((item) => item === expenseMonthKey);
+    if (index < 0) {
+      return;
+    }
+    expenseMonthWheelRef.current.scrollTo({
+      y: index * expenseMonthItemHeight,
+      animated: true,
+    });
+  }, [isExpenseMonthPickerOpen, expenseMonthKey, expenseMonthOptions]);
 
   const updateFilter = (field: keyof ServiceEventsFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -576,12 +709,29 @@ export default function ServiceLogScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAwareScrollScreen contentContainerStyle={styles.scrollContent}>
-        <Pressable
-          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-          onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
-        >
-          <Text style={styles.addButtonText}>+ Добавить сервисное событие</Text>
-        </Pressable>
+        <View style={styles.topActionsRow}>
+          <Pressable
+            style={({ pressed }) => [styles.expensesButton, pressed && styles.expensesButtonPressed]}
+            onPress={() =>
+              setIsExpenseExpanded((prev) => {
+                if (prev) {
+                  setExpenseSectionFilter(null);
+                }
+                return !prev;
+              })
+            }
+          >
+            <Text style={styles.expensesButtonText}>
+              Окно расходов {isExpenseExpanded ? "▾" : "▸"}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+            onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
+          >
+            <Text style={styles.addButtonText}>Добавить сервисное событие</Text>
+          </Pressable>
+        </View>
 
         {actionMessage ? (
           <View
@@ -601,6 +751,155 @@ export default function ServiceLogScreen() {
             <Pressable onPress={() => setActionMessage(null)}>
               <Text style={styles.actionMessageDismiss}>Скрыть</Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {isExpenseExpanded ? (
+          <View style={styles.expenseInlineCard}>
+            <Text style={styles.expenseInlineTitle}>Расходы на обслуживание</Text>
+            <View style={styles.expensePeriodRow}>
+              <Pressable
+                style={styles.expenseMonthArrow}
+                onPress={() =>
+                  setExpenseMonthKey((prev) => addMonthsToExpenseMonthKey(prev, -1))
+                }
+              >
+                <Text style={styles.expenseMonthArrowText}>‹</Text>
+              </Pressable>
+              <Pressable onPress={() => setIsExpenseMonthPickerOpen((prev) => !prev)}>
+                <Text style={styles.expensePeriodLabel}>
+                  Период: {formatExpenseMonthLabelRu(expenseMonthKey)} ▼
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.expenseMonthArrow}
+                onPress={() =>
+                  setExpenseMonthKey((prev) => addMonthsToExpenseMonthKey(prev, 1))
+                }
+              >
+                <Text style={styles.expenseMonthArrowText}>›</Text>
+              </Pressable>
+            </View>
+            {isExpenseMonthPickerOpen ? (
+              <View style={styles.expenseMonthPickerListCard}>
+                <View style={styles.expenseMonthPickerCenterMarker} />
+                <ScrollView
+                  ref={expenseMonthWheelRef}
+                  style={styles.expenseMonthPickerList}
+                  contentContainerStyle={styles.expenseMonthPickerListContent}
+                  snapToInterval={expenseMonthItemHeight}
+                  decelerationRate="fast"
+                  showsVerticalScrollIndicator={false}
+                  onMomentumScrollEnd={(event) => {
+                    const offsetY = event.nativeEvent.contentOffset.y;
+                    const index = Math.round(offsetY / expenseMonthItemHeight);
+                    const normalizedIndex = Math.min(
+                      Math.max(index, 0),
+                      expenseMonthOptions.length - 1
+                    );
+                    const monthKey = expenseMonthOptions[normalizedIndex];
+                    if (monthKey && monthKey !== expenseMonthKey) {
+                      setExpenseMonthKey(monthKey);
+                    }
+                  }}
+                >
+                  {expenseMonthOptions.map((monthKey) => {
+                    const active = monthKey === expenseMonthKey;
+                    return (
+                      <Pressable
+                        key={monthKey}
+                        style={[
+                          styles.expenseMonthPickerItem,
+                          active && styles.expenseMonthPickerItemActive,
+                        ]}
+                        onPress={() => {
+                          setExpenseMonthKey(monthKey);
+                          setIsExpenseMonthPickerOpen(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.expenseMonthPickerItemText,
+                            active && styles.expenseMonthPickerItemTextActive,
+                          ]}
+                        >
+                          {formatExpenseMonthLabelRu(monthKey)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : null}
+            <Text style={styles.expenseInlineHint}>
+              Расходы считаются по сервисным событиям с указанной стоимостью. Суммы в разных
+              валютах не объединяются.
+            </Text>
+            {dashboardSummary.paidEventCount === 0 ? (
+              <View style={styles.expenseModalEmptyBox}>
+                <Text style={styles.expenseModalEmptyTitle}>Расходов за выбранный месяц нет</Text>
+              </View>
+            ) : (
+              <View style={styles.expenseModalBody}>
+                <View style={styles.expenseTotalBox}>
+                  {dashboardSummary.totalsByCurrency.map((row) => (
+                    <Text key={row.currency} style={styles.expenseTotalValue}>
+                      {dashboardSummary.totalsByCurrency.length === 1
+                        ? ""
+                        : `${row.currency}: `}
+                      {formatExpenseAmountRu(row.totalAmount)} {row.currency}
+                    </Text>
+                  ))}
+                  <Text style={styles.expenseModalStatLabel}>
+                    {dashboardSummary.paidEventCount} событий с затратами
+                  </Text>
+                </View>
+                <Text style={styles.expenseModalSubheading}>По разделам</Text>
+                {sectionBreakdown.map((row) => (
+                  <Pressable
+                    key={`${row.sectionId ?? "none"}:${row.currency}`}
+                    style={[
+                      styles.expenseModalCurrencyRow,
+                      expenseSectionFilter === row.sectionId && styles.expenseSectionRowActive,
+                    ]}
+                    onPress={() => setExpenseSectionFilter(row.sectionId)}
+                  >
+                    <Text style={styles.expenseModalCurrencyCode}>{row.label}</Text>
+                    <Text style={styles.expenseModalCurrencyAmount}>
+                      {formatExpenseAmountRu(row.amount)} {row.currency}
+                    </Text>
+                  </Pressable>
+                ))}
+                {expenseSectionFilter ? (
+                  <Pressable onPress={() => setExpenseSectionFilter(null)}>
+                    <Text style={styles.expenseClearSectionText}>Все разделы</Text>
+                  </Pressable>
+                ) : null}
+                <Text style={styles.expenseModalSubheading}>Последние расходы</Text>
+                {paidEventsForDashboard.slice(0, 5).map((event) => (
+                  <View key={event.id} style={styles.expenseModalCurrencyRow}>
+                    <Text style={styles.expenseModalCurrencyCode}>
+                      {formatIsoCalendarDateRu(event.eventDate)} {event.serviceType}
+                    </Text>
+                    <Text style={styles.expenseModalCurrencyAmount}>
+                      {formatExpenseAmountRu(event.costAmount ?? 0)} {event.currency}
+                    </Text>
+                  </View>
+                ))}
+                <Pressable
+                  onPress={() =>
+                    router.replace(
+                      buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, true, {
+                        expandExpenses: true,
+                        month: expenseMonthKey,
+                      })
+                    )
+                  }
+                >
+                  <Text style={styles.expenseAllInJournalText}>Все расходы в журнале →</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         ) : null}
 
@@ -653,7 +952,7 @@ export default function ServiceLogScreen() {
           </Pressable>
 
           {isFiltersExpanded ? (
-            <View>
+            <>
               <View style={styles.filterRow}>
                 <View style={styles.filterHalf}>
                   <Text style={styles.filterLabel}>Дата с</Text>
@@ -719,7 +1018,6 @@ export default function ServiceLogScreen() {
                   );
                 })}
               </View>
-
               <Text style={styles.filterLabel}>Расходы</Text>
               <View style={styles.chipsRow}>
                 <Pressable
@@ -731,7 +1029,6 @@ export default function ServiceLogScreen() {
                   </Text>
                 </Pressable>
               </View>
-
               <Text style={styles.filterLabel}>Сортировка</Text>
               <View style={styles.chipsRow}>
                 {[
@@ -789,7 +1086,7 @@ export default function ServiceLogScreen() {
               >
                 <Text style={styles.resetButtonText}>Сбросить</Text>
               </Pressable>
-            </View>
+            </>
           ) : null}
         </View>
 
@@ -826,6 +1123,7 @@ export default function ServiceLogScreen() {
           />
         ))}
       </KeyboardAwareScrollScreen>
+
     </SafeAreaView>
   );
 }
@@ -876,19 +1174,47 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   addButton: {
+    flex: 1,
     backgroundColor: c.primaryAction,
     borderRadius: 12,
-    paddingVertical: 12,
+    minHeight: 42,
+    paddingHorizontal: 10,
     alignItems: "center",
-    marginBottom: 14,
+    justifyContent: "center",
   },
   addButtonPressed: {
     opacity: 0.9,
   },
   addButtonText: {
     color: c.textInverse,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
+    textAlign: "center",
+  },
+  expensesButton: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+    minHeight: 42,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  topActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 14,
+  },
+  expensesButtonPressed: {
+    opacity: 0.9,
+  },
+  expensesButtonText: {
+    color: c.textPrimary,
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
   },
   actionMessageCard: {
     flexDirection: "row",
@@ -924,6 +1250,127 @@ const styles = StyleSheet.create({
   },
   actionMessageDismiss: {
     fontSize: 12,
+    fontWeight: "600",
+    color: c.textSecondary,
+    textDecorationLine: "underline",
+  },
+  expenseInlineCard: {
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 14,
+    backgroundColor: c.card,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  expenseInlineTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  expenseInlineHint: {
+    marginTop: 4,
+    fontSize: 12,
+    color: c.textMuted,
+    lineHeight: 17,
+  },
+  expensePeriodRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    marginTop: 6,
+  },
+  expenseMonthArrow: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 8,
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: c.card,
+  },
+  expenseMonthArrowText: {
+    fontSize: 18,
+    color: c.textSecondary,
+    lineHeight: 18,
+  },
+  expensePeriodLabel: {
+    fontSize: 12,
+    color: c.textPrimary,
+    fontWeight: "600",
+  },
+  expenseMonthPickerListCard: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 10,
+    backgroundColor: c.card,
+    overflow: "hidden",
+    position: "relative",
+  },
+  expenseMonthPickerCenterMarker: {
+    position: "absolute",
+    left: 6,
+    right: 6,
+    top: 70,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: "rgba(255,255,255,0.28)",
+    pointerEvents: "none",
+    zIndex: 1,
+  },
+  expenseMonthPickerList: {
+    maxHeight: 180,
+  },
+  expenseMonthPickerListContent: {
+    paddingVertical: 70,
+  },
+  expenseMonthPickerItem: {
+    paddingHorizontal: 10,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  expenseMonthPickerItemActive: {
+    backgroundColor: c.cardSubtle,
+  },
+  expenseMonthPickerItemText: {
+    fontSize: 13,
+    color: c.textSecondary,
+  },
+  expenseMonthPickerItemTextActive: {
+    color: c.textPrimary,
+    fontWeight: "700",
+  },
+  expenseTotalBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardSubtle,
+    padding: 10,
+    gap: 3,
+  },
+  expenseTotalValue: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  expenseSectionRowActive: {
+    borderColor: c.textPrimary,
+    backgroundColor: c.cardSubtle,
+  },
+  expenseClearSectionText: {
+    fontSize: 12,
+    color: c.textSecondary,
+    textDecorationLine: "underline",
+  },
+  expenseAllInJournalText: {
+    marginTop: 4,
+    fontSize: 13,
     fontWeight: "600",
     color: c.textSecondary,
     textDecorationLine: "underline",
@@ -1158,6 +1605,14 @@ const styles = StyleSheet.create({
     width: 22,
     alignItems: "center",
     paddingTop: 10,
+    position: "relative",
+  },
+  timelineLine: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: c.border,
   },
   timelineDot: {
     width: 10,
@@ -1220,10 +1675,12 @@ const styles = StyleSheet.create({
 
   // Event content
   eventTitle: {
+    flex: 1,
     fontSize: 15,
     fontWeight: "600",
     color: c.textPrimary,
     lineHeight: 20,
+    paddingRight: 6,
   },
   wishlistOriginLabel: {
     marginTop: 2,
@@ -1297,9 +1754,153 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: c.successStrong,
   },
-  rowActions: {
+  serviceCardHeaderRow: {
     flexDirection: "row",
-    marginTop: 10,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: 8,
+  },
+  rowActionsTop: {
+    flexDirection: "row",
+    gap: 8,
+    flexShrink: 0,
+  },
+  expenseModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    padding: 16,
+  },
+  expenseModalCard: {
+    maxHeight: "80%",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    padding: 12,
+  },
+  expenseModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  expenseModalTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  expenseModalClose: {
+    fontSize: 13,
+    color: c.textMeta,
+    fontWeight: "600",
+  },
+  expenseModalHint: {
+    marginTop: 6,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  expenseModalMuted: {
+    marginTop: 10,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  expenseModalError: {
+    marginTop: 10,
+    fontSize: 12,
+    color: c.error,
+  },
+  expenseModalEmptyBox: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: c.border,
+    borderRadius: 10,
+    backgroundColor: c.cardMuted,
+    padding: 12,
+  },
+  expenseModalEmptyTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  expenseModalEmptyText: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: c.textMuted,
+  },
+  expenseModalBody: {
+    marginTop: 10,
+    paddingBottom: 4,
+    gap: 10,
+  },
+  expenseModalStatRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  expenseModalStatLabel: {
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  expenseModalStatValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  expenseModalLatestBlock: {
+    gap: 3,
+  },
+  expenseModalLatestMain: {
+    fontSize: 13,
+    color: c.textPrimary,
+    fontWeight: "600",
+  },
+  expenseModalLatestMeta: {
+    fontSize: 12,
+    color: c.textSecondary,
+  },
+  expenseModalSubheading: {
+    marginTop: 2,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    color: c.textMuted,
+    fontWeight: "700",
+  },
+  expenseModalCurrencyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  expenseModalCurrencyCode: {
+    fontSize: 13,
+    color: c.textPrimary,
+  },
+  expenseModalCurrencyAmount: {
+    fontSize: 13,
+    color: c.textPrimary,
+    fontWeight: "600",
+  },
+  expenseModalCurrencyCount: {
+    fontSize: 11,
+    color: c.textMuted,
+    fontWeight: "400",
+  },
+  expenseModalMonthBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+    padding: 10,
+    gap: 4,
+  },
+  expenseModalMonthTitle: {
+    fontSize: 12,
+    color: c.textSecondary,
+    fontWeight: "600",
   },
 });

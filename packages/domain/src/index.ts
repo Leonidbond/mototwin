@@ -82,6 +82,12 @@ export {
   groupExpensesByNode,
   buildExpenseSummaryFromServiceEvents,
   formatExpenseAmountRu,
+  getCurrentExpenseMonthKey,
+  parseExpenseMonthKey,
+  formatExpenseMonthLabelRu,
+  getExpenseMonthDateRange,
+  addMonthsToExpenseMonthKey,
+  filterEventsByExpenseMonth,
   getExpenseMonthKeyFromIso,
   getExpenseMonthMeta,
 } from "./expense-summary";

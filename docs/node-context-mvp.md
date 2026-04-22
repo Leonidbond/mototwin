@@ -33,6 +33,8 @@ Node Context action set is built in shared domain and follows safety rules:
 - `Добавить комплект` if kits are available for the node;
 - `Пояснение статуса` when `statusExplanation` exists.
 
+`Журнал` opens the dedicated Service Log page/screen for current vehicle with node filter context (`nodeId` / `nodeIds` + label when available).
+
 ### Snooze reminder (local only)
 
 For nodes with `effectiveStatus` = `OVERDUE` or `SOON`, Node Context provides local reminder actions:

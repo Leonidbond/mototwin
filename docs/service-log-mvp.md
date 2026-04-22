@@ -9,6 +9,46 @@ Service Log stores and shows two event kinds:
 
 Both web and Expo show grouped timeline, filters, sorting, and expense rollups from `SERVICE` cost fields.
 
+## Dedicated page/screen
+
+Service Log is now page/screen-first UX on both clients:
+
+- **Web:** `/vehicles/[id]/service-log`
+- **Expo:** `vehicles/[id]/service-log`
+
+Service Log modal is no longer the primary UX entry point.
+
+Supported route/query params:
+
+- `paidOnly=1` — pre-enables paid-only filter
+- `nodeId=<nodeId>` or `nodeIds=<id1,id2,...>` with optional `nodeLabel` — pre-applies node filter context
+- `expandExpenses=1` — opens inline expenses block on initial load
+- optional lifecycle handoff params for add/edit flow may be used by client UI
+
+## Expenses block (inline)
+
+Expense view is inline inside Service Log on both clients and is toggled by the existing
+`Окно расходов` action.
+
+- no expense modal/overlay
+- block is collapsed by default
+- toggle behavior: first click/tap opens, second closes
+- opening expense block enables paid-only mode for journal
+- period selector uses concrete month/year (`<Месяц Год>`) and updates journal date filter immediately
+- default expense period is current calendar month
+- supported query: `month=YYYY-MM` (applies to expense dashboard + journal date filter)
+- section rows in expense block apply journal node filter by top-level section/subtree
+- `Все расходы в журнале` keeps paid-only mode and keeps current period/section focus
+- totals are grouped per currency (no cross-currency merge)
+- helper note: sums in different currencies are shown separately
+
+Expense source semantics are unchanged:
+
+- only `SERVICE` events are considered
+- include only events with `costAmount > 0` and currency
+- exclude `STATE_UPDATE`
+- exclude wishlist rows (wishlist affects expenses only after explicit service-event save)
+
 ## Editing SERVICE events
 
 `SERVICE` events are editable on both clients.

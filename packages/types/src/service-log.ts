@@ -11,6 +11,7 @@ export type ServiceEventsSortField =
   | "comment";
 
 export type ServiceEventsSortDirection = "asc" | "desc";
+export type ServiceLogPeriodFilter = "month" | "3m" | "year" | "all";
 
 export type ServiceEventsFilters = {
   dateFrom: string;
@@ -56,6 +57,13 @@ export type ServiceLogFilters = ServiceEventsFilters;
 export type ServiceLogSortState = {
   field: ServiceEventsSortField;
   direction: ServiceEventsSortDirection;
+};
+
+export type ServiceLogFilterState = {
+  filters: ServiceEventsFilters;
+  sort: ServiceLogSortState;
+  nodeFilter: ServiceLogNodeFilter | null;
+  period: ServiceLogPeriodFilter;
 };
 
 export type ServiceLogEntryVisualKind = "primary" | "secondary";
