@@ -190,21 +190,6 @@ export type NodeTreeSearchActionViewModel = {
   label: string;
 };
 
-export type MvpServiceNodeItem = {
-  id: string;
-  code: string;
-  name: string;
-  level: number;
-  parentId: string | null;
-  displayOrder: number;
-};
-
-export type MvpServiceNodeGroup = {
-  code: string;
-  name: string;
-  nodes: MvpServiceNodeItem[];
-};
-
 export type TopServiceNodeItem = {
   id: string;
   code: string;
@@ -217,11 +202,11 @@ export type TopServiceNodeItem = {
 };
 
 export type TopNodeOverviewGroupKey =
+  | "lubrication"
   | "engine"
   | "brakes"
   | "tires"
   | "chain"
-  | "electrics"
   | "suspension";
 
 export type TopNodeOverviewCard = {

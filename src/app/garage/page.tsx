@@ -26,12 +26,23 @@ export default function GaragePage() {
     try {
       setIsLoading(true);
       setError("");
-      const [data, trashData] = await Promise.all([
+      const [garageResult, trashResult] = await Promise.allSettled([
         garageApi.getGarageVehicles(),
         garageApi.getTrashedVehicles(),
       ]);
-      setVehicles(data.vehicles ?? []);
-      setTrashCount(trashData.vehicles?.length ?? 0);
+
+      if (garageResult.status === "rejected") {
+        throw garageResult.reason;
+      }
+
+      setVehicles(garageResult.value.vehicles ?? []);
+
+      if (trashResult.status === "fulfilled") {
+        setTrashCount(trashResult.value.vehicles?.length ?? 0);
+      } else {
+        console.warn("Failed to fetch trashed vehicles count:", trashResult.reason);
+        setTrashCount(0);
+      }
     } catch (err) {
       console.error(err);
       setError(

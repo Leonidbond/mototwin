@@ -33,7 +33,6 @@ type FlatNode = {
 
 type CatalogNodeRow = FlatNode & {
   isServiceRelevant: boolean;
-  isMvpVisible: boolean;
 };
 
 export type MaintenanceTreeNode = {
@@ -82,36 +81,6 @@ export type CatalogNodeContext = {
   topLevelNodes: FlatNode[];
 };
 
-function filterNodesForMvp(rows: CatalogNodeRow[]): FlatNode[] {
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  const includedIds = new Set<string>();
-
-  for (const row of rows) {
-    if (!row.isServiceRelevant || !row.isMvpVisible) {
-      continue;
-    }
-    let current: CatalogNodeRow | undefined = row;
-    while (current) {
-      includedIds.add(current.id);
-      if (!current.parentId) {
-        break;
-      }
-      current = byId.get(current.parentId);
-    }
-  }
-
-  return rows
-    .filter((row) => includedIds.has(row.id))
-    .map(({ id, code, name, level, displayOrder, parentId }) => ({
-      id,
-      code,
-      name,
-      level,
-      displayOrder,
-      parentId,
-    }));
-}
-
 function getNodeMaintenanceRuleModel(prisma: PrismaClient) {
   return (prisma as typeof prisma & {
     nodeMaintenanceRule?: {
@@ -121,8 +90,7 @@ function getNodeMaintenanceRuleModel(prisma: PrismaClient) {
 }
 
 export async function loadCatalogNodeContext(
-  prisma: PrismaClient,
-  options: { mvpOnly?: boolean } = {}
+  prisma: PrismaClient
 ): Promise<CatalogNodeContext> {
   const nodes = await prisma.node.findMany({
     where: {
@@ -137,7 +105,6 @@ export async function loadCatalogNodeContext(
       displayOrder: true,
       parentId: true,
       isServiceRelevant: true,
-      isMvpVisible: true,
     },
   });
 
@@ -153,7 +120,7 @@ export async function loadCatalogNodeContext(
     }
     return node;
   });
-  const effectiveNodes = options.mvpOnly ? filterNodesForMvp(remappedNodes) : remappedNodes;
+  const effectiveNodes = remappedNodes;
 
   const parentNodeIds = new Set<string>();
   for (const node of effectiveNodes) {
@@ -418,7 +385,7 @@ export async function loadVehicleNodeTreeJson(
     return { error: "Vehicle not found", status: 404 };
   }
 
-  const ctx = await loadCatalogNodeContext(prisma, { mvpOnly: true });
+  const ctx = await loadCatalogNodeContext(prisma);
 
   const [nodeStates, serviceEvents] = await Promise.all([
     prisma.nodeState.findMany({

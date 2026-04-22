@@ -12,7 +12,6 @@ import type {
   GarageVehiclesResponse,
   ModelVariantsResponse,
   ModelsResponse,
-  MvpServiceNodesResponse,
   PartRecommendationsResponse,
   PartSkuDetailResponse,
   PartSkusResponse,
@@ -34,7 +33,6 @@ import type {
   UpdateVehicleStateResponse,
   UpdateWishlistItemResponse,
   VehicleDetailResponse,
-  MvpServiceNodesResponse,
   TopServiceNodesResponse,
   VehicleNodeTreeResponse,
   VehicleWishlistResponse,
@@ -96,10 +94,6 @@ export function createMotoTwinEndpoints(client: ApiClient) {
       return client.request<VehicleNodeTreeResponse>(
         `/api/vehicles/${vehicleId}/node-tree`
       );
-    },
-
-    getMvpServiceNodes() {
-      return client.request<MvpServiceNodesResponse>("/api/nodes/mvp-service");
     },
 
     getTopServiceNodes() {

@@ -11,8 +11,7 @@ Both web and Expo show grouped timeline, filters, sorting, and expense rollups f
 
 Node source for add/filter flows:
 
-- primary: `GET /api/nodes/mvp-service` (MVP-visible service nodes only)
-- compatibility fallback: `GET /api/vehicles/[id]/node-tree` (full technical tree)
+- primary: `GET /api/vehicles/[id]/node-tree` (full technical tree)
 
 ## Dedicated page/screen
 

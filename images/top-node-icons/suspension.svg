@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" role="img">
+  <title>Подвеска</title>
+  <circle cx="12" cy="3.2" r="1.4"/>
+  <line x1="12" y1="4.6" x2="12" y2="6.5"/>
+  <rect x="10.4" y="6.5" width="3.2" height="1.8" rx="0.4"/>
+  <path d="M 9 9 C 16 9 16 11 9 11 C 16 11 16 13 9 13 C 16 13 16 15 9 15 C 16 15 16 17 9 17 C 16 17 16 19 9 19"/>
+  <rect x="10.4" y="19" width="3.2" height="1.8" rx="0.4"/>
+  <line x1="12" y1="20.8" x2="12" y2="22"/>
+  <circle cx="12" cy="22.4" r="1.2"/>
+</svg>

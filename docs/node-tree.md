@@ -1,9 +1,9 @@
 # MotoTwin Node Tree
 
-Документ фиксирует два среза:
+Документ фиксирует единый источник дерева узлов для UI и backend:
 
 - полное техническое дерево `Node` в БД (иерархия сохранена)
-- MVP-представление для UI через `GET /api/nodes/mvp-service`
+- API-контракт UI: `GET /api/vehicles/[id]/node-tree` (без MVP-среза)
 
 ## Hierarchy Rules (DB)
 
@@ -181,17 +181,15 @@
 - Это live snapshot, а не только seed-контракт.
 - При изменении taxonomy/seed этот документ нужно обновлять.
 
-## MVP Service Tree (UI contract)
+## Full Service Tree (UI contract)
 
-Источник для UI: `GET /api/nodes/mvp-service`
+Источник для UI: `GET /api/vehicles/[id]/node-tree`
 
 Фильтр:
 
 - `isActive = true`
-- `isServiceRelevant = true`
-- `isMvpVisible = true`
 
-Группы и узлы (текущий MVP baseline):
+Дерево включает полный каталог узлов (service и advanced), со status агрегацией по иерархии:
 
 - `ENGINE_SERVICE` — Двигатель и масло
   - `ENGINE.LUBE.OIL`

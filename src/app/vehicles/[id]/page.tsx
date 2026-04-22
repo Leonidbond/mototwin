@@ -2050,6 +2050,29 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                   `${vehicle.year} · ${vehicle.variantName}`
                 ).replace(" · ", " | ")}
               </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openCreateServiceEventModal}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
+                >
+                  Добавить ТО
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
+                >
+                  Добавить расход
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openWishlistModalForCreate()}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
+                >
+                  Подобрать деталь
+                </button>
+              </div>
 
               <div className="mt-7 grid gap-4 sm:grid-cols-2">
                 <InfoCard label="Никнейм" value={vehicle.nickname || "Не задан"} />
@@ -4310,6 +4333,13 @@ function InfoIcon() {
 
 function TopNodeOverviewIcon({ nodeKey }: { nodeKey: TopNodeOverviewCard["key"] }) {
   switch (nodeKey) {
+    case "lubrication":
+      return (
+        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 3c-2.5 4.5-4 6.8-4 9a4 4 0 0 0 8 0c0-2.2-1.5-4.5-4-9Z" />
+          <path d="M11 14a1.5 1.5 0 0 1 1-1.5" />
+        </svg>
+      );
     case "engine":
       return (
         <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
@@ -4338,13 +4368,6 @@ function TopNodeOverviewIcon({ nodeKey }: { nodeKey: TopNodeOverviewCard["key"] 
           <path d="M7 9h3a2 2 0 0 1 0 4H8" />
           <path d="M17 15h-3a2 2 0 0 1 0-4h2" />
           <path d="M10 13h4" />
-        </svg>
-      );
-    case "electrics":
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="4" y="7" width="16" height="10" rx="2" />
-          <path d="M10 10l-2 3h3l-1 3 4-5h-3l1-2Z" />
         </svg>
       );
     case "suspension":

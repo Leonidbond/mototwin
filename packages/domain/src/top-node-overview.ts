@@ -7,9 +7,14 @@ const TOP_NODE_GROUP_DEFINITIONS: Array<{
   codes: string[];
 }> = [
   {
+    key: "lubrication",
+    title: "Смазка",
+    codes: ["ENGINE.LUBE.OIL", "ENGINE.LUBE.FILTER"],
+  },
+  {
     key: "engine",
-    title: "Двигатель",
-    codes: ["ENGINE.LUBE.OIL", "ENGINE.LUBE.FILTER", "INTAKE.FILTER", "ELECTRICS.IGNITION.SPARK"],
+    title: "Двигатель / охлаждение",
+    codes: ["INTAKE.FILTER", "ELECTRICS.IGNITION.SPARK", "COOLING.LIQUID.COOLANT"],
   },
   {
     key: "brakes",
@@ -27,14 +32,9 @@ const TOP_NODE_GROUP_DEFINITIONS: Array<{
     codes: ["DRIVETRAIN.CHAIN", "DRIVETRAIN.FRONT_SPROCKET", "DRIVETRAIN.REAR_SPROCKET"],
   },
   {
-    key: "electrics",
-    title: "Электрика",
-    codes: [],
-  },
-  {
     key: "suspension",
     title: "Подвеска",
-    codes: [],
+    codes: ["SUSPENSION.FRONT.SEALS", "SUSPENSION.FRONT.OIL"],
   },
 ];
 

@@ -87,6 +87,8 @@ function getTopOverviewIconName(
   key: TopNodeOverviewCard["key"]
 ) {
   switch (key) {
+    case "lubrication":
+      return "opacity";
     case "engine":
       return "settings";
     case "brakes":
@@ -95,8 +97,6 @@ function getTopOverviewIconName(
       return "trip-origin";
     case "chain":
       return "link";
-    case "electrics":
-      return "battery-charging-full";
     case "suspension":
       return "linear-scale";
     default:
@@ -1044,6 +1044,26 @@ export default function VehicleDetailScreen() {
             {detailViewModel.brandModelLine}
           </Text>
           <Text style={styles.variantText}>{detailViewModel.yearVersionLine}</Text>
+          <View style={styles.heroQuickActionsRow}>
+            <Pressable
+              style={({ pressed }) => [styles.heroQuickActionBtn, pressed && styles.heroQuickActionBtnPressed]}
+              onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
+            >
+              <Text style={styles.heroQuickActionText}>ТО</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.heroQuickActionBtn, pressed && styles.heroQuickActionBtnPressed]}
+              onPress={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
+            >
+              <Text style={styles.heroQuickActionText}>Расход</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.heroQuickActionBtn, pressed && styles.heroQuickActionBtnPressed]}
+              onPress={() => router.push(`/vehicles/${vehicleId}/wishlist/new`)}
+            >
+              <Text style={styles.heroQuickActionText}>Деталь</Text>
+            </Pressable>
+          </View>
 
           <View style={styles.divider} />
 
@@ -1813,6 +1833,30 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 13,
     color: c.textSecondary,
+  },
+  heroQuickActionsRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    gap: 8,
+  },
+  heroQuickActionBtn: {
+    flex: 1,
+    minHeight: 34,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 10,
+    backgroundColor: c.card,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  heroQuickActionBtnPressed: {
+    backgroundColor: c.divider,
+  },
+  heroQuickActionText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textMeta,
   },
   divider: {
     height: 1,
