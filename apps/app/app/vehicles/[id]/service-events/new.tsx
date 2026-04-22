@@ -462,7 +462,7 @@ export default function NewServiceEventScreen() {
           ]}
         >
           {isSaving ? (
-            <ActivityIndicator size="small" color={c.textInverse} />
+            <ActivityIndicator size="small" color={c.onPrimaryAction} />
           ) : (
             <Text style={styles.saveButtonText}>
               {isEditMode ? "Сохранить изменения" : "Сохранить событие"}
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     color: c.textMeta,
   },
   optionChipTextActive: {
-    color: c.textInverse,
+    color: c.onPrimaryAction,
     fontWeight: "600",
   },
   selectedNodeCard: {
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   saveButtonText: {
-    color: c.textInverse,
+    color: c.onPrimaryAction,
     fontSize: 14,
     fontWeight: "700",
   },

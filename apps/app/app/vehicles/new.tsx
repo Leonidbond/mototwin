@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   chipLabelActive: {
-    color: c.textInverse,
+    color: c.onPrimaryAction,
   },
   input: {
     marginTop: 10,
@@ -546,6 +546,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 15,
     fontWeight: "700",
-    color: c.textInverse,
+    color: c.onPrimaryAction,
   },
 });

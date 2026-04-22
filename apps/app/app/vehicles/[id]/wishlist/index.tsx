@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addPrimaryPressed: { opacity: 0.92 },
-  addPrimaryText: { color: c.textInverse, fontSize: 16, fontWeight: "700" },
+  addPrimaryText: { color: c.onPrimaryAction, fontSize: 16, fontWeight: "700" },
   emptyBox: {
     borderWidth: 1,
     borderStyle: "dashed",

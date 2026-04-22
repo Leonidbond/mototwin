@@ -1,0 +1,10 @@
+{
+  "name": "@mototwin/icons",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./top-nodes": "./src/top-nodes.ts"
+  }
+}

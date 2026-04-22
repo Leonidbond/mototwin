@@ -847,7 +847,7 @@ export function WishlistItemEditor({
             ]}
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color={c.textInverse} />
+              <ActivityIndicator size="small" color={c.onPrimaryAction} />
             ) : (
               <Text style={styles.saveBtnText}>{mode === "create" ? "Добавить" : "Сохранить"}</Text>
             )}
@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
   },
   saveBtnPressed: { opacity: 0.92 },
   saveBtnDisabled: { opacity: 0.65 },
-  saveBtnText: { fontSize: 16, fontWeight: "700", color: c.textInverse },
+  saveBtnText: { fontSize: 16, fontWeight: "700", color: c.onPrimaryAction },
   modalSafe: { flex: 1, backgroundColor: c.canvas },
   modalHeader: {
     flexDirection: "row",

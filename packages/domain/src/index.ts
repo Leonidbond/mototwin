@@ -273,3 +273,5 @@ export {
   isDuplicateActiveWishlistItem,
   normalizeWishlistTitle,
 } from "./service-kits";
+
+export { resolveGarageVehicleSilhouette } from "./vehicle-silhouette";

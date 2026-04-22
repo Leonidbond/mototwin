@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,11 +23,27 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@mototwin/types": ["./packages/types/src/index.ts"],
-      "@mototwin/domain": ["./packages/domain/src/index.ts"],
-      "@mototwin/design-tokens": ["./packages/design-tokens/src/index.ts"],
-      "@mototwin/api-client": ["./packages/api-client/src/index.ts"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@mototwin/types": [
+        "./packages/types/src/index.ts"
+      ],
+      "@mototwin/domain": [
+        "./packages/domain/src/index.ts"
+      ],
+      "@mototwin/design-tokens": [
+        "./packages/design-tokens/src/index.ts"
+      ],
+      "@mototwin/api-client": [
+        "./packages/api-client/src/index.ts"
+      ],
+      "@mototwin/icons": [
+        "./packages/icons/src/index.ts"
+      ],
+      "@mototwin/icons/*": [
+        "./packages/icons/src/*"
+      ]
     }
   },
   "include": [
@@ -34,5 +54,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

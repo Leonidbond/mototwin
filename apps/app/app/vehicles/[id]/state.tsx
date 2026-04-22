@@ -150,7 +150,7 @@ export default function UpdateVehicleStateScreen() {
             ]}
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color={c.textInverse} />
+              <ActivityIndicator size="small" color={c.onPrimaryAction} />
             ) : (
               <Text style={styles.saveButtonText}>Сохранить состояние</Text>
             )}
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   saveButtonText: {
-    color: c.textInverse,
+    color: c.onPrimaryAction,
     fontSize: 14,
     fontWeight: "700",
   },

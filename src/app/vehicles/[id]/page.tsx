@@ -88,6 +88,7 @@ import {
 } from "@mototwin/domain";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
+import { TopNodeIcon } from "@/components/icons/top-nodes";
 import type {
   AttentionItemViewModel,
   AttentionSnoozeFilter,
@@ -4332,57 +4333,9 @@ function InfoIcon() {
 }
 
 function TopNodeOverviewIcon({ nodeKey }: { nodeKey: TopNodeOverviewCard["key"] }) {
-  switch (nodeKey) {
-    case "lubrication":
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 3c-2.5 4.5-4 6.8-4 9a4 4 0 0 0 8 0c0-2.2-1.5-4.5-4-9Z" />
-          <path d="M11 14a1.5 1.5 0 0 1 1-1.5" />
-        </svg>
-      );
-    case "engine":
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="4" y="8" width="9" height="8" rx="2" />
-          <path d="M13 10h4l3 3-3 3h-4" />
-        </svg>
-      );
-    case "brakes":
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="12" r="6" />
-          <path d="M17 8h3v8h-3" />
-          <circle cx="11" cy="12" r="2" />
-        </svg>
-      );
-    case "tires":
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="8" />
-          <circle cx="12" cy="12" r="4" />
-        </svg>
-      );
-    case "chain":
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M7 9h3a2 2 0 0 1 0 4H8" />
-          <path d="M17 15h-3a2 2 0 0 1 0-4h2" />
-          <path d="M10 13h4" />
-        </svg>
-      );
-    case "suspension":
-      return (
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M7 5h10" />
-          <path d="M7 19h10" />
-          <path d="M8 7l8 10" />
-          <path d="M8 17l8-10" />
-        </svg>
-      );
-    default:
-      return null;
-  }
+  return <TopNodeIcon iconKey={nodeKey} size={20} className="text-gray-700" />;
 }
+
 
 function SpecCard({ label, value }: { label: string; value: string }) {
   return (

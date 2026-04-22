@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { MaterialIcons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +13,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildAttentionActionViewModel,
@@ -72,6 +72,7 @@ import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 import { ActionIconButton } from "../../components/action-icon-button";
 import { AppHelpFab } from "../../../src/components/app-help-fab";
+import { TopNodeIcon } from "../../../components/icons/top-nodes";
 
 function getStatusColors(status: NodeStatus | null) {
   const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
@@ -83,26 +84,7 @@ function getNodeAccentColor(status: NodeStatus | null) {
   return tokens.accent;
 }
 
-function getTopOverviewIconName(
-  key: TopNodeOverviewCard["key"]
-) {
-  switch (key) {
-    case "lubrication":
-      return "opacity";
-    case "engine":
-      return "settings";
-    case "brakes":
-      return "disc-full";
-    case "tires":
-      return "trip-origin";
-    case "chain":
-      return "link";
-    case "suspension":
-      return "linear-scale";
-    default:
-      return "build";
-  }
-}
+
 
 // ─── Expandable node row ──────────────────────────────────────────────────────
 
@@ -1210,7 +1192,7 @@ export default function VehicleDetailScreen() {
               {topNodeOverviewCards.map((card) => (
                 <View key={card.key} style={styles.topOverviewCard}>
                   <View style={styles.topOverviewTitleRow}>
-                    <MaterialIcons name={getTopOverviewIconName(card.key)} size={18} color={c.textPrimary} />
+                    <TopNodeIcon iconKey={card.key} size={18} color={c.textPrimary} />
                     <Text style={styles.topOverviewTitle}>{card.title}</Text>
                   </View>
                   <View

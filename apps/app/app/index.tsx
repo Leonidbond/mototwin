@@ -4,31 +4,24 @@ import { StatusBar } from "expo-status-bar";
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
-import {
-  buildGarageCardProps,
-  buildGarageDashboardSummary,
-  filterMeaningfulGarageSpecHighlights,
-} from "@mototwin/domain";
-import {
-  productSemanticColors as c,
-  radiusScale,
-  statusSemanticTokens,
-} from "@mototwin/design-tokens";
+import { buildGarageDashboardSummary } from "@mototwin/domain";
+import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
 import {
   readCollapsiblePreference,
   writeCollapsiblePreference,
 } from "../src/ui-collapsible-preferences";
-import { ActionIconButton } from "./components/action-icon-button";
+import { GarageEmptyState } from "../components/garage/GarageEmptyState";
+import { GarageHeader } from "../components/garage/GarageHeader";
+import { GarageSummary } from "../components/garage/GarageSummary";
+import { VehicleCard } from "../components/garage/VehicleCard";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -43,26 +36,37 @@ export default function HomeScreen() {
   const apiBaseUrl = getApiBaseUrl();
 
   const loadGarage = useCallback(async () => {
-      try {
-        setIsLoading(true);
-        setError("");
-        const client = createApiClient({ baseUrl: apiBaseUrl });
-        const endpoints = createMotoTwinEndpoints(client);
-        const data = await endpoints.getGarageVehicles();
-        const trashData = await endpoints.getTrashedVehicles();
-        setVehicles(data.vehicles || []);
-        setTrashCount(trashData.vehicles?.length ?? 0);
-      } catch (requestError) {
-        console.error(requestError);
-        setError("Не удалось загрузить гараж. Проверьте подключение к backend.");
-      } finally {
-        setIsLoading(false);
+    try {
+      setIsLoading(true);
+      setError("");
+      const client = createApiClient({ baseUrl: apiBaseUrl });
+      const endpoints = createMotoTwinEndpoints(client);
+      const [garageResult, trashResult] = await Promise.allSettled([
+        endpoints.getGarageVehicles(),
+        endpoints.getTrashedVehicles(),
+      ]);
+
+      if (garageResult.status === "rejected") {
+        throw garageResult.reason;
       }
-    }, [apiBaseUrl]);
+
+      setVehicles(garageResult.value.vehicles ?? []);
+      if (trashResult.status === "fulfilled") {
+        setTrashCount(trashResult.value.vehicles?.length ?? 0);
+      } else {
+        setTrashCount(0);
+      }
+    } catch (requestError) {
+      console.error(requestError);
+      setError("Не удалось загрузить гараж. Проверьте подключение к backend.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiBaseUrl]);
 
   useFocusEffect(
     useCallback(() => {
-      loadGarage();
+      void loadGarage();
     }, [loadGarage])
   );
 
@@ -90,258 +94,81 @@ export default function HomeScreen() {
     void writeCollapsiblePreference("garage.technicalSummary.expanded", isTechnicalSummaryExpanded);
   }, [hasLoadedCollapsePrefs, isTechnicalSummaryExpanded]);
 
-  const retryLoadGarage = async () => {
-    try {
-      setIsLoading(true);
-      setError("");
-      await loadGarage();
-    } catch (requestError) {
-      console.error(requestError);
-      setError("Не удалось загрузить гараж. Проверьте подключение к backend.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
   const dashboardSummary = buildGarageDashboardSummary(vehicles);
 
-  const renderVehicleCard = ({ item }: { item: GarageVehicleItem }) => {
-    const card = buildGarageCardProps(item);
-    const { summary, rideProfile } = card;
-    const specHighlights = filterMeaningfulGarageSpecHighlights(card.specHighlights);
-
+  if (isLoading) {
     return (
-      <View style={styles.card}>
-        <Text style={styles.cardCaption}>{card.brandModelCaption}</Text>
-        <View style={styles.cardTitleRow}>
-          <Pressable
-            onPress={() => router.push(`/vehicles/${item.id}`)}
-            style={styles.cardTitlePressable}
-          >
-            <Text style={styles.cardTitleLink} numberOfLines={2} ellipsizeMode="tail">
-              {summary.title}
-            </Text>
-          </Pressable>
-          {card.attentionIndicator.isVisible ? (
-            <Pressable
-              onPress={() => router.push(`/vehicles/${item.id}`)}
-              hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel={`Требует внимания, ${card.attentionIndicator.totalCount}. Открыть карточку мотоцикла`}
-              style={({ pressed }) => [
-                styles.attentionChip,
-                {
-                  borderColor: statusSemanticTokens[card.attentionIndicator.semanticKey].border,
-                  backgroundColor:
-                    statusSemanticTokens[card.attentionIndicator.semanticKey].background,
-                  opacity: pressed ? 0.92 : 1,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.attentionDot,
-                  {
-                    backgroundColor:
-                      statusSemanticTokens[card.attentionIndicator.semanticKey].foreground,
-                  },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.attentionChipText,
-                  { color: statusSemanticTokens[card.attentionIndicator.semanticKey].foreground },
-                ]}
-              >
-                {card.attentionIndicator.totalCount}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-        <Text style={styles.cardSubtitle}>{summary.subtitle}</Text>
-        <Text style={styles.cardMeta}>{summary.yearVersionLine.replace(" · ", " | ")}</Text>
-        <View style={styles.cardDivider} />
-        <View style={styles.metricsRow}>
-          <View style={styles.metricBlock}>
-            <Text style={styles.metricLabel}>Пробег</Text>
-            <Text style={styles.metricValue}>{summary.odometerLine}</Text>
-          </View>
-          <View style={styles.metricBlock}>
-            <Text style={styles.metricLabel}>Моточасы</Text>
-            <Text style={styles.metricValue}>
-              {summary.engineHoursLineWithUnit ?? "Не указаны"}
-            </Text>
-          </View>
-          <View style={styles.metricBlock}>
-            <Text style={styles.metricLabel}>VIN</Text>
-            <Text style={styles.metricValue}>{summary.vinLine || "Не указан"}</Text>
-          </View>
-        </View>
-
-        <View style={styles.collapsibleBlock}>
-          <Pressable
-            onPress={() => setIsUsageProfileExpanded((prev) => !prev)}
-            style={({ pressed }) => [styles.collapsibleHeader, pressed && styles.collapsibleHeaderPressed]}
-          >
-            <Text style={styles.rideProfileTitle}>Профиль эксплуатации</Text>
-            <Text style={styles.collapsibleChevron}>{isUsageProfileExpanded ? "▾" : "▸"}</Text>
-          </Pressable>
-          {isUsageProfileExpanded ? (
-            rideProfile ? (
-              <View style={styles.secondaryMetaWrap}>
-                <View style={styles.metaChip}>
-                  <Text style={styles.metaChipLabel}>Сценарий: {rideProfile.usageType}</Text>
-                </View>
-                <View style={styles.metaChip}>
-                  <Text style={styles.metaChipLabel}>Стиль: {rideProfile.ridingStyle}</Text>
-                </View>
-                <View style={styles.metaChip}>
-                  <Text style={styles.metaChipLabel}>Нагрузка: {rideProfile.loadType}</Text>
-                </View>
-                <View style={styles.metaChip}>
-                  <Text style={styles.metaChipLabel}>Интенсивность: {rideProfile.usageIntensity}</Text>
-                </View>
-              </View>
-            ) : (
-              <Text style={styles.noRideProfile}>Профиль эксплуатации пока не задан.</Text>
-            )
-          ) : null}
-        </View>
-
-        <View style={styles.collapsibleBlock}>
-          <Pressable
-            onPress={() => setIsTechnicalSummaryExpanded((prev) => !prev)}
-            style={({ pressed }) => [styles.collapsibleHeader, pressed && styles.collapsibleHeaderPressed]}
-          >
-            <Text style={styles.rideProfileTitle}>Техническая сводка</Text>
-            <Text style={styles.collapsibleChevron}>{isTechnicalSummaryExpanded ? "▾" : "▸"}</Text>
-          </Pressable>
-          {isTechnicalSummaryExpanded ? (
-            specHighlights.length > 0 ? (
-              <View style={styles.secondaryMetaWrap}>
-                {specHighlights.map((spec) => (
-                  <View key={spec.label} style={styles.metaChip}>
-                    <Text style={styles.metaChipLabel}>
-                      {spec.label}: {spec.value}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.noRideProfile}>Технические параметры пока не заполнены.</Text>
-            )
-          ) : null}
-        </View>
-      </View>
-    );
-  };
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      {isLoading ? (
-        <View style={styles.stateContainer}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.center}>
           <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка гаража...</Text>
         </View>
-      ) : null}
+      </SafeAreaView>
+    );
+  }
 
-      {!isLoading && error ? (
-        <View style={styles.stateContainer}>
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.center}>
           <Text style={styles.errorTitle}>Не удалось загрузить гараж</Text>
           <Text style={styles.errorText}>{error}</Text>
-          {__DEV__ ? (
-            <Text style={styles.hintText}>Текущий API: {apiBaseUrl}</Text>
-          ) : null}
-          <Pressable onPress={() => router.push("/profile")} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Профиль</Text>
-          </Pressable>
-          <Pressable onPress={retryLoadGarage} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>Повторить</Text>
-          </Pressable>
         </View>
-      ) : null}
+      </SafeAreaView>
+    );
+  }
 
-      {!isLoading && !error && vehicles.length === 0 ? (
-        <View style={styles.stateContainer}>
-          <Text style={styles.emptyTitle}>Личный гараж пока пуст</Text>
-          <Text style={styles.stateText}>
-            Добавьте первый мотоцикл, чтобы начать вести обслуживание.
-          </Text>
-          <Pressable onPress={() => router.push("/profile")} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Профиль</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/vehicles/new")}
-            style={styles.primaryButton}
-          >
-            <Text style={styles.primaryButtonText}>Добавить мотоцикл</Text>
-          </Pressable>
-          <Pressable onPress={retryLoadGarage} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Обновить список</Text>
-          </Pressable>
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="light" />
+      {vehicles.length === 0 ? (
+        <View style={styles.contentWrap}>
+          <GarageHeader
+            trashCount={trashCount}
+            onOpenTrash={() => router.push("/trash")}
+            onOpenProfile={() => router.push("/profile")}
+            onAddVehicle={() => router.push("/vehicles/new")}
+          />
+          <GarageEmptyState
+            onOpenProfile={() => router.push("/profile")}
+            onAddVehicle={() => router.push("/vehicles/new")}
+            onReload={() => void loadGarage()}
+          />
         </View>
-      ) : null}
-
-      {!isLoading && !error && vehicles.length > 0 ? (
+      ) : (
         <FlatList
           data={vehicles}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          renderItem={renderVehicleCard}
+          renderItem={({ item }) => (
+            <VehicleCard
+              vehicle={item}
+              isUsageProfileExpanded={isUsageProfileExpanded}
+              isTechnicalSummaryExpanded={isTechnicalSummaryExpanded}
+              onOpenVehicle={(id) => router.push(`/vehicles/${id}`)}
+              onToggleUsageProfile={() => setIsUsageProfileExpanded((prev) => !prev)}
+              onToggleTechnicalSummary={() =>
+                setIsTechnicalSummaryExpanded((prev) => !prev)
+              }
+            />
+          )}
           ListHeaderComponent={
-            <View style={styles.listHeader}>
-              <Text style={styles.eyebrow}>MotoTwin | Личный гараж</Text>
-              <View style={styles.headerTopRow}>
-                <Text style={styles.title}>Мой гараж</Text>
-              </View>
-              <View style={styles.headerActionsRow}>
-                <ActionIconButton
-                  onPress={() => router.push("/trash")}
-                  accessibilityLabel={`Открыть Свалку (${trashCount})`}
-                  variant="subtle"
-                  icon={<MaterialIcons name="delete-outline" size={18} color={c.textMeta} />}
-                />
-                <ActionIconButton
-                  onPress={() => router.push("/profile")}
-                  accessibilityLabel="Открыть профиль"
-                  icon={<MaterialIcons name="person-outline" size={18} color={c.textMeta} />}
-                />
-              </View>
-              <Text style={styles.trashCounterText}>Свалка: {trashCount}</Text>
-              <Text style={styles.subtitle}>Все мотоциклы, обслуживание и покупки в одном месте</Text>
-              <Text style={styles.accountHint}>Профиль: Гость</Text>
-              <Text style={styles.accountHintMuted}>Авторизация пока не реализована</Text>
-              <Text style={styles.description}>
-                Дашборд показывает парк мотоциклов и ключевые сигналы внимания.
-              </Text>
-              <View style={styles.summaryRow}>
-                <View style={styles.summaryChip}>
-                  <Text style={styles.summaryChipLabel}>Мотоциклы</Text>
-                  <Text style={styles.summaryChipValue}>{dashboardSummary.motorcyclesCount}</Text>
-                </View>
-                <View style={styles.summaryChip}>
-                  <Text style={styles.summaryChipLabel}>Требуют внимания</Text>
-                  <Text style={styles.summaryChipValue}>
-                    {dashboardSummary.motorcyclesWithAttentionCount}
-                  </Text>
-                </View>
-                <View style={styles.summaryChip}>
-                  <Text style={styles.summaryChipLabel}>Сигналы внимания</Text>
-                  <Text style={styles.summaryChipValue}>
-                    {dashboardSummary.attentionItemsTotalCount}
-                  </Text>
-                </View>
-              </View>
-              <Pressable
-                onPress={() => router.push("/vehicles/new")}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.primaryButtonText}>Добавить мотоцикл</Text>
-              </Pressable>
+            <View>
+              <GarageHeader
+                trashCount={trashCount}
+                onOpenTrash={() => router.push("/trash")}
+                onOpenProfile={() => router.push("/profile")}
+                onAddVehicle={() => router.push("/vehicles/new")}
+              />
+              <GarageSummary
+                motorcyclesCount={dashboardSummary.motorcyclesCount}
+                motorcyclesWithAttentionCount={dashboardSummary.motorcyclesWithAttentionCount}
+                attentionItemsTotalCount={dashboardSummary.attentionItemsTotalCount}
+              />
             </View>
           }
         />
-      ) : null}
-      <StatusBar style="auto" />
+      )}
     </SafeAreaView>
   );
 }
@@ -351,303 +178,36 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: c.canvas,
   },
-  stateContainer: {
+  contentWrap: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  eyebrow: {
-    alignSelf: "flex-start",
-    fontSize: 12,
-    fontWeight: "600",
-    color: c.textMuted,
-    letterSpacing: 0.2,
-    textTransform: "uppercase",
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: c.textPrimary,
-  },
-  subtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: "500",
-    color: c.textSecondary,
-  },
-  accountHint: {
-    marginTop: 6,
-    fontSize: 12,
-    color: c.textMuted,
-  },
-  accountHintMuted: {
-    marginTop: 2,
-    fontSize: 11,
-    color: c.textTertiary,
-  },
-  description: {
-    marginTop: 10,
-    fontSize: 14,
-    lineHeight: 20,
-    color: c.textSecondary,
-  },
-  stateText: {
-    marginTop: 12,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-    color: c.textSecondary,
-  },
-  headerTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  headerActionsRow: {
-    marginTop: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  profileIconButtonPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  trashCounterText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: c.textMuted,
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: c.textPrimary,
-    textAlign: "center",
-  },
-  errorText: {
-    marginTop: 10,
-    textAlign: "center",
-    color: c.error,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  hintText: {
-    marginTop: 8,
-    color: c.textMuted,
-    fontSize: 12,
-    textAlign: "center",
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: c.textPrimary,
-  },
-  retryButton: {
-    marginTop: 16,
-    backgroundColor: c.primaryAction,
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  retryButtonText: {
-    color: c.textInverse,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  primaryButton: {
-    marginTop: 14,
-    backgroundColor: c.primaryAction,
-    borderRadius: 10,
     paddingHorizontal: 16,
-    paddingVertical: 11,
-    alignSelf: "flex-start",
-  },
-  primaryButtonText: {
-    color: c.textInverse,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    marginTop: 10,
-    borderColor: c.borderStrong,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  secondaryButtonText: {
-    color: c.textMeta,
-    fontSize: 14,
-    fontWeight: "600",
+    paddingVertical: 20,
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 28,
+    paddingVertical: 20,
+    gap: 12,
   },
-  listHeader: {
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  summaryRow: {
-    marginTop: 10,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  summaryChip: {
-    minWidth: 110,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.cardMuted,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  summaryChipLabel: {
-    fontSize: 11,
-    color: c.textMuted,
-  },
-  summaryChipValue: {
-    marginTop: 2,
-    fontSize: 16,
-    fontWeight: "700",
-    color: c.textPrimary,
-  },
-  card: {
-    backgroundColor: c.card,
-    borderColor: c.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
-  },
-  cardCaption: {
-    fontSize: 12,
-    color: c.textMuted,
-    marginBottom: 4,
-  },
-  cardTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minWidth: 0,
-  },
-  cardTitlePressable: {
+  center: {
     flex: 1,
-    minWidth: 0,
-    paddingVertical: 2,
+    alignItems: "center",
     justifyContent: "center",
+    gap: 8,
+    padding: 24,
   },
-  cardTitleLink: {
-    fontSize: 17,
-    fontWeight: "700",
-    lineHeight: 22,
-    color: c.textPrimary,
-    textDecorationLine: "underline",
-  },
-  attentionChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: 28,
-    paddingHorizontal: 8,
-    paddingVertical: 0,
-    gap: 5,
-    borderWidth: 1,
-    borderRadius: radiusScale.pill,
-    flexShrink: 0,
-    alignSelf: "center",
-  },
-  attentionDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  attentionChipText: {
-    fontSize: 12,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  cardSubtitle: {
-    marginTop: 4,
-    fontSize: 13,
-    color: c.textSecondary,
-  },
-  cardMeta: {
-    marginTop: 8,
-    fontSize: 13,
-    color: c.textMeta,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: c.divider,
-    marginVertical: 10,
-  },
-  metricsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  metricBlock: {
-    flex: 1,
-  },
-  metricLabel: {
-    fontSize: 12,
+  stateText: {
     color: c.textMuted,
-  },
-  metricValue: {
-    marginTop: 2,
     fontSize: 14,
+  },
+  errorTitle: {
+    color: c.error,
+    fontSize: 20,
     fontWeight: "700",
-    color: c.textPrimary,
   },
-  rideProfileBlock: {
-    marginTop: 10,
-  },
-  collapsibleBlock: {
-    marginTop: 10,
-  },
-  collapsibleHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  collapsibleHeaderPressed: {
-    opacity: 0.92,
-  },
-  collapsibleChevron: {
+  errorText: {
+    color: c.textMuted,
     fontSize: 14,
-    color: c.textMuted,
-  },
-  rideProfileTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: c.textPrimary,
-    marginBottom: 6,
-  },
-  noRideProfile: {
-    marginTop: 8,
-    fontSize: 12,
-    color: c.textMuted,
-  },
-  secondaryMetaWrap: {
-    marginTop: 8,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  metaChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.chipBackground,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-  },
-  metaChipLabel: {
-    fontSize: 11,
-    color: c.textSecondary,
-    fontWeight: "500",
+    textAlign: "center",
+    maxWidth: 320,
   },
 });

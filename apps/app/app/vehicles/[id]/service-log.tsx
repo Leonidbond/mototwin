@@ -1186,7 +1186,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   addButtonText: {
-    color: c.textInverse,
+    color: c.onPrimaryAction,
     fontSize: 13,
     fontWeight: "700",
     textAlign: "center",
@@ -1511,7 +1511,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   chipTextActive: {
-    color: c.textInverse,
+    color: c.onPrimaryAction,
     fontWeight: "600",
   },
   resetButton: {
