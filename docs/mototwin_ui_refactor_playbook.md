@@ -203,6 +203,32 @@ MVP-группы и готовые ассеты ([`images/top-node-icons/`](../i
 - В карточке `TopNodeStatusCard` иконка принимает нейтральный `color` (`--color-text-muted`); статус живёт в отдельном `StatusBadge` и не влияет на заливку иконки.
 - Перегенерация: `node scripts/generate-top-node-icons.js` (обновит `.svg` и `preview/`).
 
+### 7.1 Иллюстрированные карточные иконки (PNG)
+
+Альтернативный набор иконок — крупные раскрашенные иллюстрации в стилистике MotoTwin-карточек, подходят для hero-превью top-node карточек на overview мотоцикла. Исходник-референс: [`images/top-nodes cards.png`](../images/top-nodes%20cards.png). Извлечённые ассеты с прозрачным фоном и акцентными цветами каждой группы: [`images/top-node-icons/from-cards/`](../images/top-node-icons/from-cards).
+
+| # | Top-node | Метка в UI | Акцентный цвет | PNG |
+| - | - | - | - | - |
+| 1 | lubrication | Смазка | жёлтый | [`lubrication.png`](../images/top-node-icons/from-cards/lubrication.png) |
+| 2 | engine_cooling | Двигатель / охлаждение | зелёный | [`engine_cooling.png`](../images/top-node-icons/from-cards/engine_cooling.png) |
+| 3 | brakes | Тормоза | красный | [`brakes.png`](../images/top-node-icons/from-cards/brakes.png) |
+| 4 | tires | Шины | синий | [`tires.png`](../images/top-node-icons/from-cards/tires.png) |
+| 5 | chain_sprockets | Цепь / звёзды | оранжевый | [`chain_sprockets.png`](../images/top-node-icons/from-cards/chain_sprockets.png) |
+| 6 | suspension | Подвеска | фиолетовый | [`suspension.png`](../images/top-node-icons/from-cards/suspension.png) |
+
+Характеристики:
+
+- Формат: PNG 512×512, RGBA, прозрачный фон; рассчитаны на тёмный фон карточки (`#0d1118`..`#121820`).
+- Цветная часть иконки — акцент группы; нейтральные контуры — светло-серые (`~#e2e7ef`) и читаются на dark; на light theme компонент-обёртка должен инвертировать/затемнять нейтральные штрихи.
+- В отличие от line-art SVG (раздел 7), эти ассеты фиксированного цвета и не подчиняются `currentColor` — их роль декоративная, статус по-прежнему отображается отдельным `StatusBadge`.
+
+Применение:
+
+- Overview мотоцикла, `TopNodeStatusCard` большого размера (hero-карточка узла) → PNG из `from-cards/`.
+- Компактные списки, строки таблиц, 24/32 px инлайн → line-art SVG из `images/top-node-icons/`.
+
+Перегенерация: `node scripts/extract-top-node-icons-from-cards.js` (берёт `images/top-nodes cards.png` как источник, обновляет `from-cards/`).
+
 ---
 
 ## 8. Навигация и parity

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" role="img">
-  <title>Смазка</title>
-  <path d="M 12 2.8 C 9 8 6.6 10.8 6.6 14 A 5.4 5.4 0 0 0 17.4 14 C 17.4 10.8 15 8 12 2.8 Z"/>
-  <path d="M 9.6 13.6 A 2.6 2.6 0 0 1 11.6 11.6"/>
-  <line x1="12" y1="19" x2="12" y2="21.2"/>
-</svg>
