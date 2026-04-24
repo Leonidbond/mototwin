@@ -22,26 +22,34 @@ Current MVP scope:
 
 1. Header:
    - title `Мой гараж`;
-   - subtitle `Все мотоциклы, обслуживание и покупки в одном месте`;
+   - subtitle `Ваши мотоциклы, обслуживание и расходы в одном месте`;
    - prominent CTA `Добавить мотоцикл`.
 2. Compact summary (from existing garage payload only):
    - motorcycles count;
    - motorcycles requiring attention;
    - total attention items.
-3. Vehicle cards (existing behavior preserved):
+3. Vehicle cards:
    - nickname/title;
-   - brand/model/year;
-   - attention indicator;
-   - odometer/engine hours;
-   - collapsible usage profile;
-   - collapsible technical summary.
-   - secondary action `Редактировать` (opens vehicle detail/profile edit flow).
+   - compact meta line (`year · odometer · version`);
+   - motorcycle silhouette;
+   - separate `Garage Score` block with status legend;
+   - short `Требует внимания` block or healthy fallback state;
+   - quick actions:
+     - `Открыть`
+     - `Добавить ТО`
+     - `Расход`
 4. Profile entry point:
-   - user/profile icon in Garage header (top-right);
-   - opens dedicated Profile page/screen.
+   - web: available from sidebar / garage chrome;
+   - Expo: available from bottom navigation.
 5. Trash entry point:
    - action/link `Свалка` in Garage header.
-6. Vehicle removal behavior:
+6. Mobile bottom navigation (Expo):
+   - `Мой гараж`
+   - `Узлы`
+   - `Журнал`
+   - `Расходы`
+   - `Профиль`
+7. Vehicle removal behavior:
    - Garage card action **"Переместить на свалку"** performs soft-delete;
    - vehicle disappears from Garage active list;
    - restore/permanent delete is performed on `Свалка` page/screen.
@@ -52,7 +60,8 @@ When no motorcycles exist:
 
 - Web: centered illustration `images/empty_garage.png` with caption
   `В вашем гараже пока нет мотоциклов`; primary action stays in garage header.
-- Expo: short explanation text and primary action `Добавить мотоцикл`.
+- Expo: same illustration-based empty state `images/empty_garage.png` with the
+  caption `В вашем гараже пока нет мотоциклов`; primary action stays in header.
 
 ## Web
 
@@ -65,19 +74,21 @@ When no motorcycles exist:
 - Garage delete flow is now move-to-trash flow.
 - Left sidebar is a separate collapsible panel; collapsed state is persisted in
   `localStorage` under `garage.sidebar.collapsed`.
-- Empty state uses illustration-based layout (see
-  `docs/web-screen-garage-visual-refresh.md`).
+- Empty state uses illustration-based layout.
 - Root document uses explicit dark background plus `color-scheme: dark`, so
   native scrollbar area stays visually dark on narrow viewports without
   disabling page scroll.
+- Garage Score legend uses Russian status labels (`В норме`, `Скоро`, `Просрочено`, `Недавно`).
 
 ## Expo
 
 - Route: `apps/app/app/index.tsx`.
-- Same dashboard semantics with mobile-friendly header and summary chips.
-- Existing card navigation and collapsible behavior are unchanged.
-- Garage has profile entry action that navigates to `profile` screen.
+- Same dashboard semantics with mobile-first header, summary KPI cards, and web-aligned garage cards.
+- Garage includes fixed bottom navigation with `Мой гараж`, `Узлы`, `Журнал`, `Расходы`, `Профиль`.
+- Garage has profile entry action in the bottom navigation that navigates to `profile` screen.
 - Garage has `Свалка` entry action that navigates to `trash` screen.
+- Garage Score legend uses Russian status labels (`В норме`, `Скоро`, `Просрочено`, `Недавно`).
+- Global help action `?` lives in the top-right corner.
 
 ## Shared layer
 

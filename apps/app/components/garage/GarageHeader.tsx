@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Chip, SectionHeader, Button } from "../ui";
+import { StyleSheet, Text, View } from "react-native";
+import { Button } from "../ui";
 import { ActionIconButton } from "../../app/components/action-icon-button";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 
@@ -10,60 +10,101 @@ export function GarageHeader(props: {
   onOpenProfile: () => void;
   onAddVehicle: () => void;
 }) {
-  const headerActions = [
-    {
-      key: "trash",
-      onPress: props.onOpenTrash,
-      accessibilityLabel: `Открыть Свалку (${props.trashCount})`,
-      variant: "subtle" as const,
-      iconName: "delete-outline" as const,
-    },
-    {
-      key: "profile",
-      onPress: props.onOpenProfile,
-      accessibilityLabel: "Открыть профиль",
-      iconName: "person-outline" as const,
-    },
-  ];
-
   return (
-    <View>
-      <SectionHeader
-        titleVisual="page"
-        eyebrow={<Chip tone="accent">MotoTwin | Личный гараж</Chip>}
-        title="Мой гараж"
-        subtitle="Все мотоциклы, обслуживание и покупки в одном месте"
-        actions={
-          <View style={styles.actions}>
-            {headerActions.map((action) => (
-              <ActionIconButton
-                key={action.key}
-                onPress={action.onPress}
-                accessibilityLabel={action.accessibilityLabel}
-                variant={action.variant}
-                icon={<MaterialIcons name={action.iconName} size={18} color={c.textMeta} />}
-              />
-            ))}
+    <View style={styles.wrap}>
+      <Text style={styles.title}>Мой гараж</Text>
+      <Text style={styles.subtitle}>
+        Ваши мотоциклы, обслуживание и расходы в одном месте.
+      </Text>
+      <View style={styles.actionsRow}>
+        <View style={styles.iconActions}>
+          <View style={styles.badgedIcon}>
+            <ActionIconButton
+              onPress={props.onOpenTrash}
+              accessibilityLabel={`Открыть Свалку (${props.trashCount})`}
+              variant="subtle"
+              icon={<MaterialIcons name="delete-outline" size={22} color={c.textPrimary} />}
+              style={styles.roundAction}
+            />
+            {props.trashCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{props.trashCount}</Text>
+              </View>
+            ) : null}
           </View>
-        }
-      />
-      <View style={styles.metaRow}>
-        <Text style={styles.metaText}>Свалка: {props.trashCount}</Text>
-        <Pressable onPress={props.onAddVehicle}>
-          <Button variant="primary" size="sm">Добавить мотоцикл</Button>
-        </Pressable>
+        </View>
+        <Button
+          variant="primary"
+          size="md"
+          onPress={props.onAddVehicle}
+          style={styles.addButton}
+          leadingIcon={<MaterialIcons name="add" size={20} color={c.onPrimaryAction} />}
+        >
+          Добавить мотоцикл
+        </Button>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: "row", gap: 8 },
-  metaRow: {
-    marginTop: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  wrap: {
+    gap: 12,
+    marginBottom: 10,
   },
-  metaText: { color: c.textMuted, fontSize: 12, fontWeight: "500" },
+  title: {
+    color: c.textPrimary,
+    fontSize: 36,
+    lineHeight: 40,
+    fontWeight: "800",
+    letterSpacing: -0.8,
+  },
+  subtitle: {
+    color: c.textMuted,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "500",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  iconActions: {
+    flexDirection: "row",
+  },
+  badgedIcon: {
+    position: "relative",
+  },
+  roundAction: {
+    width: 52,
+    height: 52,
+    borderRadius: 999,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+  },
+  addButton: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
+  },
+  badge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 999,
+    backgroundColor: "#FF5148",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: c.canvas,
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
 });

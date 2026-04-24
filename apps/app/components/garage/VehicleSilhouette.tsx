@@ -1,5 +1,4 @@
 import { Image, StyleSheet, View } from "react-native";
-import { productSemanticColors as c, radiusScale } from "@mototwin/design-tokens";
 import { resolveGarageVehicleSilhouette } from "@mototwin/domain";
 import type { GarageVehicleItem } from "@mototwin/types";
 import adventureTouring from "../../../../images/motorcycle-class-silhouettes/adventure_touring.png";
@@ -32,17 +31,13 @@ export function VehicleSilhouette({ vehicle }: { vehicle: GarageVehicleItem }) {
 
 const styles = StyleSheet.create({
   wrap: {
-    height: 96,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.cardSubtle,
-    borderRadius: radiusScale.md,
-    overflow: "hidden",
+    height: 156,
     justifyContent: "center",
     alignItems: "center",
   },
   image: {
-    width: "94%",
-    height: "94%",
+    width: "100%",
+    height: "100%",
+    opacity: 0.62,
   },
 });

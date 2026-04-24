@@ -2,10 +2,7 @@
 
 ## Назначение документа
 
-Этот документ объединяет:
-
-- `docs/mototwin_full_design_concept_for_cursor.md`
-- `docs/mototwin_design_concept_with_existing_tree_and_journal.md`
+Этот документ является единым актуальным источником дизайн-правил для MotoTwin.
 
 Цель: дать один актуальный источник правил для web и mobile, с учетом уже реализованных фич (полное дерево узлов, полный журнал обслуживания, top-node overview).
 

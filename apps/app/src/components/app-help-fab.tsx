@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 
 const HELP_ICONS = [
@@ -28,9 +29,10 @@ const WORKFLOW_STEPS = [
   "5) Обновляйте «Текущее состояние» и ведите журнал обслуживания.",
 ];
 
-export function AppHelpFab({ bottomOffset = 18 }: { bottomOffset?: number }) {
+export function AppHelpFab() {
   const [isOpen, setIsOpen] = useState(false);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
+  const insets = useSafeAreaInsets();
 
   return (
     <>
@@ -38,7 +40,11 @@ export function AppHelpFab({ bottomOffset = 18 }: { bottomOffset?: number }) {
         onPress={() => setIsOpen(true)}
         accessibilityRole="button"
         accessibilityLabel="Открыть подсказки по иконкам и порядку работы"
-        style={({ pressed }) => [styles.fab, { bottom: bottomOffset }, pressed && styles.fabPressed]}
+        style={({ pressed }) => [
+          styles.fab,
+          { top: Math.max(insets.top + 12, 18) },
+          pressed && styles.fabPressed,
+        ]}
       >
         <Text style={styles.fabText}>?</Text>
       </Pressable>
@@ -92,6 +98,7 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: 16,
+    top: 18,
     width: 48,
     height: 48,
     borderRadius: 24,

@@ -1,6 +1,6 @@
 # Аудит паритета Web (Next.js) и Expo — индекс и статус
 
-**Назначение:** краткая **навигация** и **текущий снимок** паритета web/Expo. Детальные матрицы, остаточные зазоры, батчи и QA — в **[web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md)** (актуальная вторая сверка пост-фиксов), **[web-expo-parity-audit-repeat.md](./web-expo-parity-audit-repeat.md)** (первая повторная сверка) и в документах `web-expo-*-fixes.md` ниже.  
+**Назначение:** краткая **навигация** и **текущий снимок** паритета web/Expo. Детальные матрицы, остаточные зазоры, батчи и QA — в **[web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md)** (актуальная детальная сверка) и в документах `web-expo-*-fixes.md` ниже.  
 **Не дублировать здесь** длинные таблицы находок: они разбиты по специализированным fix-докам и повторным аудитам.
 
 **Дата первичного обзора:** 2026-04-18  
@@ -20,8 +20,7 @@
 
 | Документ | Содержание |
 |----------|------------|
-| [web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md) | **Актуально:** вторая сверка после батчей (RUB, даты, спеки, токены, Expo debug, docs); матрица, подтверждённые фиксы, остаточные low-зазоры, QA |
-| [web-expo-parity-audit-repeat.md](./web-expo-parity-audit-repeat.md) | Первая повторная сверка (история контекста) |
+| [web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md) | **Актуально:** детальная сверка после батчей (RUB, даты, спеки, токены, Expo debug, docs); матрица, подтверждённые фиксы, остаточные low-зазоры, QA |
 | [web-expo-parity-fixes.md](./web-expo-parity-fixes.md) | Первые функциональные выравнивания (в т.ч. высокий приоритет) |
 | [web-expo-data-parity-fixes.md](./web-expo-data-parity-fixes.md) | Паритет данных, гараж, журнал, общие VM |
 | [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md) | Журнал обслуживания |

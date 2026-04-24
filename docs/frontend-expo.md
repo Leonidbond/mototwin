@@ -23,6 +23,31 @@ Defined in `apps/app/app/_layout.tsx`:
 - States: loading / error / empty / list
 - Primary action: "Добавить мотоцикл" -> `vehicles/new`
 - Refresh on focus (`useFocusEffect`)
+- Header matches current Garage product hierarchy:
+  - large title `Мой гараж`
+  - concise subtitle
+  - top action `Свалка`
+  - global help action `?` in the top-right corner
+- Uses compact 2x2 KPI cards with the same garage summary icons as web
+- Uses fixed bottom navigation:
+  - `Мой гараж`
+  - `Узлы`
+  - `Журнал`
+  - `Расходы`
+  - `Профиль`
+- Empty state uses illustration `images/empty_garage.png` and caption
+  `В вашем гараже пока нет мотоциклов`
+- Vehicle cards are web-aligned by information architecture:
+  - title + compact meta line
+  - silhouette block
+  - dedicated `Garage Score` panel
+  - short `Требует внимания` section
+  - quick actions `Открыть`, `Добавить ТО`, `Расход`
+- Garage Score legend uses Russian status labels:
+  - `В норме`
+  - `Скоро`
+  - `Просрочено`
+  - `Недавно`
 
 ### 3.2 Add Motorcycle (`vehicles/new.tsx`)
 - Progressive single-screen flow
@@ -111,3 +136,4 @@ Detailed parity matrix: `cross-platform-parity.md`.
 - `shared-packages.md`
 - `cross-platform-parity.md`
 - `api-backend.md`
+- `garage-dashboard-mvp.md`

@@ -44,22 +44,17 @@
   - Почему важно: высокая стоимость навигации и риск выбора устаревшего doc.
   - Действие: переписать индекс и выделить canonical docs.
 
-- `docs/expo-app-architecture.md`
-  - Проблема: оформлен как target-документ раннего этапа, часть route-структуры отличается от фактической.
-  - Почему важно: потенциальный конфликт с реально реализованными экранами.
-  - Действие: явно пометить как исторический migration-документ.
-
-- `docs/shared-packages-bootstrap.md`
-  - Проблема: описывает bootstrap-этап, но shared packages уже используются шире.
-  - Почему важно: занижает текущий уровень shared reuse.
-  - Действие: пометить как исторический bootstrap record.
+- legacy bootstrap / migration docs раннего этапа
+  - Проблема: часть ранних planning/bootstrap артефактов быстро устаревает и начинает конфликтовать с фактической route-структурой и текущим shared reuse.
+  - Почему важно: такие документы нужно либо архивировать, либо удалять после переноса итогового знания в canonical docs.
+  - Действие: не использовать как source of truth; переносить итог в `frontend-expo.md`, `shared-packages.md`, `technical-overview.md`.
 
 ### Fully outdated / misleading as primary docs
 
-- `docs/frontend.md`
-  - Проблема: описывает только web frontend и старую modal-centric модель как единственный frontend-контур.
-  - Почему важно: сейчас есть полноценный Expo-клиент и cross-platform parity требования.
-  - Действие: репозиционировать как legacy web snapshot, добавить указатель на новые `frontend-web.md` и `frontend-expo.md`.
+- legacy frontend snapshots
+  - Проблема: старые frontend snapshots быстро расходятся с current-state docs по web/Expo.
+  - Почему важно: сейчас есть отдельные canonical docs `frontend-web.md` и `frontend-expo.md`.
+  - Действие: хранить только как архивный контекст либо удалять после переноса значимого содержимого.
 
 - `docs/project.md`
   - Проблема: содержит большой объем product-scope и API/modules, которые не реализованы (auth, fitment engine, expenses module, subscription flows и др.).
@@ -118,7 +113,7 @@
 ### Web frontend
 - Статус: **partial/outdated as standalone truth**.
 - Gap: нет отдельного canonical документа под web как один из двух клиентов.
-- Fix: создать `frontend-web.md`, перевести `frontend.md` в historical.
+- Fix: поддерживать `frontend-web.md` как canonical doc по web-клиенту.
 
 ### Expo frontend
 - Статус: **fragmented across task docs**.
@@ -128,7 +123,7 @@
 ### Shared packages
 - Статус: **bootstrap-only docs**.
 - Gap: нет текущего shared contracts обзора.
-- Fix: `shared-packages.md`, `shared-packages-bootstrap.md` пометить historical.
+- Fix: `shared-packages.md` использовать как canonical обзор shared слоя; bootstrap-артефакты не использовать как source of truth.
 
 ### Business logic
 - Статус: **good but needs consolidation**.

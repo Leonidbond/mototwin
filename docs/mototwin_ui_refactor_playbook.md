@@ -7,9 +7,8 @@
 Он консолидирует:
 
 - `docs/mototwin_unified_design_concept.md` (актуальный источник правил);
-- `docs/mototwin_full_design_concept_for_cursor.md` (полные продуктовые и визуальные детали);
-- `docs/mototwin_design_concept_with_existing_tree_and_journal.md` (ограничения интеграции с уже реализованными flow);
-- анализ референсов из `images/examples`.
+- анализ референсов из `images/examples`;
+- текущие продуктовые ограничения уже реализованных flow (дерево, журнал, garage/dashboard).
 
 Цель: дать команде единый практический план "что, в каком порядке и по каким критериям" делать в UI-рефакторинге.
 

@@ -39,8 +39,9 @@
   lives in garage header
 - Root document uses explicit dark background and `color-scheme: dark`, so the
   garage keeps a dark native scrollbar area on narrow viewports
-- Visual density and layout decisions are documented in
-  `docs/web-screen-garage-visual-refresh.md`
+- Garage Score legend uses Russian status labels
+  (`В норме`, `Скоро`, `Просрочено`, `Недавно`)
+- Durable Garage behavior/spec lives in `garage-dashboard-mvp.md`
 
 ### 3.4 Vehicle detail (web workspace)
 
@@ -77,4 +78,4 @@ After successful mutation, page reloads relevant datasets to reflect updated sta
 - `cross-platform-parity.md`
 - `api-backend.md`
 - `functional-logic.md`
-- `web-screen-garage-visual-refresh.md`
+- `garage-dashboard-mvp.md`

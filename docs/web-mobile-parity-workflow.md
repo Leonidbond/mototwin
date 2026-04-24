@@ -86,7 +86,7 @@
 
 - [coding-rules.md](./coding-rules.md) — раздел 25, общие правила паритета  
 - [web-expo-parity-audit.md](./web-expo-parity-audit.md) — краткий индекс статуса web/Expo и ссылки на детальные документы  
-- [web-expo-parity-audit-repeat.md](./web-expo-parity-audit-repeat.md) — детальная матрица и остаточные зазоры после батчей  
+- [web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md) — актуальная детальная матрица и остаточные зазоры после батчей  
 - [cross-platform-parity.md](./cross-platform-parity.md) — продуктовая матрица паритета и намеренные отличия  
 - [parity-task-template.md](./parity-task-template.md) — шаблон промпта  
 - [cursor-workflow.md](./cursor-workflow.md) — требования к полям промпта в Cursor  

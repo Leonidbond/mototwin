@@ -105,13 +105,13 @@ export function VehicleCard({ vehicle }: Props) {
             <div style={scoreUnitStyle}>/100</div>
           </div>
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
-            <LegendRow color={LEGEND_COLORS.ok} value={okCount} label="OK" />
-            <LegendRow color={LEGEND_COLORS.soon} value={soonCount} label="Soon" />
-            <LegendRow color={LEGEND_COLORS.overdue} value={overdueCount} label="Overdue" />
+            <LegendRow color={LEGEND_COLORS.ok} value={okCount} label="В норме" />
+            <LegendRow color={LEGEND_COLORS.soon} value={soonCount} label="Скоро" />
+            <LegendRow color={LEGEND_COLORS.overdue} value={overdueCount} label="Просрочено" />
             <LegendRow
               color={LEGEND_COLORS.recently}
               value={recentlyCount}
-              label="Recently"
+              label="Недавно"
               labelColor={LEGEND_COLORS.recently}
             />
           </div>

@@ -8,7 +8,6 @@
 **Связанные документы:**
 
 - [web-expo-parity-audit.md](./web-expo-parity-audit.md) — индекс и навигация  
-- [web-expo-parity-audit-repeat.md](./web-expo-parity-audit-repeat.md) — первый повторный аудит  
 - [cross-platform-parity.md](./cross-platform-parity.md), [web-expo-visual-parity-fixes.md](./web-expo-visual-parity-fixes.md), [web-expo-data-parity-fixes.md](./web-expo-data-parity-fixes.md), [shared-form-contracts.md](./shared-form-contracts.md), [shared-design-tokens.md](./shared-design-tokens.md), [status-cache-frontend-qa.md](./status-cache-frontend-qa.md)  
 
 **Ключевые файлы реализации:**
@@ -56,7 +55,12 @@
 | Design tokens | Practical parity | Оба: `statusSemanticTokens`, `productSemanticColors`; web — токены для гаража (карточки), журнала, ошибок/success на ТС; остальной нейтраль — **Tailwind** |
 | Empty / error states | Practical parity | Сообщения согласованы по смыслу; Expo не показывает URL API в prod-like сборке |
 
-**Легенда:** Full / Practical / Partial / N/A — как в [web-expo-parity-audit-repeat.md](./web-expo-parity-audit-repeat.md) §1.
+**Легенда:**
+
+- **Full parity** — один смысл данных и исходов при том же API.
+- **Practical parity with platform-specific UX** — смысл совпадает, паттерн UI разный.
+- **Partial parity** — есть заметные различия, не блокирующие core workflow.
+- **N/A** — не применимо к паре клиентов.
 
 ---
 

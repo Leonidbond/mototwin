@@ -36,7 +36,7 @@
 <!-- Сценарии на web и Expo; граничные случаи; проверка API при необходимости. -->
 
 ## Documentation requirements
-<!-- Какие docs обновить или создать; где зафиксировать gap. Для паритета: при необходимости cross-platform-parity.md, web-expo-parity-audit.md (краткий статус/ссылка), web-expo-parity-audit-repeat.md или тематический web-expo-*-fixes.md; контракты — shared-form-contracts.md, shared-design-tokens.md и т.п. -->
+<!-- Какие docs обновить или создать; где зафиксировать gap. Для паритета: при необходимости cross-platform-parity.md, web-expo-parity-audit.md (краткий статус/ссылка), web-expo-parity-audit-repeat-2.md или тематический web-expo-*-fixes.md; контракты — shared-form-contracts.md, shared-design-tokens.md и т.п. -->
 
 ## Constraints
 <!-- MVP, без новых библиотек, только docs, и т.д. -->

@@ -1,23 +1,20 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   ActivityIndicator,
   FlatList,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
-import {
-  readCollapsiblePreference,
-  writeCollapsiblePreference,
-} from "../src/ui-collapsible-preferences";
+import { GarageBottomNav } from "../components/garage/GarageBottomNav";
 import { GarageEmptyState } from "../components/garage/GarageEmptyState";
 import { GarageHeader } from "../components/garage/GarageHeader";
 import { GarageSummary } from "../components/garage/GarageSummary";
@@ -28,9 +25,6 @@ export default function HomeScreen() {
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
-  const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
-  const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
 
   const apiBaseUrl = getApiBaseUrl();
@@ -70,36 +64,34 @@ export default function HomeScreen() {
     }, [loadGarage])
   );
 
-  useEffect(() => {
-    void (async () => {
-      const usage = await readCollapsiblePreference("garage.usageProfile.expanded");
-      const tech = await readCollapsiblePreference("garage.technicalSummary.expanded");
-      if (usage != null) {
-        setIsUsageProfileExpanded(usage);
-      }
-      if (tech != null) {
-        setIsTechnicalSummaryExpanded(tech);
-      }
-      setHasLoadedCollapsePrefs(true);
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (!hasLoadedCollapsePrefs) return;
-    void writeCollapsiblePreference("garage.usageProfile.expanded", isUsageProfileExpanded);
-  }, [hasLoadedCollapsePrefs, isUsageProfileExpanded]);
-
-  useEffect(() => {
-    if (!hasLoadedCollapsePrefs) return;
-    void writeCollapsiblePreference("garage.technicalSummary.expanded", isTechnicalSummaryExpanded);
-  }, [hasLoadedCollapsePrefs, isTechnicalSummaryExpanded]);
-
   const dashboardSummary = buildGarageDashboardSummary(vehicles);
   const openTrash = useCallback(() => router.push("/trash"), [router]);
   const openProfile = useCallback(() => router.push("/profile"), [router]);
   const openAddVehicle = useCallback(() => router.push("/vehicles/new"), [router]);
   const reloadGarage = useCallback(() => void loadGarage(), [loadGarage]);
   const openVehicle = useCallback((id: string) => router.push(`/vehicles/${id}`), [router]);
+  const openServiceEvent = useCallback(
+    (id: string) => router.push(`/vehicles/${id}/service-events/new`),
+    [router]
+  );
+  const openServiceLog = useCallback(
+    (id: string) => router.push(`/vehicles/${id}/service-log`),
+    [router]
+  );
+  const primaryVehicleId = vehicles[0]?.id ?? null;
+  const openGarage = useCallback(() => router.push("/"), [router]);
+  const openNodes = useCallback(() => {
+    if (!primaryVehicleId) return;
+    router.push(`/vehicles/${primaryVehicleId}`);
+  }, [primaryVehicleId, router]);
+  const openJournal = useCallback(() => {
+    if (!primaryVehicleId) return;
+    router.push(`/vehicles/${primaryVehicleId}/service-log`);
+  }, [primaryVehicleId, router]);
+  const openExpenses = useCallback(() => {
+    if (!primaryVehicleId) return;
+    router.push(`/vehicles/${primaryVehicleId}/service-log`);
+  }, [primaryVehicleId, router]);
 
   if (isLoading) {
     return (
@@ -120,64 +112,66 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <StatusBar style="light" />
-      {vehicles.length === 0 ? (
-        <View style={styles.contentWrap}>
-          <GarageHeader
-            trashCount={trashCount}
-            onOpenTrash={openTrash}
-            onOpenProfile={openProfile}
-            onAddVehicle={openAddVehicle}
-          />
-          <GarageEmptyState
-            onOpenProfile={openProfile}
-            onAddVehicle={openAddVehicle}
-            onReload={reloadGarage}
-          />
-        </View>
-      ) : (
-        <FlatList
-          data={vehicles}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <VehicleCard
-              vehicle={item}
-              isUsageProfileExpanded={isUsageProfileExpanded}
-              isTechnicalSummaryExpanded={isTechnicalSummaryExpanded}
-              onOpenVehicle={openVehicle}
-              onToggleUsageProfile={() => setIsUsageProfileExpanded((prev) => !prev)}
-              onToggleTechnicalSummary={() =>
-                setIsTechnicalSummaryExpanded((prev) => !prev)
-              }
+      <View style={styles.screen}>
+        {vehicles.length === 0 ? (
+          <View style={styles.contentWrap}>
+            <GarageHeader
+              trashCount={trashCount}
+              onOpenTrash={openTrash}
+              onOpenProfile={openProfile}
+              onAddVehicle={openAddVehicle}
             />
-          )}
-          ListHeaderComponent={
-            <View>
-              <GarageHeader
-                trashCount={trashCount}
-                onOpenTrash={openTrash}
-                onOpenProfile={openProfile}
-                onAddVehicle={openAddVehicle}
+            <GarageEmptyState onReload={reloadGarage} />
+          </View>
+        ) : (
+          <FlatList
+            data={vehicles}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <VehicleCard
+                vehicle={item}
+                onOpenVehicle={openVehicle}
+                onAddServiceEvent={openServiceEvent}
+                onOpenServiceLog={openServiceLog}
               />
-              <GarageSummary
-                motorcyclesCount={dashboardSummary.motorcyclesCount}
-                motorcyclesWithAttentionCount={dashboardSummary.motorcyclesWithAttentionCount}
-                attentionItemsTotalCount={dashboardSummary.attentionItemsTotalCount}
-                expensesLabel={dashboardSummary.currentMonthExpensesLabel}
-              />
-            </View>
-          }
+            )}
+            ListHeaderComponent={
+              <View>
+                <GarageHeader
+                  trashCount={trashCount}
+                  onOpenTrash={openTrash}
+                  onOpenProfile={openProfile}
+                  onAddVehicle={openAddVehicle}
+                />
+                <GarageSummary
+                  motorcyclesCount={dashboardSummary.motorcyclesCount}
+                  motorcyclesWithAttentionCount={dashboardSummary.motorcyclesWithAttentionCount}
+                  attentionItemsTotalCount={dashboardSummary.attentionItemsTotalCount}
+                  expensesLabel={dashboardSummary.currentMonthExpensesLabel}
+                />
+              </View>
+            }
+          />
+        )}
+        <GarageBottomNav
+          onOpenGarage={openGarage}
+          onOpenNodes={openNodes}
+          onOpenJournal={openJournal}
+          onOpenExpenses={openExpenses}
+          onOpenProfile={openProfile}
+          hasVehicleContext={!!primaryVehicleId}
         />
-      )}
+      </View>
     </SafeAreaView>
   );
 }
 
 function GarageScreenState(props: { children: ReactNode }) {
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.center}>{props.children}</View>
     </SafeAreaView>
   );
@@ -188,14 +182,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: c.canvas,
   },
+  screen: {
+    flex: 1,
+  },
   contentWrap: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingVertical: 12,
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingVertical: 12,
     gap: 12,
   },
   center: {
