@@ -20,6 +20,7 @@ import {
   buildRideProfileViewModel,
 } from "./vehicle-view-models";
 import { buildGarageAttentionIndicatorViewModel } from "./garage-attention";
+import { calculateGarageScore } from "./garage-score";
 
 export function buildGarageCardProps(vehicle: GarageVehicleItem): GarageCardProps {
   const summary = buildVehicleSummaryViewModel(vehicle);
@@ -35,6 +36,7 @@ export function buildGarageCardProps(vehicle: GarageVehicleItem): GarageCardProp
   return {
     vehicleId: vehicle.id,
     brandModelCaption,
+    garageScore: calculateGarageScore(vehicle.attentionSummary ?? null),
     summary,
     rideProfile,
     specHighlights,

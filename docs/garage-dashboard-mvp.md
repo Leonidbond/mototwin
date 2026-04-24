@@ -50,8 +50,9 @@ Current MVP scope:
 
 When no motorcycles exist:
 
-- `Добавьте первый мотоцикл, чтобы начать вести обслуживание`;
-- primary action `Добавить мотоцикл`.
+- Web: centered illustration `images/empty_garage.png` with caption
+  `В вашем гараже пока нет мотоциклов`; primary action stays in garage header.
+- Expo: short explanation text and primary action `Добавить мотоцикл`.
 
 ## Web
 
@@ -62,6 +63,13 @@ When no motorcycles exist:
 - Garage settings block removed; settings are moved to `/profile`.
 - Active list excludes trashed vehicles.
 - Garage delete flow is now move-to-trash flow.
+- Left sidebar is a separate collapsible panel; collapsed state is persisted in
+  `localStorage` under `garage.sidebar.collapsed`.
+- Empty state uses illustration-based layout (see
+  `docs/web-screen-garage-visual-refresh.md`).
+- Root document uses explicit dark background plus `color-scheme: dark`, so
+  native scrollbar area stays visually dark on narrow viewports without
+  disabling page scroll.
 
 ## Expo
 

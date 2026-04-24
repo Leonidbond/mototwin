@@ -10,6 +10,22 @@ export function GarageHeader(props: {
   onOpenProfile: () => void;
   onAddVehicle: () => void;
 }) {
+  const headerActions = [
+    {
+      key: "trash",
+      onPress: props.onOpenTrash,
+      accessibilityLabel: `Открыть Свалку (${props.trashCount})`,
+      variant: "subtle" as const,
+      iconName: "delete-outline" as const,
+    },
+    {
+      key: "profile",
+      onPress: props.onOpenProfile,
+      accessibilityLabel: "Открыть профиль",
+      iconName: "person-outline" as const,
+    },
+  ];
+
   return (
     <View>
       <SectionHeader
@@ -19,17 +35,15 @@ export function GarageHeader(props: {
         subtitle="Все мотоциклы, обслуживание и покупки в одном месте"
         actions={
           <View style={styles.actions}>
-            <ActionIconButton
-              onPress={props.onOpenTrash}
-              accessibilityLabel={`Открыть Свалку (${props.trashCount})`}
-              variant="subtle"
-              icon={<MaterialIcons name="delete-outline" size={18} color={c.textMeta} />}
-            />
-            <ActionIconButton
-              onPress={props.onOpenProfile}
-              accessibilityLabel="Открыть профиль"
-              icon={<MaterialIcons name="person-outline" size={18} color={c.textMeta} />}
-            />
+            {headerActions.map((action) => (
+              <ActionIconButton
+                key={action.key}
+                onPress={action.onPress}
+                accessibilityLabel={action.accessibilityLabel}
+                variant={action.variant}
+                icon={<MaterialIcons name={action.iconName} size={18} color={c.textMeta} />}
+              />
+            ))}
           </View>
         }
       />

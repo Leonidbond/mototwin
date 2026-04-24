@@ -164,6 +164,7 @@ export {
   buildNodeTreeSectionProps,
   buildServiceLogTimelineProps,
 } from "./component-contract-props";
+export { calculateGarageScore } from "./garage-score";
 export { buildGarageDashboardSummary } from "./garage-dashboard";
 export {
   DEFAULT_USER_SETTINGS,
@@ -274,4 +275,7 @@ export {
   normalizeWishlistTitle,
 } from "./service-kits";
 
-export { resolveGarageVehicleSilhouette } from "./vehicle-silhouette";
+export {
+  resolveGarageVehicleSilhouette,
+  getVehicleSilhouetteClassLabel,
+} from "./vehicle-silhouette";

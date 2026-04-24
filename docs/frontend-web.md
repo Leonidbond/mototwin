@@ -32,6 +32,15 @@
 - Loads `/api/garage`
 - States: loading / error / empty / list
 - Shows vehicle cards with summary and navigation to `/vehicles/[id]`
+- Left-side navigation is a collapsible sidebar; collapsed state is persisted
+  in `localStorage` (`garage.sidebar.collapsed`)
+- Empty state shows illustration `images/empty_garage.png` with caption
+  `В вашем гараже пока нет мотоциклов`; primary action `Добавить мотоцикл`
+  lives in garage header
+- Root document uses explicit dark background and `color-scheme: dark`, so the
+  garage keeps a dark native scrollbar area on narrow viewports
+- Visual density and layout decisions are documented in
+  `docs/web-screen-garage-visual-refresh.md`
 
 ### 3.4 Vehicle detail (web workspace)
 
@@ -68,3 +77,4 @@ After successful mutation, page reloads relevant datasets to reflect updated sta
 - `cross-platform-parity.md`
 - `api-backend.md`
 - `functional-logic.md`
+- `web-screen-garage-visual-refresh.md`

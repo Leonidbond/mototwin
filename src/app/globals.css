@@ -36,8 +36,30 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html,
 body {
-  background: var(--color-canvas);
+  min-height: 100%;
+  margin: 0;
+  background-color: var(--color-canvas) !important;
+  color-scheme: dark;
+  scrollbar-color: var(--color-border-strong) var(--color-canvas);
+}
+
+/* Keep scrollbars aligned with the dark canvas without forcing custom sizes. */
+::-webkit-scrollbar {
+  background-color: var(--color-canvas);
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--color-canvas);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-strong);
+  border-radius: 999px;
+}
+
+body {
   color: var(--color-text-primary);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;

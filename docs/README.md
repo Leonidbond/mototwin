@@ -40,5 +40,6 @@
 - `node-status.md`
 - `expo-*` step docs
 - `shared-extraction-step-*.md`
+- `web-screen-garage-visual-refresh.md`
 
 При расхождении между historical docs и canonical docs, ориентироваться на canonical set.

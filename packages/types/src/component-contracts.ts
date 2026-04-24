@@ -35,6 +35,8 @@ export type GarageCardProps = {
   vehicleId: string;
   /** e.g. "Brand | Model" caption above the title */
   brandModelCaption: string;
+  /** 0..100 compact health score for garage card; null when source attention summary is unavailable. */
+  garageScore: number | null;
   summary: VehicleSummaryViewModel;
   rideProfile: RideProfileViewModel | null;
   /** Short spec strip (engine, cooling, …) — optional; web garage shows four tiles */

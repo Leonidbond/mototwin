@@ -28,8 +28,18 @@ export default function RootLayout({
     <html
       lang="ru"
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+      style={{
+        backgroundColor: "#080d12",
+        colorScheme: "dark",
+      }}
     >
-      <body className="min-h-full flex flex-col">
+      <body
+        className="min-h-full flex flex-col"
+        style={{
+          margin: 0,
+          backgroundColor: "#080d12",
+        }}
+      >
         {children}
         <AppHelpFab />
       </body>

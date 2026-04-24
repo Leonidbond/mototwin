@@ -2,17 +2,39 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Button, Card } from "../ui";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 
-export function GarageEmptyState(props: { onOpenProfile: () => void; onAddVehicle: () => void; onReload: () => void }) {
+type GarageEmptyStateProps = {
+  onOpenProfile: () => void;
+  onAddVehicle: () => void;
+  onReload: () => void;
+};
+
+export function GarageEmptyState(props: GarageEmptyStateProps) {
   return (
     <Card padding="lg" style={styles.wrap}>
       <Text style={styles.title}>Личный гараж пока пуст</Text>
       <Text style={styles.text}>Добавьте первый мотоцикл, чтобы начать вести обслуживание.</Text>
       <View style={styles.actions}>
-        <Pressable onPress={props.onOpenProfile}><Button variant="secondary">Профиль</Button></Pressable>
-        <Pressable onPress={props.onAddVehicle}><Button variant="primary">Добавить мотоцикл</Button></Pressable>
-        <Pressable onPress={props.onReload}><Button variant="ghost">Обновить список</Button></Pressable>
+        <EmptyStateAction onPress={props.onOpenProfile} label="Профиль" variant="secondary" />
+        <EmptyStateAction
+          onPress={props.onAddVehicle}
+          label="Добавить мотоцикл"
+          variant="primary"
+        />
+        <EmptyStateAction onPress={props.onReload} label="Обновить список" variant="ghost" />
       </View>
     </Card>
+  );
+}
+
+function EmptyStateAction(props: {
+  onPress: () => void;
+  label: string;
+  variant: "primary" | "secondary" | "ghost";
+}) {
+  return (
+    <Pressable onPress={props.onPress}>
+      <Button variant={props.variant}>{props.label}</Button>
+    </Pressable>
   );
 }
 

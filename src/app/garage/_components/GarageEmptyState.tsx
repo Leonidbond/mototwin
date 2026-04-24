@@ -1,38 +1,50 @@
-import Link from "next/link";
-import { Button, Card } from "@/components/ui";
-import { productSemanticColors, typeScale } from "@mototwin/design-tokens";
+import Image from "next/image";
+import type { CSSProperties } from "react";
+import { productSemanticColors } from "@mototwin/design-tokens";
+import emptyGarageImage from "../../../../images/empty_garage.png";
 
-export function GarageEmptyState() {
+type GarageEmptyStateProps = {
+  onReload: () => void;
+};
+
+export function GarageEmptyState(_props: GarageEmptyStateProps) {
   return (
-    <Card padding="lg">
-      <h2
-        className="tracking-tight"
-        style={{
-          color: productSemanticColors.textPrimary,
-          fontSize: typeScale.h2.fontSize,
-          lineHeight: `${typeScale.h2.lineHeight}px`,
-          fontWeight: Number(typeScale.h2.weight),
-          letterSpacing: -0.2,
-        }}
-      >
-        Личный гараж пока пуст
-      </h2>
-      <p
-        className="mt-4 max-w-2xl"
-        style={{
-          color: productSemanticColors.textMuted,
-          fontSize: typeScale.body.fontSize,
-          lineHeight: `${typeScale.body.lineHeight}px`,
-          fontWeight: Number(typeScale.body.weight),
-        }}
-      >
-        Добавьте первый мотоцикл, чтобы начать вести обслуживание.
-      </p>
-      <div className="mt-8">
-        <Link href="/onboarding" className="no-underline">
-          <Button variant="primary">Добавить мотоцикл</Button>
-        </Link>
+    <div style={wrapperStyle}>
+      <div style={imageWrapStyle}>
+        <Image
+          src={emptyGarageImage}
+          alt="Пустой гараж"
+          fill
+          sizes="(min-width: 1024px) 320px, 70vw"
+          style={{ objectFit: "contain" }}
+          priority
+        />
       </div>
-    </Card>
+      <p style={titleStyle}>В вашем гараже пока нет мотоциклов</p>
+    </div>
   );
 }
+
+const wrapperStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 16,
+  padding: "32px 16px 24px",
+  textAlign: "center",
+};
+
+const imageWrapStyle: CSSProperties = {
+  position: "relative",
+  width: "min(320px, 70vw)",
+  aspectRatio: "1 / 1",
+};
+
+const titleStyle: CSSProperties = {
+  color: productSemanticColors.textSecondary,
+  fontSize: 16,
+  lineHeight: "22px",
+  fontWeight: 500,
+  maxWidth: 420,
+};

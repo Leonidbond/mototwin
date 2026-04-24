@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -95,26 +95,27 @@ export default function HomeScreen() {
   }, [hasLoadedCollapsePrefs, isTechnicalSummaryExpanded]);
 
   const dashboardSummary = buildGarageDashboardSummary(vehicles);
+  const openTrash = useCallback(() => router.push("/trash"), [router]);
+  const openProfile = useCallback(() => router.push("/profile"), [router]);
+  const openAddVehicle = useCallback(() => router.push("/vehicles/new"), [router]);
+  const reloadGarage = useCallback(() => void loadGarage(), [loadGarage]);
+  const openVehicle = useCallback((id: string) => router.push(`/vehicles/${id}`), [router]);
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={c.textPrimary} />
-          <Text style={styles.stateText}>Загрузка гаража...</Text>
-        </View>
-      </SafeAreaView>
+      <GarageScreenState>
+        <ActivityIndicator size="large" color={c.textPrimary} />
+        <Text style={styles.stateText}>Загрузка гаража...</Text>
+      </GarageScreenState>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.center}>
-          <Text style={styles.errorTitle}>Не удалось загрузить гараж</Text>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      </SafeAreaView>
+      <GarageScreenState>
+        <Text style={styles.errorTitle}>Не удалось загрузить гараж</Text>
+        <Text style={styles.errorText}>{error}</Text>
+      </GarageScreenState>
     );
   }
 
@@ -125,14 +126,14 @@ export default function HomeScreen() {
         <View style={styles.contentWrap}>
           <GarageHeader
             trashCount={trashCount}
-            onOpenTrash={() => router.push("/trash")}
-            onOpenProfile={() => router.push("/profile")}
-            onAddVehicle={() => router.push("/vehicles/new")}
+            onOpenTrash={openTrash}
+            onOpenProfile={openProfile}
+            onAddVehicle={openAddVehicle}
           />
           <GarageEmptyState
-            onOpenProfile={() => router.push("/profile")}
-            onAddVehicle={() => router.push("/vehicles/new")}
-            onReload={() => void loadGarage()}
+            onOpenProfile={openProfile}
+            onAddVehicle={openAddVehicle}
+            onReload={reloadGarage}
           />
         </View>
       ) : (
@@ -145,7 +146,7 @@ export default function HomeScreen() {
               vehicle={item}
               isUsageProfileExpanded={isUsageProfileExpanded}
               isTechnicalSummaryExpanded={isTechnicalSummaryExpanded}
-              onOpenVehicle={(id) => router.push(`/vehicles/${id}`)}
+              onOpenVehicle={openVehicle}
               onToggleUsageProfile={() => setIsUsageProfileExpanded((prev) => !prev)}
               onToggleTechnicalSummary={() =>
                 setIsTechnicalSummaryExpanded((prev) => !prev)
@@ -156,19 +157,28 @@ export default function HomeScreen() {
             <View>
               <GarageHeader
                 trashCount={trashCount}
-                onOpenTrash={() => router.push("/trash")}
-                onOpenProfile={() => router.push("/profile")}
-                onAddVehicle={() => router.push("/vehicles/new")}
+                onOpenTrash={openTrash}
+                onOpenProfile={openProfile}
+                onAddVehicle={openAddVehicle}
               />
               <GarageSummary
                 motorcyclesCount={dashboardSummary.motorcyclesCount}
                 motorcyclesWithAttentionCount={dashboardSummary.motorcyclesWithAttentionCount}
                 attentionItemsTotalCount={dashboardSummary.attentionItemsTotalCount}
+                expensesLabel={dashboardSummary.currentMonthExpensesLabel}
               />
             </View>
           }
         />
       )}
+    </SafeAreaView>
+  );
+}
+
+function GarageScreenState(props: { children: ReactNode }) {
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.center}>{props.children}</View>
     </SafeAreaView>
   );
 }

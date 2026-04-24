@@ -1,26 +1,51 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { Card } from "@/components/ui";
 import { productSemanticColors, typeScale } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { GarageEmptyState } from "./_components/GarageEmptyState";
+import { AddMotorcycleCard } from "./_components/AddMotorcycleCard";
 import { GarageHeader } from "./_components/GarageHeader";
+import { GarageSidebar } from "./_components/GarageSidebar";
 import { GarageSummary } from "./_components/GarageSummary";
+import { GarageTasksStrip } from "./_components/GarageTasksStrip";
 import { VehicleCard } from "./_components/VehicleCard";
 
 const garageApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+
+const SIDEBAR_COLLAPSED_KEY = "garage.sidebar.collapsed";
 
 export default function GaragePage() {
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isUsageProfileExpanded, setIsUsageProfileExpanded] = useState(false);
-  const [isTechnicalSummaryExpanded, setIsTechnicalSummaryExpanded] = useState(false);
-  const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
+        setSidebarCollapsed(true);
+      }
+    } catch {
+      // ignore storage access errors (SSR / privacy mode)
+    }
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        // ignore storage access errors
+      }
+      return next;
+    });
+  }, []);
 
   const loadGarage = useCallback(async () => {
     try {
@@ -67,106 +92,113 @@ export default function GaragePage() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [loadGarage]);
 
-  useEffect(() => {
-    try {
-      const usageRaw = localStorage.getItem("garage.usageProfile.expanded");
-      const techRaw = localStorage.getItem("garage.technicalSummary.expanded");
-      if (usageRaw === "true" || usageRaw === "false") {
-        setIsUsageProfileExpanded(usageRaw === "true");
-      }
-      if (techRaw === "true" || techRaw === "false") {
-        setIsTechnicalSummaryExpanded(techRaw === "true");
-      }
-    } catch {
-      // Ignore localStorage failures for local UI prefs.
-    } finally {
-      setHasLoadedCollapsePrefs(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!hasLoadedCollapsePrefs) return;
-    try {
-      localStorage.setItem("garage.usageProfile.expanded", String(isUsageProfileExpanded));
-    } catch {
-      // Ignore localStorage failures for local UI prefs.
-    }
-  }, [hasLoadedCollapsePrefs, isUsageProfileExpanded]);
-
-  useEffect(() => {
-    if (!hasLoadedCollapsePrefs) return;
-    try {
-      localStorage.setItem("garage.technicalSummary.expanded", String(isTechnicalSummaryExpanded));
-    } catch {
-      // Ignore localStorage failures for local UI prefs.
-    }
-  }, [hasLoadedCollapsePrefs, isTechnicalSummaryExpanded]);
-
   const dashboardSummary = useMemo(
     () => buildGarageDashboardSummary(vehicles),
     [vehicles]
   );
+  const hasVehicles = vehicles.length > 0;
+  const showSummary = !isLoading && !error && hasVehicles;
+  const showEmptyState = !isLoading && !error && !hasVehicles;
+  const showVehicleList = !isLoading && !error && hasVehicles;
 
   return (
-    <main className="min-h-screen px-6 py-16" style={{ backgroundColor: productSemanticColors.canvas }}>
-      <div className="mx-auto grid max-w-6xl gap-6">
-        <GarageHeader trashCount={trashCount} />
+    <main
+      style={{
+        width: "100%",
+        flex: 1,
+        minHeight: "100vh",
+        backgroundColor: productSemanticColors.canvas,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: `${sidebarCollapsed ? 64 : 220}px minmax(0, 1fr)`,
+          alignItems: "start",
+          transition: "grid-template-columns 0.18s ease",
+        }}
+      >
+        <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <section
+          style={{
+            display: "grid",
+            gap: 12,
+            padding: "12px 24px",
+            maxWidth: 1600,
+            width: "100%",
+            minWidth: 0,
+            justifySelf: "center",
+          }}
+        >
+          <GarageHeader trashCount={trashCount} />
 
-        {isLoading ? (
-          <Card>
-            <p
+          {isLoading ? <GarageStateCard>Загрузка гаража...</GarageStateCard> : null}
+
+          {error ? (
+            <GarageStateCard isError>{error}</GarageStateCard>
+          ) : null}
+
+          {showSummary ? (
+            <GarageSummary
+              motorcyclesCount={dashboardSummary.motorcyclesCount}
+              motorcyclesWithAttentionCount={dashboardSummary.motorcyclesWithAttentionCount}
+              attentionItemsTotalCount={dashboardSummary.attentionItemsTotalCount}
+              expensesLabel={dashboardSummary.currentMonthExpensesLabel}
+            />
+          ) : null}
+
+          {showEmptyState ? <GarageEmptyState onReload={() => void loadGarage()} /> : null}
+
+          {showVehicleList ? (
+            <div
               style={{
-                color: productSemanticColors.textMuted,
-                fontSize: typeScale.caption.fontSize,
-                lineHeight: `${typeScale.caption.lineHeight}px`,
-                fontWeight: Number(typeScale.caption.weight),
+                display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 420px), 1fr))",
               }}
             >
-              Загрузка гаража...
-            </p>
-          </Card>
-        ) : null}
+              {vehicles.map((vehicle) => (
+                <VehicleCard key={vehicle.id} vehicle={vehicle} />
+              ))}
+              <AddMotorcycleCard />
+            </div>
+          ) : null}
 
-        {error ? (
-          <Card style={{ borderColor: productSemanticColors.errorBorder, backgroundColor: productSemanticColors.errorSurface }}>
-            <p
-              style={{
-                color: productSemanticColors.error,
-                fontSize: typeScale.caption.fontSize,
-                lineHeight: `${typeScale.caption.lineHeight}px`,
-                fontWeight: Number(typeScale.bodyStrong.weight),
-              }}
-            >
-              {error}
-            </p>
-          </Card>
-        ) : null}
-
-        {!isLoading && !error && vehicles.length > 0 ? (
-          <GarageSummary
-            motorcyclesCount={dashboardSummary.motorcyclesCount}
-            motorcyclesWithAttentionCount={dashboardSummary.motorcyclesWithAttentionCount}
-            attentionItemsTotalCount={dashboardSummary.attentionItemsTotalCount}
-          />
-        ) : null}
-
-        {!isLoading && !error && vehicles.length === 0 ? <GarageEmptyState /> : null}
-
-        {!isLoading && !error && vehicles.length > 0 ? (
-          <div className="grid gap-6">
-            {vehicles.map((vehicle) => (
-              <VehicleCard
-                key={vehicle.id}
-                vehicle={vehicle}
-                isUsageProfileExpanded={isUsageProfileExpanded}
-                isTechnicalSummaryExpanded={isTechnicalSummaryExpanded}
-                onToggleUsageProfile={() => setIsUsageProfileExpanded((prev) => !prev)}
-                onToggleTechnicalSummary={() => setIsTechnicalSummaryExpanded((prev) => !prev)}
-              />
-            ))}
-          </div>
-        ) : null}
+          {showVehicleList ? <GarageTasksStrip vehicles={vehicles} /> : null}
+        </section>
       </div>
     </main>
+  );
+}
+
+function GarageStateCard(props: { children: ReactNode; isError?: boolean }) {
+  const textStyle = props.isError
+    ? {
+        color: productSemanticColors.error,
+        fontSize: typeScale.caption.fontSize,
+        lineHeight: `${typeScale.caption.lineHeight}px`,
+        fontWeight: Number(typeScale.bodyStrong.weight),
+      }
+    : {
+        color: productSemanticColors.textMuted,
+        fontSize: typeScale.caption.fontSize,
+        lineHeight: `${typeScale.caption.lineHeight}px`,
+        fontWeight: Number(typeScale.caption.weight),
+      };
+
+  return (
+    <Card
+      style={
+        props.isError
+          ? {
+              borderColor: productSemanticColors.errorBorder,
+              backgroundColor: productSemanticColors.errorSurface,
+            }
+          : undefined
+      }
+    >
+      <p style={textStyle}>{props.children}</p>
+    </Card>
   );
 }

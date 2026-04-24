@@ -20,11 +20,11 @@ const KEYWORDS: Array<{ key: VehicleSilhouetteKey; patterns: RegExp[] }> = [
   },
   {
     key: "adventure_touring",
-    patterns: [/adventure/i, /touring/i, /adv/i],
+    patterns: [/adventure/i, /touring/i, /\badv\b/i],
   },
   {
     key: "sport_supersport",
-    patterns: [/supersport/i, /sportbike/i, /sport/i, /rr/i],
+    patterns: [/supersport/i, /sportbike/i, /\bsport\b/i, /\brr\b/i],
   },
   {
     key: "cruiser",
@@ -61,4 +61,25 @@ export function resolveGarageVehicleSilhouette(
   }
 
   return fallback;
+}
+
+export function getVehicleSilhouetteClassLabel(key: VehicleSilhouetteKey): string {
+  switch (key) {
+    case "adventure_touring":
+      return "Adventure class";
+    case "enduro_dual_sport":
+      return "Enduro class";
+    case "naked_roadster":
+      return "Naked class";
+    case "sport_supersport":
+      return "Sport class";
+    case "cruiser":
+      return "Cruiser class";
+    case "classic_retro":
+      return "Classic class";
+    case "scooter_maxi_scooter":
+      return "Scooter class";
+    default:
+      return "Motorcycle class";
+  }
 }
