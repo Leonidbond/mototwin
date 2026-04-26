@@ -29,6 +29,7 @@
     "whatwg-fetch": "^3.6.20"
   },
   "devDependencies": {
+    "@expo/ngrok": "^4.1.0",
     "@types/react": "~19.1.10",
     "babel-preset-expo": "~54.0.10",
     "typescript": "latest"
