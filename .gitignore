@@ -10,3 +10,4 @@ coverage
 prisma/dev.db
 .expo
 apps/app/.expo
+.venv-tools

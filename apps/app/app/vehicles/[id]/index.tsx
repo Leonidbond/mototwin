@@ -4,6 +4,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  type ImageSourcePropType,
   Modal,
   Pressable,
   SafeAreaView,
@@ -42,6 +44,7 @@ import {
   formatIsoCalendarDateRu,
   formatExpenseAmountRu,
   getRecentServiceEventsForNode,
+  resolveGarageVehicleSilhouette,
 } from "@mototwin/domain";
 import type {
   AttentionItemViewModel,
@@ -76,8 +79,25 @@ import { buildVehicleServiceLogHref } from "./service-log";
 import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 import { ActionIconButton } from "../../components/action-icon-button";
+import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import { AppHelpFab } from "../../../src/components/app-help-fab";
-import { TopNodeIcon } from "../../../components/icons/top-nodes";
+import adventureTouringSilhouette from "../../../../../images/Motocycles/adventure_touring.png";
+import enduroDualSportSilhouette from "../../../../../images/Motocycles/enduro_dual_sport.png";
+import nakedRoadsterSilhouette from "../../../../../images/Motocycles/naked_roadster.png";
+import sportSupersportSilhouette from "../../../../../images/Motocycles/sport_supersport.png";
+import cruiserSilhouette from "../../../../../images/Motocycles/cruiser.png";
+import classicRetroSilhouette from "../../../../../images/Motocycles/classic_retro.png";
+import scooterMaxiScooterSilhouette from "../../../../../images/Motocycles/scooter_maxi_scooter.png";
+import brakesIcon from "../../../../../images/top-node-icons-dark/brakes/brakes.png";
+import brakesFrontPadsIcon from "../../../../../images/top-node-icons-dark/brakes/brakes_front_pads.png";
+import chainSprocketsIcon from "../../../../../images/top-node-icons-dark/chain_sprockets/chain_sprockets.png";
+import engineCoolingIcon from "../../../../../images/top-node-icons-dark/engine_cooling/engine_cooling.png";
+import coolantIcon from "../../../../../images/top-node-icons-dark/engine_cooling/cooling_liquid_coolant.png";
+import lubricationIcon from "../../../../../images/top-node-icons-dark/lubrication/lubrication.png";
+import oilIcon from "../../../../../images/top-node-icons-dark/lubrication/engine_lube_oil.png";
+import suspensionIcon from "../../../../../images/top-node-icons-dark/suspension/suspension.png";
+import tiresIcon from "../../../../../images/top-node-icons-dark/tires/tires.png";
+import tiresRearIcon from "../../../../../images/top-node-icons-dark/tires/tires_rear.png";
 
 function getStatusColors(status: NodeStatus | null) {
   const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
@@ -914,8 +934,6 @@ export default function VehicleDetailScreen() {
     ]);
   }, [apiBaseUrl, isMovingToTrash, router, vehicleId]);
 
-  const hasNickname = Boolean(vehicle?.nickname?.trim());
-
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -968,10 +986,10 @@ export default function VehicleDetailScreen() {
     overdueCount: attentionSummary.overdueCount,
     soonCount: attentionSummary.soonCount,
   });
+  const okCount = Math.max(0, 10 - attentionSummary.totalCount);
   const expenseSummary = buildExpenseSummaryFromServiceEvents(serviceEvents);
   const recentEvents = getRecentDashboardEvents(serviceEvents);
-  const readiness = buildMobileRideReadiness(attentionSummary);
-  const seasonLabel = `Сезон ${new Date().getFullYear()}`;
+  const silhouetteSource = getVehicleSilhouetteSource(vehicle);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -988,14 +1006,30 @@ export default function VehicleDetailScreen() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.mobileBrandHeader}>
+          <View>
+            <Text style={styles.mobileLogo}>
+              MOTO<Text style={styles.mobileLogoAccent}>TWIN</Text>
+            </Text>
+            <Text style={styles.mobileLogoSubtitle}>DIGITAL GARAGE</Text>
+          </View>
+          <ActionIconButton
+            onPress={() => router.push(`/vehicles/${vehicleId}/profile`)}
+            accessibilityLabel="Редактировать профиль мотоцикла"
+            icon={<MaterialIcons name="more-horiz" size={18} color={c.textMeta} />}
+          />
+        </View>
+
         <View style={[styles.dashboardTopGrid, isWideLayout && styles.dashboardTopGridWide]}>
           <View style={[styles.infoCard, styles.heroDashboardCard, isWideLayout && styles.heroDashboardCardWide]}>
             <View style={styles.heroHeaderRow}>
               <View style={styles.heroTitleCol}>
-                <Text style={styles.eyebrow}>{hasNickname ? "Никнейм" : "Мотоцикл"}</Text>
                 <Text style={styles.title}>{detailViewModel.displayName}</Text>
                 <Text style={styles.brandModel}>{detailViewModel.brandModelLine}</Text>
-                <Text style={styles.variantText}>{detailViewModel.yearVersionLine}</Text>
+                <Text style={styles.variantText}>
+                  {[vehicle.year, stateViewModel.odometerValue, rideProfileViewModel?.usageType].filter(Boolean).join(" · ")}
+                </Text>
+                <Text style={styles.heroVinLine}>VIN: {detailViewModel.vinLine}</Text>
               </View>
               <View style={styles.titleActionsRow}>
                 <Pressable
@@ -1009,11 +1043,6 @@ export default function VehicleDetailScreen() {
                   <Text style={styles.primaryMileageButtonText}>Пробег</Text>
                 </Pressable>
                 <ActionIconButton
-                  onPress={() => router.push(`/vehicles/${vehicleId}/profile`)}
-                  accessibilityLabel="Редактировать профиль мотоцикла"
-                  icon={<MaterialIcons name="edit" size={16} color={c.textMeta} />}
-                />
-                <ActionIconButton
                   onPress={moveVehicleToTrash}
                   accessibilityLabel="Переместить мотоцикл на Свалку"
                   variant="danger"
@@ -1023,72 +1052,55 @@ export default function VehicleDetailScreen() {
               </View>
             </View>
 
-            <View style={styles.heroMetaPanel}>
-              <View style={styles.heroMetaRow}>
-                <Text style={styles.heroMetaLabel}>VIN</Text>
-                <Text style={styles.heroMetaValue}>{detailViewModel.vinLine}</Text>
-              </View>
-              <View style={styles.heroMetaRow}>
-                <Text style={styles.heroMetaLabel}>Класс</Text>
-                <Text style={styles.heroMetaValue}>{vehicle.modelVariant?.versionName || "Не указан"}</Text>
-              </View>
+            <View style={styles.heroBikeStage}>
+              <Image source={silhouetteSource} style={styles.heroBikeImage} resizeMode="contain" alt="" />
+              <View style={styles.heroBikeGlow} />
             </View>
 
-            <View style={styles.heroQuickActionsRow}>
-              <DashboardActionButton
-                label="Добавить ТО"
-                iconName="build-circle"
-                onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
-              />
-              <DashboardActionButton
-                label="Расход"
-                iconName="account-balance-wallet"
-                onPress={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
-              />
-              <DashboardActionButton
-                label="Деталь"
-                iconName="shopping-cart"
-                onPress={() => router.push(`/vehicles/${vehicleId}/wishlist/new`)}
-              />
-            </View>
+            <MobileScorePanel
+              score={score}
+              okCount={okCount}
+              soonCount={attentionSummary.soonCount}
+              overdueCount={attentionSummary.overdueCount}
+            />
           </View>
 
-          <View style={styles.kpiStackMobile}>
-            <KpiCard label="Garage Score" value={score === null ? "—" : String(score)} detail={buildScoreDetail(attentionSummary)} tone={getScoreTone(score)} />
-            <KpiCard label="Текущий пробег" value={stateViewModel.odometerValue} detail={stateViewModel.engineHoursValue === "—" ? "Моточасы не указаны" : `Моточасы: ${stateViewModel.engineHoursValue}`} />
-            <KpiCard label="Ride readiness" value={readiness.title} detail={readiness.details} tone={readiness.tone} />
-            <KpiCard label={seasonLabel} value={score === null ? "Нет данных" : `${score}%`} detail="Оценка готовности по текущим узлам" />
+          <View style={styles.mobileSideStack}>
+            <ReferenceAttentionBlock
+              items={attentionSummary.items.slice(0, 3)}
+              onOpenAll={() => router.push(`/vehicles/${vehicleId}/attention`)}
+              onOpenItem={(nodeId) => openNodeContextModal(nodeId)}
+            />
+
+            <View style={styles.quickActionsBlock}>
+              <Text style={styles.referenceSectionTitle}>Быстрые действия</Text>
+              <View style={styles.heroQuickActionsRow}>
+                <DashboardActionButton
+                  label="Добавить ТО"
+                  iconName="build-circle"
+                  onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
+                />
+                <DashboardActionButton
+                  label="Добавить расход"
+                  iconName="account-balance-wallet"
+                  onPress={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
+                />
+                <DashboardActionButton
+                  label="Подобрать деталь"
+                  iconName="youtube-searched-for"
+                  onPress={() => router.push(`/vehicles/${vehicleId}/wishlist/new`)}
+                />
+                <DashboardActionButton
+                  label="Календарь ТО"
+                  iconName="event"
+                  onPress={() => router.push(`/vehicles/${vehicleId}/attention`)}
+                />
+              </View>
+            </View>
           </View>
         </View>
 
         <View style={[styles.dashboardSectionGrid, dashboardSectionStyle]}>
-          <DashboardSection
-            title="Требует внимания"
-            actionLabel="Все задачи"
-            onActionPress={() => router.push(`/vehicles/${vehicleId}/attention`)}
-          >
-            {attentionSummary.items.length === 0 ? (
-              <Text style={styles.dashboardEmptyText}>Критичных замечаний нет. Основные узлы сейчас в нормальном состоянии.</Text>
-            ) : (
-              attentionSummary.items.slice(0, 3).map((item) => (
-                <AttentionDashboardRow
-                  key={item.nodeId}
-                  item={item}
-                  onOpen={() => openNodeContextModal(item.nodeId)}
-                  onLog={() =>
-                    router.push(
-                      buildVehicleServiceLogHref(
-                        vehicleId,
-                        { nodeIds: [item.nodeId], displayLabel: item.name },
-                        false
-                      )
-                    )
-                  }
-                  onService={item.canAddServiceEvent ? () => openAddServiceFromTreeNode(item.nodeId) : undefined}
-                />
-              ))
-            )}
-          </DashboardSection>
 
           <DashboardSection
             title="Состояние узлов"
@@ -1378,6 +1390,15 @@ export default function VehicleDetailScreen() {
         </View>
         ) : null}
       </ScrollView>
+      <GarageBottomNav
+        activeKey="garage"
+        onOpenGarage={() => router.push("/")}
+        onOpenNodes={() => setIsFullNodeTreeOpen(true)}
+        onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
+        onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
+        onOpenProfile={() => router.push(`/vehicles/${vehicleId}/profile`)}
+        hasVehicleContext
+      />
       <Modal
         visible={Boolean(selectedNodeContextViewModel)}
         animationType="slide"
@@ -1691,8 +1712,6 @@ export default function VehicleDetailScreen() {
   );
 }
 
-type DashboardTone = NodeStatus | "UNKNOWN";
-
 function DashboardSection({
   title,
   actionLabel,
@@ -1742,83 +1761,102 @@ function DashboardActionButton({
   );
 }
 
-function KpiCard({
-  label,
-  value,
-  detail,
-  tone = "UNKNOWN",
+function MobileScorePanel({
+  score,
+  okCount,
+  soonCount,
+  overdueCount,
 }: {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: DashboardTone;
+  score: number | null;
+  okCount: number;
+  soonCount: number;
+  overdueCount: number;
 }) {
-  const tokens = statusSemanticTokens[tone];
   return (
-    <View style={styles.kpiCardMobile}>
-      <View style={[styles.kpiAccentDot, { backgroundColor: tokens.accent }]} />
-      <View style={styles.kpiTextCol}>
-        <Text style={styles.kpiLabel}>{label}</Text>
-        <Text style={styles.kpiValue} numberOfLines={1}>
-          {value}
+    <View style={styles.mobileScorePanel}>
+      <View style={styles.mobileScoreMain}>
+        <Text style={styles.mobileScoreLabel}>Garage Score</Text>
+        <Text style={styles.mobileScoreValue}>
+          {score ?? "—"}<Text style={styles.mobileScoreTotal}> /100</Text>
         </Text>
-        <Text style={styles.kpiDetail} numberOfLines={2}>
-          {detail}
-        </Text>
+      </View>
+      <MobileScoreStat value={okCount} label="OK" color={statusSemanticTokens.OK.accent} />
+      <MobileScoreStat value={soonCount} label="Soon" color={statusSemanticTokens.SOON.accent} />
+      <MobileScoreStat value={overdueCount} label="Overdue" color={statusSemanticTokens.OVERDUE.accent} />
+    </View>
+  );
+}
+
+function MobileScoreStat({ value, label, color }: { value: number; label: string; color: string }) {
+  return (
+    <View style={styles.mobileScoreStat}>
+      <Text style={[styles.mobileScoreStatValue, { color }]}>{value}</Text>
+      <Text style={styles.mobileScoreStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function ReferenceAttentionBlock({
+  items,
+  onOpenAll,
+  onOpenItem,
+}: {
+  items: AttentionItemViewModel[];
+  onOpenAll: () => void;
+  onOpenItem: (nodeId: string) => void;
+}) {
+  return (
+    <View style={styles.referenceBlock}>
+      <View style={styles.referenceSectionHeader}>
+        <Text style={styles.referenceSectionTitle}>Требует внимания</Text>
+        <Pressable onPress={onOpenAll} style={({ pressed }) => pressed && styles.referenceLinkPressed}>
+          <Text style={styles.referenceSectionLink}>Смотреть все</Text>
+        </Pressable>
+      </View>
+      <View style={styles.referenceAttentionList}>
+        {items.length === 0 ? (
+          <Text style={styles.dashboardEmptyText}>Критичных замечаний нет.</Text>
+        ) : (
+          items.map((item) => (
+            <ReferenceAttentionRow key={item.nodeId} item={item} onPress={() => onOpenItem(item.nodeId)} />
+          ))
+        )}
       </View>
     </View>
   );
 }
 
-function AttentionDashboardRow({
-  item,
-  onOpen,
-  onLog,
-  onService,
-}: {
-  item: AttentionItemViewModel;
-  onOpen: () => void;
-  onLog: () => void;
-  onService?: () => void;
-}) {
+function ReferenceAttentionRow({ item, onPress }: { item: AttentionItemViewModel; onPress: () => void }) {
   const tokens = statusSemanticTokens[item.effectiveStatus];
   return (
-    <View style={styles.attentionDashboardRow}>
-      <View
-        style={[
-          styles.attentionDashboardIcon,
-          { borderColor: tokens.border, backgroundColor: tokens.background },
-        ]}
-      >
-        <TopNodeIcon iconKey={getTopNodeIconKeyFromCode(item.code)} size={28} color={tokens.accent} />
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.referenceAttentionRow,
+        { borderLeftColor: tokens.accent },
+        pressed && styles.referenceAttentionRowPressed,
+      ]}
+    >
+      <View style={[styles.referenceAttentionIcon, { borderColor: tokens.border, backgroundColor: tokens.background }]}>
+        <TopNodePngIcon source={getAttentionIconSource(item.code)} size={31} />
       </View>
-      <View style={styles.attentionDashboardTextCol}>
-        <View style={styles.attentionDashboardTitleRow}>
-          <Text style={styles.attentionDashboardTitle} numberOfLines={1}>
+      <View style={styles.referenceAttentionTextCol}>
+        <View style={styles.referenceAttentionTitleRow}>
+          <Text style={styles.referenceAttentionTitle} numberOfLines={1}>
             {item.name}
           </Text>
-          <View style={[styles.attentionStatusBadge, { borderColor: tokens.border, backgroundColor: tokens.background }]}>
-            <Text style={[styles.attentionStatusBadgeText, { color: tokens.foreground }]}>{item.statusLabelRu}</Text>
+          <View style={[styles.referenceStatusBadge, { backgroundColor: tokens.background }]}>
+            <Text style={[styles.referenceStatusBadgeText, { color: tokens.foreground }]}>
+              {item.statusLabelRu}
+            </Text>
           </View>
         </View>
-        <Text style={styles.attentionDashboardMeta} numberOfLines={1}>
+        <Text style={styles.referenceAttentionMeta} numberOfLines={1}>
           {item.shortExplanation || item.topLevelParentName || "Нужен контекст узла"}
         </Text>
-        <View style={styles.attentionDashboardActions}>
-          {onService ? (
-            <Pressable onPress={onService} style={({ pressed }) => [styles.compactActionPrimary, pressed && styles.compactActionPressed]}>
-              <Text style={styles.compactActionPrimaryText}>ТО</Text>
-            </Pressable>
-          ) : null}
-          <Pressable onPress={onOpen} style={({ pressed }) => [styles.compactActionNeutral, pressed && styles.compactActionPressed]}>
-            <Text style={styles.compactActionNeutralText}>Узел</Text>
-          </Pressable>
-          <Pressable onPress={onLog} style={({ pressed }) => [styles.compactActionNeutral, pressed && styles.compactActionPressed]}>
-            <Text style={styles.compactActionNeutralText}>Журнал</Text>
-          </Pressable>
-        </View>
       </View>
-    </View>
+      <MaterialIcons name="chevron-right" size={22} color={c.textTertiary} />
+    </Pressable>
   );
 }
 
@@ -1827,7 +1865,7 @@ function TopOverviewDashboardCard({ card }: { card: TopNodeOverviewCard }) {
   return (
     <View style={styles.systemDashboardCard}>
       <View style={[styles.systemDashboardIcon, { borderColor: tokens.border, backgroundColor: tokens.background }]}>
-        <TopNodeIcon iconKey={card.key} size={30} color={tokens.accent} />
+        <TopNodePngIcon source={TOP_NODE_GROUP_ICON_SRC[card.key]} size={40} />
       </View>
       <View style={styles.systemDashboardTextCol}>
         <Text style={styles.systemDashboardTitle} numberOfLines={1}>
@@ -1840,6 +1878,10 @@ function TopOverviewDashboardCard({ card }: { card: TopNodeOverviewCard }) {
       </View>
     </View>
   );
+}
+
+function TopNodePngIcon({ source, size }: { source: ImageSourcePropType; size: number }) {
+  return <Image source={source} style={{ width: size, height: size }} resizeMode="contain" alt="" />;
 }
 
 function RecentDashboardEventRow({ event }: { event: ServiceEventItem }) {
@@ -1925,51 +1967,6 @@ function getRecentDashboardEvents(events: ServiceEventItem[]) {
     .slice(0, 3);
 }
 
-function buildMobileRideReadiness(summary: {
-  overdueCount: number;
-  soonCount: number;
-  totalCount: number;
-}): { title: string; details: string; tone: DashboardTone } {
-  if (summary.overdueCount > 0) {
-    return {
-      title: "Не готов",
-      details: `${summary.overdueCount} ${pluralizeRu(summary.overdueCount, ["просроченный узел", "просроченных узла", "просроченных узлов"])}`,
-      tone: "OVERDUE",
-    };
-  }
-  if (summary.soonCount > 0) {
-    return {
-      title: "Скоро ТО",
-      details: `${summary.soonCount} ${pluralizeRu(summary.soonCount, ["узел скоро потребует ТО", "узла скоро потребуют ТО", "узлов скоро потребуют ТО"])}`,
-      tone: "SOON",
-    };
-  }
-  if (summary.totalCount === 0) {
-    return { title: "Готов", details: "Критичных замечаний нет", tone: "OK" };
-  }
-  return { title: "Проверить", details: "Есть замечания без критичного статуса", tone: "UNKNOWN" };
-}
-
-function buildScoreDetail(summary: { overdueCount: number; soonCount: number; totalCount: number }) {
-  if (summary.totalCount === 0) {
-    return "Нет активных задач";
-  }
-  return `${summary.overdueCount} просрочено · ${summary.soonCount} скоро`;
-}
-
-function getScoreTone(score: number | null): DashboardTone {
-  if (score === null) {
-    return "UNKNOWN";
-  }
-  if (score < 60) {
-    return "OVERDUE";
-  }
-  if (score < 85) {
-    return "SOON";
-  }
-  return "OK";
-}
-
 const TOP_NODE_ICON_BY_PREFIX: Array<[string, TopNodeOverviewCard["key"]]> = [
   ["ENGINE.LUBE", "lubrication"],
   ["COOLING", "engine"],
@@ -1979,8 +1976,61 @@ const TOP_NODE_ICON_BY_PREFIX: Array<[string, TopNodeOverviewCard["key"]]> = [
   ["SUSPENSION", "suspension"],
 ];
 
-function getTopNodeIconKeyFromCode(code: string): TopNodeOverviewCard["key"] {
-  return TOP_NODE_ICON_BY_PREFIX.find(([prefix]) => code.startsWith(prefix))?.[1] ?? "lubrication";
+const TOP_NODE_GROUP_ICON_SRC: Record<TopNodeOverviewCard["key"], ImageSourcePropType> = {
+  lubrication: lubricationIcon,
+  engine: engineCoolingIcon,
+  brakes: brakesIcon,
+  tires: tiresIcon,
+  chain: chainSprocketsIcon,
+  suspension: suspensionIcon,
+};
+
+const TOP_NODE_LEAF_ICON_SRC: Record<string, ImageSourcePropType> = {
+  "ENGINE.LUBE.OIL": oilIcon,
+  "ENGINE.LUBE.FILTER": lubricationIcon,
+  "COOLING.LIQUID.COOLANT": coolantIcon,
+  "BRAKES.FRONT.PADS": brakesFrontPadsIcon,
+  "BRAKES.REAR.PADS": brakesIcon,
+  "TIRES.REAR": tiresRearIcon,
+};
+
+const SILHOUETTE_SRC = {
+  adventure_touring: adventureTouringSilhouette,
+  enduro_dual_sport: enduroDualSportSilhouette,
+  naked_roadster: nakedRoadsterSilhouette,
+  sport_supersport: sportSupersportSilhouette,
+  cruiser: cruiserSilhouette,
+  classic_retro: classicRetroSilhouette,
+  scooter_maxi_scooter: scooterMaxiScooterSilhouette,
+} as const;
+
+function getAttentionIconSource(code: string): ImageSourcePropType {
+  const direct = TOP_NODE_LEAF_ICON_SRC[code];
+  if (direct) {
+    return direct;
+  }
+  const groupKey = TOP_NODE_ICON_BY_PREFIX.find(([prefix]) => code.startsWith(prefix))?.[1] ?? "lubrication";
+  return TOP_NODE_GROUP_ICON_SRC[groupKey];
+}
+
+function getVehicleSilhouetteSource(vehicle: VehicleDetail): ImageSourcePropType {
+  const key = resolveGarageVehicleSilhouette({
+    brand: { name: vehicle.brandName },
+    model: { name: vehicle.modelName },
+    modelVariant: {
+      year: vehicle.year,
+      versionName: vehicle.variantName,
+      market: vehicle.modelVariant?.market ?? null,
+      engineType: vehicle.modelVariant?.engineType ?? null,
+      coolingType: vehicle.modelVariant?.coolingType ?? null,
+      wheelSizes: vehicle.modelVariant?.wheelSizes ?? null,
+      brakeSystem: vehicle.modelVariant?.brakeSystem ?? null,
+      chainPitch: vehicle.modelVariant?.chainPitch ?? null,
+      stockSprockets: vehicle.modelVariant?.stockSprockets ?? null,
+    },
+    rideProfile: vehicle.rideProfile,
+  });
+  return SILHOUETTE_SRC[key] ?? SILHOUETTE_SRC.naked_roadster;
 }
 
 function formatExpenseTotals(rows: ExpenseSummaryViewModel["totalsByCurrency"]) {
@@ -2022,8 +2072,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 40,
+    paddingTop: 8,
+    paddingBottom: 18,
   },
   scrollContentLandscape: {
     paddingHorizontal: 20,
@@ -2032,6 +2082,7 @@ const styles = StyleSheet.create({
   },
   dashboardTopGrid: {
     gap: 12,
+    marginBottom: 12,
   },
   dashboardTopGridWide: {
     flexDirection: "row",
@@ -2054,7 +2105,7 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
   },
   heroDashboardCard: {
-    marginBottom: 12,
+    marginBottom: 0,
   },
   heroDashboardCardWide: {
     flex: 1.22,
@@ -2069,6 +2120,114 @@ const styles = StyleSheet.create({
   heroTitleCol: {
     flex: 1,
     minWidth: 0,
+  },
+  mobileBrandHeader: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  mobileLogo: {
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: "900",
+    fontStyle: "italic",
+    letterSpacing: 0.4,
+    color: c.textPrimary,
+  },
+  mobileLogoAccent: {
+    color: c.primaryAction,
+  },
+  mobileLogoSubtitle: {
+    marginTop: 1,
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    color: c.textMuted,
+  },
+  mobileSideStack: {
+    flex: 1,
+    minWidth: 0,
+    gap: 12,
+  },
+  heroVinLine: {
+    marginTop: 9,
+    fontSize: 11,
+    lineHeight: 14,
+    color: c.textMeta,
+  },
+  heroBikeStage: {
+    height: 170,
+    marginTop: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  heroBikeImage: {
+    width: "108%",
+    height: "100%",
+    opacity: 0.96,
+  },
+  heroBikeGlow: {
+    position: "absolute",
+    bottom: 8,
+    width: "72%",
+    height: 22,
+    borderRadius: 999,
+    backgroundColor: "rgba(148, 163, 184, 0.18)",
+  },
+  mobileScorePanel: {
+    marginHorizontal: -16,
+    marginBottom: -16,
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "stretch",
+    borderTopWidth: 1,
+    borderTopColor: c.divider,
+    backgroundColor: "rgba(4, 8, 13, 0.42)",
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  mobileScoreMain: {
+    flex: 1.15,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  mobileScoreLabel: {
+    fontSize: 10,
+    color: c.textSecondary,
+  },
+  mobileScoreValue: {
+    marginTop: 2,
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: "900",
+    color: c.primaryAction,
+  },
+  mobileScoreTotal: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textMuted,
+  },
+  mobileScoreStat: {
+    flex: 0.72,
+    alignItems: "center",
+    justifyContent: "center",
+    borderLeftWidth: 1,
+    borderLeftColor: c.divider,
+  },
+  mobileScoreStatValue: {
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: "900",
+  },
+  mobileScoreStatLabel: {
+    marginTop: 1,
+    fontSize: 10,
+    fontWeight: "700",
+    color: c.textMuted,
   },
   heroMetaPanel: {
     marginTop: 14,
@@ -2204,6 +2363,89 @@ const styles = StyleSheet.create({
   dashboardSectionBody: {
     gap: 8,
   },
+  referenceBlock: {
+    gap: 8,
+  },
+  quickActionsBlock: {
+    gap: 8,
+  },
+  referenceSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  referenceSectionTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: c.textPrimary,
+  },
+  referenceSectionLink: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: c.primaryAction,
+  },
+  referenceLinkPressed: {
+    opacity: 0.72,
+  },
+  referenceAttentionList: {
+    gap: 8,
+  },
+  referenceAttentionRow: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderLeftWidth: 2,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  referenceAttentionRowPressed: {
+    opacity: 0.9,
+    backgroundColor: c.cardMuted,
+  },
+  referenceAttentionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  referenceAttentionTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  referenceAttentionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  referenceAttentionTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: "800",
+    color: c.textPrimary,
+  },
+  referenceAttentionMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  referenceStatusBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  referenceStatusBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+  },
   dashboardEmptyText: {
     fontSize: 13,
     lineHeight: 18,
@@ -2296,7 +2538,7 @@ const styles = StyleSheet.create({
   dashboardSystemsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 7,
   },
   systemDashboardCard: {
     width: "48%",
@@ -2310,12 +2552,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: c.border,
     backgroundColor: c.cardMuted,
-    padding: 9,
+    padding: 8,
   },
   systemDashboardIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 999,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -2487,7 +2729,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
+    overflow: "hidden",
   },
   eyebrow: {
     fontSize: 12,
@@ -2505,8 +2747,9 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     minWidth: 0,
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 21,
+    lineHeight: 25,
+    fontWeight: "900",
     color: c.textPrimary,
   },
   titleActionsRow: {
@@ -2545,38 +2788,43 @@ const styles = StyleSheet.create({
     color: c.textMuted,
   },
   brandModel: {
-    marginTop: 4,
-    fontSize: 14,
-    color: c.textMuted,
-  },
-  variantText: {
-    marginTop: 4,
-    fontSize: 13,
+    marginTop: 2,
+    fontSize: 15,
+    fontWeight: "700",
     color: c.textSecondary,
   },
+  variantText: {
+    marginTop: 8,
+    fontSize: 11,
+    color: c.textMuted,
+  },
   heroQuickActionsRow: {
-    marginTop: 10,
+    marginTop: 8,
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   heroQuickActionBtn: {
-    flex: 1,
-    minHeight: 34,
+    width: "48%",
+    minHeight: 60,
     borderWidth: 1,
-    borderColor: c.borderStrong,
-    borderRadius: 10,
+    borderColor: c.border,
+    borderRadius: 11,
     backgroundColor: c.card,
     alignItems: "center",
     justifyContent: "center",
+    gap: 7,
     paddingHorizontal: 8,
   },
   heroQuickActionBtnPressed: {
     backgroundColor: c.divider,
   },
   heroQuickActionText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: c.textMeta,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "800",
+    color: c.textSecondary,
+    textAlign: "center",
   },
   divider: {
     height: 1,

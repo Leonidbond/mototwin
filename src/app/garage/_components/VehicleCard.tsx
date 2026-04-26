@@ -101,7 +101,7 @@ export function VehicleCard({ vehicle }: Props) {
         <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
           <VehicleSilhouette vehicle={vehicle} silhouetteKey={silhouetteKey} />
           <p style={{ marginTop: 2, textAlign: "center", ...captionStyle }}>
-            Схематичный вид &nbsp;•&nbsp; {silhouetteClassLabel}
+            Изображение класса &nbsp;•&nbsp; {silhouetteClassLabel}
           </p>
         </div>
 

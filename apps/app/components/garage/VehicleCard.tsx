@@ -10,14 +10,14 @@ import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { Button, Card } from "../ui";
 import { GarageScore } from "./GarageScore";
 import { VehicleSilhouette } from "./VehicleSilhouette";
-import brakesIcon from "../../../../images/top-node-icons/from-cards/brakes.png";
-import tiresIcon from "../../../../images/top-node-icons/from-cards/tires.png";
+import brakesFrontPadsIcon from "../../../../images/top-node-icons-dark/brakes/brakes_front_pads.png";
+import tiresRearIcon from "../../../../images/top-node-icons-dark/tires/tires_rear.png";
 
 type AttentionTone = "soon" | "overdue";
 
 const TOP_NODE_ICONS = {
-  brakes: brakesIcon,
-  tires: tiresIcon,
+  brakes: brakesFrontPadsIcon,
+  tires: tiresRearIcon,
 } as const;
 
 export function VehicleCard(props: {
@@ -62,7 +62,7 @@ export function VehicleCard(props: {
       <View style={styles.heroRow}>
         <View style={styles.silhouetteBlock}>
           <VehicleSilhouette vehicle={props.vehicle} />
-          <Text style={styles.caption}>Схематичный вид • {silhouetteLabel}</Text>
+          <Text style={styles.caption}>Изображение класса • {silhouetteLabel}</Text>
         </View>
         <GarageScore
           score={card.garageScore}
@@ -142,8 +142,9 @@ function AttentionRow(props: {
     <View style={styles.attentionRow}>
       <Image
         source={TOP_NODE_ICONS[props.iconKey]}
-        style={[styles.attentionIcon, { tintColor: accent }]}
+        style={styles.attentionIcon}
         resizeMode="contain"
+        alt=""
       />
       <View style={styles.attentionTextWrap}>
         <View style={styles.attentionHeadline}>

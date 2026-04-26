@@ -15,6 +15,7 @@ type NavItem = {
 };
 
 export function GarageBottomNav(props: {
+  activeKey?: BottomNavKey;
   onOpenGarage: () => void;
   onOpenNodes: () => void;
   onOpenJournal: () => void;
@@ -64,7 +65,7 @@ export function GarageBottomNav(props: {
     <View style={[styles.shell, { paddingBottom: Math.max(insets.bottom, 4) }]}>
       <View style={styles.bar}>
         {items.map((item) => {
-          const active = !!item.active;
+          const active = props.activeKey ? props.activeKey === item.key : !!item.active;
           const foreground = item.disabled
             ? c.textTertiary
             : active

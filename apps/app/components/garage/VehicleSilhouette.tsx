@@ -1,13 +1,13 @@
 import { Image, StyleSheet, View } from "react-native";
 import { resolveGarageVehicleSilhouette } from "@mototwin/domain";
 import type { GarageVehicleItem } from "@mototwin/types";
-import adventureTouring from "../../../../images/motorcycle-class-silhouettes/adventure_touring.png";
-import enduroDualSport from "../../../../images/motorcycle-class-silhouettes/enduro_dual_sport.png";
-import nakedRoadster from "../../../../images/motorcycle-class-silhouettes/naked_roadster.png";
-import sportSupersport from "../../../../images/motorcycle-class-silhouettes/sport_supersport.png";
-import cruiser from "../../../../images/motorcycle-class-silhouettes/cruiser.png";
-import classicRetro from "../../../../images/motorcycle-class-silhouettes/classic_retro.png";
-import scooterMaxiScooter from "../../../../images/motorcycle-class-silhouettes/scooter_maxi_scooter.png";
+import adventureTouring from "../../../../images/Motocycles/adventure_touring.png";
+import enduroDualSport from "../../../../images/Motocycles/enduro_dual_sport.png";
+import nakedRoadster from "../../../../images/Motocycles/naked_roadster.png";
+import sportSupersport from "../../../../images/Motocycles/sport_supersport.png";
+import cruiser from "../../../../images/Motocycles/cruiser.png";
+import classicRetro from "../../../../images/Motocycles/classic_retro.png";
+import scooterMaxiScooter from "../../../../images/Motocycles/scooter_maxi_scooter.png";
 
 const SILHOUETTES = {
   adventure_touring: adventureTouring,
@@ -24,7 +24,14 @@ export function VehicleSilhouette({ vehicle }: { vehicle: GarageVehicleItem }) {
   const source = SILHOUETTES[key] ?? SILHOUETTES.naked_roadster;
   return (
     <View style={styles.wrap}>
-      <Image source={source} style={styles.image} resizeMode="contain" accessible accessibilityLabel="Силуэт класса мотоцикла" />
+      <Image
+        source={source}
+        style={styles.image}
+        resizeMode="contain"
+        accessible
+        accessibilityLabel="Изображение класса мотоцикла"
+        alt="Изображение класса мотоцикла"
+      />
     </View>
   );
 }
@@ -38,6 +45,6 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
-    opacity: 0.62,
+    opacity: 0.94,
   },
 });

@@ -1,13 +1,13 @@
 import Image from "next/image";
 import { resolveGarageVehicleSilhouette } from "@mototwin/domain";
 import type { GarageVehicleItem } from "@mototwin/types";
-import adventureTouring from "../../../../images/motorcycle-class-silhouettes/adventure_touring.png";
-import enduroDualSport from "../../../../images/motorcycle-class-silhouettes/enduro_dual_sport.png";
-import nakedRoadster from "../../../../images/motorcycle-class-silhouettes/naked_roadster.png";
-import sportSupersport from "../../../../images/motorcycle-class-silhouettes/sport_supersport.png";
-import cruiser from "../../../../images/motorcycle-class-silhouettes/cruiser.png";
-import classicRetro from "../../../../images/motorcycle-class-silhouettes/classic_retro.png";
-import scooterMaxiScooter from "../../../../images/motorcycle-class-silhouettes/scooter_maxi_scooter.png";
+import adventureTouring from "../../../../images/Motocycles/adventure_touring.png";
+import enduroDualSport from "../../../../images/Motocycles/enduro_dual_sport.png";
+import nakedRoadster from "../../../../images/Motocycles/naked_roadster.png";
+import sportSupersport from "../../../../images/Motocycles/sport_supersport.png";
+import cruiser from "../../../../images/Motocycles/cruiser.png";
+import classicRetro from "../../../../images/Motocycles/classic_retro.png";
+import scooterMaxiScooter from "../../../../images/Motocycles/scooter_maxi_scooter.png";
 
 const SILHOUETTE_SRC = {
   adventure_touring: adventureTouring,
@@ -36,10 +36,10 @@ export function VehicleSilhouette(props: {
     >
       <Image
         src={src}
-        alt={`Силуэт класса ${key.replaceAll("_", " ")}`}
+        alt={`Мотоцикл класса ${key.replaceAll("_", " ")}`}
         fill
         sizes="(min-width: 1024px) 360px, 100vw"
-        style={{ objectFit: "contain", opacity: 0.65 }}
+        style={{ objectFit: "contain", opacity: 0.94 }}
       />
     </div>
   );

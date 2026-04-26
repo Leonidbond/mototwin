@@ -106,40 +106,34 @@ MotoTwin должен ощущаться как **Digital Garage / Premium Pit B
 
 ---
 
-## 5. Силуэты мотоциклов (MVP)
+## 5. Изображения мотоциклов по классам (MVP)
 
-Принцип: схематичный силуэт класса, не точная модель.
+Принцип: распознаваемое изображение класса (silhouette key), не точная модель. Используется и в карточке гаража, и на overview-странице мотоцикла.
 
-Источник эталонной библиотеки силуэтов: [`images/classes.png`](../images/classes.png).
-Готовые к использованию ассеты (прозрачный PNG, цвет штрихов `#e2e7ef`, рассчитан на тёмный фон) лежат в [`images/motorcycle-class-silhouettes/`](../images/motorcycle-class-silhouettes).
+Активный набор ассетов: [`images/Motocycles/`](../images/Motocycles) (рендерные иллюстрации цветом, с прозрачным фоном). Соответствие классов — по `VehicleSilhouetteKey` из `@mototwin/domain` (см. `resolveGarageVehicleSilhouette`).
 
-Рекомендуемые классы и соответствующие файлы:
-
-| # | Класс | Ассет |
+| # | Класс (key) | Ассет |
 | - | - | - |
-| 1 | Adventure / Touring | [`adventure_touring.png`](../images/motorcycle-class-silhouettes/adventure_touring.png) |
-| 2 | Enduro / Dual-sport | [`enduro_dual_sport.png`](../images/motorcycle-class-silhouettes/enduro_dual_sport.png) |
-| 3 | Naked / Roadster | [`naked_roadster.png`](../images/motorcycle-class-silhouettes/naked_roadster.png) |
-| 4 | Sport / Supersport | [`sport_supersport.png`](../images/motorcycle-class-silhouettes/sport_supersport.png) |
-| 5 | Cruiser | [`cruiser.png`](../images/motorcycle-class-silhouettes/cruiser.png) |
-| 6 | Classic / Retro | [`classic_retro.png`](../images/motorcycle-class-silhouettes/classic_retro.png) |
-| 7 | Scooter / Maxi-scooter | [`scooter_maxi_scooter.png`](../images/motorcycle-class-silhouettes/scooter_maxi_scooter.png) |
+| 1 | `adventure_touring` | [`adventure_touring.png`](../images/Motocycles/adventure_touring.png) |
+| 2 | `enduro_dual_sport` | [`enduro_dual_sport.png`](../images/Motocycles/enduro_dual_sport.png) |
+| 3 | `naked_roadster` | [`naked_roadster.png`](../images/Motocycles/naked_roadster.png) |
+| 4 | `sport_supersport` | [`sport_supersport.png`](../images/Motocycles/sport_supersport.png) |
+| 5 | `cruiser` | [`cruiser.png`](../images/Motocycles/cruiser.png) |
+| 6 | `classic_retro` | [`classic_retro.png`](../images/Motocycles/classic_retro.png) |
+| 7 | `scooter_maxi_scooter` | [`scooter_maxi_scooter.png`](../images/Motocycles/scooter_maxi_scooter.png) |
 
-Стартовый минимум первого этапа:
-
-1. Adventure
-2. Enduro
-3. Naked
-4. Sport Touring
-5. Cruiser
-
-Правило: силуэт поддерживает распознавание класса, но не должен доминировать над данными/статусами.
+Правило: изображение поддерживает распознавание класса, но не должно доминировать над данными/статусами.
 
 Технические заметки по ассетам:
 
-- Формат: PNG, RGBA, прозрачный фон; рассчитаны на тёмный фон карточки (`#0d1118`..`#121820`). На светлой теме компонент `VehicleSilhouette` должен инвертировать/перекрашивать штрихи.
-- Единый стиль: тонкая линия, цвет `#e2e7ef`, без теней и заливок; силуэт обрезан с 40 px паддингом.
-- Перегенерация: `node scripts/extract-motorcycle-class-silhouettes.js` (берёт `images/classes.png` как источник).
+- Формат: PNG, RGBA, прозрачный фон; рассчитаны на тёмный фон карточки (`#0d1118`..`#121820`). На светлой теме компонент `VehicleSilhouette` должен учитывать контраст (тёмные элементы — колёса, двигатель — могут сливаться со светлым фоном и наоборот).
+- Кадрирование: бок мотоцикла, прозрачный фон должен плотно прилегать к содержимому. Допускается **не более ~16 px** прозрачного паддинга по периметру; иначе при `object-fit: contain` мотоцикл визуально уменьшается, а тёмные части (колёса/двигатель) сливаются с фоном карточки и создают эффект «обрезания снизу».
+- Имя файла = silhouette key из `VehicleSilhouetteKey` (snake_case), 1-в-1 как в таблице выше — иначе сломается импорт в `VehicleSilhouette` / `VehicleDashboard`.
+- Препроцессинг новых ассетов: открыть PNG, удалить лишние прозрачные поля (`Image.getbbox()` в Pillow или эквивалент), оставить ~16 px безопасного паддинга, сохранить с `optimize=True`.
+- Web (`next/image`): импортируется как `StaticImageData`, рендерится с `objectFit: "contain"` и `opacity ≈ 0.94` в карточке гаража и `objectFit: "contain"` без `overflow: hidden` на странице мотоцикла (`VehicleDashboard`), чтобы избежать визуального обрезания.
+- Expo (React Native `Image`): `resizeMode="contain"`, `opacity ≈ 0.94`, `accessibilityLabel="Изображение класса мотоцикла"`.
+- После замены/перекадрирования файлов очистить кэш оптимизации Next.js: `rm -rf .next/dev/cache/images/*` (иначе dev-сервер будет отдавать старую версию).
+- Скрипт `scripts/extract-motorcycle-class-silhouettes.js` относится к более раннему line-art набору в `images/motorcycle-class-silhouettes/` и в продуктовом UI больше не используется; оставлен как исторический референс.
 
 ---
 

@@ -28,13 +28,13 @@ import type {
 } from "@mototwin/types";
 import { Button, Card } from "@/components/ui";
 import styles from "./VehicleDashboard.module.css";
-import adventureTouring from "../../../../../images/motorcycle-class-silhouettes/adventure_touring.png";
-import enduroDualSport from "../../../../../images/motorcycle-class-silhouettes/enduro_dual_sport.png";
-import nakedRoadster from "../../../../../images/motorcycle-class-silhouettes/naked_roadster.png";
-import sportSupersport from "../../../../../images/motorcycle-class-silhouettes/sport_supersport.png";
-import cruiser from "../../../../../images/motorcycle-class-silhouettes/cruiser.png";
-import classicRetro from "../../../../../images/motorcycle-class-silhouettes/classic_retro.png";
-import scooterMaxiScooter from "../../../../../images/motorcycle-class-silhouettes/scooter_maxi_scooter.png";
+import adventureTouring from "../../../../../images/Motocycles/adventure_touring.png";
+import enduroDualSport from "../../../../../images/Motocycles/enduro_dual_sport.png";
+import nakedRoadster from "../../../../../images/Motocycles/naked_roadster.png";
+import sportSupersport from "../../../../../images/Motocycles/sport_supersport.png";
+import cruiser from "../../../../../images/Motocycles/cruiser.png";
+import classicRetro from "../../../../../images/Motocycles/classic_retro.png";
+import scooterMaxiScooter from "../../../../../images/Motocycles/scooter_maxi_scooter.png";
 import brakesIcon from "../../../../../images/top-node-icons-dark/brakes/brakes.png";
 import brakesFluidIcon from "../../../../../images/top-node-icons-dark/brakes/brakes_fluid.png";
 import brakesFrontPadsIcon from "../../../../../images/top-node-icons-dark/brakes/brakes_front_pads.png";
@@ -258,22 +258,25 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
 
           <div
             style={{
-              position: "relative",
-              marginTop: 8,
-              height: 300,
-              overflow: "hidden",
-              borderRadius: 20,
-              border: `1px solid ${productSemanticColors.divider}`,
-              background:
-                "radial-gradient(circle at 50% 60%, rgba(255,255,255,0.09), transparent 38%), radial-gradient(circle at 30% 22%, rgba(249,115,22,0.18), transparent 32%), linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0))",
+              marginTop: 12,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             <Image
               src={silhouetteSrc}
-              alt={detailViewModel?.displayName || "Силуэт мотоцикла"}
-              fill
+              alt={detailViewModel?.displayName || "Изображение мотоцикла"}
+              priority
               sizes="(min-width: 1280px) 820px, 100vw"
-              style={{ objectFit: "contain", opacity: 0.96, padding: "16px 18px 4px" }}
+              style={{
+                width: "100%",
+                height: "auto",
+                maxHeight: 360,
+                objectFit: "contain",
+                display: "block",
+              }}
             />
           </div>
 
