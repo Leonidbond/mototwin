@@ -1068,6 +1068,7 @@ export default function VehicleDetailScreen() {
               okCount={okCount}
               soonCount={attentionSummary.soonCount}
               overdueCount={attentionSummary.overdueCount}
+              onOpenAttention={() => router.push(`/vehicles/${vehicleId}/attention`)}
             />
           </View>
 
@@ -1120,7 +1121,11 @@ export default function VehicleDetailScreen() {
             ) : (
               <View style={styles.dashboardSystemsGrid}>
                 {topNodeOverviewCards.map((card) => (
-                  <TopOverviewDashboardCard key={card.key} card={card} />
+                  <TopOverviewDashboardCard
+                    key={card.key}
+                    card={card}
+                    onOpenAllNodes={() => setIsFullNodeTreeOpen(true)}
+                  />
                 ))}
               </View>
             )}
@@ -1136,7 +1141,21 @@ export default function VehicleDetailScreen() {
             {recentEvents.length === 0 ? (
               <Text style={styles.dashboardEmptyText}>После первого ТО или расхода здесь появятся последние события.</Text>
             ) : (
-              recentEvents.map((event) => <RecentDashboardEventRow key={event.id} event={event} />)
+              recentEvents.map((event) => (
+                <RecentDashboardEventRow
+                  key={event.id}
+                  event={event}
+                  onOpen={() => {
+                    const nodeFilter = event.nodeId
+                      ? {
+                          nodeIds: [event.nodeId],
+                          displayLabel: event.node?.name?.trim() || "Узел",
+                        }
+                      : null;
+                    router.push(buildVehicleServiceLogHref(vehicleId, nodeFilter, false));
+                  }}
+                />
+              ))
             )}
           </DashboardSection>
 
@@ -1148,6 +1167,7 @@ export default function VehicleDetailScreen() {
           <PartsDashboardCard
             onOpenWishlist={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
             onAddPart={() => router.push(`/vehicles/${vehicleId}/wishlist/new`)}
+            onPressBody={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
           />
         </View>
 
@@ -1770,14 +1790,21 @@ function MobileScorePanel({
   okCount,
   soonCount,
   overdueCount,
+  onOpenAttention,
 }: {
   score: number | null;
   okCount: number;
   soonCount: number;
   overdueCount: number;
+  onOpenAttention: () => void;
 }) {
   return (
-    <View style={styles.mobileScorePanel}>
+    <Pressable
+      onPress={onOpenAttention}
+      accessibilityRole="button"
+      accessibilityLabel="Garage Score и требующие внимания узлы"
+      style={({ pressed }) => [styles.mobileScorePanel, pressed && styles.mobileScorePanelPressed]}
+    >
       <View style={styles.mobileScoreMain}>
         <Text style={styles.mobileScoreLabel}>Garage Score</Text>
         <Text style={styles.mobileScoreValue}>
@@ -1787,7 +1814,7 @@ function MobileScorePanel({
       <MobileScoreStat value={okCount} label="OK" color={statusSemanticTokens.OK.accent} />
       <MobileScoreStat value={soonCount} label="Soon" color={statusSemanticTokens.SOON.accent} />
       <MobileScoreStat value={overdueCount} label="Overdue" color={statusSemanticTokens.OVERDUE.accent} />
-    </View>
+    </Pressable>
   );
 }
 
@@ -1864,10 +1891,21 @@ function ReferenceAttentionRow({ item, onPress }: { item: AttentionItemViewModel
   );
 }
 
-function TopOverviewDashboardCard({ card }: { card: TopNodeOverviewCard }) {
+function TopOverviewDashboardCard({
+  card,
+  onOpenAllNodes,
+}: {
+  card: TopNodeOverviewCard;
+  onOpenAllNodes: () => void;
+}) {
   const tokens = card.status ? statusSemanticTokens[card.status] : statusSemanticTokens.UNKNOWN;
   return (
-    <View style={styles.systemDashboardCard}>
+    <Pressable
+      onPress={onOpenAllNodes}
+      accessibilityRole="button"
+      accessibilityLabel={`${card.title}, ${card.statusLabel}. Открыть все узлы`}
+      style={({ pressed }) => [styles.systemDashboardCard, pressed && styles.systemDashboardCardPressed]}
+    >
       <View style={[styles.systemDashboardIcon, { borderColor: tokens.border, backgroundColor: tokens.background }]}>
         <TopNodePngIcon source={TOP_NODE_GROUP_ICON_SRC[card.key]} size={40} />
       </View>
@@ -1880,7 +1918,7 @@ function TopOverviewDashboardCard({ card }: { card: TopNodeOverviewCard }) {
           {card.details}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -1888,11 +1926,16 @@ function TopNodePngIcon({ source, size }: { source: ImageSourcePropType; size: n
   return <Image source={source} style={{ width: size, height: size }} resizeMode="contain" alt="" />;
 }
 
-function RecentDashboardEventRow({ event }: { event: ServiceEventItem }) {
+function RecentDashboardEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: () => void }) {
   const costLabel =
     event.costAmount && event.currency ? `${formatExpenseAmountRu(event.costAmount)} ${event.currency}` : "—";
   return (
-    <View style={styles.recentDashboardRow}>
+    <Pressable
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`Событие ${event.serviceType}, открыть в журнале`}
+      style={({ pressed }) => [styles.recentDashboardRow, pressed && styles.recentDashboardRowPressed]}
+    >
       <View style={styles.recentDashboardTopRow}>
         <Text style={styles.recentDashboardDate}>{formatIsoCalendarDateRu(event.eventDate)}</Text>
         <Text style={styles.recentDashboardCost}>{costLabel}</Text>
@@ -1903,7 +1946,7 @@ function RecentDashboardEventRow({ event }: { event: ServiceEventItem }) {
       <Text style={styles.recentDashboardMeta} numberOfLines={1}>
         {event.node?.name || "Без привязки к узлу"}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -1941,13 +1984,20 @@ function ExpenseDashboardCard({
 function PartsDashboardCard({
   onOpenWishlist,
   onAddPart,
+  onPressBody,
 }: {
   onOpenWishlist: () => void;
   onAddPart: () => void;
+  onPressBody: () => void;
 }) {
   return (
     <DashboardSection title="Что нужно купить" actionLabel="Список" onActionPress={onOpenWishlist}>
-      <View style={styles.partsDashboardBody}>
+      <Pressable
+        onPress={onPressBody}
+        accessibilityRole="button"
+        accessibilityLabel="Открыть список покупок"
+        style={({ pressed }) => [styles.partsDashboardBody, pressed && styles.partsDashboardBodyPressed]}
+      >
         <View style={styles.partsDashboardIcon}>
           <MaterialIcons name="shopping-cart" size={24} color={c.primaryAction} />
         </View>
@@ -1957,7 +2007,8 @@ function PartsDashboardCard({
             Добавляйте детали из дерева узлов или создавайте позицию вручную.
           </Text>
         </View>
-      </View>
+        <MaterialIcons name="chevron-right" size={20} color={c.textTertiary} style={styles.partsDashboardBodyChevron} />
+      </Pressable>
       <Pressable onPress={onAddPart} style={({ pressed }) => [styles.partsDashboardButton, pressed && styles.partsDashboardButtonPressed]}>
         <Text style={styles.partsDashboardButtonText}>Добавить деталь</Text>
       </Pressable>
@@ -2200,6 +2251,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(4, 8, 13, 0.42)",
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
+  },
+  mobileScorePanelPressed: {
+    opacity: 0.92,
   },
   mobileScoreMain: {
     flex: 1.15,
@@ -2565,6 +2619,10 @@ const styles = StyleSheet.create({
     backgroundColor: c.cardMuted,
     padding: 8,
   },
+  systemDashboardCardPressed: {
+    opacity: 0.9,
+    backgroundColor: c.chipBackground,
+  },
   systemDashboardIcon: {
     width: 44,
     height: 44,
@@ -2597,6 +2655,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: c.divider,
     gap: 3,
+  },
+  recentDashboardRowPressed: {
+    backgroundColor: c.cardMuted,
   },
   recentDashboardTopRow: {
     flexDirection: "row",
@@ -2664,6 +2725,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    paddingVertical: 4,
+    marginHorizontal: -2,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+  },
+  partsDashboardBodyPressed: {
+    backgroundColor: c.cardMuted,
+  },
+  partsDashboardBodyChevron: {
+    flexShrink: 0,
   },
   partsDashboardIcon: {
     width: 46,
