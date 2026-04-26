@@ -15,6 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "mobile:dev": "npm run dev --workspace @mototwin/app",
     "mobile:dev:tunnel": "npm run dev:tunnel --workspace @mototwin/app",
+    "mobile:dev:lan": "npm run dev:lan --workspace @mototwin/app",
     "mobile:android": "npm run android --workspace @mototwin/app",
     "mobile:ios": "npm run ios --workspace @mototwin/app",
     "mobile:web": "npm run web --workspace @mototwin/app"
