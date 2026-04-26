@@ -4,9 +4,9 @@ import type { CSSProperties } from "react";
 import { Card } from "@/components/ui";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
-import brakesIcon from "../../../../images/top-node-icons/from-cards/brakes.png";
-import engineCoolingIcon from "../../../../images/top-node-icons/from-cards/engine_cooling.png";
-import tiresIcon from "../../../../images/top-node-icons/from-cards/tires.png";
+import brakesIcon from "../../../../images/top-node-icons-dark/brakes/brakes_front_pads.png";
+import engineCoolingIcon from "../../../../images/top-node-icons-dark/engine_cooling/engine_cooling.png";
+import tiresIcon from "../../../../images/top-node-icons-dark/tires/tires_rear.png";
 
 type TaskIconKind = "brake" | "engine" | "tire";
 
@@ -110,7 +110,13 @@ export function GarageTasksStrip(props: { vehicles: GarageVehicleItem[] }) {
               alt=""
               width={36}
               height={36}
-              style={{ width: 36, height: 36, objectFit: "contain", flex: "0 0 auto" }}
+              style={{
+                width: 36,
+                height: 36,
+                objectFit: "contain",
+                filter: item.metaTone === "danger" ? "drop-shadow(0 0 6px #F04F47)" : "drop-shadow(0 0 6px #F6C453)",
+                flex: "0 0 auto",
+              }}
             />
             <div style={{ minWidth: 0 }}>
               <div style={captionStyle}>{item.caption}</div>

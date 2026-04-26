@@ -1,3 +1,4 @@
+import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import {
@@ -9,28 +10,34 @@ import { productSemanticColors } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { Button, Card } from "@/components/ui";
 import { VehicleSilhouette } from "./VehicleSilhouette";
-import brakesIcon from "../../../../images/top-node-icons/from-cards/brakes.png";
-import chainSprocketsIcon from "../../../../images/top-node-icons/from-cards/chain_sprockets.png";
-import engineCoolingIcon from "../../../../images/top-node-icons/from-cards/engine_cooling.png";
-import lubricationIcon from "../../../../images/top-node-icons/from-cards/lubrication.png";
-import suspensionIcon from "../../../../images/top-node-icons/from-cards/suspension.png";
-import tiresIcon from "../../../../images/top-node-icons/from-cards/tires.png";
+import brakesFrontPadsIcon from "../../../../images/top-node-icons-dark/brakes/brakes_front_pads.png";
+import brakesIcon from "../../../../images/top-node-icons-dark/brakes/brakes.png";
+import chainSprocketsIcon from "../../../../images/top-node-icons-dark/chain_sprockets/chain_sprockets.png";
+import engineCoolingIcon from "../../../../images/top-node-icons-dark/engine_cooling/engine_cooling.png";
+import lubricationIcon from "../../../../images/top-node-icons-dark/lubrication/lubrication.png";
+import suspensionIcon from "../../../../images/top-node-icons-dark/suspension/suspension.png";
+import tiresRearIcon from "../../../../images/top-node-icons-dark/tires/tires_rear.png";
+import tiresIcon from "../../../../images/top-node-icons-dark/tires/tires.png";
 
 type TopNodeIconKey =
   | "brakes"
+  | "brakes_front_pads"
   | "chain_sprockets"
   | "engine_cooling"
   | "lubrication"
   | "suspension"
-  | "tires";
+  | "tires"
+  | "tires_rear";
 
-const TOP_NODE_ICONS = {
+const TOP_NODE_ICONS: Record<TopNodeIconKey, StaticImageData> = {
   brakes: brakesIcon,
+  brakes_front_pads: brakesFrontPadsIcon,
   chain_sprockets: chainSprocketsIcon,
   engine_cooling: engineCoolingIcon,
   lubrication: lubricationIcon,
   suspension: suspensionIcon,
   tires: tiresIcon,
+  tires_rear: tiresRearIcon,
 } as const;
 
 type Props = {
@@ -126,7 +133,7 @@ export function VehicleCard({ vehicle }: Props) {
               {overdueCount > 0 ? (
                 <AttentionRow
                   tone="overdue"
-                  iconKey="tires"
+                  iconKey="tires_rear"
                   title="Задняя шина"
                   badgeLabel="Просрочено"
                   subtitle="Рекомендуется замена"
@@ -135,7 +142,7 @@ export function VehicleCard({ vehicle }: Props) {
               {soonCount > 0 ? (
                 <AttentionRow
                   tone="soon"
-                  iconKey="brakes"
+                  iconKey="brakes_front_pads"
                   title="Тормозные колодки"
                   badgeLabel="Скоро"
                   subtitle="Проверить через 450 км"
@@ -219,7 +226,7 @@ function AttentionRow({
   const accent = tone === "overdue" ? LEGEND_COLORS.overdue : LEGEND_COLORS.soon;
   return (
     <div style={attentionRowStyle}>
-      <TopNodeIconMask iconKey={iconKey} color={accent} />
+      <TopNodeIconImage iconKey={iconKey} color={accent} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={attentionTitleRowStyle}>{title}</span>
@@ -259,33 +266,44 @@ function HealthyRow() {
   );
 }
 
-function TopNodeIconMask({
+function TopNodeIconImage({
   iconKey,
   color,
 }: {
   iconKey: TopNodeIconKey;
   color: string;
 }) {
-  const maskUrl = `url(${TOP_NODE_ICONS[iconKey].src})`;
+  const iconSrc = TOP_NODE_ICONS[iconKey];
   return (
     <span
       aria-hidden
       style={{
-        display: "inline-block",
+        position: "relative",
+        display: "inline-flex",
         flex: "0 0 auto",
         width: 36,
         height: 36,
-        backgroundColor: color,
-        maskImage: maskUrl,
-        maskRepeat: "no-repeat",
-        maskPosition: "center",
-        maskSize: "contain",
-        WebkitMaskImage: maskUrl,
-        WebkitMaskRepeat: "no-repeat",
-        WebkitMaskPosition: "center",
-        WebkitMaskSize: "contain",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: 12,
+        border: `1px solid ${color}66`,
+        backgroundColor: `${color}1A`,
+        boxShadow: `0 0 14px ${color}35`,
+        overflow: "hidden",
       }}
-    />
+    >
+      <Image
+        src={iconSrc}
+        alt=""
+        fill
+        sizes="36px"
+        style={{
+          objectFit: "contain",
+          padding: 1,
+          filter: `drop-shadow(0 0 6px ${color}) saturate(1.12)`,
+        }}
+      />
+    </span>
   );
 }
 

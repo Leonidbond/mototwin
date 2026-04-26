@@ -11,9 +11,8 @@ type NavIconKind =
   | "journal"
   | "expenses"
   | "details"
-  | "reminders"
   | "profile"
-  | "settings";
+  | "logout";
 
 type NavItem = {
   href: string;
@@ -28,9 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/service-log", label: "Журнал", icon: "journal" },
   { href: "/expenses", label: "Расходы", icon: "expenses" },
   { href: "/details", label: "Детали", icon: "details" },
-  { href: "/reminders", label: "Напоминания", icon: "reminders" },
   { href: "/profile", label: "Профиль", icon: "profile" },
-  { href: "/settings", label: "Настройки", icon: "settings" },
 ];
 
 export function GarageSidebar({
@@ -41,7 +38,7 @@ export function GarageSidebar({
   onToggle: () => void;
 }) {
   return (
-    <aside style={{ ...asideStyle, padding: collapsed ? "16px 8px" : 16 }}>
+    <aside style={{ ...asideStyle, padding: collapsed ? "14px 7px" : "18px 14px" }}>
       <div>
         <div
           style={{
@@ -49,8 +46,8 @@ export function GarageSidebar({
             alignItems: "center",
             justifyContent: collapsed ? "center" : "space-between",
             gap: 8,
-            marginBottom: 20,
-            minHeight: 36,
+            marginBottom: 22,
+            minHeight: 42,
           }}
         >
           {collapsed ? (
@@ -74,22 +71,26 @@ export function GarageSidebar({
               backgroundColor: collapsed
                 ? productSemanticColors.card
                 : productSemanticColors.cardSubtle,
+              opacity: 0.72,
             }}
           >
             <ChevronIcon direction={collapsed ? "right" : "left"} />
           </button>
         </div>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {NAV_ITEMS.map((item) => (
             <NavLink key={item.label} item={item} collapsed={collapsed} />
           ))}
         </nav>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {!collapsed ? (
           <div style={proCardStyle}>
-            <div style={proTitleStyle}>PRO</div>
+            <div style={proTitleStyle}>
+              <span style={{ color: productSemanticColors.textPrimary }}>MOTOTWIN</span>{" "}
+              <span>PRO</span>
+            </div>
             <div style={{ marginTop: 4, ...proTextStyle }}>
               Больше возможностей для вашего гаража
             </div>
@@ -121,6 +122,22 @@ export function GarageSidebar({
             </div>
           ) : null}
         </Link>
+
+        <button
+          type="button"
+          style={{
+            ...logoutLinkStyle,
+            justifyContent: collapsed ? "center" : "flex-start",
+            padding: collapsed ? "9px 0" : "10px 12px",
+          }}
+          title={collapsed ? "Выйти" : undefined}
+          aria-label={collapsed ? "Выйти" : undefined}
+        >
+          <IconBox>
+            <NavIcon kind="logout" color={productSemanticColors.textMuted} />
+          </IconBox>
+          {!collapsed ? <span>Выйти</span> : null}
+        </button>
       </div>
     </aside>
   );
@@ -137,17 +154,21 @@ function NavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
       title={collapsed ? item.label : undefined}
       aria-label={collapsed ? item.label : undefined}
       style={{
+        position: "relative",
         display: "flex",
         alignItems: "center",
         justifyContent: collapsed ? "center" : "flex-start",
-        gap: collapsed ? 0 : 12,
-        padding: collapsed ? "9px 0" : "9px 12px",
-        borderRadius: 12,
+        gap: collapsed ? 0 : 10,
+        minHeight: 42,
+        padding: collapsed ? "9px 0" : "9px 10px 9px 12px",
+        borderRadius: 0,
         color,
-        backgroundColor: isActive ? productSemanticColors.cardSubtle : "transparent",
-        border: `1px solid ${isActive ? productSemanticColors.borderStrong : "transparent"}`,
-        fontSize: 14,
+        backgroundColor: isActive ? "rgba(255,255,255,0.055)" : "transparent",
+        border: `1px solid ${isActive ? "rgba(255,255,255,0.055)" : "transparent"}`,
+        borderLeft: `3px solid ${isActive ? productSemanticColors.primaryAction : "transparent"}`,
+        fontSize: 13,
         fontWeight: isActive ? 600 : 500,
+        letterSpacing: -0.1,
       }}
     >
       <IconBox>
@@ -242,11 +263,12 @@ function NavIcon({ kind, color }: { kind: NavIconKind; color: string }) {
           <path d="M19 12a7 7 0 0 0-.2-1.7l2-1.5-2-3.4-2.3.9a7 7 0 0 0-3-1.7L13 2h-2l-.5 2.6a7 7 0 0 0-3 1.7l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .6.1 1.2.2 1.7l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 3 1.7L11 22h2l.5-2.6a7 7 0 0 0 3-1.7l2.3.9 2-3.4-2-1.5c.1-.5.2-1.1.2-1.7z" />
         </svg>
       );
-    case "reminders":
+    case "logout":
       return (
         <svg viewBox="0 0 24 24" {...common}>
-          <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16z" />
-          <path d="M10 20a2 2 0 0 0 4 0" />
+          <path d="M10 17l5-5-5-5" />
+          <path d="M15 12H3" />
+          <path d="M13 5h6v14h-6" />
         </svg>
       );
     case "profile":
@@ -256,26 +278,20 @@ function NavIcon({ kind, color }: { kind: NavIconKind; color: string }) {
           <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
         </svg>
       );
-    case "settings":
-      return (
-        <svg viewBox="0 0 24 24" {...common}>
-          <circle cx="12" cy="12" r="3" />
-          <path d="M4 12a8 8 0 0 1 .2-1.7L3 9l1.5-2.6 1.8.7a8 8 0 0 1 2.9-1.7L9.5 4h5l.3 1.4a8 8 0 0 1 2.9 1.7l1.8-.7L21 9l-1.2 1.3c.1.5.2 1.1.2 1.7s-.1 1.2-.2 1.7L21 15l-1.5 2.6-1.8-.7a8 8 0 0 1-2.9 1.7l-.3 1.4h-5l-.3-1.4a8 8 0 0 1-2.9-1.7l-1.8.7L3 15l1.2-1.3A8 8 0 0 1 4 12z" />
-        </svg>
-      );
   }
 }
 
 const asideStyle: CSSProperties = {
-  position: "relative",
+  position: "sticky",
+  top: 0,
   display: "flex",
   flexDirection: "column",
   justifyContent: "space-between",
-  minHeight: "calc(100vh - 32px)",
+  minHeight: "100vh",
   padding: 16,
   borderRight: `1px solid ${productSemanticColors.border}`,
-  backgroundColor: productSemanticColors.card,
-  gap: 20,
+  backgroundColor: "#070B10",
+  gap: 24,
   transition: "padding 0.18s ease",
 };
 
@@ -312,7 +328,7 @@ const brandStyle: CSSProperties = {
   color: productSemanticColors.textPrimary,
   fontSize: 18,
   fontWeight: 800,
-  letterSpacing: 1.6,
+  letterSpacing: 1,
 };
 
 const subBrandStyle: CSSProperties = {
@@ -327,14 +343,14 @@ const proCardStyle: CSSProperties = {
   padding: 14,
   borderRadius: 14,
   border: `1px solid ${productSemanticColors.border}`,
-  backgroundColor: productSemanticColors.cardSubtle,
+  background: "linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02))",
 };
 
 const proTitleStyle: CSSProperties = {
   color: productSemanticColors.primaryAction,
-  fontSize: 14,
+  fontSize: 12,
   fontWeight: 800,
-  letterSpacing: 0.8,
+  letterSpacing: 0.5,
 };
 
 const proTextStyle: CSSProperties = {
@@ -357,6 +373,20 @@ const userCardStyle: CSSProperties = {
   backgroundColor: productSemanticColors.cardSubtle,
   border: `1px solid ${productSemanticColors.border}`,
   color: productSemanticColors.textPrimary,
+};
+
+const logoutLinkStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  width: "100%",
+  borderRadius: 12,
+  border: "none",
+  background: "transparent",
+  color: productSemanticColors.textMuted,
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: "pointer",
 };
 
 const avatarStyle: CSSProperties = {

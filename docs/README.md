@@ -20,6 +20,7 @@
 - `cross-platform-parity.md` — текущая продуктовая матрица parity и намеренные отличия.
 - `mototwin_unified_design_concept.md` — единый дизайн-концепт.
 - `mototwin_ui_refactor_playbook.md` — инженерный playbook UI-рефакторинга.
+- `top-node-icons.md` — правила хранения, именования и подключения TOP-node иконок.
 
 ## Feature specs (durable product docs)
 

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -89,6 +88,8 @@ import {
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
 import { TopNodeIcon } from "@/components/icons/top-nodes";
+import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { VehicleDashboard } from "./_components/VehicleDashboard";
 import type {
   AttentionItemViewModel,
   AttentionSnoozeFilter,
@@ -119,6 +120,7 @@ import type {
 } from "@mototwin/types";
 
 const vehicleDetailApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+const SIDEBAR_COLLAPSED_KEY = "vehicle.detail.sidebar.collapsed";
 
 type VehiclePageProps = {
   params: Promise<{
@@ -139,6 +141,7 @@ function buildNodeSnoozeStorageKey(vehicleId: string, nodeId: string): string {
 export default function VehiclePage({ params }: VehiclePageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [vehicleId, setVehicleId] = useState("");
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -231,6 +234,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   const [vehicleStateError, setVehicleStateError] = useState("");
   const [isSavingVehicleState, setIsSavingVehicleState] = useState(false);
   const [serviceType, setServiceType] = useState("");
+  const [isAdvancedDetailsOpen, setIsAdvancedDetailsOpen] = useState(false);
   const [eventDate, setEventDate] = useState("");
   const [odometer, setOdometer] = useState("");
   const [engineHours, setEngineHours] = useState("");
@@ -240,6 +244,28 @@ export default function VehiclePage({ params }: VehiclePageProps) {
   );
   const [comment, setComment] = useState("");
   const [installedPartsJson, setInstalledPartsJson] = useState("");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
+        setSidebarCollapsed(true);
+      }
+    } catch {
+      // Ignore local storage failures.
+    }
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        // Ignore local storage failures.
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!profileFormSuccess) {
       return;
@@ -783,11 +809,30 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     }
     const editServiceEventId = searchParams.get("editServiceEventId");
     if (editServiceEventId) {
-      openEditServiceEventFromLog(editServiceEventId);
+      const serviceEvent = serviceEvents.find((candidate) => candidate.id === editServiceEventId);
+      if (!serviceEvent || serviceEvent.eventKind === "STATE_UPDATE") {
+        return;
+      }
+      const nodePath = findNodePathById(nodeTree, serviceEvent.nodeId);
+      if (!nodePath) {
+        setServiceEventFormError("Не удалось определить путь узла.");
+        return;
+      }
+      setServiceEventFormError("");
+      setEditingServiceEventId(serviceEvent.id);
+      applyAddServiceEventFormValues(createInitialEditServiceEventValues(serviceEvent));
+      setSelectedNodePath(nodePath);
+      setIsAddServiceEventModalOpen(true);
       return;
     }
-    openCreateServiceEventModal();
-  }, [searchParams, serviceEvents]);
+    setEditingServiceEventId(null);
+    setSelectedNodePath([]);
+    const empty = createInitialAddServiceEventFormValues();
+    empty.currency = readDefaultCurrencySetting();
+    applyAddServiceEventFormValues(empty);
+    setServiceEventFormError("");
+    setIsAddServiceEventModalOpen(true);
+  }, [searchParams, serviceEvents, nodeTree]);
 
   const loadServiceEvents = useCallback(async () => {
     if (!vehicleId) {
@@ -963,25 +1008,6 @@ export default function VehiclePage({ params }: VehiclePageProps) {
       { todayDateYmd: todayDate }
     );
     applyAddServiceEventFormValues(values);
-    setSelectedNodePath(nodePath);
-    setIsAddServiceEventModalOpen(true);
-  };
-
-  const openEditServiceEventFromLog = (eventId: string) => {
-    const serviceEvent = serviceEvents.find((candidate) => candidate.id === eventId);
-    if (!serviceEvent || serviceEvent.eventKind === "STATE_UPDATE") {
-      return;
-    }
-
-    const nodePath = findNodePathById(nodeTree, serviceEvent.nodeId);
-    if (!nodePath) {
-      setServiceEventFormError("Не удалось определить путь узла.");
-      return;
-    }
-
-    setServiceEventFormError("");
-    setEditingServiceEventId(serviceEvent.id);
-    applyAddServiceEventFormValues(createInitialEditServiceEventValues(serviceEvent));
     setSelectedNodePath(nodePath);
     setIsAddServiceEventModalOpen(true);
   };
@@ -1924,56 +1950,179 @@ export default function VehiclePage({ params }: VehiclePageProps) {
     : { items: [] };
 
   return (
-    <main
-      className="min-h-screen px-6 py-14 text-gray-950 lg:py-16"
-      style={{ backgroundColor: productSemanticColors.canvas }}
-    >
-      <div className="mx-auto max-w-6xl">
-        <nav className="mb-3 text-sm text-gray-600">
-          <Link href="/garage" className="transition hover:text-gray-950">
-            Гараж
-          </Link>{" "}
-          <span className="text-gray-400">/</span>{" "}
-          <span className="text-gray-900">Мотоцикл</span>
-        </nav>
-
-        <div className="mb-7">
-          <Link
-            href="/garage"
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-          >
-            Назад в гараж
-          </Link>
-        </div>
-
-        {isLoading ? (
-          <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
-            <p className="text-sm text-gray-600">Загрузка мотоцикла...</p>
-          </div>
-        ) : null}
-
-        {!isLoading && error ? (
-          <div
-            className="rounded-3xl border p-7"
+    <>
+      <main
+        style={{
+          width: "100%",
+          minHeight: "100vh",
+          backgroundColor: productSemanticColors.canvas,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            display: "grid",
+            gridTemplateColumns: `${sidebarCollapsed ? 64 : 204}px minmax(0, 1fr)`,
+            alignItems: "start",
+            transition: "grid-template-columns 0.18s ease",
+          }}
+        >
+          <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+          <section
             style={{
-              borderColor: productSemanticColors.errorBorder,
-              backgroundColor: productSemanticColors.errorSurface,
+              display: "grid",
+              gap: 12,
+              padding: "10px 18px 24px 16px",
+              maxWidth: 1420,
+              width: "100%",
+              minWidth: 0,
+              justifySelf: "center",
             }}
           >
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
-              Не удалось открыть мотоцикл
-            </h1>
-            <p className="mt-3 text-sm" style={{ color: productSemanticColors.error }}>
-              {error}
-            </p>
-            <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
-              ID: {vehicleId}
-            </p>
-          </div>
-        ) : null}
+            {isLoading ? (
+              <div
+                style={{
+                  borderRadius: 24,
+                  border: `1px solid ${productSemanticColors.border}`,
+                  backgroundColor: productSemanticColors.card,
+                  padding: 28,
+                  color: productSemanticColors.textMuted,
+                  fontSize: 14,
+                }}
+              >
+                Загрузка мотоцикла...
+              </div>
+            ) : null}
 
-        {!isLoading && !error && vehicle ? (
-          <div className="space-y-7">
+            {!isLoading && error ? (
+              <div
+                style={{
+                  borderRadius: 24,
+                  border: `1px solid ${productSemanticColors.errorBorder}`,
+                  backgroundColor: productSemanticColors.errorSurface,
+                  padding: 28,
+                }}
+              >
+                <h1
+                  style={{
+                    margin: 0,
+                    color: productSemanticColors.textPrimary,
+                    fontSize: 28,
+                    lineHeight: "36px",
+                    fontWeight: 700,
+                  }}
+                >
+                  Не удалось открыть мотоцикл
+                </h1>
+                <p className="mt-3 text-sm" style={{ color: productSemanticColors.error }}>
+                  {error}
+                </p>
+                <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
+                  ID: {vehicleId}
+                </p>
+              </div>
+            ) : null}
+
+            {!isLoading && !error && vehicle ? (
+              <div style={{ display: "grid", gap: 16 }}>
+                <VehicleDashboard
+                  vehicle={vehicle}
+                  detailViewModel={detailViewModel}
+                  vehicleStateViewModel={vehicleStateViewModel}
+                  topNodeOverviewCards={topNodeOverviewCards}
+                  attentionSummary={attentionSummary}
+                  attentionItems={attentionSummary.items}
+                  expenseSummary={expenseSummary}
+                  serviceEvents={serviceEvents}
+                  wishlistItems={wishlistActiveViewModels}
+                  isTopServiceNodesLoading={isTopServiceNodesLoading}
+                  topServiceNodesError={topServiceNodesError}
+                  isServiceEventsLoading={isServiceEventsLoading}
+                  serviceEventsError={serviceEventsError}
+                  isWishlistLoading={isWishlistLoading}
+                  wishlistError={wishlistError}
+                  moveToTrashError={moveToTrashError}
+                  onEditProfile={openEditProfileModal}
+                  onMoveToTrash={() => void moveVehicleToTrash()}
+                  onUpdateMileage={openVehicleStateEditor}
+                  onAddService={openCreateServiceEventModal}
+                  onAddExpense={() =>
+                    router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)
+                  }
+                  onOpenParts={() => openWishlistModalForCreate()}
+                  onOpenAttention={() => setIsAttentionModalOpen(true)}
+                  onOpenAllNodes={() => {
+                    setIsAdvancedDetailsOpen(true);
+                    setIsFullNodeTreeOpen(true);
+                  }}
+                  onOpenServiceLog={openServiceLogModalFull}
+                  onOpenExpenseDetails={() => setIsExpenseDetailsModalOpen(true)}
+                  onOpenAttentionItemService={openAddServiceFromAttentionItem}
+                  onOpenAttentionItemLog={openServiceLogForAttentionItem}
+                  onOpenAttentionItemContext={openNodeContextFromAttentionItem}
+                />
+
+                <section
+                  style={{
+                    borderRadius: 24,
+                    border: `1px solid ${productSemanticColors.border}`,
+                    backgroundColor: productSemanticColors.card,
+                    overflow: "hidden",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setIsAdvancedDetailsOpen((prev) => !prev)}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: "18px 22px",
+                      color: productSemanticColors.textPrimary,
+                      backgroundColor: "transparent",
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 600 }}>
+                        Расширенные данные и рабочие панели
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: productSemanticColors.textMuted,
+                          fontSize: 13,
+                          lineHeight: "18px",
+                        }}
+                      >
+                        Состояние, дерево узлов, список покупок и техническая сводка в одном
+                        раскрываемом блоке.
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        color: productSemanticColors.textSecondary,
+                        fontSize: 22,
+                        lineHeight: 1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isAdvancedDetailsOpen ? "−" : "+"}
+                    </span>
+                  </button>
+
+                  {isAdvancedDetailsOpen ? (
+                    <div
+                      style={{
+                        padding: 20,
+                        borderTop: `1px solid ${productSemanticColors.border}`,
+                        backgroundColor: productSemanticColors.cardSubtle,
+                      }}
+                    >
+                      <div className="space-y-7">
             <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="text-sm text-gray-500">
                 {vehicle.brandName} | {vehicle.modelName}
@@ -2619,10 +2768,15 @@ export default function VehiclePage({ params }: VehiclePageProps) {
                 </div>
               ) : null}
             </section>
-
-          </div>
-        ) : null}
-      </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </section>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      </main>
 
       {selectedNodeSubtreeModalViewModel ? (
         <div
@@ -4215,7 +4369,7 @@ export default function VehiclePage({ params }: VehiclePageProps) {
           {profileFormSuccess}
         </div>
       ) : null}
-    </main>
+    </>
   );
 }
 
