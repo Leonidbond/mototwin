@@ -14,6 +14,7 @@ import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
+import { AppScreenHelpBar } from "./components/app-screen-help-bar";
 import { GarageBottomNav } from "../components/garage/GarageBottomNav";
 import { GarageEmptyState } from "../components/garage/GarageEmptyState";
 import { GarageHeader } from "../components/garage/GarageHeader";
@@ -115,6 +116,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <StatusBar style="light" />
       <View style={styles.screen}>
+        <AppScreenHelpBar />
         {vehicles.length === 0 ? (
           <View style={styles.contentWrap}>
             <GarageHeader
@@ -172,6 +174,7 @@ export default function HomeScreen() {
 function GarageScreenState(props: { children: ReactNode }) {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <AppScreenHelpBar />
       <View style={styles.center}>{props.children}</View>
     </SafeAreaView>
   );

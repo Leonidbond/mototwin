@@ -27,33 +27,47 @@ export function ScreenHeader(props: {
   };
 
   return (
-    <View style={styles.shell}>
-      <Pressable
-        onPress={handleBack}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel="Назад"
-        style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-      >
-        <MaterialIcons name="chevron-left" size={22} color={c.textPrimary} />
-      </Pressable>
-      <Text numberOfLines={1} style={styles.title}>
-        {title ?? ""}
-      </Text>
-      <View style={styles.rightSlot}>
-        {rightSlot ?? null}
-        {showHelp ? <HelpTriggerButton /> : null}
+    <View>
+      {showHelp ? (
+        <View style={styles.helpRow}>
+          <HelpTriggerButton size={32} />
+        </View>
+      ) : null}
+      <View style={styles.shell}>
+        <Pressable
+          onPress={handleBack}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Назад"
+          style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+        >
+          <MaterialIcons name="chevron-left" size={22} color={c.textPrimary} />
+        </Pressable>
+        <Text numberOfLines={1} style={styles.title}>
+          {title ?? ""}
+        </Text>
+        <View style={styles.rightSlot}>{rightSlot ?? null}</View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  helpRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingTop: 2,
+    paddingBottom: 2,
+    backgroundColor: c.canvas,
+  },
   shell: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingTop: 4,
+    paddingBottom: 10,
     gap: 8,
     backgroundColor: c.canvas,
   },
@@ -77,5 +91,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    minWidth: 32,
   },
 });

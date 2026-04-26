@@ -79,8 +79,8 @@ import { buildVehicleServiceLogHref } from "./service-log";
 import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 import { ActionIconButton } from "../../components/action-icon-button";
+import { AppScreenHelpBar } from "../../components/app-screen-help-bar";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
-import { HelpTriggerButton } from "../../../src/components/app-help-fab";
 import adventureTouringSilhouette from "../../../../../images/Motocycles/adventure_touring.png";
 import enduroDualSportSilhouette from "../../../../../images/Motocycles/enduro_dual_sport.png";
 import nakedRoadsterSilhouette from "../../../../../images/Motocycles/naked_roadster.png";
@@ -937,6 +937,7 @@ export default function VehicleDetailScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <AppScreenHelpBar />
         <View style={styles.stateContainer}>
           <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка мотоцикла...</Text>
@@ -948,6 +949,7 @@ export default function VehicleDetailScreen() {
   if (error) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <AppScreenHelpBar />
         <View style={styles.stateContainer}>
           <Text style={styles.errorTitle}>Ошибка загрузки</Text>
           <Text style={styles.errorText}>{error}</Text>
@@ -959,6 +961,7 @@ export default function VehicleDetailScreen() {
   if (!vehicle) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <AppScreenHelpBar />
         <View style={styles.stateContainer}>
           <Text style={styles.errorTitle}>Мотоцикл не найден</Text>
         </View>
@@ -993,6 +996,7 @@ export default function VehicleDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <AppScreenHelpBar />
       <StatusExplanationModal
         visible={Boolean(statusExplanationNode?.statusExplanation)}
         node={statusExplanationNode}
@@ -1019,7 +1023,6 @@ export default function VehicleDetailScreen() {
               accessibilityLabel="Редактировать профиль мотоцикла"
               icon={<MaterialIcons name="more-horiz" size={18} color={c.textMeta} />}
             />
-            <HelpTriggerButton />
           </View>
         </View>
 
@@ -1068,7 +1071,7 @@ export default function VehicleDetailScreen() {
             />
           </View>
 
-          <View style={styles.mobileSideStack}>
+          <View style={[styles.mobileSideStack, isWideLayout && styles.mobileSideStackWide]}>
             <ReferenceAttentionBlock
               items={attentionSummary.items.slice(0, 3)}
               onOpenAll={() => router.push(`/vehicles/${vehicleId}/attention`)}
@@ -2073,13 +2076,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 18,
+    paddingTop: 4,
+    paddingBottom: 10,
   },
   scrollContentLandscape: {
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 28,
+    paddingTop: 6,
+    paddingBottom: 14,
   },
   dashboardTopGrid: {
     gap: 12,
@@ -2154,9 +2157,11 @@ const styles = StyleSheet.create({
     color: c.textMuted,
   },
   mobileSideStack: {
-    flex: 1,
     minWidth: 0,
     gap: 12,
+  },
+  mobileSideStackWide: {
+    flex: 1,
   },
   heroVinLine: {
     marginTop: 9,
@@ -3611,7 +3616,7 @@ const styles = StyleSheet.create({
   subtreeModalBody: {
     paddingHorizontal: 8,
     paddingVertical: 8,
-    paddingBottom: 88,
+    paddingBottom: 20,
   },
 
   // Badge

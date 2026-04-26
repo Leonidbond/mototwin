@@ -902,7 +902,7 @@ export function WishlistItemEditor({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.canvas },
   keyboardAvoiding: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 120 },
+  scroll: { padding: 16, paddingBottom: 28 },
   centered: {
     flex: 1,
     alignItems: "center",

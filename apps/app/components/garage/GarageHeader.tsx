@@ -2,7 +2,6 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "../ui";
 import { ActionIconButton } from "../../app/components/action-icon-button";
-import { HelpTriggerButton } from "../../src/components/app-help-fab";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 
 export function GarageHeader(props: {
@@ -20,7 +19,6 @@ export function GarageHeader(props: {
             Ваши мотоциклы, обслуживание и расходы в одном месте.
           </Text>
         </View>
-        <HelpTriggerButton size={36} />
       </View>
       <View style={styles.actionsRow}>
         <View style={styles.iconActions}>
