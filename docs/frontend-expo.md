@@ -68,13 +68,27 @@ Defined in `apps/app/app/_layout.tsx`:
 - Loads:
   - `getVehicleDetail()`
   - `getNodeTree()`
+  - `getTopServiceNodes()`
+  - `getServiceEvents()`
 - Shows:
-  - identity/state card
+  - first-screen dashboard aligned with web semantics:
+    - hero/identity card with edit, trash, and primary orange mileage update action
+    - quick actions: `Добавить ТО`, `Расход`, `Деталь`
+    - KPI strip: `Garage Score`, current mileage/engine hours, `Ride readiness`, season readiness
+    - compact `Требует внимания` rows from shared attention summary
+    - compact `Состояние узлов` cards from `buildTopNodeOverviewCards`
+    - compact recent service events
+    - expenses and wishlist entry cards
   - collapsible ride profile section
   - collapsible technical summary section
-  - hierarchical node tree with status badges
-- Leaf node action `+` navigates to add service event screen with preselected node
-- Action to open service log under node-tree header
+  - full hierarchical node tree only after `Все узлы`
+- Uses `useWindowDimensions()` to adapt the dashboard:
+  - phone portrait: single-column cards, TOP-node overview in compact wrapped cards
+  - phone landscape / wide screens: hero + KPI and dashboard sections are arranged in denser horizontal groups
+  - tablet-width: constrained centered content with wider multi-column dashboard blocks
+- `Требует внимания` follows web visual rule: the row background stays neutral; status color is applied to badge and icon container.
+- TOP-node icons use the shared Expo `TopNodeIcon` renderer (`@mototwin/icons` MaterialCommunityIcons fallback). The app does not import the web PNG icon set directly in this screen.
+- Leaf node actions still navigate to add service event / wishlist flows with preselected node; service log remains the journal route.
 
 ### 3.4 Service Log (`vehicles/[id]/service-log.tsx`)
 - Loads `getServiceEvents()`
@@ -107,6 +121,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - API base URL is resolved dynamically from Expo host (`apps/app/src/api-base-url.ts`).
 - Expo uses shared packages for API contracts and core domain formatting helpers.
 - UI and navigation remain mobile-specific (React Native + Expo Router).
+- `apps/app/app.json` allows both portrait and landscape via Expo `orientation: "default"`. Screens should therefore avoid portrait-only assumptions and use SafeArea + responsive layout primitives.
 
 ### 4.1 Keyboard-aware forms policy
 
@@ -125,7 +140,7 @@ Defined in `apps/app/app/_layout.tsx`:
 
 - Garage flow: mostly aligned with web, with mobile-first layout.
 - Add motorcycle flow: now implemented in Expo route-based flow.
-- Vehicle detail/service log/state/profile flows: implemented and functionally aligned.
+- Vehicle detail/service log/state/profile flows: implemented and functionally aligned. Vehicle detail now mirrors the web dashboard's first-screen information hierarchy while keeping mobile route-based flows and Expo icon fallback.
 - Web still keeps richer modal orchestration in one page; Expo uses decomposed routes.
 
 Detailed parity matrix: `cross-platform-parity.md`.

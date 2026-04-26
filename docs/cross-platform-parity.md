@@ -46,9 +46,12 @@ Parity оценивается по core workflows, business outcome и поль�
 
 - **Web:** implemented (`/vehicles/[id]`)
 - **Expo:** implemented (`vehicles/[id]/index`)
-- **Parity status:** mostly aligned
-- **Notes:** both expose identity/state/profile/technical/node-tree context; web uses larger single-page modal orchestration. Blocks **«Профиль эксплуатации»** and **«Техническая сводка»** are collapsible on both clients and persist local UI state only with per-vehicle keys (`vehicleDetail.<vehicleId>.usageProfile.expanded`, `vehicleDetail.<vehicleId>.technicalSummary.expanded`), default: expanded.
-- **Overview top-nodes:** both clients now show compact overview cards (6 groups) powered by TOP-12 service nodes (`/api/nodes/top`) and keep full tree access as separate expandable flow (`Все узлы →`) without removing existing full-tree business logic.
+- **Parity status:** aligned by first-screen dashboard semantics; platform layout remains intentionally different.
+- **Notes:** both expose identity/state/profile/technical/node-tree context; web uses larger single-page modal orchestration, while Expo keeps route-based flows. Expo vehicle detail now mirrors the web dashboard hierarchy on the first screen: hero/identity, orange mileage update action, quick actions (`ТО`, `Расход`, `Деталь`), KPI/readiness strip, **«Требует внимания»**, **«Состояние узлов»**, recent events, expenses, and wishlist entry point.
+- **Responsive mobile behavior:** Expo allows portrait and landscape (`orientation: "default"`). Phone portrait stays single-column; phone landscape and tablet-width layouts use denser horizontal groups for hero/KPI, attention/systems, and lower dashboard cards.
+- **Overview top-nodes:** both clients now show compact overview cards (6 groups) powered by TOP-12 service nodes (`/api/nodes/top`) and keep full tree access as separate expandable flow (`Все узлы →`) without removing existing full-tree business logic. Expo renders TOP-node icons through the shared `@mototwin/icons` MaterialCommunityIcons fallback rather than importing the web PNG icon set directly.
+- **Attention visual rule:** both clients keep attention row/card backgrounds neutral and apply status color to badges and icon containers, not the entire block.
+- Blocks **«Профиль эксплуатации»** and **«Техническая сводка»** are collapsible on both clients and persist local UI state only with per-vehicle keys (`vehicleDetail.<vehicleId>.usageProfile.expanded`, `vehicleDetail.<vehicleId>.technicalSummary.expanded`), default: expanded.
 
 ## 3.4 Service log
 

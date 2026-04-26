@@ -94,6 +94,12 @@ The vehicle-detail page maps these codes in `TOP_NODE_LEAF_ICON_SRC`. `getAttent
 - `Требует внимания` uses leaf icons through `getAttentionIconSrc()`.
 - Icons are rendered as PNGs through `next/image`, not CSS masks.
 
+`apps/app/app/vehicles/[id]/index.tsx`
+
+- Expo vehicle detail keeps the same TOP-node grouping semantics but uses the shared `TopNodeIcon` renderer from `apps/app/components/icons/top-nodes/index.tsx`.
+- The Expo renderer maps `@mototwin/icons` keys to `MaterialCommunityIcons`; it is the supported mobile fallback until the app adopts direct PNG or SVG rendering for this icon set.
+- Do not use legacy `images/top-node-icons/from-cards` assets for new Expo dashboard blocks.
+
 ### Garage
 
 `src/app/garage/_components/VehicleCard.tsx`
