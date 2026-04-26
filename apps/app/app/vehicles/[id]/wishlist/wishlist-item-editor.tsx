@@ -7,13 +7,13 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   PART_WISHLIST_STATUS_ORDER,
@@ -484,7 +484,7 @@ export function WishlistItemEditor({
 
   if (!vehicleId) {
     return (
-      <SafeAreaView style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={["top"]}>
         <Text style={styles.errorText}>Не удалось определить ID мотоцикла.</Text>
       </SafeAreaView>
     );
@@ -492,7 +492,7 @@ export function WishlistItemEditor({
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={["top"]}>
         <ActivityIndicator size="large" color={c.textPrimary} />
         <Text style={styles.muted}>Загрузка…</Text>
       </SafeAreaView>
@@ -501,7 +501,7 @@ export function WishlistItemEditor({
 
   if (loadError) {
     return (
-      <SafeAreaView style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={["top"]}>
         <Text style={styles.errorText}>{loadError}</Text>
         <Pressable
           onPress={() => void load()}
@@ -514,7 +514,7 @@ export function WishlistItemEditor({
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScreenHeader title={mode === "create" ? "Новая позиция" : "Редактирование позиции"} />
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}

@@ -5,7 +5,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { View } from "react-native";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import { AppHelpFab } from "../src/components/app-help-fab";
+import { AppHelpProvider } from "../src/components/app-help-fab";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -36,15 +36,16 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.canvas }}>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: c.canvas },
-        }}
-      />
-      <AppHelpFab />
-    </View>
+    <AppHelpProvider>
+      <View style={{ flex: 1, backgroundColor: c.canvas }}>
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: c.canvas },
+          }}
+        />
+      </View>
+    </AppHelpProvider>
   );
 }

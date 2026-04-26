@@ -3,12 +3,12 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
@@ -178,7 +178,7 @@ export default function AttentionScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={["top"]}>
         <ActivityIndicator size="large" color={c.textPrimary} />
         <Text style={styles.muted}>Загрузка…</Text>
       </SafeAreaView>
@@ -187,7 +187,7 @@ export default function AttentionScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={["top"]}>
         <Text style={styles.error}>{error}</Text>
         <Pressable
           onPress={() => void load()}
@@ -200,7 +200,7 @@ export default function AttentionScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
       <StatusExplanationModal
         visible={Boolean(statusExplanationNode?.statusExplanation)}
         node={statusExplanationNode}

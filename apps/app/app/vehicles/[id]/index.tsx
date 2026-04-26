@@ -8,7 +8,6 @@ import {
   type ImageSourcePropType,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +15,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildAttentionSummaryFromNodeTree,
@@ -80,7 +80,7 @@ import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 import { ActionIconButton } from "../../components/action-icon-button";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
-import { AppHelpFab } from "../../../src/components/app-help-fab";
+import { HelpTriggerButton } from "../../../src/components/app-help-fab";
 import adventureTouringSilhouette from "../../../../../images/Motocycles/adventure_touring.png";
 import enduroDualSportSilhouette from "../../../../../images/Motocycles/enduro_dual_sport.png";
 import nakedRoadsterSilhouette from "../../../../../images/Motocycles/naked_roadster.png";
@@ -936,7 +936,7 @@ export default function VehicleDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.stateContainer}>
           <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка мотоцикла...</Text>
@@ -947,7 +947,7 @@ export default function VehicleDetailScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.stateContainer}>
           <Text style={styles.errorTitle}>Ошибка загрузки</Text>
           <Text style={styles.errorText}>{error}</Text>
@@ -958,7 +958,7 @@ export default function VehicleDetailScreen() {
 
   if (!vehicle) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.stateContainer}>
           <Text style={styles.errorTitle}>Мотоцикл не найден</Text>
         </View>
@@ -992,7 +992,7 @@ export default function VehicleDetailScreen() {
   const silhouetteSource = getVehicleSilhouetteSource(vehicle);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <StatusExplanationModal
         visible={Boolean(statusExplanationNode?.statusExplanation)}
         node={statusExplanationNode}
@@ -1013,11 +1013,14 @@ export default function VehicleDetailScreen() {
             </Text>
             <Text style={styles.mobileLogoSubtitle}>DIGITAL GARAGE</Text>
           </View>
-          <ActionIconButton
-            onPress={() => router.push(`/vehicles/${vehicleId}/profile`)}
-            accessibilityLabel="Редактировать профиль мотоцикла"
-            icon={<MaterialIcons name="more-horiz" size={18} color={c.textMeta} />}
-          />
+          <View style={styles.mobileBrandHeaderActions}>
+            <ActionIconButton
+              onPress={() => router.push(`/vehicles/${vehicleId}/profile`)}
+              accessibilityLabel="Редактировать профиль мотоцикла"
+              icon={<MaterialIcons name="more-horiz" size={18} color={c.textMeta} />}
+            />
+            <HelpTriggerButton />
+          </View>
         </View>
 
         <View style={[styles.dashboardTopGrid, isWideLayout && styles.dashboardTopGridWide]}>
@@ -1592,7 +1595,6 @@ export default function VehicleDetailScreen() {
                     ))}
                   </View>
                 </ScrollView>
-                <AppHelpFab />
               </>
             ) : null}
           </View>
@@ -1702,7 +1704,6 @@ export default function VehicleDetailScreen() {
                     ))
                   )}
                 </ScrollView>
-                <AppHelpFab />
               </>
             ) : null}
           </View>
@@ -2127,6 +2128,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 8,
+  },
+  mobileBrandHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   mobileLogo: {
     fontSize: 18,

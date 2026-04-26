@@ -5,12 +5,12 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildInitialVehicleProfileFormValues,
@@ -152,7 +152,7 @@ export default function EditVehicleProfileScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.stateContainer}>
           <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка профиля...</Text>
@@ -162,7 +162,7 @@ export default function EditVehicleProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title="Профиль мотоцикла" />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <View style={styles.card}>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildTrashedVehicleViewModel } from "@mototwin/domain";
@@ -73,7 +74,7 @@ export default function TrashScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title="Свалка" />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.subtitle}>

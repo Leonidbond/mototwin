@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { SafeAreaView, ScrollView, StyleSheet, Text, Pressable, View } from "react-native";
+import { ScrollView, StyleSheet, Text, Pressable, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
@@ -112,7 +113,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title="Профиль" />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>

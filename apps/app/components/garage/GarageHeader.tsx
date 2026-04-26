@@ -2,6 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "../ui";
 import { ActionIconButton } from "../../app/components/action-icon-button";
+import { HelpTriggerButton } from "../../src/components/app-help-fab";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 
 export function GarageHeader(props: {
@@ -12,10 +13,15 @@ export function GarageHeader(props: {
 }) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>Мой гараж</Text>
-      <Text style={styles.subtitle}>
-        Ваши мотоциклы, обслуживание и расходы в одном месте.
-      </Text>
+      <View style={styles.titleRow}>
+        <View style={styles.titleCol}>
+          <Text style={styles.title}>Мой гараж</Text>
+          <Text style={styles.subtitle}>
+            Ваши мотоциклы, обслуживание и расходы в одном месте.
+          </Text>
+        </View>
+        <HelpTriggerButton size={36} />
+      </View>
       <View style={styles.actionsRow}>
         <View style={styles.iconActions}>
           <View style={styles.badgedIcon}>
@@ -51,6 +57,16 @@ const styles = StyleSheet.create({
   wrap: {
     gap: 12,
     marginBottom: 10,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  titleCol: {
+    flex: 1,
+    gap: 6,
   },
   title: {
     color: c.textPrimary,

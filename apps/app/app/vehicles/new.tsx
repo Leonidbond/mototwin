@@ -3,12 +3,12 @@ import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   createInitialAddMotorcycleFormValues,
@@ -241,7 +241,7 @@ export default function NewVehicleScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title="Добавить мотоцикл" />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <Text style={styles.description}>

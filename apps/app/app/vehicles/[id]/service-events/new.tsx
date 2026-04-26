@@ -4,12 +4,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   createInitialEditServiceEventValues,
@@ -326,7 +326,7 @@ export default function NewServiceEventScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.stateContainer}>
           <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка формы...</Text>
@@ -336,7 +336,7 @@ export default function NewServiceEventScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title={isEditMode ? "Редактировать обслуживание" : "Новое обслуживание"} />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <Text style={styles.sectionTitle}>Узел обслуживания</Text>

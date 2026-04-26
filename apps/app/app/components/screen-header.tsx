@@ -3,14 +3,16 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
+import { HelpTriggerButton } from "../../src/components/app-help-fab";
 
 export function ScreenHeader(props: {
   title?: string;
   onBack?: () => void;
   rightSlot?: ReactNode;
+  showHelp?: boolean;
 }) {
   const router = useRouter();
-  const { title, onBack, rightSlot } = props;
+  const { title, onBack, rightSlot, showHelp = true } = props;
 
   const handleBack = () => {
     if (onBack) {
@@ -38,7 +40,10 @@ export function ScreenHeader(props: {
       <Text numberOfLines={1} style={styles.title}>
         {title ?? ""}
       </Text>
-      <View style={styles.rightSlot}>{rightSlot ?? null}</View>
+      <View style={styles.rightSlot}>
+        {rightSlot ?? null}
+        {showHelp ? <HelpTriggerButton /> : null}
+      </View>
     </View>
   );
 }
@@ -69,7 +74,8 @@ const styles = StyleSheet.create({
     color: c.textPrimary,
   },
   rightSlot: {
-    minWidth: 32,
-    alignItems: "flex-end",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 });

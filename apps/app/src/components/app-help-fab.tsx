@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import {
   Modal,
   Pressable,
@@ -7,7 +7,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 
 const HELP_ICONS = [
@@ -29,100 +28,123 @@ const WORKFLOW_STEPS = [
   "5) Обновляйте «Текущее состояние» и ведите журнал обслуживания.",
 ];
 
-export function AppHelpFab() {
+type AppHelpContextValue = {
+  open: () => void;
+  close: () => void;
+};
+
+const AppHelpContext = createContext<AppHelpContextValue | null>(null);
+
+export function AppHelpProvider(props: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const currentYear = useMemo(() => new Date().getFullYear(), []);
-  const insets = useSafeAreaInsets();
-
+  const value = useMemo<AppHelpContextValue>(
+    () => ({ open: () => setIsOpen(true), close: () => setIsOpen(false) }),
+    []
+  );
   return (
-    <>
-      <Pressable
-        onPress={() => setIsOpen(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Открыть подсказки по иконкам и порядку работы"
-        style={({ pressed }) => [
-          styles.fab,
-          { top: Math.max(insets.top + 12, 18) },
-          pressed && styles.fabPressed,
-        ]}
-      >
-        <Text style={styles.fabText}>?</Text>
-      </Pressable>
-
-      <Modal visible={isOpen} transparent animationType="fade" onRequestClose={() => setIsOpen(false)}>
-        <Pressable style={styles.overlay} onPress={() => setIsOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
-            <View style={styles.headerRow}>
-              <Text style={styles.title}>Подсказки по интерфейсу</Text>
-              <Pressable
-                onPress={() => setIsOpen(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Закрыть подсказки"
-                style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </Pressable>
-            </View>
-
-            <Text style={styles.subtitle}>Основные иконки и порядок работы в MotoTwin.</Text>
-
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-              <View style={styles.iconsGrid}>
-                {HELP_ICONS.map((item) => (
-                  <View key={item.label} style={styles.iconCard}>
-                    <Text style={styles.iconEmoji}>{item.icon}</Text>
-                    <Text style={styles.iconLabel}>{item.label}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <Text style={styles.sectionTitle}>Порядок работы</Text>
-              <View style={styles.stepsWrap}>
-                {WORKFLOW_STEPS.map((step) => (
-                  <Text key={step} style={styles.stepText}>
-                    {step}
-                  </Text>
-                ))}
-              </View>
-
-              <Text style={styles.footerText}>MotoTwin {currentYear}</Text>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </>
+    <AppHelpContext.Provider value={value}>
+      {props.children}
+      <HelpModal visible={isOpen} onClose={() => setIsOpen(false)} />
+    </AppHelpContext.Provider>
   );
 }
 
-const styles = StyleSheet.create({
-  fab: {
-    position: "absolute",
-    right: 16,
-    top: 18,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+export function useAppHelp(): AppHelpContextValue {
+  const ctx = useContext(AppHelpContext);
+  if (!ctx) {
+    return { open: () => {}, close: () => {} };
+  }
+  return ctx;
+}
+
+export function HelpTriggerButton(props: { size?: number; accessibilityLabel?: string }) {
+  const { open } = useAppHelp();
+  const size = props.size ?? 32;
+  return (
+    <Pressable
+      onPress={open}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={props.accessibilityLabel ?? "Открыть подсказки"}
+      style={({ pressed }) => [
+        triggerStyles.button,
+        { width: size, height: size, borderRadius: size / 2 },
+        pressed && triggerStyles.buttonPressed,
+      ]}
+    >
+      <Text style={triggerStyles.text}>?</Text>
+    </Pressable>
+  );
+}
+
+function HelpModal(props: { visible: boolean; onClose: () => void }) {
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+  return (
+    <Modal visible={props.visible} transparent animationType="fade" onRequestClose={props.onClose}>
+      <Pressable style={styles.overlay} onPress={props.onClose}>
+        <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>Подсказки по интерфейсу</Text>
+            <Pressable
+              onPress={props.onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Закрыть подсказки"
+              style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.subtitle}>Основные иконки и порядок работы в MotoTwin.</Text>
+
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.iconsGrid}>
+              {HELP_ICONS.map((item) => (
+                <View key={item.label} style={styles.iconCard}>
+                  <Text style={styles.iconEmoji}>{item.icon}</Text>
+                  <Text style={styles.iconLabel}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.sectionTitle}>Порядок работы</Text>
+            <View style={styles.stepsWrap}>
+              {WORKFLOW_STEPS.map((step) => (
+                <Text key={step} style={styles.stepText}>
+                  {step}
+                </Text>
+              ))}
+            </View>
+
+            <Text style={styles.footerText}>MotoTwin {currentYear}</Text>
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const triggerStyles = StyleSheet.create({
+  button: {
     borderWidth: 1,
     borderColor: c.borderStrong,
     backgroundColor: c.card,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-    zIndex: 20,
   },
-  fabPressed: {
-    opacity: 0.88,
+  buttonPressed: {
+    opacity: 0.85,
+    backgroundColor: c.cardMuted,
   },
-  fabText: {
-    fontSize: 22,
+  text: {
+    fontSize: 14,
     fontWeight: "700",
     color: c.textPrimary,
-    lineHeight: 24,
+    lineHeight: 16,
   },
+});
+
+const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",

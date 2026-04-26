@@ -4,12 +4,12 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
@@ -151,7 +151,7 @@ export default function VehicleWishlistScreen() {
 
   if (!vehicleId) {
     return (
-      <SafeAreaView style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={["top"]}>
         <Text style={styles.error}>Не удалось определить ID мотоцикла.</Text>
       </SafeAreaView>
     );
@@ -159,7 +159,7 @@ export default function VehicleWishlistScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={["top"]}>
         <ActivityIndicator size="large" color={c.textPrimary} />
         <Text style={styles.muted}>Загрузка…</Text>
       </SafeAreaView>
@@ -168,7 +168,7 @@ export default function VehicleWishlistScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={["top"]}>
         <Text style={styles.error}>{error}</Text>
         <Pressable
           onPress={() => void load()}
@@ -181,7 +181,7 @@ export default function VehicleWishlistScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScreenHeader title="Что нужно купить" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.sectionHint}>

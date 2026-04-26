@@ -4,13 +4,13 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import type {
@@ -674,7 +674,7 @@ export default function ServiceLogScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.stateContainer}>
           <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка журнала...</Text>
@@ -685,7 +685,7 @@ export default function ServiceLogScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.stateContainer}>
           <Text style={styles.errorTitle}>Ошибка загрузки</Text>
           <Text style={styles.errorText}>{error}</Text>
@@ -696,7 +696,7 @@ export default function ServiceLogScreen() {
 
   if (events.length === 0) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.stateContainer}>
           <Text style={styles.emptyTitle}>Журнал пуст</Text>
           <Text style={styles.emptyText}>
@@ -708,7 +708,7 @@ export default function ServiceLogScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title="Журнал обслуживания" />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.scrollContent}>
         <View style={styles.topActionsRow}>
