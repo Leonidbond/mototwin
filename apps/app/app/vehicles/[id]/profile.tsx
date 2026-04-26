@@ -32,6 +32,7 @@ import type {
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../../components/screen-header";
 
 const USAGE_TYPES = RIDE_USAGE_TYPE_OPTIONS as Array<{ value: RideUsageType; label: string }>;
 const RIDING_STYLES = RIDE_RIDING_STYLE_OPTIONS as Array<{ value: RideStyle; label: string }>;
@@ -162,9 +163,9 @@ export default function EditVehicleProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="Профиль мотоцикла" />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Профиль мотоцикла</Text>
           <Text style={styles.cardSubtitle}>
             Можно изменить никнейм, VIN и профиль эксплуатации.
           </Text>

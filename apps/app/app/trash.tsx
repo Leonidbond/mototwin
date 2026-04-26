@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "expo-router";
 import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildTrashedVehicleViewModel } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../src/api-base-url";
+import { ScreenHeader } from "./components/screen-header";
 
 export default function TrashScreen() {
-  const router = useRouter();
   const apiBaseUrl = getApiBaseUrl();
   const [items, setItems] = useState<Array<ReturnType<typeof buildTrashedVehicleViewModel>>>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,14 +74,11 @@ export default function TrashScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="Свалка" />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Свалка</Text>
         <Text style={styles.subtitle}>
           Здесь хранятся удаленные мотоциклы перед окончательным удалением
         </Text>
-        <Pressable onPress={() => router.push("/")} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Вернуться в гараж</Text>
-        </Pressable>
 
         {isLoading ? <Text style={styles.stateText}>Загрузка Свалки...</Text> : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -129,18 +125,7 @@ export default function TrashScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: c.canvas },
   content: { padding: 16, gap: 10, paddingBottom: 24 },
-  title: { fontSize: 24, fontWeight: "700", color: c.textPrimary },
   subtitle: { fontSize: 13, color: c.textSecondary },
-  backButton: {
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: c.card,
-  },
-  backButtonText: { fontSize: 12, fontWeight: "600", color: c.textMeta },
   stateText: { fontSize: 13, color: c.textSecondary },
   errorText: { fontSize: 13, color: c.error },
   card: {

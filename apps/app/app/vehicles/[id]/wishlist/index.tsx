@@ -28,6 +28,7 @@ import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { buildServiceEventNewFromWishlistHref, buildVehicleWishlistNewHref } from "./hrefs";
 import { ActionIconButton } from "../../../components/action-icon-button";
+import { ScreenHeader } from "../../../components/screen-header";
 
 export default function VehicleWishlistScreen() {
   const router = useRouter();
@@ -181,6 +182,7 @@ export default function VehicleWishlistScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <ScreenHeader title="Что нужно купить" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.sectionHint}>
           Активный список: статусы «Нужно купить» — «Куплено». Установленные позиции сохраняются в

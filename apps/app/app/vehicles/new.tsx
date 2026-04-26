@@ -32,6 +32,7 @@ import type {
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../components/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../components/screen-header";
 
 type RideOption<T extends string> = {
   value: T;
@@ -241,8 +242,8 @@ export default function NewVehicleScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="Добавить мотоцикл" />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Добавление мотоцикла</Text>
         <Text style={styles.description}>
           Заполните базовые данные. Сначала выберите марку, затем модель и модификацию.
         </Text>
@@ -435,13 +436,7 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 28,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: c.textPrimary,
-  },
   description: {
-    marginTop: 8,
     fontSize: 14,
     lineHeight: 20,
     color: c.textSecondary,

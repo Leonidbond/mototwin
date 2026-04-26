@@ -43,6 +43,7 @@ import {
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../../components/screen-header";
 import { ActionIconButton } from "../../components/action-icon-button";
 
 function readSearchParam(value: string | string[] | undefined): string | undefined {
@@ -708,6 +709,7 @@ export default function ServiceLogScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="Журнал обслуживания" />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.scrollContent}>
         <View style={styles.topActionsRow}>
           <Pressable

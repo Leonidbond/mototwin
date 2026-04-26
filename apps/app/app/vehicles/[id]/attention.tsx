@@ -36,6 +36,7 @@ import { buildVehicleServiceLogHref } from "./service-log";
 import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 import { ActionIconButton } from "../../components/action-icon-button";
+import { ScreenHeader } from "../../components/screen-header";
 
 export default function AttentionScreen() {
   const router = useRouter();
@@ -205,6 +206,7 @@ export default function AttentionScreen() {
         node={statusExplanationNode}
         onClose={() => setStatusExplanationNode(null)}
       />
+      <ScreenHeader title="Требует внимания" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.summaryLine}>
           Всего: <Text style={styles.summaryStrong}>{summary.totalCount}</Text>

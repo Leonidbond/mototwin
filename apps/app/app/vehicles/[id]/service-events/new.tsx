@@ -36,6 +36,7 @@ import type {
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../../components/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../../../components/screen-header";
 import { readUserLocalSettings } from "../../../../src/ui-user-local-settings";
 
 export default function NewServiceEventScreen() {
@@ -336,10 +337,8 @@ export default function NewServiceEventScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title={isEditMode ? "Редактировать обслуживание" : "Новое обслуживание"} />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
-        <Text style={styles.screenTitle}>
-          {isEditMode ? "Редактировать сервисное событие" : "Добавить сервисное событие"}
-        </Text>
         <Text style={styles.sectionTitle}>Узел обслуживания</Text>
         {levels.map((levelNodes, levelIndex) => (
           <View key={`level-${levelIndex}`} style={styles.levelBlock}>
@@ -516,12 +515,6 @@ const styles = StyleSheet.create({
     color: c.textMeta,
     marginBottom: 8,
     marginTop: 8,
-  },
-  screenTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: c.textPrimary,
-    marginBottom: 6,
   },
   levelBlock: {
     marginBottom: 8,

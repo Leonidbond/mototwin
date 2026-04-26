@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "expo-router";
 import { SafeAreaView, ScrollView, StyleSheet, Text, Pressable, View } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
@@ -17,6 +16,7 @@ import {
   readUserLocalSettingsForIdentity,
   writeUserLocalSettingsForIdentity,
 } from "../src/ui-user-local-settings";
+import { ScreenHeader } from "./components/screen-header";
 
 function buildProfileData(selectedDevUserEmail: string) {
   const option = getDevUserOptions().find((item) => item.email === selectedDevUserEmail);
@@ -29,7 +29,6 @@ function buildProfileData(selectedDevUserEmail: string) {
 }
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const apiBaseUrl = getApiBaseUrl();
   const [userSettings, setUserSettings] = useState<UserLocalSettings>({
     ...DEFAULT_USER_LOCAL_SETTINGS,
@@ -114,14 +113,8 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="Профиль" />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.topRow}>
-          <Text style={styles.title}>Профиль</Text>
-          <Pressable onPress={() => router.push("/")} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Назад в гараж</Text>
-          </Pressable>
-        </View>
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Профиль</Text>
           <InfoRow label="Имя" value={profile.displayName} />
@@ -275,17 +268,6 @@ function SettingRow({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: c.canvas },
   content: { padding: 16, gap: 12, paddingBottom: 24 },
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  title: { fontSize: 24, fontWeight: "700", color: c.textPrimary },
-  backButton: {
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: c.card,
-  },
-  backButtonText: { fontSize: 12, fontWeight: "600", color: c.textMeta },
   section: {
     borderWidth: 1,
     borderColor: c.border,

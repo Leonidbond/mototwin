@@ -54,6 +54,7 @@ import type {
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { readUserLocalSettings } from "../../../../src/ui-user-local-settings";
+import { ScreenHeader } from "../../../components/screen-header";
 import { buildServiceEventNewFromWishlistHref } from "./hrefs";
 
 type WishlistItemEditorProps = {
@@ -514,6 +515,7 @@ export function WishlistItemEditor({
 
   return (
     <SafeAreaView style={styles.safe}>
+      <ScreenHeader title={mode === "create" ? "Новая позиция" : "Редактирование позиции"} />
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}
         behavior={Platform.OS === "ios" ? "padding" : "height"}

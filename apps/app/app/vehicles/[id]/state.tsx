@@ -14,6 +14,7 @@ import { normalizeVehicleStatePayload, validateVehicleStateFormValues } from "@m
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../../components/screen-header";
 
 export default function UpdateVehicleStateScreen() {
   const router = useRouter();
@@ -109,9 +110,9 @@ export default function UpdateVehicleStateScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="Текущее состояние" />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Текущее состояние</Text>
           <Text style={styles.cardSubtitle}>
             Обновите актуальный пробег и моточасы мотоцикла.
           </Text>
