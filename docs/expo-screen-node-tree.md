@@ -9,8 +9,13 @@ The Vehicle Detail screen (`apps/app/app/vehicles/[id].tsx`) now shows the full 
 - Top-level nodes (ENGINE, FUEL, BRAKES, etc.) are visible by default — children are collapsed
 - Tapping a node with children toggles its children open or closed (local state, `Set<string>`)
 - Leaf nodes that have a `statusExplanation.reasonShort` show it as a secondary line below the name
-- Nodes without children are not interactive (no tap feedback)
+- Nodes without children keep quick actions (`Журнал`, `Купить`, `Добавить сервисное событие`) where allowed
 - The tree is rendered recursively via a `NodeRow` component; no external tree library is used
+- Search works from 2 characters by node name/code and opens the matching subtree with parents expanded
+- Status filter chips support `Все`, `Просрочено`, `Скоро`, `Недавно заменено`, `ОК`
+- Status filtering keeps matching nodes plus their parent chain, and automatically expands branches that contain matches
+- Search results are scoped by the active status filter
+- Node context, subtree modal and status explanation modal share the same dark theme tokens and return to the previous overlay/screen when closed
 
 ## Visual structure
 
@@ -24,6 +29,18 @@ The Vehicle Detail screen (`apps/app/app/vehicles/[id].tsx`) now shows the full 
 │       Скоро по пробегу                  │
 ├─────────────────────────────────────────┤
 │ ▸ Тормоза                     OK        │  ← collapsed
+└─────────────────────────────────────────┘
+```
+
+With status filter enabled:
+
+```text
+Фильтр по статусу
+[Все] [Просрочено · 2] [Скоро · 4] [Недавно заменено · 1] [ОК · 18]
+
+┌─────────────────────────────────────────┐
+│ ▾ Двигатель                   OVERDUE   │  ← parent kept for context
+│     Масло двигателя           OVERDUE   │  ← matching node
 └─────────────────────────────────────────┘
 ```
 
@@ -45,8 +62,5 @@ Loaded in parallel with vehicle detail on screen mount.
 
 ## What is intentionally deferred
 
-- **Full status explanation** — the detailed breakdown (elapsed km, remaining days, rule intervals) is shown on web but not yet on mobile; too much data for a compact row
-- **Node drill-down screen** — tapping a leaf to see its full detail; deferred
-- **Add service event from tree** — tapping a leaf to log maintenance; next major mobile step
 - **Animations** — expand/collapse could animate; deferred, not needed for MVP
-- **Scroll-to-node** — deep expand could benefit from auto-scroll; deferred
+- **Dedicated node drill-down route** — the current implementation uses Node Context modal instead of a separate route

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
@@ -389,6 +388,29 @@ export default function VehicleServiceLogPage() {
     }
     return sort.direction === "asc" ? "↑" : "↓";
   };
+  const navigateBackWithFallback = () => {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push(`/vehicles/${vehicleId}`);
+  };
+  const filterLabelStyle = { color: productSemanticColors.textSecondary };
+  const filterControlStyle = {
+    backgroundColor: productSemanticColors.cardSubtle,
+    borderColor: productSemanticColors.borderStrong,
+    color: productSemanticColors.textPrimary,
+  };
+  const filterActionStyle = {
+    backgroundColor: productSemanticColors.cardSubtle,
+    borderColor: productSemanticColors.borderStrong,
+    color: productSemanticColors.textPrimary,
+  };
+  const sortButtonStyle = {
+    backgroundColor: productSemanticColors.cardMuted,
+    borderColor: productSemanticColors.borderStrong,
+    color: productSemanticColors.textSecondary,
+  };
 
   return (
     <main
@@ -396,8 +418,9 @@ export default function VehicleServiceLogPage() {
       style={{ backgroundColor: productSemanticColors.canvas, color: productSemanticColors.textPrimary }}
     >
       <div className="mx-auto max-w-6xl space-y-4">
-        <Link
-          href={`/vehicles/${vehicleId}`}
+        <button
+          type="button"
+          onClick={navigateBackWithFallback}
           className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
           style={{
             backgroundColor: productSemanticColors.card,
@@ -406,7 +429,7 @@ export default function VehicleServiceLogPage() {
           }}
         >
           Назад к мотоциклу
-        </Link>
+        </button>
         <header
           className="rounded-2xl border border-gray-200 bg-white px-5 py-4"
           style={{
@@ -732,52 +755,72 @@ export default function VehicleServiceLogPage() {
           {isFiltersExpanded ? (
             <>
           <div className="mt-2 grid gap-2.5 md:grid-cols-2 lg:grid-cols-12">
-            <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-2">
+            <label
+              className="flex min-w-0 flex-col gap-1 text-xs font-medium lg:col-span-2"
+              style={filterLabelStyle}
+            >
               Дата с
               <input
                 type="date"
                 value={filters.dateFrom}
                 onChange={(e) => updateFilter("dateFrom", e.target.value)}
-                className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                className="h-10 w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 focus:ring-slate-600"
+                style={filterControlStyle}
               />
             </label>
-            <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-2">
+            <label
+              className="flex min-w-0 flex-col gap-1 text-xs font-medium lg:col-span-2"
+              style={filterLabelStyle}
+            >
               Дата по
               <input
                 type="date"
                 value={filters.dateTo}
                 onChange={(e) => updateFilter("dateTo", e.target.value)}
-                className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                className="h-10 w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 focus:ring-slate-600"
+                style={filterControlStyle}
               />
             </label>
-            <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-3">
+            <label
+              className="flex min-w-0 flex-col gap-1 text-xs font-medium lg:col-span-3"
+              style={filterLabelStyle}
+            >
               Узел
               <input
                 value={filters.node}
                 onChange={(e) => updateFilter("node", e.target.value)}
                 placeholder="Первые буквы узла"
-                className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                className="h-10 w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition placeholder:text-slate-500 focus:ring-2 focus:ring-slate-600"
+                style={filterControlStyle}
               />
             </label>
-            <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-2">
+            <label
+              className="flex min-w-0 flex-col gap-1 text-xs font-medium lg:col-span-2"
+              style={filterLabelStyle}
+            >
               Тип записи
               <select
                 value={filters.eventKind}
                 onChange={(e) => updateFilter("eventKind", e.target.value)}
-                className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                className="h-10 w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 focus:ring-slate-600"
+                style={filterControlStyle}
               >
                 <option value="">Все</option>
                 <option value="SERVICE">Сервис</option>
                 <option value="STATE_UPDATE">Обновление состояния</option>
               </select>
             </label>
-            <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-gray-600 lg:col-span-2">
+            <label
+              className="flex min-w-0 flex-col gap-1 text-xs font-medium lg:col-span-2"
+              style={filterLabelStyle}
+            >
               Тип сервиса
               <input
                 value={filters.serviceType}
                 onChange={(e) => updateFilter("serviceType", e.target.value)}
                 placeholder="Текст типа сервиса"
-                className="h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                className="h-10 w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition placeholder:text-slate-500 focus:ring-2 focus:ring-slate-600"
+                style={filterControlStyle}
               />
             </label>
             <div className="flex items-end lg:col-span-1">
@@ -785,24 +828,32 @@ export default function VehicleServiceLogPage() {
                 type="button"
                 onClick={resetFilters}
                 disabled={!isQueryActive}
-                className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 w-full items-center justify-center rounded-lg border px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+                style={filterActionStyle}
               >
                 Сбросить
               </button>
             </div>
           </div>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-gray-600">
+            <label
+              className="flex cursor-pointer items-center gap-2 text-xs font-medium"
+              style={filterLabelStyle}
+            >
               <input
                 type="checkbox"
                 checked={filters.paidOnly === true}
                 onChange={(e) => setPaidOnly(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
+                className="h-4 w-4 rounded"
+                style={{ accentColor: productSemanticColors.primaryAction }}
               />
               Только события с расходами
             </label>
           </div>
-          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+          <div
+            className="mt-2.5 flex flex-wrap items-center gap-2 text-xs"
+            style={{ color: productSemanticColors.textSecondary }}
+          >
             <button
               type="button"
               onClick={() =>
@@ -812,7 +863,8 @@ export default function VehicleServiceLogPage() {
                     prev.field === "eventDate" && prev.direction === "asc" ? "desc" : "asc",
                 }))
               }
-              className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
+              className="rounded-full border px-3 py-1 transition"
+              style={sortButtonStyle}
             >
               Дата {sortIndicator("eventDate")}
             </button>
@@ -825,7 +877,8 @@ export default function VehicleServiceLogPage() {
                     prev.field === "eventKind" && prev.direction === "asc" ? "desc" : "asc",
                 }))
               }
-              className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
+              className="rounded-full border px-3 py-1 transition"
+              style={sortButtonStyle}
             >
               Тип {sortIndicator("eventKind")}
             </button>
@@ -838,7 +891,8 @@ export default function VehicleServiceLogPage() {
                     prev.field === "serviceType" && prev.direction === "asc" ? "desc" : "asc",
                 }))
               }
-              className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
+              className="rounded-full border px-3 py-1 transition"
+              style={sortButtonStyle}
             >
               Сервис {sortIndicator("serviceType")}
             </button>
@@ -850,7 +904,8 @@ export default function VehicleServiceLogPage() {
                   direction: prev.field === "node" && prev.direction === "asc" ? "desc" : "asc",
                 }))
               }
-              className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
+              className="rounded-full border px-3 py-1 transition"
+              style={sortButtonStyle}
             >
               Узел {sortIndicator("node")}
             </button>
@@ -863,7 +918,8 @@ export default function VehicleServiceLogPage() {
                     prev.field === "odometer" && prev.direction === "asc" ? "desc" : "asc",
                 }))
               }
-              className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
+              className="rounded-full border px-3 py-1 transition"
+              style={sortButtonStyle}
             >
               Пробег {sortIndicator("odometer")}
             </button>
@@ -876,7 +932,8 @@ export default function VehicleServiceLogPage() {
                     prev.field === "engineHours" && prev.direction === "asc" ? "desc" : "asc",
                 }))
               }
-              className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
+              className="rounded-full border px-3 py-1 transition"
+              style={sortButtonStyle}
             >
               Моточасы {sortIndicator("engineHours")}
             </button>
@@ -888,7 +945,8 @@ export default function VehicleServiceLogPage() {
                   direction: prev.field === "cost" && prev.direction === "asc" ? "desc" : "asc",
                 }))
               }
-              className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
+              className="rounded-full border px-3 py-1 transition"
+              style={sortButtonStyle}
             >
               Стоимость {sortIndicator("cost")}
             </button>
@@ -901,7 +959,8 @@ export default function VehicleServiceLogPage() {
                     prev.field === "comment" && prev.direction === "asc" ? "desc" : "asc",
                 }))
               }
-              className="rounded-full border border-gray-300 px-3 py-1 transition hover:bg-gray-50"
+              className="rounded-full border px-3 py-1 transition"
+              style={sortButtonStyle}
             >
               Комментарий {sortIndicator("comment")}
             </button>

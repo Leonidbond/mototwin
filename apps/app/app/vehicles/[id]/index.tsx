@@ -65,7 +65,11 @@ import type {
   TopServiceNodeItem,
   VehicleDetail,
 } from "@mototwin/types";
-import { productSemanticColors as c, statusSemanticTokens } from "@mototwin/design-tokens";
+import {
+  productSemanticColors as c,
+  statusSemanticTokens,
+  statusTextLabelsRu,
+} from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import {
   readCollapsiblePreference,
@@ -111,6 +115,15 @@ function getNodeAccentColor(status: NodeStatus | null) {
   return tokens.accent;
 }
 
+const NODE_STATUS_FILTER_OPTIONS: NodeStatus[] = [
+  "OVERDUE",
+  "SOON",
+  "RECENTLY_REPLACED",
+  "OK",
+];
+
+type NodeStatusFilter = NodeStatus | "ALL";
+
 function findNodeViewModelPathById(
   nodes: NodeTreeItemViewModel[],
   targetNodeId: string,
@@ -127,6 +140,69 @@ function findNodeViewModelPathById(
     }
   }
   return null;
+}
+
+function filterNodeViewModelsByStatus(
+  nodes: NodeTreeItemViewModel[],
+  status: NodeStatus | null
+): NodeTreeItemViewModel[] {
+  if (!status) {
+    return nodes;
+  }
+
+  return nodes.flatMap((node) => {
+    const filteredChildren = filterNodeViewModelsByStatus(node.children, status);
+    const matches = node.effectiveStatus === status;
+    if (!matches && filteredChildren.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        ...node,
+        children: filteredChildren,
+        hasChildren: filteredChildren.length > 0,
+      },
+    ];
+  });
+}
+
+function collectExpandedNodeIdsWithStatusDescendants(
+  nodes: NodeTreeItemViewModel[],
+  status: NodeStatus
+): Set<string> {
+  const expandedIds = new Set<string>();
+
+  const walk = (node: NodeTreeItemViewModel): boolean => {
+    const hasMatchingChild = node.children.some((child) => walk(child));
+    const matches = node.effectiveStatus === status;
+    if (hasMatchingChild) {
+      expandedIds.add(node.id);
+    }
+    return matches || hasMatchingChild;
+  };
+
+  nodes.forEach((node) => walk(node));
+  return expandedIds;
+}
+
+function countNodeStatuses(nodes: NodeTreeItemViewModel[]): Record<NodeStatus, number> {
+  const counts: Record<NodeStatus, number> = {
+    OVERDUE: 0,
+    SOON: 0,
+    RECENTLY_REPLACED: 0,
+    OK: 0,
+  };
+
+  const walk = (node: NodeTreeItemViewModel) => {
+    if (node.effectiveStatus) {
+      counts[node.effectiveStatus] += 1;
+    }
+    node.children.forEach(walk);
+  };
+
+  nodes.forEach(walk);
+  return counts;
 }
 
 function flattenNodeViewModelsById(nodes: NodeTreeItemViewModel[]): Map<string, NodeTreeItemViewModel> {
@@ -411,6 +487,7 @@ function NodeRow({
                 pressed && styles.badgePressed,
               ]}
             >
+              <MaterialIcons name="menu-book" size={12} color={colors.text} />
               <Text style={[styles.badgeText, badgeTextStyle, { color: colors.text }]}>
                 {label}
               </Text>
@@ -438,7 +515,7 @@ function NodeRow({
               onPress={() => onAddToWishlist(rowNode.id)}
               accessibilityLabel={`Добавить узел ${rowNode.name} в список покупок`}
               variant="subtle"
-              icon={<MaterialIcons name="shopping-cart" size={15} color={c.textSecondary} />}
+              icon={<MaterialIcons name="playlist-add" size={17} color={c.textSecondary} />}
             />
           ) : null}
           {onOpenContext ? (
@@ -453,7 +530,7 @@ function NodeRow({
             <ActionIconButton
               onPress={() => treeItemContract.onRequestAddServiceEvent?.()}
               accessibilityLabel={`Добавить сервисное событие для узла ${rowNode.name}`}
-              icon={<MaterialIcons name="build-circle" size={16} color={c.textSecondary} />}
+              icon={<MaterialIcons name="event-available" size={16} color={c.textSecondary} />}
             />
           ) : null}
         </View>
@@ -538,6 +615,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
   const [nodeSearchQuery, setNodeSearchQuery] = useState("");
   const [debouncedNodeSearchQuery, setDebouncedNodeSearchQuery] = useState("");
+  const [nodeStatusFilter, setNodeStatusFilter] = useState<NodeStatusFilter>("ALL");
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [statusHighlightedNodeIds, setStatusHighlightedNodeIds] = useState<Set<string>>(new Set());
   const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
@@ -663,6 +741,23 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   }, [nodeSearchQuery]);
 
   useEffect(() => {
+    if (!selectedNodeStatusFilter) {
+      return;
+    }
+    const expandedNodeIds = collectExpandedNodeIdsWithStatusDescendants(
+      topLevelNodeViewModels,
+      selectedNodeStatusFilter
+    );
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      expandedNodeIds.forEach((nodeId) => {
+        next.add(nodeId);
+      });
+      return next;
+    });
+  }, [topLevelNodeViewModels, selectedNodeStatusFilter]);
+
+  useEffect(() => {
     if (!nodeContextIdParam) {
       return;
     }
@@ -749,12 +844,21 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     () => getTopLevelNodeTreeItems(nodeTreeViewModel),
     [nodeTreeViewModel]
   );
+  const selectedNodeStatusFilter = nodeStatusFilter === "ALL" ? null : nodeStatusFilter;
+  const nodeStatusCounts = useMemo(
+    () => countNodeStatuses(topLevelNodeViewModels),
+    [topLevelNodeViewModels]
+  );
+  const filteredTopLevelNodeViewModels = useMemo(
+    () => filterNodeViewModelsByStatus(topLevelNodeViewModels, selectedNodeStatusFilter),
+    [topLevelNodeViewModels, selectedNodeStatusFilter]
+  );
   const selectedTopLevelNode = useMemo(
     () =>
       selectedTopLevelNodeId
-        ? getNodeSubtreeById(topLevelNodeViewModels, selectedTopLevelNodeId)
+        ? getNodeSubtreeById(filteredTopLevelNodeViewModels, selectedTopLevelNodeId)
         : null,
-    [topLevelNodeViewModels, selectedTopLevelNodeId]
+    [filteredTopLevelNodeViewModels, selectedTopLevelNodeId]
   );
   const selectedNodeSubtreeModalViewModel = useMemo<NodeSubtreeModalViewModel | null>(
     () =>
@@ -798,12 +902,12 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   ]);
   const nodeSearchResults = useMemo<NodeTreeSearchResultViewModel[]>(
     () =>
-      searchNodeTree(topLevelNodeViewModels, {
+      searchNodeTree(filteredTopLevelNodeViewModels, {
         query: debouncedNodeSearchQuery,
         limit: 10,
         minQueryLength: 2,
       }),
-    [topLevelNodeViewModels, debouncedNodeSearchQuery]
+    [filteredTopLevelNodeViewModels, debouncedNodeSearchQuery]
   );
   const topNodeStatusByCode = useMemo(() => {
     const statusByCode = new Map<string, NodeStatus | null>();
@@ -939,6 +1043,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       }
       setNodeSearchQuery("");
       setDebouncedNodeSearchQuery("");
+      setNodeStatusFilter("ALL");
       setHighlightedNodeId(nodeId);
       setExpandedIds((prev) => {
         const next = new Set(prev);
@@ -982,6 +1087,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       setDebouncedNodeSearchQuery("");
       setStatusHighlightedNodeIds(nextHighlightedIds);
       setHighlightedNodeId(focusNodeId);
+      setNodeStatusFilter("ALL");
       setSelectedTopLevelNodeId(focusTopLevelNodeId);
     },
     [topLevelNodeViewModels]
@@ -1344,6 +1450,10 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
             <ScreenHeader
               title="Состояние узлов"
               onBack={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                  return;
+                }
                 router.replace(`/vehicles/${vehicleId}`);
               }}
             />
@@ -1393,6 +1503,61 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                   placeholderTextColor={c.textSecondary}
                   returnKeyType="search"
                 />
+                <Text style={styles.searchLabel}>Фильтр по статусу</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.statusFilterRow}
+                >
+                  <Pressable
+                    onPress={() => setNodeStatusFilter("ALL")}
+                    style={({ pressed }) => [
+                      styles.statusFilterChip,
+                      nodeStatusFilter === "ALL" && styles.statusFilterChipActiveNeutral,
+                      pressed && styles.statusFilterChipPressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Показать узлы со всеми статусами"
+                  >
+                    <Text
+                      style={[
+                        styles.statusFilterChipText,
+                        nodeStatusFilter === "ALL" && styles.statusFilterChipTextActiveNeutral,
+                      ]}
+                    >
+                      Все
+                    </Text>
+                  </Pressable>
+                  {NODE_STATUS_FILTER_OPTIONS.map((status) => {
+                    const tokens = statusSemanticTokens[status];
+                    const isActive = nodeStatusFilter === status;
+                    return (
+                      <Pressable
+                        key={status}
+                        onPress={() => setNodeStatusFilter(status)}
+                        style={({ pressed }) => [
+                          styles.statusFilterChip,
+                          isActive && {
+                            backgroundColor: tokens.background,
+                            borderColor: tokens.border,
+                          },
+                          pressed && styles.statusFilterChipPressed,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Показать узлы со статусом ${statusTextLabelsRu[status]}`}
+                      >
+                        <Text
+                          style={[
+                            styles.statusFilterChipText,
+                            isActive && { color: tokens.foreground },
+                          ]}
+                        >
+                          {statusTextLabelsRu[status]} · {nodeStatusCounts[status]}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
                 {nodeSearchQuery.trim().length > 0 && nodeSearchQuery.trim().length < 2 ? (
                   <Text style={styles.searchHint}>Введите минимум 2 символа.</Text>
                 ) : null}
@@ -1504,7 +1669,10 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                 ) : null}
                 {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
                   <View style={styles.treeCard}>
-                    {topLevelNodeViewModels.map((node, index) => (
+                    {filteredTopLevelNodeViewModels.length === 0 ? (
+                      <Text style={styles.searchNoResults}>Узлы с выбранным статусом не найдены</Text>
+                    ) : null}
+                    {filteredTopLevelNodeViewModels.map((node, index) => (
                       <View key={node.id}>
                         {index > 0 ? <View style={styles.treeDivider} /> : null}
                         <NodeRow
@@ -1829,11 +1997,11 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                         variant="subtle"
                         icon={
                           action.key === "journal" ? (
-                            <MaterialIcons name="history" size={15} color={c.textMeta} />
+                            <MaterialIcons name="menu-book" size={15} color={c.textMeta} />
                           ) : action.key === "add_service_event" ? (
-                            <MaterialIcons name="build-circle" size={15} color={c.textMeta} />
+                            <MaterialIcons name="event-available" size={15} color={c.textMeta} />
                           ) : action.key === "add_wishlist" ? (
-                            <MaterialIcons name="shopping-cart" size={15} color={c.textMeta} />
+                            <MaterialIcons name="playlist-add" size={16} color={c.textMeta} />
                           ) : action.key === "add_kit" ? (
                             <MaterialIcons name="inventory-2" size={15} color={c.textMeta} />
                           ) : (
@@ -3885,6 +4053,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: c.textMuted,
   },
+  statusFilterRow: {
+    gap: 8,
+    paddingBottom: 10,
+  },
+  statusFilterChip: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 999,
+    backgroundColor: c.cardMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  statusFilterChipActiveNeutral: {
+    backgroundColor: c.textPrimary,
+    borderColor: c.textPrimary,
+  },
+  statusFilterChipPressed: {
+    opacity: 0.86,
+  },
+  statusFilterChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textSecondary,
+  },
+  statusFilterChipTextActiveNeutral: {
+    color: c.textInverse,
+  },
   searchResultsBox: {
     borderWidth: 1,
     borderColor: c.border,
@@ -4234,6 +4429,9 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     alignSelf: "center",
     flexShrink: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   badgeNested: {
     paddingHorizontal: 8,

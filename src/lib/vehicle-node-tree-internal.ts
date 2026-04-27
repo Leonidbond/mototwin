@@ -9,6 +9,7 @@ import type { PrismaClient } from "@prisma/client";
 
 export const TOP_LEVEL_NODE_CODES = new Set([
   "ENGINE",
+  "INTAKE",
   "FUEL",
   "COOLING",
   "EXHAUST",

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
@@ -43,6 +43,7 @@ function buildProfileViewModel(selectedDevUserEmail: string, fromApi?: ProfileVi
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [userSettings, setUserSettings] = useState<UserLocalSettings>(() => ({
     ...DEFAULT_USER_LOCAL_SETTINGS,
   }));
@@ -168,6 +169,13 @@ export default function ProfilePage() {
     setApiProfile(null);
     void loadSettings();
   };
+  const navigateBackWithFallback = () => {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/garage");
+  };
 
   return (
     <main
@@ -177,13 +185,14 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-semibold tracking-tight">Профиль</h1>
-          <Link
-            href="/garage"
+          <button
+            type="button"
+            onClick={navigateBackWithFallback}
             className="rounded-xl border px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-white"
             style={{ borderColor: productSemanticColors.borderStrong }}
           >
             Назад в гараж
-          </Link>
+          </button>
         </div>
 
         <section

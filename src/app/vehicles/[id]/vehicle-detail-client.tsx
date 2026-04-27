@@ -86,7 +86,8 @@ import {
   USER_LOCAL_SETTINGS_STORAGE_KEY,
 } from "@mototwin/domain";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
-import { productSemanticColors, statusSemanticTokens } from "@mototwin/design-tokens";
+import { productSemanticColors, statusSemanticTokens, statusTextLabelsRu } from "@mototwin/design-tokens";
+import { ACTION_SVG_BODIES, type ActionIconKey } from "@mototwin/icons";
 import { TopNodeIcon } from "@/components/icons/top-nodes";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
@@ -129,11 +130,25 @@ type VehiclePageProps = {
   pageView?: "dashboard" | "nodeTree";
 };
 
+type OverlayReturnTarget =
+  | { type: "attention" }
+  | { type: "nodeContext"; nodeId: string }
+  | { type: "topLevelNode"; nodeId: string; highlightedNodeId: string | null };
+
 type ServiceLogActionNotice = {
   tone: "success" | "error";
   title: string;
   details?: string;
 };
+
+const NODE_STATUS_FILTER_OPTIONS: NodeStatus[] = [
+  "OVERDUE",
+  "SOON",
+  "RECENTLY_REPLACED",
+  "OK",
+];
+
+type NodeStatusFilter = NodeStatus | "ALL";
 
 function buildNodeSnoozeStorageKey(vehicleId: string, nodeId: string): string {
   return `mototwin.nodeSnooze.${vehicleId}.${nodeId}`;
@@ -155,6 +170,69 @@ function findNodeViewModelPathById(
     }
   }
   return null;
+}
+
+function filterNodeViewModelsByStatus(
+  nodes: NodeTreeItemViewModel[],
+  status: NodeStatus | null
+): NodeTreeItemViewModel[] {
+  if (!status) {
+    return nodes;
+  }
+
+  return nodes.flatMap((node) => {
+    const filteredChildren = filterNodeViewModelsByStatus(node.children, status);
+    const matches = node.effectiveStatus === status;
+    if (!matches && filteredChildren.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        ...node,
+        children: filteredChildren,
+        hasChildren: filteredChildren.length > 0,
+      },
+    ];
+  });
+}
+
+function collectExpandedNodeIdsWithStatusDescendants(
+  nodes: NodeTreeItemViewModel[],
+  status: NodeStatus
+): Set<string> {
+  const expandedIds = new Set<string>();
+
+  const walk = (node: NodeTreeItemViewModel): boolean => {
+    const hasMatchingChild = node.children.some((child) => walk(child));
+    const matches = node.effectiveStatus === status;
+    if (hasMatchingChild) {
+      expandedIds.add(node.id);
+    }
+    return matches || hasMatchingChild;
+  };
+
+  nodes.forEach((node) => walk(node));
+  return expandedIds;
+}
+
+function countNodeStatuses(nodes: NodeTreeItemViewModel[]): Record<NodeStatus, number> {
+  const counts: Record<NodeStatus, number> = {
+    OVERDUE: 0,
+    SOON: 0,
+    RECENTLY_REPLACED: 0,
+    OK: 0,
+  };
+
+  const walk = (node: NodeTreeItemViewModel) => {
+    if (node.effectiveStatus) {
+      counts[node.effectiveStatus] += 1;
+    }
+    node.children.forEach(walk);
+  };
+
+  nodes.forEach(walk);
+  return counts;
 }
 
 function flattenNodeViewModelsById(nodes: NodeTreeItemViewModel[]): Map<string, NodeTreeItemViewModel> {
@@ -202,6 +280,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     useState<ServiceLogActionNotice | null>(null);
   const [selectedNodePath, setSelectedNodePath] = useState<SelectedNodePath>([]);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+  const [nodeStatusFilter, setNodeStatusFilter] = useState<NodeStatusFilter>("ALL");
   const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
   const [isUsageProfileSectionExpanded, setIsUsageProfileSectionExpanded] = useState(true);
@@ -213,6 +292,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [statusHighlightedNodeIds, setStatusHighlightedNodeIds] = useState<Set<string>>(new Set());
   const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
+  const overlayReturnStackRef = useRef<OverlayReturnTarget[]>([]);
   const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
     PartRecommendationViewModel[]
   >([]);
@@ -337,6 +417,15 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     () => getTopLevelNodeTreeItems(nodeTreeViewModel),
     [nodeTreeViewModel]
   );
+  const selectedNodeStatusFilter = nodeStatusFilter === "ALL" ? null : nodeStatusFilter;
+  const nodeStatusCounts = useMemo(
+    () => countNodeStatuses(topLevelNodeViewModels),
+    [topLevelNodeViewModels]
+  );
+  const filteredTopLevelNodeViewModels = useMemo(
+    () => filterNodeViewModelsByStatus(topLevelNodeViewModels, selectedNodeStatusFilter),
+    [topLevelNodeViewModels, selectedNodeStatusFilter]
+  );
   const selectedTopLevelNode = useMemo(
     () =>
       selectedTopLevelNodeId
@@ -344,14 +433,21 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         : null,
     [topLevelNodeViewModels, selectedTopLevelNodeId]
   );
+  const selectedTopLevelNodeForDisplay = useMemo(
+    () =>
+      selectedTopLevelNodeId
+        ? getNodeSubtreeById(filteredTopLevelNodeViewModels, selectedTopLevelNodeId)
+        : null,
+    [filteredTopLevelNodeViewModels, selectedTopLevelNodeId]
+  );
   const selectedNodeSubtreeModalViewModel = useMemo<NodeSubtreeModalViewModel | null>(
     () =>
-      selectedTopLevelNode
-        ? buildNodeSubtreeModalViewModel(selectedTopLevelNode, {
+      selectedTopLevelNodeForDisplay
+        ? buildNodeSubtreeModalViewModel(selectedTopLevelNodeForDisplay, {
             maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
           })
         : null,
-    [selectedTopLevelNode, isNodeMaintenanceModeEnabled]
+    [selectedTopLevelNodeForDisplay, isNodeMaintenanceModeEnabled]
   );
   const selectedNodeContextNode = useMemo(
     () =>
@@ -389,12 +485,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   ]);
   const nodeSearchResults = useMemo<NodeTreeSearchResultViewModel[]>(
     () =>
-      searchNodeTree(topLevelNodeViewModels, {
+      searchNodeTree(filteredTopLevelNodeViewModels, {
         query: debouncedNodeSearchQuery,
         limit: 10,
         minQueryLength: 2,
       }),
-    [topLevelNodeViewModels, debouncedNodeSearchQuery]
+    [filteredTopLevelNodeViewModels, debouncedNodeSearchQuery]
   );
   const topNodeStatusByCode = useMemo(() => {
     const statusByCode = new Map<string, NodeStatus | null>();
@@ -425,6 +521,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       }
       setNodeSearchQuery("");
       setDebouncedNodeSearchQuery("");
+      setNodeStatusFilter("ALL");
       setHighlightedNodeId(nodeId);
       setExpandedNodes((prev) => {
         const next = { ...prev };
@@ -465,6 +562,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
       setNodeSearchQuery("");
       setDebouncedNodeSearchQuery("");
+      setNodeStatusFilter("ALL");
       setStatusHighlightedNodeIds(nextHighlightedIds);
       setHighlightedNodeId(focusNodeId);
       setExpandedNodes((prev) => ({ ...prev, ...nextExpandedNodes }));
@@ -612,6 +710,23 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       window.clearTimeout(timeoutId);
     };
   }, [nodeSearchQuery]);
+
+  useEffect(() => {
+    if (!selectedNodeStatusFilter) {
+      return;
+    }
+    const expandedIds = collectExpandedNodeIdsWithStatusDescendants(
+      topLevelNodeViewModels,
+      selectedNodeStatusFilter
+    );
+    setExpandedNodes((prev) => {
+      const next = { ...prev };
+      expandedIds.forEach((nodeId) => {
+        next[nodeId] = true;
+      });
+      return next;
+    });
+  }, [topLevelNodeViewModels, selectedNodeStatusFilter]);
 
   useEffect(() => {
     if (!vehicleId || !selectedNodeContextId) {
@@ -1092,6 +1207,13 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       return DEFAULT_USER_LOCAL_SETTINGS.defaultCurrency;
     }
   };
+  const navigateBackWithFallback = (fallbackHref: string) => {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push(fallbackHref);
+  };
 
   const openAddServiceEventFromLeafNode = (leafNodeId: string) => {
     if (!vehicle) {
@@ -1167,6 +1289,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (!item.canAddServiceEvent) {
       return;
     }
+    pushOverlayReturnTarget({ type: "attention" });
     setIsAttentionModalOpen(false);
     openAddServiceEventFromLeafNode(item.nodeId);
   };
@@ -1183,6 +1306,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (!canOpenNodeStatusExplanationModal(vm)) {
       return;
     }
+    pushOverlayReturnTarget({ type: "attention" });
     setIsAttentionModalOpen(false);
     openStatusExplanationModal(vm);
   };
@@ -1231,7 +1355,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setIsWishlistModalOpen(true);
   };
 
-  const closeWishlistModal = () => {
+  const closeWishlistModal = (options: { restorePrevious?: boolean } = {}) => {
     setIsWishlistModalOpen(false);
     setWishlistEditingId(null);
     setWishlistFormError("");
@@ -1247,6 +1371,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setWishlistServiceKits([]);
     setWishlistServiceKitsError("");
     setWishlistAddingKitCode("");
+    if (options.restorePrevious ?? true) {
+      restorePreviousOverlay();
+    }
   };
 
   const submitWishlistForm = async () => {
@@ -1282,7 +1409,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       }
 
       await Promise.all([loadWishlist(), loadServiceEvents(), loadNodeTree(), loadTopServiceNodes()]);
-      closeWishlistModal();
+      closeWishlistModal({ restorePrevious: false });
 
       if (
         savedItem &&
@@ -1352,7 +1479,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       await vehicleDetailApi.createWishlistItem(vehicleId, payload);
       await Promise.all([loadWishlist(), loadNodeTree()]);
       setWishlistNotice("Рекомендованный SKU добавлен в список покупок.");
-      closeWishlistModal();
+      closeWishlistModal({ restorePrevious: false });
     } catch (e) {
       setWishlistFormError(
         e instanceof Error ? e.message : "Не удалось добавить рекомендованный SKU."
@@ -1381,7 +1508,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       setWishlistNotice(
         `Комплект добавлен: ${res.result.createdItems.length} создано, ${res.result.skippedItems.length} пропущено.`
       );
-      closeWishlistModal();
+      closeWishlistModal({ restorePrevious: false });
     } catch (e) {
       setWishlistFormError(
         e instanceof Error ? e.message : "Не удалось добавить комплект обслуживания."
@@ -1444,22 +1571,79 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
   };
 
+  const pushOverlayReturnTarget = (target: OverlayReturnTarget) => {
+    overlayReturnStackRef.current = [...overlayReturnStackRef.current, target];
+  };
+  const restoreOverlayReturnTarget = (target: OverlayReturnTarget) => {
+    if (target.type === "attention") {
+      setIsAttentionModalOpen(true);
+      return;
+    }
+    if (target.type === "nodeContext") {
+      setSelectedNodeContextId(target.nodeId);
+      return;
+    }
+    setHighlightedNodeId(target.highlightedNodeId);
+    setSelectedTopLevelNodeId(target.nodeId);
+  };
+  const restorePreviousOverlay = () => {
+    const target = overlayReturnStackRef.current.at(-1);
+    if (!target) {
+      return;
+    }
+    overlayReturnStackRef.current = overlayReturnStackRef.current.slice(0, -1);
+    window.requestAnimationFrame(() => restoreOverlayReturnTarget(target));
+  };
+  const getCurrentOverlayReturnTarget = (): OverlayReturnTarget | null => {
+    if (selectedNodeContextId) {
+      return { type: "nodeContext", nodeId: selectedNodeContextId };
+    }
+    if (selectedTopLevelNodeId) {
+      return {
+        type: "topLevelNode",
+        nodeId: selectedTopLevelNodeId,
+        highlightedNodeId,
+      };
+    }
+    if (isAttentionModalOpen) {
+      return { type: "attention" };
+    }
+    return null;
+  };
+  const clearTopLevelNodeSubtreeModal = () => {
+    setSelectedTopLevelNodeId(null);
+    setHighlightedNodeId(null);
+  };
+  const closeTopLevelNodeSubtreeModal = (options: { restorePrevious?: boolean } = {}) => {
+    clearTopLevelNodeSubtreeModal();
+    if (options.restorePrevious ?? true) {
+      restorePreviousOverlay();
+    }
+  };
+  const clearNodeContextModal = () => {
+    setSelectedNodeContextId(null);
+    setNodeContextAddingRecommendedSkuId("");
+    setNodeContextAddingKitCode("");
+  };
+  const closeNodeContextModal = (options: { restorePrevious?: boolean } = {}) => {
+    clearNodeContextModal();
+    if (options.restorePrevious ?? true) {
+      restorePreviousOverlay();
+    }
+  };
+  const closeStatusExplanationModal = (options: { restorePrevious?: boolean } = {}) => {
+    setSelectedStatusExplanationNode(null);
+    if (options.restorePrevious ?? true) {
+      restorePreviousOverlay();
+    }
+  };
   const openWishlistFromAttentionItem = (item: AttentionItemViewModel) => {
+    pushOverlayReturnTarget({ type: "attention" });
     setIsAttentionModalOpen(false);
     openWishlistModalForCreate(item.nodeId);
   };
   const openNodeContextFromAttentionItem = (item: AttentionItemViewModel) => {
-    setIsAttentionModalOpen(false);
-    openNodeContextModal(item.nodeId);
-  };
-  const closeTopLevelNodeSubtreeModal = () => {
-    setSelectedTopLevelNodeId(null);
-    setHighlightedNodeId(null);
-  };
-  const closeNodeContextModal = () => {
-    setSelectedNodeContextId(null);
-    setNodeContextAddingRecommendedSkuId("");
-    setNodeContextAddingKitCode("");
+    openNodeContextModal(item.nodeId, { type: "attention" });
   };
   const openTopOverviewNode = (nodeId: string) => {
     if (pageView === "nodeTree") {
@@ -1481,12 +1665,17 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       `/vehicles/${vehicleId}/nodes?highlightIssueNodeIds=${encodeURIComponent(nodeIds.join(","))}`
     );
   };
-  const openNodeContextModal = (nodeId: string) => {
+  const openNodeContextModal = (nodeId: string, returnTarget?: OverlayReturnTarget | null) => {
+    const target = returnTarget ?? getCurrentOverlayReturnTarget();
+    if (target) {
+      pushOverlayReturnTarget(target);
+    }
     setIsAttentionModalOpen(false);
-    closeTopLevelNodeSubtreeModal();
+    clearTopLevelNodeSubtreeModal();
     setSelectedNodeContextId(nodeId);
   };
   const openTopLevelNodeSubtreeModal = (nodeId: string) => {
+    overlayReturnStackRef.current = [];
     setHighlightedNodeId(null);
     setSelectedTopLevelNodeId(nodeId);
   };
@@ -1588,17 +1777,19 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       return;
     }
     if (actionKey === "journal") {
-      closeNodeContextModal();
+      closeNodeContextModal({ restorePrevious: false });
       openServiceLogFilteredByNode(selectedNodeContextNode);
       return;
     }
     if (actionKey === "add_service_event" && selectedNodeContextNode.canAddServiceEvent) {
-      closeNodeContextModal();
+      pushOverlayReturnTarget({ type: "nodeContext", nodeId: selectedNodeContextNode.id });
+      closeNodeContextModal({ restorePrevious: false });
       openAddServiceEventFromLeafNode(selectedNodeContextNode.id);
       return;
     }
     if (actionKey === "add_wishlist" && !selectedNodeContextNode.hasChildren) {
-      closeNodeContextModal();
+      pushOverlayReturnTarget({ type: "nodeContext", nodeId: selectedNodeContextNode.id });
+      closeNodeContextModal({ restorePrevious: false });
       openWishlistModalForCreate(selectedNodeContextNode.id);
       return;
     }
@@ -1607,7 +1798,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       return;
     }
     if (actionKey === "open_status_explanation" && selectedNodeContextNode.statusExplanation) {
-      closeNodeContextModal();
+      pushOverlayReturnTarget({ type: "nodeContext", nodeId: selectedNodeContextNode.id });
+      closeNodeContextModal({ restorePrevious: false });
       openStatusExplanationModal(selectedNodeContextNode);
     }
   };
@@ -1641,15 +1833,22 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     openServiceLogFilteredByNode(node);
   };
   const openAddServiceEventFromTreeContext = (leafNodeId: string) => {
-    closeTopLevelNodeSubtreeModal();
+    const target = getCurrentOverlayReturnTarget();
+    if (target) {
+      pushOverlayReturnTarget(target);
+    }
+    closeTopLevelNodeSubtreeModal({ restorePrevious: false });
     openAddServiceEventFromLeafNode(leafNodeId);
   };
   const openWishlistFromTreeContext = (nodeId: string) => {
-    closeTopLevelNodeSubtreeModal();
+    const target = getCurrentOverlayReturnTarget();
+    if (target) {
+      pushOverlayReturnTarget(target);
+    }
+    closeTopLevelNodeSubtreeModal({ restorePrevious: false });
     openWishlistModalForCreate(nodeId);
   };
   const openStatusExplanationFromTreeContext = (node: NodeTreeItemViewModel) => {
-    closeTopLevelNodeSubtreeModal();
     openStatusExplanationModal(node);
   };
   const getNodeModeToggleLabel = () =>
@@ -1730,6 +1929,38 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       statusHighlightedNodeIds.has(node.id) && isIssueNodeStatus(node.effectiveStatus)
         ? statusSemanticTokens[node.effectiveStatus]
         : null;
+    const renderMaintenanceTableCell = (
+      line: string,
+      options: { key?: string; muted?: boolean } = {}
+    ) => {
+      const contentStyle = {
+        color: options.muted
+          ? productSemanticColors.textSecondary
+          : productSemanticColors.textPrimary,
+      };
+      return (
+        <td
+          key={options.key ?? line}
+          className="whitespace-nowrap px-2 py-0.5 align-top first:pl-0"
+        >
+          {canOpenStatusExplanation ? (
+            <button
+              type="button"
+              onClick={() => openStatusExplanationFromTreeContext(node)}
+              className="block text-left text-xs underline decoration-dotted underline-offset-2 transition hover:text-slate-100"
+              style={contentStyle}
+              title={line}
+            >
+              {line}
+            </button>
+          ) : (
+            <span className="block text-xs" style={contentStyle} title={line}>
+              {line}
+            </span>
+          )}
+        </td>
+      );
+    };
 
     return (
       <div key={node.id} className="space-y-2.5">
@@ -1838,56 +2069,28 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               maintenancePlan &&
               !hasChildren &&
               maintenancePlan.hasMeaningfulData ? (
-                <div className="mt-1.5 space-y-1 pl-8">
-                  {maintenancePlan.dueLines.map((line) => (
-                    canOpenStatusExplanation ? (
-                      <button
-                        key={line}
-                        type="button"
-                        onClick={() => openStatusExplanationFromTreeContext(node)}
-                        className="block text-left text-xs text-slate-200 underline decoration-dotted underline-offset-2 transition hover:text-slate-100"
-                        style={{ color: productSemanticColors.textPrimary }}
-                      >
-                        {line}
-                      </button>
-                    ) : (
-                      <p key={line} className="text-xs text-slate-200" style={{ color: productSemanticColors.textPrimary }}>
-                        {line}
-                      </p>
-                    )
-                  ))}
-                  {maintenancePlan.lastServiceLine ? (
-                    canOpenStatusExplanation ? (
-                      <button
-                        type="button"
-                        onClick={() => openStatusExplanationFromTreeContext(node)}
-                        className="block text-left text-xs text-slate-400 underline decoration-dotted underline-offset-2 transition hover:text-slate-100"
-                        style={{ color: productSemanticColors.textSecondary }}
-                      >
-                        {maintenancePlan.lastServiceLine}
-                      </button>
-                    ) : (
-                      <p className="text-xs text-slate-400" style={{ color: productSemanticColors.textSecondary }}>
-                        {maintenancePlan.lastServiceLine}
-                      </p>
-                    )
-                  ) : null}
-                  {maintenancePlan.ruleIntervalLine ? (
-                    canOpenStatusExplanation ? (
-                      <button
-                        type="button"
-                        onClick={() => openStatusExplanationFromTreeContext(node)}
-                        className="block text-left text-xs text-slate-400 underline decoration-dotted underline-offset-2 transition hover:text-slate-100"
-                        style={{ color: productSemanticColors.textSecondary }}
-                      >
-                        {maintenancePlan.ruleIntervalLine}
-                      </button>
-                    ) : (
-                      <p className="text-xs text-slate-400" style={{ color: productSemanticColors.textSecondary }}>
-                        {maintenancePlan.ruleIntervalLine}
-                      </p>
-                    )
-                  ) : null}
+                <div className="mt-1.5 overflow-x-auto pl-8">
+                  <table className="w-auto border-collapse">
+                    <tbody>
+                      <tr>
+                        {maintenancePlan.dueLines.map((line) =>
+                          renderMaintenanceTableCell(line)
+                        )}
+                        {maintenancePlan.lastServiceLine
+                          ? renderMaintenanceTableCell(maintenancePlan.lastServiceLine, {
+                              key: "last-service",
+                              muted: true,
+                            })
+                          : null}
+                        {maintenancePlan.ruleIntervalLine
+                          ? renderMaintenanceTableCell(maintenancePlan.ruleIntervalLine, {
+                              key: "rule-interval",
+                              muted: true,
+                            })
+                          : null}
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               ) : null}
             </div>
@@ -1903,6 +2106,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     title="Журнал"
                     aria-label={`Открыть журнал обслуживания по узлу «${node.name}»`}
                   >
+                    <ActionIcon iconKey="openServiceLog" className="mr-1 h-3.5 w-3.5" />
                     {node.statusLabel}
                   </button>
                   <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
@@ -1923,7 +2127,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   title="Добавить в список покупок"
                   aria-label="Добавить в список покупок"
                 >
-                  <WishlistIcon />
+                  <ActionIcon iconKey="addToShoppingList" />
                 </button>
                 <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
                   Добавить в список покупок
@@ -1962,7 +2166,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     aria-label="Добавить сервисное событие"
                     title="Добавить сервисное событие"
                   >
-                    <ServiceEventIcon />
+                    <ActionIcon iconKey="addServiceEvent" />
                   </button>
                   <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
                     Добавить сервисное событие
@@ -2159,9 +2363,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   };
 
   const openCreateServiceEventModal = () => {
+    overlayReturnStackRef.current = [];
     resetServiceEventForm();
     setServiceEventFormError("");
     setIsAddServiceEventModalOpen(true);
+  };
+  const closeAddServiceEventModal = (options: { restorePrevious?: boolean } = {}) => {
+    setIsAddServiceEventModalOpen(false);
+    if (options.restorePrevious ?? true) {
+      restorePreviousOverlay();
+    }
   };
 
   const handleSubmitServiceEvent = async () => {
@@ -2219,7 +2430,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       });
       resetServiceEventForm();
       await Promise.all([loadServiceEvents(), loadNodeTree(), loadWishlist(), loadTopServiceNodes()]);
-      setIsAddServiceEventModalOpen(false);
+      closeAddServiceEventModal({ restorePrevious: false });
     } catch (createError) {
       console.error(createError);
       setServiceEventFormError("Не удалось сохранить сервисное событие.");
@@ -2439,6 +2650,55 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       </p>
                     ) : null}
                   </div>
+                  <div className="space-y-2">
+                    <p
+                      className="text-xs font-medium uppercase tracking-wide text-slate-400"
+                      style={{ color: productSemanticColors.textSecondary }}
+                    >
+                      Фильтр по статусу
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNodeStatusFilter("ALL")}
+                        className="rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                        style={{
+                          backgroundColor:
+                            nodeStatusFilter === "ALL"
+                              ? productSemanticColors.textPrimary
+                              : productSemanticColors.cardMuted,
+                          borderColor: productSemanticColors.borderStrong,
+                          color:
+                            nodeStatusFilter === "ALL"
+                              ? productSemanticColors.textInverse
+                              : productSemanticColors.textSecondary,
+                        }}
+                      >
+                        Все
+                      </button>
+                      {NODE_STATUS_FILTER_OPTIONS.map((status) => {
+                        const tokens = statusSemanticTokens[status];
+                        const isActive = nodeStatusFilter === status;
+                        return (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => setNodeStatusFilter(status)}
+                            className="rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                            style={{
+                              backgroundColor: isActive
+                                ? tokens.background
+                                : productSemanticColors.cardMuted,
+                              borderColor: isActive ? tokens.border : productSemanticColors.borderStrong,
+                              color: isActive ? tokens.foreground : productSemanticColors.textSecondary,
+                            }}
+                          >
+                            {statusTextLabelsRu[status]} · {nodeStatusCounts[status]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   {nodeSearchQuery.trim().length >= 2 ? (
                     nodeSearchResults.length > 0 ? (
                       <div
@@ -2523,9 +2783,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                     {action.key === "open" ? (
                                       <OpenContextIcon />
                                     ) : action.key === "service_log" ? (
-                                      <HistoryIcon />
+                                      <ActionIcon iconKey="openServiceLog" />
                                     ) : (
-                                      <WishlistIcon />
+                                      <ActionIcon iconKey="addToShoppingList" />
                                     )}
                                   </button>
                                   <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
@@ -2550,8 +2810,19 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       </p>
                     )
                   ) : null}
+                  {filteredTopLevelNodeViewModels.length === 0 ? (
+                    <p
+                      className="rounded-xl border border-dashed border-slate-600 px-3 py-3 text-sm text-slate-300"
+                      style={{
+                        borderColor: productSemanticColors.borderStrong,
+                        color: productSemanticColors.textSecondary,
+                      }}
+                    >
+                      Узлы с выбранным статусом не найдены.
+                    </p>
+                  ) : null}
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {topLevelNodeViewModels.map((rootNode) => {
+                    {filteredTopLevelNodeViewModels.map((rootNode) => {
                       const summary = buildTopLevelNodeSummaryViewModel(rootNode, {
                         maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
                       });
@@ -2752,7 +3023,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 <div>
                   <button
                     type="button"
-                    onClick={() => router.push(`/vehicles/${vehicleId}`)}
+                    onClick={() => navigateBackWithFallback(`/vehicles/${vehicleId}`)}
                     className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3.5 text-sm font-medium text-slate-100 transition hover:bg-slate-800"
                     style={{
                       backgroundColor: productSemanticColors.card,
@@ -3437,7 +3708,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
             >
               {selectedNodeSubtreeModalViewModel.isLeafRoot ? (
                 <div className="space-y-2.5">
-                  {selectedTopLevelNode ? renderChildTreeNode(selectedTopLevelNode, 0) : null}
+                  {selectedTopLevelNodeForDisplay
+                    ? renderChildTreeNode(selectedTopLevelNodeForDisplay, 0)
+                    : null}
                 </div>
               ) : selectedNodeSubtreeModalViewModel.childNodes.length > 0 ? (
                 <div className="space-y-2.5">
@@ -3596,7 +3869,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               </h2>
               <button
                 type="button"
-                onClick={() => setIsAddServiceEventModalOpen(false)}
+                onClick={() => closeAddServiceEventModal()}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
               >
                 Закрыть
@@ -4175,35 +4448,53 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           className="fixed inset-0 z-[65] flex items-start justify-center px-4 py-6 sm:items-center"
           style={{ backgroundColor: productSemanticColors.overlayModal }}
         >
-          <div className="garage-dark-surface-text w-full max-w-lg rounded-3xl border border-gray-200 bg-white shadow-xl sm:max-w-xl">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
+          <div
+            className="garage-dark-surface-text w-full max-w-lg rounded-3xl border shadow-xl sm:max-w-xl"
+            style={{
+              backgroundColor: productSemanticColors.card,
+              borderColor: productSemanticColors.borderStrong,
+              color: productSemanticColors.textPrimary,
+            }}
+          >
+            <div
+              className="flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4"
+              style={{ borderColor: productSemanticColors.borderStrong }}
+            >
               <div>
-                <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                <h2
+                  className="text-xl font-semibold tracking-tight"
+                  style={{ color: productSemanticColors.textPrimary }}
+                >
                   Требует внимания
                 </h2>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs" style={{ color: productSemanticColors.textSecondary }}>
                   Узлы «Просрочено» и «Скоро» по текущему дереву узлов.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAttentionModalOpen(false)}
-                className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border px-3.5 text-sm font-medium transition"
+                style={{
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                  color: productSemanticColors.textPrimary,
+                }}
               >
                 Закрыть
               </button>
             </div>
             <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm" style={{ color: productSemanticColors.textSecondary }}>
                 Всего:{" "}
-                <span className="font-semibold text-gray-950">
+                <span className="font-semibold" style={{ color: productSemanticColors.textPrimary }}>
                   {attentionSummary.totalCount}
                 </span>
                 {attentionSummary.overdueCount > 0 ? (
                   <>
                     {" "}
                     · Просрочено:{" "}
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium" style={{ color: productSemanticColors.textPrimary }}>
                       {attentionSummary.overdueCount}
                     </span>
                   </>
@@ -4212,7 +4503,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   <>
                     {" "}
                     · Скоро:{" "}
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium" style={{ color: productSemanticColors.textPrimary }}>
                       {attentionSummary.soonCount}
                     </span>
                   </>
@@ -4225,11 +4516,21 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       key={filter}
                       type="button"
                       onClick={() => setAttentionSnoozeFilter(filter)}
-                      className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition ${
-                        attentionSnoozeFilter === filter
-                          ? "border-gray-900 bg-gray-900 text-white"
-                          : "border-gray-300 bg-white text-gray-800 hover:bg-gray-50"
-                      }`}
+                      className="inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition"
+                      style={{
+                        backgroundColor:
+                          attentionSnoozeFilter === filter
+                            ? productSemanticColors.primaryAction
+                            : productSemanticColors.cardSubtle,
+                        borderColor:
+                          attentionSnoozeFilter === filter
+                            ? productSemanticColors.primaryAction
+                            : productSemanticColors.borderStrong,
+                        color:
+                          attentionSnoozeFilter === filter
+                            ? productSemanticColors.onPrimaryAction
+                            : productSemanticColors.textPrimary,
+                      }}
                     >
                       {getAttentionSnoozeFilterLabel(filter)}
                     </button>
@@ -4238,20 +4539,32 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               ) : null}
 
               {isNodeTreeLoading ? (
-                <p className="mt-6 text-sm text-gray-600">Загрузка дерева узлов…</p>
+                <p className="mt-6 text-sm" style={{ color: productSemanticColors.textSecondary }}>
+                  Загрузка дерева узлов…
+                </p>
               ) : nodeTreeError ? (
                 <p className="mt-6 text-sm" style={{ color: productSemanticColors.error }}>
                   {nodeTreeError}
                 </p>
               ) : filteredAttentionItems.length === 0 ? (
-                <div className="mt-6 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+                <div
+                  className="mt-6 rounded-xl border border-dashed px-4 py-8 text-center text-sm"
+                  style={{
+                    backgroundColor: productSemanticColors.cardMuted,
+                    borderColor: productSemanticColors.borderSubtle,
+                    color: productSemanticColors.textSecondary,
+                  }}
+                >
                   {attentionEmptyStateLabel}
                 </div>
               ) : (
                 <div className="mt-5 space-y-6">
                   {filteredAttentionGroups.map((group) => (
                     <section key={group.status}>
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <h3
+                        className="text-xs font-semibold uppercase tracking-wide"
+                        style={{ color: productSemanticColors.textMuted }}
+                      >
                         {group.sectionTitleRu}
                       </h3>
                       <ul className="mt-3 space-y-3">
@@ -4266,10 +4579,15 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                           return (
                             <li
                               key={item.nodeId}
-                              className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+                              className="rounded-2xl border p-4 shadow-sm"
+                              style={{
+                                backgroundColor: productSemanticColors.cardMuted,
+                                borderColor: productSemanticColors.borderStrong,
+                                color: productSemanticColors.textPrimary,
+                              }}
                             >
                               {item.topLevelParentName ? (
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs" style={{ color: productSemanticColors.textMuted }}>
                                   Раздел: {item.topLevelParentName}
                                 </p>
                               ) : null}
@@ -4277,7 +4595,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                 <button
                                   type="button"
                                   onClick={() => openNodeContextFromAttentionItem(item)}
-                                  className="text-base font-semibold text-gray-950 transition hover:underline"
+                                  className="text-base font-semibold transition hover:underline"
+                                  style={{ color: productSemanticColors.textPrimary }}
                                 >
                                   {item.name}
                                 </button>
@@ -4296,22 +4615,35 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                 <button
                                   type="button"
                                   onClick={() => openStatusExplanationForAttentionItem(item)}
-                                  className="mt-2 text-left text-sm text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-gray-700"
+                                  className="mt-2 text-left text-sm underline decoration-dotted underline-offset-2 transition"
+                                  style={{ color: productSemanticColors.textSecondary }}
                                 >
                                   {item.shortExplanation}
                                 </button>
                               ) : item.shortExplanation ? (
-                                <p className="mt-2 text-sm text-gray-600">{item.shortExplanation}</p>
+                                <p className="mt-2 text-sm" style={{ color: productSemanticColors.textSecondary }}>
+                                  {item.shortExplanation}
+                                </p>
                               ) : null}
                               {snoozeLabel ? (
-                                <p className="mt-2 text-xs font-medium text-gray-600">{snoozeLabel}</p>
+                                <p
+                                  className="mt-2 text-xs font-medium"
+                                  style={{ color: productSemanticColors.textSecondary }}
+                                >
+                                  {snoozeLabel}
+                                </p>
                               ) : null}
 
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <button
                                   type="button"
                                   onClick={() => openServiceLogForAttentionItem(item)}
-                                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                                  className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardSubtle,
+                                    borderColor: productSemanticColors.borderStrong,
+                                    color: productSemanticColors.textPrimary,
+                                  }}
                                 >
                                   Журнал по узлу
                                 </button>
@@ -4319,7 +4651,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                   <button
                                     type="button"
                                     onClick={() => openAddServiceFromAttentionItem(item)}
-                                    className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
+                                    className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition"
+                                    style={{
+                                      backgroundColor: productSemanticColors.cardSubtle,
+                                      borderColor: productSemanticColors.borderStrong,
+                                      color: productSemanticColors.textPrimary,
+                                    }}
                                   >
                                     Добавить сервис
                                   </button>
@@ -4327,14 +4664,24 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                 <button
                                   type="button"
                                   onClick={() => openWishlistFromAttentionItem(item)}
-                                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
+                                  className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardSubtle,
+                                    borderColor: productSemanticColors.borderStrong,
+                                    color: productSemanticColors.textPrimary,
+                                  }}
                                 >
                                   В список покупок
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => openNodeContextFromAttentionItem(item)}
-                                  className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
+                                  className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardSubtle,
+                                    borderColor: productSemanticColors.borderStrong,
+                                    color: productSemanticColors.textPrimary,
+                                  }}
                                 >
                                   Контекст узла
                                 </button>
@@ -4353,32 +4700,58 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       ) : null}
 
       {selectedNodeContextViewModel ? (
-        <div className="fixed inset-0 z-[65] flex items-start justify-center bg-black/60 px-4 py-6 sm:items-center">
-          <div className="garage-dark-surface-text w-full max-w-4xl rounded-3xl border border-slate-700 bg-slate-900 shadow-xl">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-700 px-6 py-4">
+        <div
+          className="fixed inset-0 z-[65] flex items-start justify-center px-4 py-6 sm:items-center"
+          style={{ backgroundColor: productSemanticColors.overlayModal }}
+        >
+          <div
+            className="garage-dark-surface-text w-full max-w-4xl rounded-3xl border shadow-xl"
+            style={{
+              backgroundColor: productSemanticColors.card,
+              borderColor: productSemanticColors.borderStrong,
+              color: productSemanticColors.textPrimary,
+            }}
+          >
+            <div
+              className="flex items-start justify-between gap-3 border-b px-6 py-4"
+              style={{ borderColor: productSemanticColors.borderStrong }}
+            >
               <div className="min-w-0">
-                <h2 className="truncate text-xl font-semibold tracking-tight text-slate-100">
+                <h2
+                  className="truncate text-xl font-semibold tracking-tight"
+                  style={{ color: productSemanticColors.textPrimary }}
+                >
                   {selectedNodeContextViewModel.nodeName}
                 </h2>
-                <p className="truncate text-xs text-slate-400">{selectedNodeContextViewModel.pathLabel}</p>
-                <p className="truncate text-[11px] text-slate-500">{selectedNodeContextViewModel.nodeCode}</p>
+                <p className="truncate text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                  {selectedNodeContextViewModel.pathLabel}
+                </p>
+                <p className="truncate text-[11px]" style={{ color: productSemanticColors.textMuted }}>
+                  {selectedNodeContextViewModel.nodeCode}
+                </p>
                 {selectedNodeContextViewModel.shortExplanationLabel ? (
                   selectedNodeContextNode && canOpenNodeStatusExplanationModal(selectedNodeContextNode) ? (
                     <button
                       type="button"
-                      className="mt-1 block text-left text-sm text-slate-300 underline decoration-dotted underline-offset-2"
+                      className="mt-1 block text-left text-sm underline decoration-dotted underline-offset-2"
+                      style={{ color: productSemanticColors.textSecondary }}
                       onClick={() => openStatusExplanationFromTreeContext(selectedNodeContextNode)}
                     >
                       {selectedNodeContextViewModel.shortExplanationLabel}
                     </button>
                   ) : (
-                    <p className="mt-1 text-sm text-slate-300">
+                    <p className="mt-1 text-sm" style={{ color: productSemanticColors.textSecondary }}>
                       {selectedNodeContextViewModel.shortExplanationLabel}
                     </p>
                   )
                 ) : null}
                 {selectedNodeSnoozeLabel ? (
-                  <p className="mt-1 text-xs font-medium text-slate-300">{selectedNodeSnoozeLabel}</p>
+                  <p
+                    className="mt-1 text-xs font-medium"
+                    style={{ color: productSemanticColors.textSecondary }}
+                  >
+                    {selectedNodeSnoozeLabel}
+                  </p>
                 ) : null}
               </div>
               <div className="flex items-center gap-2">
@@ -4393,7 +4766,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 <button
                   type="button"
                   onClick={closeNodeContextModal}
-                  className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-600 px-3.5 text-sm font-medium text-slate-100 transition hover:bg-slate-800"
+                  className="inline-flex h-9 items-center justify-center rounded-lg border px-3.5 text-sm font-medium transition"
+                  style={{
+                    backgroundColor: productSemanticColors.cardSubtle,
+                    borderColor: productSemanticColors.borderStrong,
+                    color: productSemanticColors.textPrimary,
+                  }}
                 >
                   Закрыть
                 </button>
@@ -4412,11 +4790,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       aria-label={action.label}
                     >
                       {action.key === "journal" ? (
-                        <HistoryIcon />
+                        <ActionIcon iconKey="openServiceLog" />
                       ) : action.key === "add_service_event" ? (
-                        <ServiceEventIcon />
+                        <ActionIcon iconKey="addServiceEvent" />
                       ) : action.key === "add_wishlist" ? (
-                        <WishlistIcon />
+                        <ActionIcon iconKey="addToShoppingList" />
                       ) : action.key === "add_kit" ? (
                         <KitIcon />
                       ) : (
@@ -4433,14 +4811,24 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     <button
                       type="button"
                       onClick={() => setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "7d")}
-                      className="inline-flex h-8 items-center rounded-lg border border-slate-600 bg-slate-800 px-3 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
+                      className="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-medium transition"
+                      style={{
+                        backgroundColor: productSemanticColors.cardSubtle,
+                        borderColor: productSemanticColors.borderStrong,
+                        color: productSemanticColors.textPrimary,
+                      }}
                     >
                       Отложить на 7 дней
                     </button>
                     <button
                       type="button"
                       onClick={() => setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "30d")}
-                      className="inline-flex h-8 items-center rounded-lg border border-slate-600 bg-slate-800 px-3 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
+                      className="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-medium transition"
+                      style={{
+                        backgroundColor: productSemanticColors.cardSubtle,
+                        borderColor: productSemanticColors.borderStrong,
+                        color: productSemanticColors.textPrimary,
+                      }}
                     >
                       Отложить на 30 дней
                     </button>
@@ -4448,7 +4836,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       <button
                         type="button"
                         onClick={() => setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "clear")}
-                        className="inline-flex h-8 items-center rounded-lg border border-slate-600 bg-slate-800 px-3 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
+                        className="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-medium transition"
+                        style={{
+                          backgroundColor: productSemanticColors.cardSubtle,
+                          borderColor: productSemanticColors.borderStrong,
+                          color: productSemanticColors.textPrimary,
+                        }}
                       >
                         Снять отложенное
                       </button>
@@ -4459,19 +4852,29 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
               {selectedNodeContextViewModel.maintenancePlan &&
               selectedNodeContextViewModel.maintenancePlan.hasMeaningfulData ? (
-                <section className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-slate-100">План обслуживания</h3>
+                <section
+                  className="rounded-xl border px-4 py-3"
+                  style={{
+                    backgroundColor: productSemanticColors.cardSubtle,
+                    borderColor: productSemanticColors.borderStrong,
+                    color: productSemanticColors.textPrimary,
+                  }}
+                >
+                  <h3 className="text-sm font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                    План обслуживания
+                  </h3>
                   {selectedNodeContextViewModel.maintenancePlan.shortText ? (
                     selectedNodeContextNode && canOpenNodeStatusExplanationModal(selectedNodeContextNode) ? (
                       <button
                         type="button"
-                        className="mt-1 block text-left text-xs text-slate-300 underline decoration-dotted underline-offset-2"
+                        className="mt-1 block text-left text-xs underline decoration-dotted underline-offset-2"
+                        style={{ color: productSemanticColors.textSecondary }}
                         onClick={() => openStatusExplanationFromTreeContext(selectedNodeContextNode)}
                       >
                         {selectedNodeContextViewModel.maintenancePlan.shortText}
                       </button>
                     ) : (
-                      <p className="mt-1 text-xs text-slate-300">
+                      <p className="mt-1 text-xs" style={{ color: productSemanticColors.textSecondary }}>
                         {selectedNodeContextViewModel.maintenancePlan.shortText}
                       </p>
                     )
@@ -4482,13 +4885,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                         <button
                           key={line}
                           type="button"
-                          className="block text-left text-xs text-slate-200 underline decoration-dotted underline-offset-2"
+                          className="block text-left text-xs underline decoration-dotted underline-offset-2"
+                          style={{ color: productSemanticColors.textPrimary }}
                           onClick={() => openStatusExplanationFromTreeContext(selectedNodeContextNode)}
                         >
                           {line}
                         </button>
                       ) : (
-                        <p key={line} className="text-xs text-slate-200">
+                        <p key={line} className="text-xs" style={{ color: productSemanticColors.textPrimary }}>
                           {line}
                         </p>
                       )
@@ -4497,13 +4901,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       selectedNodeContextNode && canOpenNodeStatusExplanationModal(selectedNodeContextNode) ? (
                         <button
                           type="button"
-                          className="block text-left text-xs text-slate-400 underline decoration-dotted underline-offset-2"
+                          className="block text-left text-xs underline decoration-dotted underline-offset-2"
+                          style={{ color: productSemanticColors.textSecondary }}
                           onClick={() => openStatusExplanationFromTreeContext(selectedNodeContextNode)}
                         >
                           {selectedNodeContextViewModel.maintenancePlan.lastServiceLine}
                         </button>
                       ) : (
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
                           {selectedNodeContextViewModel.maintenancePlan.lastServiceLine}
                         </p>
                       )
@@ -4512,13 +4917,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       selectedNodeContextNode && canOpenNodeStatusExplanationModal(selectedNodeContextNode) ? (
                         <button
                           type="button"
-                          className="block text-left text-xs text-slate-400 underline decoration-dotted underline-offset-2"
+                          className="block text-left text-xs underline decoration-dotted underline-offset-2"
+                          style={{ color: productSemanticColors.textSecondary }}
                           onClick={() => openStatusExplanationFromTreeContext(selectedNodeContextNode)}
                         >
                           {selectedNodeContextViewModel.maintenancePlan.ruleIntervalLine}
                         </button>
                       ) : (
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
                           {selectedNodeContextViewModel.maintenancePlan.ruleIntervalLine}
                         </p>
                       )
@@ -4527,20 +4933,42 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 </section>
               ) : null}
 
-              <section className="rounded-xl border border-slate-700 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-100">Последние сервисные события</h3>
+              <section
+                className="rounded-xl border px-4 py-3"
+                style={{
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                  color: productSemanticColors.textPrimary,
+                }}
+              >
+                <h3 className="text-sm font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                  Последние сервисные события
+                </h3>
                 {selectedNodeContextViewModel.recentServiceEvents.length === 0 ? (
-                  <p className="mt-2 text-xs text-slate-400">По этому узлу записей пока нет.</p>
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                    По этому узлу записей пока нет.
+                  </p>
                 ) : (
                   <ul className="mt-2 space-y-2">
                     {selectedNodeContextViewModel.recentServiceEvents.map((event) => (
-                      <li key={event.id} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2">
-                        <p className="text-xs font-medium text-slate-100">
+                      <li
+                        key={event.id}
+                        className="rounded-lg border px-3 py-2"
+                        style={{
+                          backgroundColor: productSemanticColors.cardMuted,
+                          borderColor: productSemanticColors.borderSubtle,
+                        }}
+                      >
+                        <p className="text-xs font-medium" style={{ color: productSemanticColors.textPrimary }}>
                           {formatIsoCalendarDateRu(event.eventDate)} · {event.serviceType}
                         </p>
-                        <p className="text-xs text-slate-300">Пробег: {event.odometer} км</p>
+                        <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                          Пробег: {event.odometer} км
+                        </p>
                         {event.costLabelRu ? (
-                          <p className="text-xs text-slate-400">Стоимость: {event.costLabelRu}</p>
+                          <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                            Стоимость: {event.costLabelRu}
+                          </p>
                         ) : null}
                       </li>
                     ))}
@@ -4548,18 +4976,29 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 )}
               </section>
 
-              <section className="rounded-xl border border-slate-700 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-100">Рекомендации SKU</h3>
+              <section
+                className="rounded-xl border px-4 py-3"
+                style={{
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                  color: productSemanticColors.textPrimary,
+                }}
+              >
+                <h3 className="text-sm font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                  Рекомендации SKU
+                </h3>
                 {nodeContextRecommendationsError ? (
                   <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
                     {nodeContextRecommendationsError}
                   </p>
                 ) : null}
                 {nodeContextRecommendationsLoading ? (
-                  <p className="mt-2 text-xs text-slate-400">Загрузка рекомендаций...</p>
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                    Загрузка рекомендаций...
+                  </p>
                 ) : null}
                 {!nodeContextRecommendationsLoading && nodeContextRecommendations.length === 0 ? (
-                  <p className="mt-2 text-xs text-slate-400">
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
                     Для этого узла пока нет рекомендаций из каталога.
                   </p>
                 ) : null}
@@ -4567,13 +5006,19 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   {nodeContextRecommendations.slice(0, 5).map((rec) => (
                     <div
                       key={rec.skuId}
-                      className="flex items-start justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
+                      className="flex items-start justify-between gap-2 rounded-lg border px-3 py-2"
+                      style={{
+                        backgroundColor: productSemanticColors.cardMuted,
+                        borderColor: productSemanticColors.borderSubtle,
+                      }}
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-medium text-slate-100">
+                        <p className="truncate text-xs font-medium" style={{ color: productSemanticColors.textPrimary }}>
                           {rec.brandName} · {rec.canonicalName}
                         </p>
-                        <p className="truncate text-[11px] text-slate-300">{rec.recommendationLabel}</p>
+                        <p className="truncate text-[11px]" style={{ color: productSemanticColors.textSecondary }}>
+                          {rec.recommendationLabel}
+                        </p>
                         {rec.compatibilityWarning ? (
                           <p className="truncate text-[11px] text-amber-700">{rec.compatibilityWarning}</p>
                         ) : null}
@@ -4582,7 +5027,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                         type="button"
                         onClick={() => void addRecommendedSkuToWishlistFromNodeContext(rec)}
                         disabled={nodeContextAddingRecommendedSkuId === rec.skuId}
-                        className="inline-flex h-7 shrink-0 items-center rounded-md border border-slate-600 bg-slate-900 px-2.5 text-[11px] font-medium text-slate-100 transition hover:bg-slate-700 disabled:opacity-60"
+                        className="inline-flex h-7 shrink-0 items-center rounded-md border px-2.5 text-[11px] font-medium transition disabled:opacity-60"
+                        style={{
+                          backgroundColor: productSemanticColors.card,
+                          borderColor: productSemanticColors.borderStrong,
+                          color: productSemanticColors.textPrimary,
+                        }}
                       >
                         {nodeContextAddingRecommendedSkuId === rec.skuId ? "Добавление..." : "В список"}
                       </button>
@@ -4591,34 +5041,60 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 </div>
               </section>
 
-              <section className="rounded-xl border border-slate-700 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-100">Комплекты обслуживания</h3>
+              <section
+                className="rounded-xl border px-4 py-3"
+                style={{
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                  color: productSemanticColors.textPrimary,
+                }}
+              >
+                <h3 className="text-sm font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                  Комплекты обслуживания
+                </h3>
                 {nodeContextServiceKitsError ? (
                   <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
                     {nodeContextServiceKitsError}
                   </p>
                 ) : null}
                 {nodeContextServiceKitsLoading ? (
-                  <p className="mt-2 text-xs text-slate-400">Загрузка комплектов...</p>
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                    Загрузка комплектов...
+                  </p>
                 ) : null}
                 {!nodeContextServiceKitsLoading && nodeContextServiceKits.length === 0 ? (
-                  <p className="mt-2 text-xs text-slate-400">Для этого узла комплекты не найдены.</p>
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                    Для этого узла комплекты не найдены.
+                  </p>
                 ) : null}
                 <div className="mt-2 space-y-2">
                   {nodeContextServiceKits.slice(0, 3).map((kit) => (
                     <div
                       key={kit.code}
-                      className="flex items-start justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
+                      className="flex items-start justify-between gap-2 rounded-lg border px-3 py-2"
+                      style={{
+                        backgroundColor: productSemanticColors.cardMuted,
+                        borderColor: productSemanticColors.borderSubtle,
+                      }}
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-medium text-slate-100">{kit.title}</p>
-                        <p className="truncate text-[11px] text-slate-300">{kit.description}</p>
+                        <p className="truncate text-xs font-medium" style={{ color: productSemanticColors.textPrimary }}>
+                          {kit.title}
+                        </p>
+                        <p className="truncate text-[11px]" style={{ color: productSemanticColors.textSecondary }}>
+                          {kit.description}
+                        </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => void addServiceKitToWishlistFromNodeContext(kit)}
                         disabled={nodeContextAddingKitCode === kit.code}
-                        className="inline-flex h-7 shrink-0 items-center rounded-md border border-slate-600 bg-slate-900 px-2.5 text-[11px] font-medium text-slate-100 transition hover:bg-slate-700 disabled:opacity-60"
+                        className="inline-flex h-7 shrink-0 items-center rounded-md border px-2.5 text-[11px] font-medium transition disabled:opacity-60"
+                        style={{
+                          backgroundColor: productSemanticColors.card,
+                          borderColor: productSemanticColors.borderStrong,
+                          color: productSemanticColors.textPrimary,
+                        }}
                       >
                         {nodeContextAddingKitCode === kit.code ? "Добавление..." : "Добавить"}
                       </button>
@@ -4660,7 +5136,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               </h2>
               <button
                 type="button"
-                onClick={() => setSelectedStatusExplanationNode(null)}
+                onClick={() => closeStatusExplanationModal()}
                 className="inline-flex h-9 items-center justify-center rounded-lg border px-3.5 text-sm font-medium transition"
                 style={{
                   backgroundColor: productSemanticColors.cardSubtle,
@@ -5101,35 +5577,25 @@ function TrashIcon() {
   );
 }
 
-function HistoryIcon() {
+function ActionIcon({
+  iconKey,
+  className = "h-4 w-4",
+}: {
+  iconKey: ActionIconKey;
+  className?: string;
+}) {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 12a9 9 0 1 0 3-6.7" />
-      <path d="M3 4v5h5" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
-function ServiceEventIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-      <circle cx="12" cy="12" r="10" fill="currentColor" />
-      <path
-        d="M8.1 6.3a4.8 4.8 0 0 1 6 6l3.7 3.7-1.4 1.4-3.7-3.7a4.8 4.8 0 0 1-6-6l2.9 2.9h2.1l1.1-1.1V7.4L8.1 6.3Z"
-        fill="#ffffff"
-      />
-    </svg>
-  );
-}
-
-function WishlistIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="9" cy="20" r="1" />
-      <circle cx="18" cy="20" r="1" />
-      <path d="M3 4h2l2.4 10.5a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 7H7" />
-    </svg>
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      dangerouslySetInnerHTML={{ __html: ACTION_SVG_BODIES[iconKey] }}
+    />
   );
 }
 

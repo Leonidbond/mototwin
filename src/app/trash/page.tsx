@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildTrashedVehicleViewModel } from "@mototwin/domain";
@@ -9,6 +9,7 @@ import { productSemanticColors } from "@mototwin/design-tokens";
 const trashApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
 export default function TrashPage() {
+  const router = useRouter();
   const [items, setItems] = useState<Array<ReturnType<typeof buildTrashedVehicleViewModel>>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,6 +66,13 @@ export default function TrashPage() {
   };
 
   const isEmpty = useMemo(() => !isLoading && !error && items.length === 0, [isLoading, error, items.length]);
+  const navigateBackWithFallback = () => {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/garage");
+  };
 
   return (
     <main
@@ -79,13 +87,14 @@ export default function TrashPage() {
               Здесь хранятся удаленные мотоциклы перед окончательным удалением
             </p>
           </div>
-          <Link
-            href="/garage"
+          <button
+            type="button"
+            onClick={navigateBackWithFallback}
             className="rounded-xl border px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-white"
             style={{ borderColor: productSemanticColors.borderStrong }}
           >
             Вернуться в гараж
-          </Link>
+          </button>
         </div>
 
         {isLoading ? <p className="text-sm text-gray-600">Загрузка Свалки...</p> : null}

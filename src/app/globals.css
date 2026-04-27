@@ -173,13 +173,19 @@ body {
 }
 
 .mototwin-dark :is(input, select, textarea) {
-  background-color: var(--color-card-muted);
-  border-color: var(--color-border-strong);
-  color: var(--color-text-primary);
+  background-color: var(--color-card-muted) !important;
+  border-color: var(--color-border-strong) !important;
+  color: var(--color-text-primary) !important;
+  color-scheme: dark;
 }
 
 .mototwin-dark :is(input, textarea)::placeholder {
-  color: var(--color-text-muted);
+  color: var(--color-text-muted) !important;
+}
+
+.mototwin-dark select option {
+  background-color: var(--color-card) !important;
+  color: var(--color-text-primary) !important;
 }
 
 .node-tree-readable,
@@ -230,10 +236,16 @@ body {
   background-color: var(--color-card-muted) !important;
   border-color: var(--color-border-strong) !important;
   color: var(--color-text-primary) !important;
+  color-scheme: dark;
 }
 
 .mt-internal-page :is(input, textarea)::placeholder {
   color: var(--color-text-muted) !important;
+}
+
+.mt-internal-page select option {
+  background-color: var(--color-card) !important;
+  color: var(--color-text-primary) !important;
 }
 
 .mt-internal-page :is(.hover\:bg-white:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover) {
