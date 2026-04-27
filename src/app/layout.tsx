@@ -34,7 +34,7 @@ export default function RootLayout({
       }}
     >
       <body
-        className="min-h-full flex flex-col"
+        className="mototwin-dark min-h-full flex flex-col"
         style={{
           margin: 0,
           backgroundColor: "#080d12",

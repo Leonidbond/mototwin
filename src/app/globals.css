@@ -32,6 +32,15 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-mt-canvas: var(--color-canvas);
+  --color-mt-card: var(--color-card);
+  --color-mt-card-muted: var(--color-card-muted);
+  --color-mt-card-subtle: var(--color-card-subtle);
+  --color-mt-border: var(--color-border);
+  --color-mt-border-strong: var(--color-border-strong);
+  --color-mt-text-primary: var(--color-text-primary);
+  --color-mt-text-secondary: var(--color-text-secondary);
+  --color-mt-text-muted: var(--color-text-muted);
   --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
@@ -69,4 +78,164 @@ body {
 ::selection {
   background: var(--color-border-strong);
   color: var(--color-text-primary);
+}
+
+/**
+ * Dark garage panels / modals for node state: `button` does not always inherit
+ * `color` from the parent, and missing Tailwind utilities would fall back to an
+ * unreadable (near-black) default on dark `bg-slate-900` shells.
+ */
+.garage-dark-surface-text {
+  background-color: var(--color-card) !important;
+  border-color: var(--color-border-strong) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.garage-dark-surface-text :is(.bg-white, .bg-gray-50, .bg-gray-50\/70, .bg-gray-50\/80, .bg-white\/80) {
+  background-color: var(--color-card-muted) !important;
+}
+
+.garage-dark-surface-text :is(.border-gray-100, .border-gray-200, .border-gray-300) {
+  border-color: var(--color-border-strong) !important;
+}
+
+.garage-dark-surface-text
+  :is(h1, h2, h3, h4, p, span, div, label, li, button, input, textarea):not([style]) {
+  color: var(--color-text-primary) !important;
+}
+
+.garage-dark-surface-text :is(input, textarea)::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+/*
+ * Legacy light-utility bridge.
+ * Several older pages and dialogs still use Tailwind's white/gray palette.
+ * Under the app-wide dark shell, map those classes to the garage tokens so
+ * every route renders in the same visual language while files migrate to
+ * token-backed primitives.
+ */
+.mototwin-dark :is(.bg-white, .bg-gray-50, .bg-gray-100, .bg-gray-50\/70, .bg-gray-50\/80, .bg-white\/80) {
+  background-color: var(--color-card) !important;
+}
+
+.mototwin-dark :is(.bg-gray-900, .bg-gray-950) {
+  background-color: var(--color-card-subtle) !important;
+}
+
+.mototwin-dark
+  :is(.bg-slate-700, .bg-slate-800, .bg-slate-800\/70, .bg-slate-800\/80, .bg-slate-900) {
+  background-color: var(--color-card) !important;
+}
+
+.mototwin-dark :is(.bg-slate-950, .bg-black) {
+  background-color: var(--color-card-subtle) !important;
+}
+
+.mototwin-dark :is(.border-gray-100, .border-gray-200, .border-gray-300, .border-gray-400) {
+  border-color: var(--color-border) !important;
+}
+
+.mototwin-dark :is(.border-slate-500, .border-slate-600, .border-slate-700, .border-slate-800) {
+  border-color: var(--color-border-strong) !important;
+}
+
+.mototwin-dark :is(.border-gray-900, .border-gray-950) {
+  border-color: var(--color-border-strong) !important;
+}
+
+.mototwin-dark :is(.text-gray-950, .text-gray-900, .text-gray-800, .text-white) {
+  color: var(--color-text-primary) !important;
+}
+
+.mototwin-dark :is(.text-slate-50, .text-slate-100, .text-slate-200) {
+  color: var(--color-text-primary) !important;
+}
+
+.mototwin-dark :is(.text-gray-700, .text-gray-600, .text-gray-500, .text-gray-400, .text-gray-300) {
+  color: var(--color-text-secondary) !important;
+}
+
+.mototwin-dark :is(.text-slate-300, .text-slate-400, .text-slate-500) {
+  color: var(--color-text-secondary) !important;
+}
+
+.mototwin-dark :is(.hover\:bg-white:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover) {
+  background-color: var(--color-card-muted) !important;
+}
+
+.mototwin-dark :is(.focus\:border-gray-950:focus, .focus\:border-gray-500:focus) {
+  border-color: var(--color-border-strong) !important;
+}
+
+.mototwin-dark :is(.focus\:ring-gray-200:focus) {
+  --tw-ring-color: var(--color-border-strong) !important;
+}
+
+.mototwin-dark :is(input, select, textarea) {
+  background-color: var(--color-card-muted);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.mototwin-dark :is(input, textarea)::placeholder {
+  color: var(--color-text-muted);
+}
+
+.node-tree-readable,
+.node-tree-readable :is(h1, h2, h3, h4, p, span, div, label, button, input):not([style]) {
+  color: var(--color-text-primary) !important;
+}
+
+.parts-selection-surface :is(.bg-white, .bg-gray-50, .bg-gray-50\/70, .bg-gray-50\/80, .bg-white\/80),
+.parts-selection-surface :is(.bg-amber-50\/50, .bg-amber-50\/80, .bg-emerald-50\/70) {
+  background-color: var(--color-card-muted) !important;
+}
+
+.parts-selection-surface :is(.border-gray-100, .border-gray-200, .border-gray-300),
+.parts-selection-surface :is(.border-amber-200, .border-emerald-200) {
+  border-color: var(--color-border-strong) !important;
+}
+
+/*
+ * Internal web pages (journal, profile, onboarding, trash) share the garage
+ * visual language: dark canvas, token surfaces, light text and muted metadata.
+ * This class is applied directly on page roots so it does not depend on the
+ * global body bridge being present in a hot-reloaded bundle.
+ */
+.mt-internal-page,
+.mt-internal-page :is(section, header, article, details, .mt-internal-surface) {
+  color: var(--color-text-primary);
+}
+
+.mt-internal-page
+  :is(.bg-white, .bg-gray-50, .bg-gray-100, .bg-gray-50\/70, .bg-gray-50\/80, .bg-white\/80, .bg-amber-50\/80) {
+  background-color: var(--color-card) !important;
+}
+
+.mt-internal-page
+  :is(.border-gray-100, .border-gray-200, .border-gray-300, .border-gray-400, .border-rose-200, .border-emerald-200) {
+  border-color: var(--color-border) !important;
+}
+
+.mt-internal-page :is(.text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700, .text-white) {
+  color: var(--color-text-primary) !important;
+}
+
+.mt-internal-page :is(.text-gray-600, .text-gray-500, .text-gray-400, .text-gray-300) {
+  color: var(--color-text-secondary) !important;
+}
+
+.mt-internal-page :is(input, select, textarea) {
+  background-color: var(--color-card-muted) !important;
+  border-color: var(--color-border-strong) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.mt-internal-page :is(input, textarea)::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+.mt-internal-page :is(.hover\:bg-white:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover) {
+  background-color: var(--color-card-muted) !important;
 }

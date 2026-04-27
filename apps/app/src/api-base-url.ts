@@ -8,13 +8,20 @@ function isTunnelPackagerHost(host: string): boolean {
   return TUNNEL_PACKAGER_MARKERS.some((m) => h.includes(m));
 }
 
+function devApiBaseFromExpoExtra(): string | undefined {
+  const extra = Constants.expoConfig?.extra as { devApiBaseUrl?: string } | undefined;
+  const u = extra?.devApiBaseUrl?.trim();
+  return u ? u.replace(/\/$/, "") : undefined;
+}
+
 /**
  * Returns the backend API base URL.
  *
  * Priority:
- * 1. `EXPO_PUBLIC_API_BASE_URL` in `apps/app/.env` (required for Expo Go + tunnel, see .env.example)
- * 2. From Metro's `hostUri` when using LAN (same IP for bundler and API)
- * 3. `http://localhost:3000` (simulator / web)
+ * 1. `EXPO_PUBLIC_API_BASE_URL` in `apps/app/.env` (optional override)
+ * 2. Metro `hostUri` when not a tunnel (LAN — same host as bundler, port 3000)
+ * 3. `expo.extra.devApiBaseUrl` from `app.config.ts` (LAN IP from dev machine interfaces at Metro start; used for tunnel)
+ * 4. `http://localhost:3000` (simulator / web)
  */
 export function getApiBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
@@ -27,21 +34,25 @@ export function getApiBaseUrl(): string {
     Constants.expoConfig?.hostUri ??
     (Constants.manifest as { debuggerHost?: string } | null)?.debuggerHost;
 
+  const fromExtra = devApiBaseFromExpoExtra();
+
   if (hostUri) {
     const host = hostUri.split(":")[0] ?? "";
     if (isTunnelPackagerHost(host)) {
+      if (fromExtra) return fromExtra;
       if (__DEV__) {
         console.warn(
-          "[mototwin] Metro tunnel host detected; do not use it for the API. " +
-            "Create apps/app/.env with EXPO_PUBLIC_API_BASE_URL=http://<YOUR_MAC_LAN_IP>:3000 " +
-            "(see apps/app/.env.example). Start Next at repo root: npm run dev"
+          "[mototwin] Metro tunnel host detected; API URL must not use the tunnel. " +
+            "Restart Metro so app.config can embed dev machine LAN IP (expo.extra.devApiBaseUrl), " +
+            "or set EXPO_PUBLIC_API_BASE_URL (see apps/app/.env.example). Start Next: npm run dev"
         );
       }
-      // Tunnel URL :3000 would always time out — fall back to loopback (works on iOS Simulator + Android emulator with host port forwarding, not on a physical device).
       return "http://127.0.0.1:3000";
     }
     return `http://${host}:3000`;
   }
+
+  if (fromExtra) return fromExtra;
 
   return "http://localhost:3000";
 }

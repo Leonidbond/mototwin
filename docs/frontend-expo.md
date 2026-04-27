@@ -76,7 +76,7 @@ Defined in `apps/app/app/_layout.tsx`:
     - quick actions: `Добавить ТО`, `Расход`, `Деталь`
     - KPI strip: `Garage Score`, current mileage/engine hours, `Ride readiness`, season readiness
     - compact `Требует внимания` rows from shared attention summary
-    - compact `Состояние узлов` cards from `buildTopNodeOverviewCards`
+    - compact `Состояние узлов` cards from `buildTopNodeOverviewCards`: the card itself is static, the group icon drills into issue nodes (`SOON` / `OVERDUE`), and each leaf badge opens the exact node in the tree
     - compact recent service events
     - expenses and wishlist entry cards
   - collapsible ride profile section

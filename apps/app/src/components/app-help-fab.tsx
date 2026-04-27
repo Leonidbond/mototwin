@@ -147,7 +147,7 @@ const triggerStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: c.overlayModal,
     justifyContent: "flex-end",
     padding: 12,
   },

@@ -1,9 +1,10 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
+  type GestureResponderEvent,
   Image,
   type ImageSourcePropType,
   Modal,
@@ -25,7 +26,6 @@ import {
   buildNodeSearchResultActions,
   buildNodeSubtreeModalViewModel,
   buildTopNodeOverviewCards,
-  buildTopLevelNodeSummaryViewModel,
   buildNodeMaintenancePlanViewModel,
   buildRideProfileViewModel,
   buildVehicleDetailViewModel,
@@ -80,6 +80,8 @@ import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 import { ActionIconButton } from "../../components/action-icon-button";
 import { AppScreenHelpBar } from "../../components/app-screen-help-bar";
+import { ScreenHeader } from "../../components/screen-header";
+import { HelpTriggerButton } from "../../../src/components/app-help-fab";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import adventureTouringSilhouette from "../../../../../images/Motocycles/adventure_touring.png";
 import enduroDualSportSilhouette from "../../../../../images/Motocycles/enduro_dual_sport.png";
@@ -109,6 +111,42 @@ function getNodeAccentColor(status: NodeStatus | null) {
   return tokens.accent;
 }
 
+function findNodeViewModelPathById(
+  nodes: NodeTreeItemViewModel[],
+  targetNodeId: string,
+  path: string[] = []
+): string[] | null {
+  for (const node of nodes) {
+    const nextPath = [...path, node.id];
+    if (node.id === targetNodeId) {
+      return nextPath;
+    }
+    const nested = findNodeViewModelPathById(node.children, targetNodeId, nextPath);
+    if (nested) {
+      return nested;
+    }
+  }
+  return null;
+}
+
+function flattenNodeViewModelsById(nodes: NodeTreeItemViewModel[]): Map<string, NodeTreeItemViewModel> {
+  const byId = new Map<string, NodeTreeItemViewModel>();
+  const stack = [...nodes];
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node) {
+      continue;
+    }
+    byId.set(node.id, node);
+    stack.push(...node.children);
+  }
+  return byId;
+}
+
+function isIssueNodeStatus(status: NodeStatus | null): status is "OVERDUE" | "SOON" {
+  return status === "OVERDUE" || status === "SOON";
+}
+
 
 
 // ─── Expandable node row ──────────────────────────────────────────────────────
@@ -125,6 +163,9 @@ type NodeRowProps = {
   onOpenServiceLogForNode?: (node: NodeTreeItemViewModel) => void;
   isMaintenanceModeEnabled: boolean;
   highlightedNodeId?: string | null;
+  statusHighlightedNodeIds?: Set<string>;
+  highlightedScrollViewRef?: RefObject<ScrollView | null>;
+  highlightedScrollViewportHeight?: number;
 };
 
 function NodeRow({
@@ -139,7 +180,11 @@ function NodeRow({
   onOpenServiceLogForNode,
   isMaintenanceModeEnabled,
   highlightedNodeId,
+  statusHighlightedNodeIds,
+  highlightedScrollViewRef,
+  highlightedScrollViewportHeight,
 }: NodeRowProps) {
+  const rowRef = useRef<View | null>(null);
   const treeItemContract: NodeTreeItemProps = {
     item: node,
     depth,
@@ -155,13 +200,34 @@ function NodeRow({
   const status = rowNode.effectiveStatus as NodeStatus | null;
   const colors = getStatusColors(status);
   const label = rowNode.statusLabel;
-  const reasonShort = rowNode.shortExplanationLabel;
   const indent = 12 + depth * 14;
   const accentColor = getNodeAccentColor(status);
   const isTopLevel = depth === 0;
   const badgeStyle = !isTopLevel ? styles.badgeNested : undefined;
   const badgeTextStyle = !isTopLevel ? styles.badgeTextNested : undefined;
+  const statusHighlightTokens =
+    statusHighlightedNodeIds?.has(rowNode.id) && isIssueNodeStatus(rowNode.effectiveStatus)
+      ? statusSemanticTokens[rowNode.effectiveStatus]
+      : null;
   const maintenancePlan = isMaintenanceModeEnabled ? buildNodeMaintenancePlanViewModel(rowNode) : null;
+  const shouldUseMaintenanceShortExplanation =
+    isMaintenanceModeEnabled &&
+    rowNode.effectiveStatus === "OVERDUE" &&
+    !rowNode.shortExplanationLabel &&
+    Boolean(maintenancePlan?.shortText);
+  const overdueDueLineFallback =
+    isMaintenanceModeEnabled && rowNode.effectiveStatus === "OVERDUE"
+      ? (maintenancePlan?.dueLines[0] ?? null)
+      : null;
+  const overdueDetailedFallback =
+    isMaintenanceModeEnabled && rowNode.effectiveStatus === "OVERDUE"
+      ? (rowNode.statusExplanation?.reasonDetailed?.trim() || null)
+      : null;
+  const reasonShort =
+    rowNode.shortExplanationLabel ??
+    (shouldUseMaintenanceShortExplanation ? maintenancePlan?.shortText ?? null : null) ??
+    overdueDetailedFallback ??
+    overdueDueLineFallback;
   const summary = maintenancePlan?.parentSummary;
   const summaryLine =
     summary && (summary.overdueCount > 0 || summary.soonCount > 0 || summary.plannedLaterCount > 0)
@@ -173,10 +239,46 @@ function NodeRow({
           .filter(Boolean)
           .join(" · ")
       : null;
+  const canOpenMaintenanceExplanation =
+    canOpenNodeStatusExplanationModal(rowNode) && Boolean(onOpenStatusExplanation);
+  const openMaintenanceExplanation = (event?: GestureResponderEvent) => {
+    event?.stopPropagation();
+    if (onOpenStatusExplanation && canOpenMaintenanceExplanation) {
+      onOpenStatusExplanation(rowNode);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      highlightedNodeId !== rowNode.id ||
+      !highlightedScrollViewRef?.current ||
+      !rowRef.current
+    ) {
+      return;
+    }
+    const timeout = setTimeout(() => {
+      const scrollViewHandle = highlightedScrollViewRef.current;
+      const rowHandle = rowRef.current;
+      if (!scrollViewHandle || !rowHandle) {
+        return;
+      }
+      rowHandle.measureLayout(
+        scrollViewHandle,
+        (_x, y, _width, nodeHeight) => {
+          const viewportHeight = highlightedScrollViewportHeight ?? 0;
+          const centeredY = viewportHeight > 0 ? y - viewportHeight / 2 + nodeHeight / 2 : y;
+          scrollViewHandle.scrollTo({ y: Math.max(0, centeredY), animated: true });
+        },
+        () => {}
+      );
+    }, 80);
+    return () => clearTimeout(timeout);
+  }, [highlightedNodeId, highlightedScrollViewRef, highlightedScrollViewportHeight, rowNode.id]);
 
   return (
     <View style={styles.nodeContainer}>
       <Pressable
+        ref={rowRef}
         onPress={() => hasChildren && treeItemContract.onToggleExpand()}
         style={({ pressed }) => [
           styles.nodeRow,
@@ -184,6 +286,10 @@ function NodeRow({
           isTopLevel && styles.nodeRowTopLevel,
           depth > 0 && styles.nodeRowNested,
           highlightedNodeId === rowNode.id && styles.nodeRowHighlighted,
+          statusHighlightTokens && {
+            borderColor: statusHighlightTokens.border,
+            borderWidth: 1,
+          },
           accentColor !== "transparent" && { borderLeftColor: accentColor, borderLeftWidth: 3 },
           pressed && hasChildren && styles.nodeRowPressed,
         ]}
@@ -201,10 +307,9 @@ function NodeRow({
               {rowNode.name}
             </Text>
             {reasonShort &&
-            canOpenNodeStatusExplanationModal(rowNode) &&
-            onOpenStatusExplanation ? (
+            canOpenMaintenanceExplanation ? (
               <Pressable
-                onPress={() => onOpenStatusExplanation(rowNode)}
+                onPress={openMaintenanceExplanation}
                 hitSlop={6}
                 accessibilityRole="button"
                 accessibilityLabel="Пояснение расчёта статуса"
@@ -215,7 +320,20 @@ function NodeRow({
               <Text style={styles.reasonShort}>{reasonShort}</Text>
             ) : null}
             {isMaintenanceModeEnabled && maintenancePlan && !reasonShort && maintenancePlan.shortText ? (
-              <Text style={styles.reasonShort}>{maintenancePlan.shortText}</Text>
+              canOpenMaintenanceExplanation ? (
+                <Pressable
+                  onPress={openMaintenanceExplanation}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Пояснение расчёта статуса"
+                >
+                  <Text style={[styles.reasonShort, styles.reasonShortLink]}>
+                    {maintenancePlan.shortText}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Text style={styles.reasonShort}>{maintenancePlan.shortText}</Text>
+              )
             ) : null}
             {isMaintenanceModeEnabled && summaryLine ? (
               <Text style={styles.planSummaryText}>{summaryLine}</Text>
@@ -226,15 +344,53 @@ function NodeRow({
             maintenancePlan.hasMeaningfulData ? (
               <View style={styles.planLeafBlock}>
                 {maintenancePlan.dueLines.map((line) => (
-                  <Text key={line} style={styles.planLeafLine}>
-                    {line}
-                  </Text>
+                  canOpenMaintenanceExplanation ? (
+                    <Pressable
+                      key={line}
+                      onPress={openMaintenanceExplanation}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel="Пояснение расчёта статуса"
+                    >
+                      <Text style={[styles.planLeafLine, styles.planLeafLink]}>{line}</Text>
+                    </Pressable>
+                  ) : (
+                    <Text key={line} style={styles.planLeafLine}>
+                      {line}
+                    </Text>
+                  )
                 ))}
                 {maintenancePlan.lastServiceLine ? (
-                  <Text style={styles.planLeafMuted}>{maintenancePlan.lastServiceLine}</Text>
+                  canOpenMaintenanceExplanation ? (
+                    <Pressable
+                      onPress={openMaintenanceExplanation}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel="Пояснение расчёта статуса"
+                    >
+                      <Text style={[styles.planLeafMuted, styles.planLeafLink]}>
+                        {maintenancePlan.lastServiceLine}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={styles.planLeafMuted}>{maintenancePlan.lastServiceLine}</Text>
+                  )
                 ) : null}
                 {maintenancePlan.ruleIntervalLine ? (
-                  <Text style={styles.planLeafMuted}>{maintenancePlan.ruleIntervalLine}</Text>
+                  canOpenMaintenanceExplanation ? (
+                    <Pressable
+                      onPress={openMaintenanceExplanation}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel="Пояснение расчёта статуса"
+                    >
+                      <Text style={[styles.planLeafMuted, styles.planLeafLink]}>
+                        {maintenancePlan.ruleIntervalLine}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={styles.planLeafMuted}>{maintenancePlan.ruleIntervalLine}</Text>
+                  )
                 ) : null}
               </View>
             ) : null}
@@ -318,6 +474,9 @@ function NodeRow({
               onOpenServiceLogForNode={onOpenServiceLogForNode}
               isMaintenanceModeEnabled={isMaintenanceModeEnabled}
               highlightedNodeId={highlightedNodeId}
+              statusHighlightedNodeIds={statusHighlightedNodeIds}
+              highlightedScrollViewRef={highlightedScrollViewRef}
+              highlightedScrollViewportHeight={highlightedScrollViewportHeight}
             />
           ))
         : null}
@@ -327,13 +486,40 @@ function NodeRow({
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function VehicleDetailScreen() {
+type VehicleDetailScreenProps = {
+  forcedView?: "nodes";
+};
+
+export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
-  const params = useLocalSearchParams<{ id?: string; nodeContextId?: string }>();
-  const vehicleId = typeof params.id === "string" ? params.id : "";
+  const subtreeScrollViewRef = useRef<ScrollView | null>(null);
+  const params = useLocalSearchParams<{
+    id?: string | string[];
+    nodeContextId?: string;
+    nodeId?: string;
+    highlightIssueNodeIds?: string;
+    view?: string | string[];
+  }>();
+  const vehicleId =
+    typeof params.id === "string"
+      ? params.id
+      : Array.isArray(params.id) && typeof params.id[0] === "string"
+        ? params.id[0]
+        : "";
+  const viewParam = params.view;
+  const queryView = Array.isArray(viewParam) ? viewParam[0] : viewParam;
+  const shouldRedirectLegacyNodesView = !forcedView && queryView === "nodes";
   const nodeContextIdParam =
     typeof params.nodeContextId === "string" ? params.nodeContextId : "";
+  const targetNodeIdParam = typeof params.nodeId === "string" ? params.nodeId : "";
+  const highlightIssueNodeIdsParam =
+    typeof params.highlightIssueNodeIds === "string" ? params.highlightIssueNodeIds : "";
+
+  useEffect(() => {
+    if (!shouldRedirectLegacyNodesView || !vehicleId) return;
+    router.replace(`/vehicles/${vehicleId}/nodes`);
+  }, [router, shouldRedirectLegacyNodesView, vehicleId]);
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
@@ -344,7 +530,6 @@ export default function VehicleDetailScreen() {
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [isTopServiceNodesLoading, setIsTopServiceNodesLoading] = useState(false);
   const [topServiceNodesError, setTopServiceNodesError] = useState("");
-  const [isFullNodeTreeOpen, setIsFullNodeTreeOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isRideProfileExpanded, setIsRideProfileExpanded] = useState(true);
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(true);
@@ -354,6 +539,7 @@ export default function VehicleDetailScreen() {
   const [nodeSearchQuery, setNodeSearchQuery] = useState("");
   const [debouncedNodeSearchQuery, setDebouncedNodeSearchQuery] = useState("");
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [statusHighlightedNodeIds, setStatusHighlightedNodeIds] = useState<Set<string>>(new Set());
   const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
     PartRecommendationViewModel[]
   >([]);
@@ -727,7 +913,10 @@ export default function VehicleDetailScreen() {
   const openStatusExplanationFromTreeNode = useCallback((node: NodeTreeItemViewModel) => {
     setSelectedTopLevelNodeId(null);
     setHighlightedNodeId(null);
-    setStatusExplanationNode(node);
+    setStatusExplanationNode(null);
+    requestAnimationFrame(() => {
+      setStatusExplanationNode(node);
+    });
   }, []);
   const openSearchResultInSubtreeModal = useCallback((result: NodeTreeSearchResultViewModel) => {
     setNodeSearchQuery("");
@@ -742,6 +931,109 @@ export default function VehicleDetailScreen() {
     });
     setSelectedTopLevelNodeId(result.topLevelNodeId);
   }, []);
+  const focusNodeInTree = useCallback(
+    (nodeId: string) => {
+      const path = findNodeViewModelPathById(topLevelNodeViewModels, nodeId);
+      if (!path || path.length === 0) {
+        return;
+      }
+      setNodeSearchQuery("");
+      setDebouncedNodeSearchQuery("");
+      setHighlightedNodeId(nodeId);
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        for (const ancestorId of path.slice(0, -1)) {
+          next.add(ancestorId);
+        }
+        return next;
+      });
+      setSelectedTopLevelNodeId(path[0] ?? null);
+    },
+    [topLevelNodeViewModels]
+  );
+  const focusIssueNodesInTree = useCallback(
+    (nodeIds: string[]) => {
+      const idToNode = flattenNodeViewModelsById(topLevelNodeViewModels);
+      const nextHighlightedIds = new Set<string>();
+      let focusNodeId: string | null = null;
+      let focusTopLevelNodeId: string | null = null;
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        for (const nodeId of nodeIds) {
+          const path = findNodeViewModelPathById(topLevelNodeViewModels, nodeId);
+          if (!path || path.length === 0) {
+            continue;
+          }
+          for (const ancestorId of path.slice(0, -1)) {
+            next.add(ancestorId);
+          }
+          for (const pathNodeId of path) {
+            const pathNode = idToNode.get(pathNodeId);
+            if (pathNode && isIssueNodeStatus(pathNode.effectiveStatus)) {
+              nextHighlightedIds.add(pathNode.id);
+              focusNodeId ??= pathNode.id;
+              focusTopLevelNodeId ??= path[0] ?? null;
+            }
+          }
+        }
+        return next;
+      });
+      setNodeSearchQuery("");
+      setDebouncedNodeSearchQuery("");
+      setStatusHighlightedNodeIds(nextHighlightedIds);
+      setHighlightedNodeId(focusNodeId);
+      setSelectedTopLevelNodeId(focusTopLevelNodeId);
+    },
+    [topLevelNodeViewModels]
+  );
+  const openTopOverviewNode = useCallback(
+    (nodeId: string) => {
+      if (isNodeTreePage) {
+        setStatusHighlightedNodeIds(new Set());
+        focusNodeInTree(nodeId);
+        return;
+      }
+      router.push(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(nodeId)}`);
+    },
+    [focusNodeInTree, isNodeTreePage, router, vehicleId]
+  );
+  const openTopOverviewIssueNodes = useCallback(
+    (nodeIds: string[]) => {
+      if (nodeIds.length === 0) {
+        return;
+      }
+      if (isNodeTreePage) {
+        focusIssueNodesInTree(nodeIds);
+        return;
+      }
+      router.push(
+        `/vehicles/${vehicleId}/nodes?highlightIssueNodeIds=${encodeURIComponent(nodeIds.join(","))}`
+      );
+    },
+    [focusIssueNodesInTree, isNodeTreePage, router, vehicleId]
+  );
+  useEffect(() => {
+    if (!isNodeTreePage || !targetNodeIdParam || topLevelNodeViewModels.length === 0) {
+      return;
+    }
+    setStatusHighlightedNodeIds(new Set());
+    focusNodeInTree(targetNodeIdParam);
+  }, [focusNodeInTree, isNodeTreePage, targetNodeIdParam, topLevelNodeViewModels.length]);
+  useEffect(() => {
+    if (!isNodeTreePage || !highlightIssueNodeIdsParam || topLevelNodeViewModels.length === 0) {
+      return;
+    }
+    const nodeIds = highlightIssueNodeIdsParam
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    focusIssueNodesInTree(nodeIds);
+  }, [
+    focusIssueNodesInTree,
+    highlightIssueNodeIdsParam,
+    isNodeTreePage,
+    topLevelNodeViewModels.length,
+  ]);
   const closeNodeContextModal = useCallback(() => {
     setSelectedNodeContextId(null);
     setNodeContextAddingRecommendedSkuId("");
@@ -764,6 +1056,22 @@ export default function VehicleDetailScreen() {
       openServiceLogForTreeNode(selectedNode);
     },
     [openServiceLogForTreeNode, topLevelNodeViewModels]
+  );
+  const openStatusExplanationFromSearchResult = useCallback(
+    (result: NodeTreeSearchResultViewModel) => {
+      const selectedNode = getNodeSubtreeById(topLevelNodeViewModels, result.nodeId);
+      if (!selectedNode || !canOpenNodeStatusExplanationModal(selectedNode)) {
+        return;
+      }
+      setNodeSearchQuery("");
+      setDebouncedNodeSearchQuery("");
+      setHighlightedNodeId(null);
+      setStatusExplanationNode(null);
+      requestAnimationFrame(() => {
+        setStatusExplanationNode(selectedNode);
+      });
+    },
+    [topLevelNodeViewModels]
   );
   const openWishlistFromSearchResult = useCallback(
     (result: NodeTreeSearchResultViewModel) => {
@@ -898,6 +1206,8 @@ export default function VehicleDetailScreen() {
   );
   const getNodeModeToggleLabel = () =>
     isNodeMaintenanceModeEnabled ? "План обслуживания: вкл" : "Показывать план обслуживания";
+  const getNodeModeToggleShortLabel = () =>
+    isNodeMaintenanceModeEnabled ? "План ТО: вкл" : "План ТО";
   const selectedNodeSnoozeUntil = selectedNodeContextId
     ? (nodeSnoozeByNodeId[selectedNodeContextId] ?? null)
     : null;
@@ -905,6 +1215,19 @@ export default function VehicleDetailScreen() {
   const canSnoozeSelectedNode =
     selectedNodeContextViewModel?.effectiveStatus === "OVERDUE" ||
     selectedNodeContextViewModel?.effectiveStatus === "SOON";
+  const canOpenSelectedNodeContextExplanation = selectedNodeContextNode
+    ? canOpenNodeStatusExplanationModal(selectedNodeContextNode)
+    : false;
+  const openSelectedNodeContextExplanation = useCallback(() => {
+    if (!selectedNodeContextNode || !canOpenNodeStatusExplanationModal(selectedNodeContextNode)) {
+      return;
+    }
+    closeNodeContextModal();
+    setStatusExplanationNode(null);
+    requestAnimationFrame(() => {
+      setStatusExplanationNode(selectedNodeContextNode);
+    });
+  }, [closeNodeContextModal, selectedNodeContextNode]);
   const moveVehicleToTrash = useCallback(() => {
     if (!vehicleId || isMovingToTrash) {
       return;
@@ -969,6 +1292,13 @@ export default function VehicleDetailScreen() {
     );
   }
 
+  const resolvedView = forcedView ?? queryView;
+  const isNodeTreePage = resolvedView === "nodes";
+  const isLandscape = width > height;
+  const isWideLayout = width >= 720 || isLandscape;
+  const isTabletLayout = width >= 900;
+  const contentMaxWidth = isTabletLayout ? 1080 : 760;
+
   const detailViewModel = buildVehicleDetailViewModel(vehicle);
   const stateViewModel = buildVehicleStateViewModel({
     odometer: vehicle.odometer,
@@ -979,10 +1309,6 @@ export default function VehicleDetailScreen() {
     modelVariant: vehicle.modelVariant,
   });
   const hasTechnicalInfo = technicalInfoViewModel.items.length > 0;
-  const isLandscape = width > height;
-  const isWideLayout = width >= 720 || isLandscape;
-  const isTabletLayout = width >= 900;
-  const contentMaxWidth = isTabletLayout ? 1080 : 760;
   const dashboardSectionStyle = isWideLayout ? styles.dashboardSectionWide : undefined;
   const score = calculateGarageScore({
     totalCount: attentionSummary.totalCount,
@@ -994,9 +1320,12 @@ export default function VehicleDetailScreen() {
   const recentEvents = getRecentDashboardEvents(serviceEvents);
   const silhouetteSource = getVehicleSilhouetteSource(vehicle);
 
+  if (shouldRedirectLegacyNodesView) {
+    return null;
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <AppScreenHelpBar />
       <StatusExplanationModal
         visible={Boolean(statusExplanationNode?.statusExplanation)}
         node={statusExplanationNode}
@@ -1010,6 +1339,202 @@ export default function VehicleDetailScreen() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
+        {isNodeTreePage ? (
+          <>
+            <ScreenHeader
+              title="Состояние узлов"
+              onBack={() => {
+                router.replace(`/vehicles/${vehicleId}`);
+              }}
+            />
+            <View style={styles.fullTreeSection}>
+              <View style={styles.nodeTreePageActionsRow}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.maintenanceModeToggle,
+                    isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleActive,
+                    pressed && styles.maintenanceModeTogglePressed,
+                  ]}
+                  onPress={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
+                  accessibilityRole="button"
+                  accessibilityLabel={getNodeModeToggleLabel()}
+                >
+                  <Text
+                    style={[
+                      styles.maintenanceModeToggleText,
+                      isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleTextActive,
+                    ]}
+                  >
+                    {getNodeModeToggleShortLabel()}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sectionJournalButton,
+                    pressed && styles.sectionJournalButtonPressed,
+                  ]}
+                  onPress={() => router.push(`/vehicles/${vehicleId}/service-log`)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Журнал обслуживания"
+                >
+                  <Text style={styles.sectionJournalButtonText}>Журнал</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.sectionSubheader}>
+                Детальная структура узлов, поиск, контекст, действия обслуживания и план ТО.
+              </Text>
+              <>
+                <Text style={styles.searchLabel}>Поиск по узлам</Text>
+                <TextInput
+                  style={styles.searchInput}
+                  value={nodeSearchQuery}
+                  onChangeText={setNodeSearchQuery}
+                  placeholder="Поиск по узлам"
+                  placeholderTextColor={c.textSecondary}
+                  returnKeyType="search"
+                />
+                {nodeSearchQuery.trim().length > 0 && nodeSearchQuery.trim().length < 2 ? (
+                  <Text style={styles.searchHint}>Введите минимум 2 символа.</Text>
+                ) : null}
+                {nodeSearchQuery.trim().length >= 2 ? (
+                  nodeSearchResults.length > 0 ? (
+                    <View style={styles.searchResultsBox}>
+                      {nodeSearchResults.map((result) => {
+                        const resultNode = getNodeSubtreeById(topLevelNodeViewModels, result.nodeId);
+                        const canOpenResultExplanation =
+                          Boolean(result.shortExplanationLabel) &&
+                          Boolean(resultNode) &&
+                          canOpenNodeStatusExplanationModal(resultNode);
+                        return (
+                        <View key={result.nodeId} style={styles.searchResultCard}>
+                          <Pressable
+                            onPress={() => openSearchResultInSubtreeModal(result)}
+                            style={({ pressed }) => [
+                              styles.searchResultRow,
+                              pressed && styles.searchResultRowPressed,
+                            ]}
+                          >
+                            <View style={styles.searchResultTextCol}>
+                              <Text style={styles.searchResultTitle}>{result.nodeName}</Text>
+                              <Text style={styles.searchResultPath}>{result.pathLabel}</Text>
+                              <Text style={styles.searchResultCode}>{result.nodeCode}</Text>
+                              {result.shortExplanationLabel ? (
+                                canOpenResultExplanation ? (
+                                  <Pressable
+                                    onPress={(event) => {
+                                      event.stopPropagation();
+                                      openStatusExplanationFromSearchResult(result);
+                                    }}
+                                    hitSlop={6}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Пояснение расчёта статуса"
+                                  >
+                                    <Text style={[styles.searchResultPath, styles.searchResultLink]}>
+                                      {result.shortExplanationLabel}
+                                    </Text>
+                                  </Pressable>
+                                ) : (
+                                  <Text style={styles.searchResultPath}>{result.shortExplanationLabel}</Text>
+                                )
+                              ) : null}
+                            </View>
+                            {result.effectiveStatus ? (
+                              <View
+                                style={[
+                                  styles.badge,
+                                  {
+                                    backgroundColor: getStatusColors(result.effectiveStatus).bg,
+                                    borderColor: getStatusColors(result.effectiveStatus).border,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.badgeText,
+                                    { color: getStatusColors(result.effectiveStatus).text },
+                                  ]}
+                                >
+                                  {result.statusLabel}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </Pressable>
+                          <View style={styles.searchActionsRow}>
+                            {buildNodeSearchResultActions(result).map((action) => (
+                              <ActionIconButton
+                                key={`${result.nodeId}.${action.key}`}
+                                onPress={() => handleSearchResultAction(action.key, result)}
+                                accessibilityLabel={`${action.label}: ${result.nodeName}`}
+                                variant="subtle"
+                                icon={
+                                  action.key === "open" ? (
+                                    <MaterialIcons name="open-in-new" size={15} color={c.textMeta} />
+                                  ) : action.key === "service_log" ? (
+                                    <MaterialIcons name="history" size={15} color={c.textMeta} />
+                                  ) : (
+                                    <MaterialIcons name="shopping-cart" size={15} color={c.textMeta} />
+                                  )
+                                }
+                              />
+                            ))}
+                          </View>
+                        </View>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text style={styles.searchNoResults}>Узлы не найдены</Text>
+                  )
+                ) : null}
+                {isNodeTreeLoading ? (
+                  <Text style={styles.treeLoadingText}>Загрузка дерева узлов...</Text>
+                ) : null}
+                {nodeTreeError ? (
+                  <View style={styles.treeErrorBox}>
+                    <Text style={styles.treeErrorText}>{nodeTreeError}</Text>
+                    <Pressable
+                      style={({ pressed }) => [styles.treeRetryButton, pressed && styles.treeRetryButtonPressed]}
+                      onPress={() => {
+                        void load();
+                      }}
+                    >
+                      <Text style={styles.treeRetryButtonText}>Повторить</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+                {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
+                  <View style={styles.treeCard}>
+                    {topLevelNodeViewModels.map((node, index) => (
+                      <View key={node.id}>
+                        {index > 0 ? <View style={styles.treeDivider} /> : null}
+                        <NodeRow
+                          node={node}
+                          depth={0}
+                          expandedIds={expandedIds}
+                          onToggle={toggleNode}
+                          onAddFromLeaf={openAddServiceFromTreeNode}
+                          onAddToWishlist={openWishlistForTreeNode}
+                          onOpenContext={openNodeContextModal}
+                          onOpenStatusExplanation={openStatusExplanationFromTreeNode}
+                          onOpenServiceLogForNode={openServiceLogForTreeNode}
+                          isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
+                          highlightedNodeId={highlightedNodeId}
+                          statusHighlightedNodeIds={statusHighlightedNodeIds}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+                {!isNodeTreeLoading && !nodeTreeError && nodeTree.length === 0 ? (
+                  <View style={styles.emptyNodes}>
+                    <Text style={styles.emptyNodesText}>Данные о состоянии узлов отсутствуют</Text>
+                  </View>
+                ) : null}
+              </>
+            </View>
+          </>
+        ) : (
+          <>
         <View style={styles.mobileBrandHeader}>
           <View>
             <Text style={styles.mobileLogo}>
@@ -1018,6 +1543,7 @@ export default function VehicleDetailScreen() {
             <Text style={styles.mobileLogoSubtitle}>DIGITAL GARAGE</Text>
           </View>
           <View style={styles.mobileBrandHeaderActions}>
+            <HelpTriggerButton size={28} />
             <ActionIconButton
               onPress={() => router.push(`/vehicles/${vehicleId}/profile`)}
               accessibilityLabel="Редактировать профиль мотоцикла"
@@ -1111,8 +1637,10 @@ export default function VehicleDetailScreen() {
 
           <DashboardSection
             title="Состояние узлов"
-            actionLabel={isFullNodeTreeOpen ? "Скрыть" : "Все узлы"}
-            onActionPress={() => setIsFullNodeTreeOpen((prev) => !prev)}
+            actionLabel="Все узлы"
+            onActionPress={() => {
+              router.push(`/vehicles/${vehicleId}/nodes`);
+            }}
           >
             {isTopServiceNodesLoading ? (
               <Text style={styles.dashboardEmptyText}>Загрузка основных узлов...</Text>
@@ -1124,7 +1652,8 @@ export default function VehicleDetailScreen() {
                   <TopOverviewDashboardCard
                     key={card.key}
                     card={card}
-                    onOpenAllNodes={() => setIsFullNodeTreeOpen(true)}
+                    onOpenNode={openTopOverviewNode}
+                    onOpenNodeIssues={openTopOverviewIssueNodes}
                   />
                 ))}
               </View>
@@ -1222,204 +1751,17 @@ export default function VehicleDetailScreen() {
             ) : null}
           </View>
         ) : null}
-
-        {/* Node tree */}
-        {isFullNodeTreeOpen ? (
-        <View style={styles.fullTreeSection}>
-          <Text style={styles.sectionHeader}>Все узлы мотоцикла</Text>
-          <View style={styles.sectionActionsRow}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.maintenanceModeToggle,
-                isFullNodeTreeOpen && styles.maintenanceModeToggleActive,
-                pressed && styles.maintenanceModeTogglePressed,
-              ]}
-              onPress={() => setIsFullNodeTreeOpen((prev) => !prev)}
-            >
-              <Text
-                style={[
-                  styles.maintenanceModeToggleText,
-                  isFullNodeTreeOpen && styles.maintenanceModeToggleTextActive,
-                ]}
-              >
-                {isFullNodeTreeOpen ? "Скрыть дерево" : "Все узлы →"}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.sectionJournalButton,
-                pressed && styles.sectionJournalButtonPressed,
-              ]}
-              onPress={() => router.push(`/vehicles/${vehicleId}/service-log`)}
-              accessibilityRole="button"
-              accessibilityLabel="Журнал обслуживания"
-            >
-              <Text style={styles.sectionJournalButtonText}>Журнал обслуживания</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.sectionSubheader}>
-            Детальная структура узлов, поиск, контекст и действия обслуживания.
-          </Text>
-          <>
-          <Text style={styles.searchLabel}>Поиск по узлам</Text>
-          <TextInput
-            style={styles.searchInput}
-            value={nodeSearchQuery}
-            onChangeText={setNodeSearchQuery}
-            placeholder="Поиск по узлам"
-            placeholderTextColor={c.textSecondary}
-            returnKeyType="search"
-          />
-          {nodeSearchQuery.trim().length > 0 && nodeSearchQuery.trim().length < 2 ? (
-            <Text style={styles.searchHint}>Введите минимум 2 символа.</Text>
-          ) : null}
-          {nodeSearchQuery.trim().length >= 2 ? (
-            nodeSearchResults.length > 0 ? (
-              <View style={styles.searchResultsBox}>
-                {nodeSearchResults.map((result) => (
-                  <View key={result.nodeId} style={styles.searchResultCard}>
-                    <Pressable
-                      onPress={() => openSearchResultInSubtreeModal(result)}
-                      style={({ pressed }) => [
-                        styles.searchResultRow,
-                        pressed && styles.searchResultRowPressed,
-                      ]}
-                    >
-                      <View style={styles.searchResultTextCol}>
-                        <Text style={styles.searchResultTitle}>{result.nodeName}</Text>
-                        <Text style={styles.searchResultPath}>{result.pathLabel}</Text>
-                        <Text style={styles.searchResultCode}>{result.nodeCode}</Text>
-                        {result.shortExplanationLabel ? (
-                          <Text style={styles.searchResultPath}>{result.shortExplanationLabel}</Text>
-                        ) : null}
-                      </View>
-                      {result.effectiveStatus ? (
-                        <View
-                          style={[
-                            styles.badge,
-                            {
-                              backgroundColor: getStatusColors(result.effectiveStatus).bg,
-                              borderColor: getStatusColors(result.effectiveStatus).border,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.badgeText,
-                              { color: getStatusColors(result.effectiveStatus).text },
-                            ]}
-                          >
-                            {result.statusLabel}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </Pressable>
-                    <View style={styles.searchActionsRow}>
-                      {buildNodeSearchResultActions(result).map((action) => (
-                        <ActionIconButton
-                          key={`${result.nodeId}.${action.key}`}
-                          onPress={() => handleSearchResultAction(action.key, result)}
-                          accessibilityLabel={`${action.label}: ${result.nodeName}`}
-                          variant="subtle"
-                          icon={
-                            action.key === "open" ? (
-                              <MaterialIcons name="open-in-new" size={15} color={c.textMeta} />
-                            ) : action.key === "service_log" ? (
-                              <MaterialIcons name="history" size={15} color={c.textMeta} />
-                            ) : (
-                              <MaterialIcons name="shopping-cart" size={15} color={c.textMeta} />
-                            )
-                          }
-                        />
-                      ))}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.searchNoResults}>Узлы не найдены</Text>
-            )
-          ) : null}
-          {isNodeTreeLoading ? (
-            <Text style={styles.treeLoadingText}>Загрузка дерева узлов...</Text>
-          ) : null}
-          {nodeTreeError ? (
-            <View style={styles.treeErrorBox}>
-              <Text style={styles.treeErrorText}>{nodeTreeError}</Text>
-              <Pressable
-                style={({ pressed }) => [styles.treeRetryButton, pressed && styles.treeRetryButtonPressed]}
-                onPress={() => {
-                  void load();
-                }}
-              >
-                <Text style={styles.treeRetryButtonText}>Повторить</Text>
-              </Pressable>
-            </View>
-          ) : null}
-          {!isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
-            <View style={styles.treeCard}>
-              {topLevelNodeViewModels.map((node, index) => {
-                const summary = buildTopLevelNodeSummaryViewModel(node, {
-                  maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
-                });
-                return (
-                <View key={node.id}>
-                  {index > 0 ? <View style={styles.treeDivider} /> : null}
-                  <Pressable
-                    onPress={() => {
-                      setHighlightedNodeId(null);
-                      setSelectedTopLevelNodeId(node.id);
-                    }}
-                    style={({ pressed }) => [styles.topLevelNodeRow, pressed && styles.topLevelNodeRowPressed]}
-                  >
-                    <View style={styles.topLevelNodeRowLeft}>
-                      <Text style={styles.topLevelNodeName}>{summary.nodeName}</Text>
-                      {summary.shortExplanationLabel ? (
-                        <Text style={styles.reasonShort}>{summary.shortExplanationLabel}</Text>
-                      ) : null}
-                      {summary.maintenanceSummaryLine ? (
-                        <Text style={styles.planSummaryText}>{summary.maintenanceSummaryLine}</Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.topLevelNodeRowRight}>
-                      {summary.effectiveStatus ? (
-                        <View
-                          style={[
-                            styles.badge,
-                            { backgroundColor: getStatusColors(summary.effectiveStatus).bg, borderColor: getStatusColors(summary.effectiveStatus).border },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.badgeText,
-                              { color: getStatusColors(summary.effectiveStatus).text },
-                            ]}
-                          >
-                            {summary.statusLabel}
-                          </Text>
-                        </View>
-                      ) : null}
-                      <Text style={styles.sectionChevron}>›</Text>
-                    </View>
-                  </Pressable>
-                </View>
-              );
-              })}
-            </View>
-          ) : null}
-          {!isNodeTreeLoading && !nodeTreeError && nodeTree.length === 0 ? (
-            <View style={styles.emptyNodes}>
-              <Text style={styles.emptyNodesText}>Данные о состоянии узлов отсутствуют</Text>
-            </View>
-          ) : null}
           </>
-        </View>
-        ) : null}
+        )}
       </ScrollView>
       <GarageBottomNav
-        activeKey="garage"
+        activeKey={isNodeTreePage ? "nodes" : "garage"}
         onOpenGarage={() => router.push("/")}
-        onOpenNodes={() => setIsFullNodeTreeOpen(true)}
+        onOpenNodes={() => {
+          if (!isNodeTreePage) {
+            router.push(`/vehicles/${vehicleId}/nodes`);
+          }
+        }}
         onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
         onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
         onOpenProfile={() => router.push(`/vehicles/${vehicleId}/profile`)}
@@ -1440,6 +1782,24 @@ export default function VehicleDetailScreen() {
                     <Text style={styles.subtreeModalTitle}>{selectedNodeContextViewModel.nodeName}</Text>
                     <Text style={styles.subtreeModalSubtitle}>{selectedNodeContextViewModel.pathLabel}</Text>
                     <Text style={styles.searchResultCode}>{selectedNodeContextViewModel.nodeCode}</Text>
+                    {selectedNodeContextViewModel.shortExplanationLabel ? (
+                      canOpenSelectedNodeContextExplanation ? (
+                        <Pressable
+                          onPress={openSelectedNodeContextExplanation}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel="Пояснение расчёта статуса"
+                        >
+                          <Text style={[styles.subtreeModalSubtitle, styles.searchResultLink]}>
+                            {selectedNodeContextViewModel.shortExplanationLabel}
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <Text style={styles.subtreeModalSubtitle}>
+                          {selectedNodeContextViewModel.shortExplanationLabel}
+                        </Text>
+                      )
+                    ) : null}
                     {selectedNodeSnoozeLabel ? (
                       <Text style={styles.snoozeLabelText}>{selectedNodeSnoozeLabel}</Text>
                     ) : null}
@@ -1454,7 +1814,11 @@ export default function VehicleDetailScreen() {
                     <Text style={styles.subtreeModalCloseBtnText}>Закрыть</Text>
                   </Pressable>
                 </View>
-                <ScrollView contentContainerStyle={styles.subtreeModalBody} keyboardShouldPersistTaps="handled">
+                <ScrollView
+                  ref={subtreeScrollViewRef}
+                  contentContainerStyle={styles.subtreeModalBody}
+                  keyboardShouldPersistTaps="handled"
+                >
                   <View style={styles.searchActionsRow}>
                     {selectedNodeContextViewModel.actions.map((action) => (
                       <ActionIconButton
@@ -1520,15 +1884,78 @@ export default function VehicleDetailScreen() {
                   selectedNodeContextViewModel.maintenancePlan.hasMeaningfulData ? (
                     <View style={styles.searchResultCard}>
                       <Text style={styles.searchResultTitle}>План обслуживания</Text>
+                      {selectedNodeContextViewModel.maintenancePlan.shortText ? (
+                        canOpenSelectedNodeContextExplanation ? (
+                          <Pressable
+                            onPress={openSelectedNodeContextExplanation}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel="Пояснение расчёта статуса"
+                          >
+                            <Text style={[styles.searchResultPath, styles.searchResultLink]}>
+                              {selectedNodeContextViewModel.maintenancePlan.shortText}
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.searchResultPath}>
+                            {selectedNodeContextViewModel.maintenancePlan.shortText}
+                          </Text>
+                        )
+                      ) : null}
                       {selectedNodeContextViewModel.maintenancePlan.dueLines.map((line) => (
-                        <Text key={line} style={styles.searchResultPath}>
-                          {line}
-                        </Text>
+                        canOpenSelectedNodeContextExplanation ? (
+                          <Pressable
+                            key={line}
+                            onPress={openSelectedNodeContextExplanation}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel="Пояснение расчёта статуса"
+                          >
+                            <Text style={[styles.searchResultPath, styles.searchResultLink]}>
+                              {line}
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <Text key={line} style={styles.searchResultPath}>
+                            {line}
+                          </Text>
+                        )
                       ))}
                       {selectedNodeContextViewModel.maintenancePlan.lastServiceLine ? (
-                        <Text style={styles.searchResultPath}>
-                          {selectedNodeContextViewModel.maintenancePlan.lastServiceLine}
-                        </Text>
+                        canOpenSelectedNodeContextExplanation ? (
+                          <Pressable
+                            onPress={openSelectedNodeContextExplanation}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel="Пояснение расчёта статуса"
+                          >
+                            <Text style={[styles.searchResultPath, styles.searchResultLink]}>
+                              {selectedNodeContextViewModel.maintenancePlan.lastServiceLine}
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.searchResultPath}>
+                            {selectedNodeContextViewModel.maintenancePlan.lastServiceLine}
+                          </Text>
+                        )
+                      ) : null}
+                      {selectedNodeContextViewModel.maintenancePlan.ruleIntervalLine ? (
+                        canOpenSelectedNodeContextExplanation ? (
+                          <Pressable
+                            onPress={openSelectedNodeContextExplanation}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel="Пояснение расчёта статуса"
+                          >
+                            <Text style={[styles.searchResultPath, styles.searchResultLink]}>
+                              {selectedNodeContextViewModel.maintenancePlan.ruleIntervalLine}
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.searchResultPath}>
+                            {selectedNodeContextViewModel.maintenancePlan.ruleIntervalLine}
+                          </Text>
+                        )
                       ) : null}
                     </View>
                   ) : null}
@@ -1648,14 +2075,40 @@ export default function VehicleDetailScreen() {
                       {selectedNodeSubtreeModalViewModel.rootNodeName}
                     </Text>
                     {selectedNodeSubtreeModalViewModel.shortExplanationLabel ? (
-                      <Text style={styles.subtreeModalSubtitle}>
-                        {selectedNodeSubtreeModalViewModel.shortExplanationLabel}
-                      </Text>
+                      selectedTopLevelNode && canOpenNodeStatusExplanationModal(selectedTopLevelNode) ? (
+                        <Pressable
+                          onPress={() => openStatusExplanationFromTreeNode(selectedTopLevelNode)}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel="Пояснение расчёта статуса"
+                        >
+                          <Text style={[styles.subtreeModalSubtitle, styles.searchResultLink]}>
+                            {selectedNodeSubtreeModalViewModel.shortExplanationLabel}
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <Text style={styles.subtreeModalSubtitle}>
+                          {selectedNodeSubtreeModalViewModel.shortExplanationLabel}
+                        </Text>
+                      )
                     ) : null}
                     {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine ? (
-                      <Text style={styles.planSummaryText}>
-                        {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine}
-                      </Text>
+                      selectedTopLevelNode && canOpenNodeStatusExplanationModal(selectedTopLevelNode) ? (
+                        <Pressable
+                          onPress={() => openStatusExplanationFromTreeNode(selectedTopLevelNode)}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel="Пояснение расчёта статуса"
+                        >
+                          <Text style={[styles.planSummaryText, styles.searchResultLink]}>
+                            {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine}
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <Text style={styles.planSummaryText}>
+                          {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine}
+                        </Text>
+                      )
                     ) : null}
                   </View>
                   <View style={styles.subtreeModalHeaderActions}>
@@ -1706,6 +2159,9 @@ export default function VehicleDetailScreen() {
                         onOpenServiceLogForNode={openServiceLogForTreeNode}
                         isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
                         highlightedNodeId={highlightedNodeId}
+                        statusHighlightedNodeIds={statusHighlightedNodeIds}
+                        highlightedScrollViewRef={subtreeScrollViewRef}
+                        highlightedScrollViewportHeight={height * 0.72}
                       />
                     ) : null
                   ) : (
@@ -1723,6 +2179,9 @@ export default function VehicleDetailScreen() {
                         onOpenServiceLogForNode={openServiceLogForTreeNode}
                         isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
                         highlightedNodeId={highlightedNodeId}
+                        statusHighlightedNodeIds={statusHighlightedNodeIds}
+                        highlightedScrollViewRef={subtreeScrollViewRef}
+                        highlightedScrollViewportHeight={height * 0.72}
                       />
                     ))
                   )}
@@ -1734,6 +2193,10 @@ export default function VehicleDetailScreen() {
       </Modal>
     </SafeAreaView>
   );
+}
+
+export default function VehicleDetailRoute() {
+  return <VehicleDetailScreen />;
 }
 
 function DashboardSection({
@@ -1893,37 +2356,88 @@ function ReferenceAttentionRow({ item, onPress }: { item: AttentionItemViewModel
 
 function TopOverviewDashboardCard({
   card,
-  onOpenAllNodes,
+  onOpenNode,
+  onOpenNodeIssues,
 }: {
   card: TopNodeOverviewCard;
-  onOpenAllNodes: () => void;
+  onOpenNode: (nodeId: string) => void;
+  onOpenNodeIssues: (nodeIds: string[]) => void;
 }) {
   const tokens = card.status ? statusSemanticTokens[card.status] : statusSemanticTokens.UNKNOWN;
   return (
-    <Pressable
-      onPress={onOpenAllNodes}
-      accessibilityRole="button"
-      accessibilityLabel={`${card.title}, ${card.statusLabel}. Открыть все узлы`}
-      style={({ pressed }) => [styles.systemDashboardCard, pressed && styles.systemDashboardCardPressed]}
-    >
-      <View style={[styles.systemDashboardIcon, { borderColor: tokens.border, backgroundColor: tokens.background }]}>
-        <TopNodePngIcon source={TOP_NODE_GROUP_ICON_SRC[card.key]} size={40} />
-      </View>
+    <View style={styles.systemDashboardCard}>
+      <Pressable
+        style={styles.systemDashboardIcon}
+        onPress={() => onOpenNodeIssues(card.nodes.map((node) => node.id))}
+        accessibilityRole="button"
+        accessibilityLabel={`Показать проблемные узлы группы ${card.title}`}
+      >
+        <TopNodePngIcon source={TOP_NODE_GROUP_ICON_SRC[card.key]} size={42} color={tokens.foreground} />
+      </Pressable>
       <View style={styles.systemDashboardTextCol}>
         <Text style={styles.systemDashboardTitle} numberOfLines={1}>
           {card.title}
         </Text>
-        <Text style={[styles.systemDashboardStatus, { color: tokens.foreground }]}>{card.statusLabel}</Text>
-        <Text style={styles.systemDashboardMeta} numberOfLines={1}>
-          {card.details}
-        </Text>
+        {card.nodes.length > 0 ? (
+          <View style={styles.systemDashboardNodeList}>
+            {card.nodes.map((node) => {
+              const nodeTokens = node.status
+                ? statusSemanticTokens[node.status]
+                : statusSemanticTokens.UNKNOWN;
+              return (
+                <Pressable
+                  key={node.code}
+                  onPress={(event: GestureResponderEvent) => {
+                    event.stopPropagation();
+                    onOpenNode(node.id);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Открыть узел ${node.name}`}
+                  style={[
+                    styles.systemDashboardNodeBadge,
+                    {
+                      borderColor: nodeTokens.border,
+                      backgroundColor: nodeTokens.background,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.systemDashboardNodeBadgeText, { color: nodeTokens.foreground }]}
+                    numberOfLines={1}
+                  >
+                    {node.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : (
+          <Text style={styles.systemDashboardMeta} numberOfLines={1}>
+            {card.details}
+          </Text>
+        )}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
-function TopNodePngIcon({ source, size }: { source: ImageSourcePropType; size: number }) {
-  return <Image source={source} style={{ width: size, height: size }} resizeMode="contain" alt="" />;
+function TopNodePngIcon({
+  source,
+  size,
+  color,
+}: {
+  source: ImageSourcePropType;
+  size: number;
+  color?: string;
+}) {
+  return (
+    <Image
+      source={source}
+      style={{ width: size, height: size, tintColor: color }}
+      resizeMode="contain"
+      alt=""
+    />
+  );
 }
 
 function RecentDashboardEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: () => void }) {
@@ -2608,10 +3122,10 @@ const styles = StyleSheet.create({
   systemDashboardCard: {
     width: "48%",
     minWidth: 136,
-    minHeight: 74,
+    minHeight: 122,
     flexGrow: 1,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 9,
     borderRadius: 14,
     borderWidth: 1,
@@ -2619,15 +3133,9 @@ const styles = StyleSheet.create({
     backgroundColor: c.cardMuted,
     padding: 8,
   },
-  systemDashboardCardPressed: {
-    opacity: 0.9,
-    backgroundColor: c.chipBackground,
-  },
   systemDashboardIcon: {
     width: 44,
     height: 44,
-    borderRadius: 999,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2640,15 +3148,28 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: c.textPrimary,
   },
-  systemDashboardStatus: {
-    marginTop: 3,
-    fontSize: 11,
-    fontWeight: "800",
-  },
   systemDashboardMeta: {
     marginTop: 3,
     fontSize: 11,
     color: c.textMuted,
+  },
+  systemDashboardNodeList: {
+    marginTop: 7,
+    gap: 5,
+    alignItems: "flex-start",
+  },
+  systemDashboardNodeBadge: {
+    maxWidth: "100%",
+    minHeight: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  systemDashboardNodeBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
   },
   recentDashboardRow: {
     paddingVertical: 7,
@@ -3245,6 +3766,14 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: "wrap",
   },
+  nodeTreePageActionsRow: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   maintenanceModeToggle: {
     alignSelf: "flex-start",
     borderRadius: 10,
@@ -3398,6 +3927,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: c.textMuted,
   },
+  searchResultLink: {
+    color: c.textSecondary,
+    textDecorationLine: "underline",
+  },
   searchResultCode: {
     marginTop: 2,
     fontSize: 11,
@@ -3539,8 +4072,8 @@ const styles = StyleSheet.create({
   },
   nodeRowHighlighted: {
     borderWidth: 1,
-    borderColor: "#F59E0B",
-    backgroundColor: "#FFF7ED",
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardMuted,
   },
   nodeRowPressed: {
     backgroundColor: c.divider,
@@ -3611,6 +4144,10 @@ const styles = StyleSheet.create({
     color: c.textMuted,
     lineHeight: 15,
   },
+  planLeafLink: {
+    color: c.textSecondary,
+    textDecorationLine: "underline",
+  },
   subtreeModalOverlay: {
     flex: 1,
     backgroundColor: c.overlayModal,
@@ -3642,9 +4179,9 @@ const styles = StyleSheet.create({
   },
   subtreeModalHeaderTextColHighlighted: {
     borderWidth: 1,
-    borderColor: "#F59E0B",
+    borderColor: c.borderStrong,
     borderRadius: 10,
-    backgroundColor: "#FFF7ED",
+    backgroundColor: c.cardMuted,
     paddingHorizontal: 8,
     paddingVertical: 6,
   },

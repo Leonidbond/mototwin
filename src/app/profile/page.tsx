@@ -171,7 +171,7 @@ export default function ProfilePage() {
 
   return (
     <main
-      className="min-h-screen px-6 py-16 text-gray-950"
+      className="mt-internal-page min-h-screen px-6 py-16 text-gray-950"
       style={{ backgroundColor: productSemanticColors.canvas }}
     >
       <div className="mx-auto max-w-3xl space-y-6">
@@ -318,7 +318,10 @@ export default function ProfilePage() {
         {devLoginEnabled ? (
           <section
             className="rounded-2xl border border-amber-300 bg-amber-50 p-5"
-            style={{ backgroundColor: "#fffbeb" }}
+            style={{
+              backgroundColor: productSemanticColors.cardMuted,
+              borderColor: productSemanticColors.borderStrong,
+            }}
           >
             <h2 className="text-lg font-semibold text-amber-900">Разработка</h2>
             <div className="mt-1 text-sm font-medium text-amber-900">Dev-only user switcher</div>

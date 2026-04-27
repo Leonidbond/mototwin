@@ -91,13 +91,18 @@ The vehicle-detail page maps these codes in `TOP_NODE_LEAF_ICON_SRC`. `getAttent
 `src/app/vehicles/[id]/_components/VehicleDashboard.tsx`
 
 - `Состояние узлов` uses group icons from `TOP_NODE_CARD_ICON_SRC`.
+- The group icon is colored directly from the group's aggregate status. Do not add a colored circular background when the requirement says to color an icon.
+- The group icon opens the node tree in issue-highlight mode: all `SOON` / `OVERDUE` nodes in that TOP-node group are highlighted with a status-colored frame.
+- Leaf-node badges inside the card use the leaf node name as the badge label, are colored by the leaf status, and open the tree focused on that exact node.
+- The TOP-node card surface itself is not clickable; only the group icon and leaf badges are actions.
 - `Требует внимания` uses leaf icons through `getAttentionIconSrc()`.
-- Icons are rendered as PNGs through `next/image`, not CSS masks.
+- Dashboard PNG icons may be rendered through a CSS mask when direct status tinting is needed. SVG icons continue to use `currentColor`.
 
 `apps/app/app/vehicles/[id]/index.tsx`
 
-- Expo vehicle detail keeps the same TOP-node grouping semantics but uses the shared `TopNodeIcon` renderer from `apps/app/components/icons/top-nodes/index.tsx`.
-- The Expo renderer maps `@mototwin/icons` keys to `MaterialCommunityIcons`; it is the supported mobile fallback until the app adopts direct PNG or SVG rendering for this icon set.
+- Expo vehicle detail keeps the same TOP-node grouping semantics and now uses the dark PNG set for dashboard group icons.
+- Expo tints group icons directly with the aggregate status color (`tintColor`). Do not add a colored circular background when the requirement says to color an icon.
+- Leaf-node badges mirror web behavior: badge text is the node name, badge color comes from the node status, and tapping the badge opens the tree focused on that exact node.
 - Do not use legacy `images/top-node-icons/from-cards` assets for new Expo dashboard blocks.
 
 ### Garage

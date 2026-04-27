@@ -104,7 +104,7 @@ export default function TrashScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Восстановить"
               >
-                <MaterialIcons name="undo" size={14} color="#15803d" />
+                <MaterialIcons name="undo" size={14} color={c.successStrong} />
               </Pressable>
               <Pressable
                 onPress={() => permanentlyDelete(item.id)}
@@ -113,7 +113,7 @@ export default function TrashScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Удалить окончательно"
               >
-                <MaterialIcons name="delete-outline" size={14} color="#be123c" />
+                <MaterialIcons name="delete-outline" size={14} color={c.error} />
               </Pressable>
             </View>
           </View>
@@ -147,8 +147,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#86efac",
-    backgroundColor: "#f0fdf4",
+    borderColor: c.successBorder,
+    backgroundColor: c.successSurface,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -159,8 +159,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#fecaca",
-    backgroundColor: "#fff1f2",
+    borderColor: c.errorBorder,
+    backgroundColor: c.errorSurface,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,

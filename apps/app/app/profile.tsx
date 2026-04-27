@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
@@ -50,7 +50,7 @@ export default function ProfileScreen() {
     return identity?.trim().toLowerCase() || null;
   }, [apiProfile?.email, selectedDevUserEmail]);
 
-  const loadProfileAndSettings = async () => {
+  const loadProfileAndSettings = useCallback(async () => {
     const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
     try {
       const [settingsResponse, profileResponse] = await Promise.all([
@@ -77,7 +77,7 @@ export default function ProfileScreen() {
       setUserSettings(fallback);
       setSettingsError("Не удалось загрузить настройки с сервера, использован локальный кэш.");
     }
-  };
+  }, [apiBaseUrl, resolvedProfileIdentity]);
 
   useEffect(() => {
     void (async () => {
@@ -86,7 +86,7 @@ export default function ProfileScreen() {
       }
       await loadProfileAndSettings();
     })();
-  }, [devLoginEnabled]);
+  }, [devLoginEnabled, loadProfileAndSettings]);
 
   const updateUserSettings = async (patch: Partial<UserLocalSettings>) => {
     const next = mergeUserLocalSettings(userSettings, patch);
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   settingsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: c.textPrimary },
   savedText: { fontSize: 11, color: c.textMuted },
-  errorText: { fontSize: 11, color: "#be123c" },
+  errorText: { fontSize: 11, color: c.error },
   infoRow: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   infoLabel: { fontSize: 13, color: c.textMuted },
   infoValue: { fontSize: 13, fontWeight: "600", color: c.textPrimary, flexShrink: 1, textAlign: "right" },
@@ -302,13 +302,13 @@ const styles = StyleSheet.create({
   settingOptionTextActive: { color: c.textInverse },
   devSection: {
     borderWidth: 1,
-    borderColor: "#fcd34d",
-    backgroundColor: "#fffbeb",
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardMuted,
     borderRadius: 12,
     padding: 12,
     gap: 6,
   },
-  devTitle: { fontSize: 13, fontWeight: "700", color: "#92400e" },
-  devSubtitle: { fontSize: 11, color: "#a16207" },
+  devTitle: { fontSize: 13, fontWeight: "700", color: c.textPrimary },
+  devSubtitle: { fontSize: 11, color: c.textSecondary },
   currentText: { fontSize: 11, color: c.textMuted },
 });

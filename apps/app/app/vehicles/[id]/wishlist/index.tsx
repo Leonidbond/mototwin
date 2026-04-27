@@ -374,8 +374,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     fontSize: 11,
     fontWeight: "600",
-    color: "#3730a3",
-    backgroundColor: "#eef2ff",
+    color: c.serviceBadgeText,
+    backgroundColor: c.serviceBadgeBg,
   },
   cardActions: {
     marginTop: 12,

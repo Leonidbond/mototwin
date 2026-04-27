@@ -1321,7 +1321,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: c.borderStrong,
-    backgroundColor: "rgba(255,255,255,0.28)",
+    backgroundColor: c.cardMuted,
     pointerEvents: "none",
     zIndex: 1,
   },
@@ -1409,8 +1409,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#FDE68A",
-    backgroundColor: "#FFFBEB",
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardMuted,
   },
   paidFilterBannerText: {
     flex: 1,
@@ -1769,7 +1769,7 @@ const styles = StyleSheet.create({
   },
   expenseModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: c.overlayModal,
     justifyContent: "center",
     padding: 16,
   },

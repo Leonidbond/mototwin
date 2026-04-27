@@ -68,7 +68,7 @@ export default function TrashPage() {
 
   return (
     <main
-      className="min-h-screen px-6 py-16 text-gray-950"
+      className="mt-internal-page min-h-screen px-6 py-16 text-gray-950"
       style={{ backgroundColor: productSemanticColors.canvas }}
     >
       <div className="mx-auto max-w-4xl">

@@ -216,4 +216,11 @@ export type TopNodeOverviewCard = {
   statusLabel: string;
   details: string;
   nodeCodes: string[];
+  nodes: Array<{
+    id: string;
+    code: string;
+    name: string;
+    status: NodeStatus | null;
+    statusLabel: string;
+  }>;
 };

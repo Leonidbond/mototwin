@@ -391,19 +391,39 @@ export default function VehicleServiceLogPage() {
   };
 
   return (
-    <main className="min-h-screen px-6 py-12" style={{ backgroundColor: productSemanticColors.canvas }}>
+    <main
+      className="mt-internal-page min-h-screen px-6 py-12"
+      style={{ backgroundColor: productSemanticColors.canvas, color: productSemanticColors.textPrimary }}
+    >
       <div className="mx-auto max-w-6xl space-y-4">
         <Link
           href={`/vehicles/${vehicleId}`}
           className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+          style={{
+            backgroundColor: productSemanticColors.card,
+            borderColor: productSemanticColors.borderStrong,
+            color: productSemanticColors.textPrimary,
+          }}
         >
           Назад к мотоциклу
         </Link>
-        <header className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+        <header
+          className="rounded-2xl border border-gray-200 bg-white px-5 py-4"
+          style={{
+            backgroundColor: productSemanticColors.card,
+            borderColor: productSemanticColors.borderStrong,
+            color: productSemanticColors.textPrimary,
+          }}
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs text-gray-500">{vehicleTitle}</p>
-              <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
+              <p className="text-xs text-gray-500" style={{ color: productSemanticColors.textSecondary }}>
+                {vehicleTitle}
+              </p>
+              <h1
+                className="text-2xl font-semibold tracking-tight text-gray-950"
+                style={{ color: productSemanticColors.textPrimary }}
+              >
                 Журнал обслуживания
               </h1>
             </div>
@@ -422,6 +442,11 @@ export default function VehicleServiceLogPage() {
                   });
                 }}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                style={{
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                  color: productSemanticColors.textPrimary,
+                }}
               >
                 Окно расходов {isExpenseExpanded ? "▾" : "▸"}
               </button>
@@ -429,6 +454,10 @@ export default function VehicleServiceLogPage() {
                 type="button"
                 onClick={openCreate}
                 className="inline-flex h-9 items-center justify-center rounded-lg bg-gray-950 px-3.5 text-sm font-medium text-white transition hover:bg-gray-800"
+                style={{
+                  backgroundColor: productSemanticColors.primaryAction,
+                  color: productSemanticColors.onPrimaryAction,
+                }}
               >
                 Добавить сервисное событие
               </button>
@@ -437,15 +466,29 @@ export default function VehicleServiceLogPage() {
         </header>
 
         {actionMessage ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <div
+            className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+            style={{
+              backgroundColor: productSemanticColors.successSurface,
+              borderColor: productSemanticColors.successBorder,
+              color: productSemanticColors.successText,
+            }}
+          >
             {actionMessage}
           </div>
         ) : null}
 
         {isExpenseExpanded ? (
-          <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+          <section
+            className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5"
+            style={{
+              backgroundColor: productSemanticColors.card,
+              borderColor: productSemanticColors.borderStrong,
+              color: productSemanticColors.textPrimary,
+            }}
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold tracking-tight text-gray-950">
+              <h2 className="text-lg font-semibold tracking-tight text-gray-950" style={{ color: productSemanticColors.textPrimary }}>
                 Расходы на обслуживание
               </h2>
               <div className="flex items-center gap-2 text-sm text-gray-700">
@@ -530,7 +573,7 @@ export default function VehicleServiceLogPage() {
                 </div>
               ) : null}
             </div>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600" style={{ color: productSemanticColors.textSecondary }}>
               Расходы считаются по сервисным событиям с указанной стоимостью.
             </p>
             {dashboardSummary.paidEventCount === 0 ? (
@@ -665,14 +708,25 @@ export default function VehicleServiceLogPage() {
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-3">
+        <div
+          className="rounded-2xl border border-gray-200 bg-gray-50/70 p-3"
+          style={{
+            backgroundColor: productSemanticColors.card,
+            borderColor: productSemanticColors.borderStrong,
+            color: productSemanticColors.textPrimary,
+          }}
+        >
           <button
             type="button"
             onClick={() => setIsFiltersExpanded((prev) => !prev)}
             className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-left"
           >
-            <span className="text-sm font-semibold text-gray-900">Фильтры и сортировка</span>
-            <span className="text-sm text-gray-600">{isFiltersExpanded ? "▾" : "▸"}</span>
+            <span className="text-sm font-semibold text-gray-900" style={{ color: productSemanticColors.textPrimary }}>
+              Фильтры и сортировка
+            </span>
+            <span className="text-sm text-gray-600" style={{ color: productSemanticColors.textSecondary }}>
+              {isFiltersExpanded ? "▾" : "▸"}
+            </span>
           </button>
 
           {isFiltersExpanded ? (
@@ -875,19 +929,66 @@ export default function VehicleServiceLogPage() {
         ) : null}
 
         {!isLoading && !error && groups.length > 0 ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+          <div
+            className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5"
+            style={{
+              backgroundColor: productSemanticColors.card,
+              borderColor: productSemanticColors.borderStrong,
+              color: productSemanticColors.textPrimary,
+            }}
+          >
             <div id="service-log-events-list" className="space-y-6">
               {groups.map((group) => (
                 <section key={group.monthKey} className="space-y-3">
                   <div className="sticky top-0 z-[1] -mx-1 px-1 py-1">
-                    <div className="inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold capitalize tracking-tight text-gray-700">
+                    <div
+                      className="inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold capitalize tracking-tight text-gray-700"
+                      style={{
+                        backgroundColor: productSemanticColors.cardMuted,
+                        borderColor: productSemanticColors.border,
+                        color: productSemanticColors.textPrimary,
+                      }}
+                    >
                       {group.label}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
-                    {group.summary.serviceCount > 0 ? <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">Обслуживание: {group.summary.serviceCount}</span> : null}
-                    {group.summary.stateUpdateCount > 0 ? <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">Обновления состояния: {group.summary.stateUpdateCount}</span> : null}
-                    {group.summary.costLabel ? <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700">Расходы: {group.summary.costLabel}</span> : null}
+                    {group.summary.serviceCount > 0 ? (
+                      <span
+                        className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700"
+                        style={{
+                          backgroundColor: productSemanticColors.cardMuted,
+                        borderColor: productSemanticColors.border,
+                          color: productSemanticColors.textSecondary,
+                        }}
+                      >
+                        Обслуживание: {group.summary.serviceCount}
+                      </span>
+                    ) : null}
+                    {group.summary.stateUpdateCount > 0 ? (
+                      <span
+                        className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700"
+                        style={{
+                          backgroundColor: productSemanticColors.cardMuted,
+                        borderColor: productSemanticColors.border,
+                          color: productSemanticColors.textSecondary,
+                        }}
+                      >
+                        Обновления состояния: {group.summary.stateUpdateCount}
+                      </span>
+                    ) : null}
+                    {group.summary.costLabel ? (
+                      <span
+                        className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700"
+                        style={{
+                          backgroundColor: productSemanticColors.cardMuted,
+                        borderColor: productSemanticColors.borderStrong,
+                          color: productSemanticColors.textSecondary,
+                        }}
+                      >
+                        Расходы: {group.summary.costLabel}
+                      </span>
+                    ) : null}
                   </div>
 
                   <div className="space-y-4">
@@ -899,7 +1000,10 @@ export default function VehicleServiceLogPage() {
                           id={`service-log-event-${entry.id}`}
                           className="relative pl-10"
                         >
-                          <div className="absolute bottom-0 left-4 top-0 w-px" style={{ backgroundColor: productSemanticColors.border }} />
+                          <div
+                            className="absolute bottom-0 left-4 top-0 w-px"
+                            style={{ backgroundColor: productSemanticColors.border }}
+                          />
                           <div
                             className="absolute left-[9px] top-6 h-3 w-3 rounded-full border-2"
                             style={{
@@ -907,7 +1011,15 @@ export default function VehicleServiceLogPage() {
                               backgroundColor: isStateUpdate ? productSemanticColors.timelineStateFill : productSemanticColors.timelineServiceFill,
                             }}
                           />
-                          <div className={`rounded-2xl border px-4 py-3 sm:px-5 ${isStateUpdate ? "" : "shadow-sm"}`} style={{ borderColor: productSemanticColors.border, backgroundColor: isStateUpdate ? productSemanticColors.cardMuted : productSemanticColors.card }}>
+                          <div
+                            className={`rounded-2xl border px-4 py-3 sm:px-5 ${isStateUpdate ? "" : "shadow-sm"}`}
+                            style={{
+                              borderColor: productSemanticColors.border,
+                              backgroundColor: isStateUpdate
+                                ? productSemanticColors.cardMuted
+                                : productSemanticColors.card,
+                            }}
+                          >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
                                 <span
@@ -916,20 +1028,49 @@ export default function VehicleServiceLogPage() {
                                 >
                                   {getServiceLogEventKindBadgeLabel(entry.eventKind)}
                                 </span>
-                                <span className="text-xs text-gray-500">{entry.dateLabel}</span>
+                                <span className="text-xs text-gray-500" style={{ color: productSemanticColors.textSecondary }}>
+                                  {entry.dateLabel}
+                                </span>
                               </div>
                               <div className="flex items-center gap-3">
-                                <span className={`text-xs ${isStateUpdate ? "text-gray-500" : "text-gray-600"}`}>{entry.secondaryTitle}</span>
+                                <span
+                                  className={`text-xs ${isStateUpdate ? "text-gray-500" : "text-gray-600"}`}
+                                  style={{ color: productSemanticColors.textSecondary }}
+                                >
+                                  {entry.secondaryTitle}
+                                </span>
                                 {!isStateUpdate ? (
                                   <div className="flex items-center gap-3">
                                     <div className="group relative">
-                                      <button type="button" onClick={() => openEdit(entry.id)} title="Редактировать" aria-label="Редактировать" className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-gray-950">
+                                      <button
+                                        type="button"
+                                        onClick={() => openEdit(entry.id)}
+                                        title="Редактировать"
+                                        aria-label="Редактировать"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-gray-950"
+                                        style={{
+                                          backgroundColor: productSemanticColors.cardSubtle,
+                                          borderColor: productSemanticColors.borderStrong,
+                                          color: productSemanticColors.textPrimary,
+                                        }}
+                                      >
                                         <EditIcon />
                                       </button>
                                       <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">Редактировать</span>
                                     </div>
                                     <div className="group relative">
-                                      <button type="button" onClick={() => void deleteEvent(entry.id)} title="Удалить" aria-label="Удалить" className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100 hover:text-rose-900">
+                                      <button
+                                        type="button"
+                                        onClick={() => void deleteEvent(entry.id)}
+                                        title="Удалить"
+                                        aria-label="Удалить"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100 hover:text-rose-900"
+                                        style={{
+                                          backgroundColor: productSemanticColors.errorSurface,
+                                          borderColor: productSemanticColors.errorBorder,
+                                          color: productSemanticColors.error,
+                                        }}
+                                      >
                                         <TrashIcon />
                                       </button>
                                       <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">Удалить</span>
@@ -942,34 +1083,84 @@ export default function VehicleServiceLogPage() {
                             <div className="mt-2">
                               {isStateUpdate ? (
                                 <>
-                                  <h3 className="text-sm font-medium text-gray-700">{entry.mainTitle}</h3>
+                                  <h3 className="text-sm font-medium text-gray-700" style={{ color: productSemanticColors.textPrimary }}>
+                                    {entry.mainTitle}
+                                  </h3>
                                   {entry.stateUpdateLines.length > 0 ? (
                                     <div className="mt-1 space-y-1">
                                       {entry.stateUpdateLines.map((line) => (
-                                        <p key={`${entry.id}.${line}`} className="text-xs text-gray-500">{line}</p>
+                                        <p
+                                          key={`${entry.id}.${line}`}
+                                          className="text-xs text-gray-500"
+                                          style={{ color: productSemanticColors.textSecondary }}
+                                        >
+                                          {line}
+                                        </p>
                                       ))}
                                     </div>
                                   ) : (
-                                    <p className="mt-1 text-xs text-gray-500">{entry.stateUpdateSubtitle}</p>
+                                    <p className="mt-1 text-xs text-gray-500" style={{ color: productSemanticColors.textSecondary }}>
+                                      {entry.stateUpdateSubtitle}
+                                    </p>
                                   )}
                                 </>
                               ) : (
                                 <>
-                                  <h3 className="text-base font-semibold text-gray-950">{entry.mainTitle}</h3>
-                                  {entry.wishlistOriginLabelRu ? <p className="mt-0.5 text-xs text-gray-500">{entry.wishlistOriginLabelRu}</p> : null}
+                                  <h3 className="text-base font-semibold text-gray-950" style={{ color: productSemanticColors.textPrimary }}>
+                                    {entry.mainTitle}
+                                  </h3>
+                                  {entry.wishlistOriginLabelRu ? (
+                                    <p className="mt-0.5 text-xs text-gray-500" style={{ color: productSemanticColors.textSecondary }}>
+                                      {entry.wishlistOriginLabelRu}
+                                    </p>
+                                  ) : null}
                                 </>
                               )}
                             </div>
 
                             <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                              <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">{entry.odometerLabel}: {entry.odometerValue}</span>
-                              {entry.engineHoursValue !== null ? <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">{entry.engineHoursLabel}: {entry.engineHoursValue}</span> : null}
-                              {!isStateUpdate && entry.costAmount !== null && entry.costCurrency ? <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">{entry.costLabel}: {entry.costAmount} {entry.costCurrency}</span> : null}
+                              <span
+                                className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700"
+                                style={{
+                                  backgroundColor: productSemanticColors.cardMuted,
+                                  color: productSemanticColors.textSecondary,
+                                }}
+                              >
+                                {entry.odometerLabel}: {entry.odometerValue}
+                              </span>
+                              {entry.engineHoursValue !== null ? (
+                                <span
+                                  className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardMuted,
+                                    color: productSemanticColors.textSecondary,
+                                  }}
+                                >
+                                  {entry.engineHoursLabel}: {entry.engineHoursValue}
+                                </span>
+                              ) : null}
+                              {!isStateUpdate && entry.costAmount !== null && entry.costCurrency ? (
+                                <span
+                                  className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardMuted,
+                                    color: productSemanticColors.textSecondary,
+                                  }}
+                                >
+                                  {entry.costLabel}: {entry.costAmount} {entry.costCurrency}
+                                </span>
+                              ) : null}
                             </div>
 
                             {entry.comment ? (
-                              <div className="mt-3 border-t border-gray-100 pt-3">
-                                <p className={`text-sm ${isStateUpdate ? "text-gray-500" : "text-gray-700"}`}>
+                              <div
+                                className="mt-3 border-t border-gray-100 pt-3"
+                                style={{ borderTopColor: productSemanticColors.border }}
+                              >
+                                <p
+                                  className={`text-sm ${isStateUpdate ? "text-gray-500" : "text-gray-700"}`}
+                                  style={{ color: productSemanticColors.textSecondary }}
+                                >
                                   {expandedComments[entry.id] ? entry.comment : `${entry.comment.slice(0, SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS)}${entry.comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS ? "..." : ""}`}
                                 </p>
                                 {entry.comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS ? (
@@ -997,23 +1188,49 @@ export default function VehicleServiceLogPage() {
 
       {isServiceEventModalOpen ? (
         <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 px-4 py-6 sm:items-center">
-          <div className="w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+          <div
+            className="w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl"
+            style={{
+              backgroundColor: productSemanticColors.card,
+              borderColor: productSemanticColors.borderStrong,
+              color: productSemanticColors.textPrimary,
+            }}
+          >
+            <div
+              className="flex items-center justify-between border-b border-gray-200 px-6 py-4"
+              style={{ borderBottomColor: productSemanticColors.borderStrong }}
+            >
+              <h2
+                className="text-xl font-semibold tracking-tight text-gray-950"
+                style={{ color: productSemanticColors.textPrimary }}
+              >
                 {editingServiceEventId ? "Редактировать сервисное событие" : "Добавить сервисное событие"}
               </h2>
               <button
                 type="button"
                 onClick={() => setIsServiceEventModalOpen(false)}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                style={{
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                  color: productSemanticColors.textPrimary,
+                }}
               >
                 Закрыть
               </button>
             </div>
             <div className="max-h-[72vh] overflow-y-auto px-6 py-6">
               <div className="space-y-5">
-                <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4">
-                  <h3 className="text-sm font-semibold text-gray-950">Выбор узла</h3>
+                <div
+                  className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4"
+                  style={{
+                    backgroundColor: productSemanticColors.cardMuted,
+                    borderColor: productSemanticColors.border,
+                  }}
+                >
+                  <h3 className="text-sm font-semibold text-gray-950" style={{ color: productSemanticColors.textPrimary }}>
+                    Выбор узла
+                  </h3>
                   <label className="mt-3 block text-xs font-medium text-gray-600">
                     Узел (leaf)
                     <select
@@ -1031,8 +1248,16 @@ export default function VehicleServiceLogPage() {
                   </label>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                  <h3 className="text-sm font-semibold text-gray-950">Данные события</h3>
+                <div
+                  className="rounded-2xl border border-gray-200 bg-white p-4"
+                  style={{
+                    backgroundColor: productSemanticColors.cardMuted,
+                    borderColor: productSemanticColors.border,
+                  }}
+                >
+                  <h3 className="text-sm font-semibold text-gray-950" style={{ color: productSemanticColors.textPrimary }}>
+                    Данные события
+                  </h3>
                   <div className="mt-3 grid gap-4.5 sm:grid-cols-2">
                     <label className="text-xs font-medium text-gray-600">
                       Дата события
@@ -1115,11 +1340,16 @@ export default function VehicleServiceLogPage() {
                   </p>
                 ) : null}
 
-                <div className="flex justify-end gap-2 border-t border-gray-100 pt-5">
+                <div className="flex justify-end gap-2 border-t border-gray-100 pt-5" style={{ borderTopColor: productSemanticColors.border }}>
                   <button
                     type="button"
                     onClick={() => setIsServiceEventModalOpen(false)}
                     className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                    style={{
+                      backgroundColor: productSemanticColors.cardSubtle,
+                      borderColor: productSemanticColors.borderStrong,
+                      color: productSemanticColors.textPrimary,
+                    }}
                   >
                     Отмена
                   </button>
@@ -1128,6 +1358,10 @@ export default function VehicleServiceLogPage() {
                     onClick={() => void saveServiceEvent()}
                     disabled={isSavingServiceEvent}
                     className="inline-flex h-10 items-center justify-center rounded-xl bg-gray-950 px-4 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{
+                      backgroundColor: productSemanticColors.primaryAction,
+                      color: productSemanticColors.onPrimaryAction,
+                    }}
                   >
                     {isSavingServiceEvent ? "Сохранение..." : "Сохранить"}
                   </button>

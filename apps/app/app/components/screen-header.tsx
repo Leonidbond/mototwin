@@ -28,11 +28,6 @@ export function ScreenHeader(props: {
 
   return (
     <View>
-      {showHelp ? (
-        <View style={styles.helpRow}>
-          <HelpTriggerButton size={32} />
-        </View>
-      ) : null}
       <View style={styles.shell}>
         <Pressable
           onPress={handleBack}
@@ -46,22 +41,16 @@ export function ScreenHeader(props: {
         <Text numberOfLines={1} style={styles.title}>
           {title ?? ""}
         </Text>
-        <View style={styles.rightSlot}>{rightSlot ?? null}</View>
+        <View style={styles.rightSlot}>
+          {rightSlot ?? null}
+          {showHelp ? <HelpTriggerButton size={28} /> : null}
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  helpRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingTop: 2,
-    paddingBottom: 2,
-    backgroundColor: c.canvas,
-  },
   shell: {
     flexDirection: "row",
     alignItems: "center",
@@ -91,6 +80,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    minWidth: 32,
+    minWidth: 28,
   },
 });

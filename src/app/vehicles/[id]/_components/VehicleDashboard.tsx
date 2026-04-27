@@ -119,6 +119,8 @@ type VehicleDashboardProps = {
   onOpenParts: () => void;
   onOpenAttention: () => void;
   onOpenAllNodes: () => void;
+  onOpenNode: (nodeId: string) => void;
+  onOpenNodeIssues: (nodeIds: string[]) => void;
   onOpenServiceLog: () => void;
   onOpenExpenseDetails: () => void;
   onOpenAttentionItemService: (item: AttentionItemViewModel) => void;
@@ -345,7 +347,12 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
           {!isTopServiceNodesLoading && !topServiceNodesError ? (
             <div className={styles.systemsGrid}>
               {topNodeOverviewCards.map((card) => (
-                <SystemStatusCard key={card.key} card={card} onOpenAllNodes={props.onOpenAllNodes} />
+                <SystemStatusCard
+                  key={card.key}
+                  card={card}
+                  onOpenNode={props.onOpenNode}
+                  onOpenNodeIssues={props.onOpenNodeIssues}
+                />
               ))}
             </div>
           ) : null}
@@ -821,27 +828,25 @@ function CompactActionButton(props: {
 
 function SystemStatusCard(props: {
   card: TopNodeOverviewCard;
-  onOpenAllNodes: () => void;
+  onOpenNode: (nodeId: string) => void;
+  onOpenNodeIssues: (nodeIds: string[]) => void;
 }) {
   const tokens = getStatusTokens(props.card.status);
   return (
-    <button
-      type="button"
-      onClick={props.onOpenAllNodes}
+    <div
       style={{
         position: "relative",
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         minWidth: 0,
         boxSizing: "border-box",
-        height: 74,
+        minHeight: 112,
         overflow: "hidden",
-        padding: "8px 82px 8px 12px",
+        padding: "10px 82px 10px 12px",
         textAlign: "left",
         borderRadius: 14,
         border: `1px solid ${productSemanticColors.border}`,
         backgroundColor: productSemanticColors.cardMuted,
-        cursor: "pointer",
       }}
     >
       <div style={{ minWidth: 0, flex: 1 }}>
@@ -849,38 +854,91 @@ function SystemStatusCard(props: {
           <div style={{ color: productSemanticColors.textPrimary, fontSize: 13, fontWeight: 700 }}>
             {normalizeTopNodeLabel(props.card)}
           </div>
-          <div style={{ marginTop: 5, color: tokens.foreground, fontSize: 13, fontWeight: 700 }}>
-            {getStatusLabel(props.card.status)}
-          </div>
         </div>
-        <MutedText style={{ marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {props.card.details}
-        </MutedText>
+        <div style={{ display: "grid", gap: 5, marginTop: 8 }}>
+          {props.card.nodes.map((node) => {
+            const nodeTokens = getStatusTokens(node.status);
+            return (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onOpenNode(node.id);
+                }}
+                key={node.code}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "fit-content",
+                  maxWidth: "100%",
+                  minHeight: 21,
+                  borderRadius: 999,
+                  border: `1px solid ${nodeTokens.border}`,
+                  backgroundColor: nodeTokens.background,
+                  color: nodeTokens.foreground,
+                  padding: "0 8px",
+                  fontSize: 10,
+                  fontWeight: 800,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                }}
+                title={`${node.name}: ${node.statusLabel}`}
+              >
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {node.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {props.card.nodes.length === 0 ? (
+          <MutedText style={{ marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {props.card.details}
+          </MutedText>
+        ) : null}
       </div>
-      <span
+      <button
+        type="button"
+        onClick={() => props.onOpenNodeIssues(props.card.nodes.map((node) => node.id))}
+        aria-label={`Показать проблемные узлы группы ${props.card.title}`}
+        title="Показать узлы со статусом Скоро или Просрочено"
         style={{
           position: "absolute",
           right: 4,
           top: "50%",
           display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
           width: 78,
           height: 78,
           opacity: 0.98,
           transform: "translateY(-50%)",
+          border: 0,
+          padding: 0,
+          background: "transparent",
+          cursor: "pointer",
         }}
       >
-        <Image
-          src={TOP_NODE_CARD_ICON_SRC[props.card.key]}
-          alt=""
-          fill
-          sizes="78px"
+        <span
+          aria-hidden
           style={{
-            objectFit: "contain",
-            filter: "none",
+            display: "inline-flex",
+            width: 74,
+            height: 74,
+            backgroundColor: tokens.foreground,
+            maskImage: `url(${TOP_NODE_CARD_ICON_SRC[props.card.key].src})`,
+            maskPosition: "center",
+            maskRepeat: "no-repeat",
+            maskSize: "contain",
+            WebkitMaskImage: `url(${TOP_NODE_CARD_ICON_SRC[props.card.key].src})`,
+            WebkitMaskPosition: "center",
+            WebkitMaskRepeat: "no-repeat",
+            WebkitMaskSize: "contain",
           }}
         />
-      </span>
-    </button>
+      </button>
+    </div>
   );
 }
 

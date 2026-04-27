@@ -49,10 +49,22 @@ export function buildTopNodeOverviewCards(
   nodes: TopServiceNodeItem[],
   statusByCode: Map<string, NodeStatus | null>
 ): TopNodeOverviewCard[] {
-  const availableCodes = new Set(nodes.map((node) => node.code));
+  const nodeByCode = new Map(nodes.map((node) => [node.code, node]));
+  const availableCodes = new Set(nodeByCode.keys());
 
   return TOP_NODE_GROUP_DEFINITIONS.map((group) => {
     const nodeCodes = group.codes.filter((code) => availableCodes.has(code));
+    const cardNodes = nodeCodes.map((code) => {
+      const node = nodeByCode.get(code);
+      const nodeStatus = statusByCode.get(code) ?? null;
+      return {
+        id: node?.id ?? code,
+        code,
+        name: node?.name ?? code,
+        status: nodeStatus,
+        statusLabel: nodeStatus ? getNodeStatusLabel(nodeStatus) : "Нет данных",
+      };
+    });
     const statuses = nodeCodes
       .map((code) => statusByCode.get(code))
       .filter((status): status is NodeStatus => Boolean(status));
@@ -70,6 +82,7 @@ export function buildTopNodeOverviewCards(
       statusLabel,
       details,
       nodeCodes,
+      nodes: cardNodes,
     };
   });
 }

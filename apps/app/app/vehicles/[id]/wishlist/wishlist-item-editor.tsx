@@ -979,8 +979,8 @@ const styles = StyleSheet.create({
   },
   recName: { fontSize: 13, fontWeight: "600", color: c.textPrimary },
   recommendationLabel: { marginTop: 4, fontSize: 11, color: c.textSecondary, fontWeight: "600" },
-  recommendationWarning: { marginTop: 2, fontSize: 11, color: "#92400e" },
-  recommendationWarningVerify: { fontWeight: "600", color: "#78350f" },
+  recommendationWarning: { marginTop: 2, fontSize: 11, color: c.textSecondary },
+  recommendationWarningVerify: { fontWeight: "600", color: c.textPrimary },
   kitsBox: {
     marginTop: 10,
     borderTopWidth: 1,
