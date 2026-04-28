@@ -43,6 +43,25 @@ function parsePaidOnly(v: string | null): boolean {
   return v === "1" || v === "true";
 }
 
+function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
+  let parsed = payload;
+  if (typeof payload === "string") {
+    try {
+      parsed = JSON.parse(payload) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const record = parsed as { source?: unknown; wishlistItemId?: unknown };
+  if (record.source !== "wishlist" || typeof record.wishlistItemId !== "string") {
+    return null;
+  }
+  return record.wishlistItemId.trim() || null;
+}
+
 export default function VehicleServiceLogPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -54,6 +73,8 @@ export default function VehicleServiceLogPage() {
   const nodeLabelFromQuery = searchParams.get("nodeLabel");
   const expandExpensesFromQuery = searchParams.get("expandExpenses");
   const monthFromQuery = searchParams.get("month");
+  const highlightedServiceEventId =
+    searchParams.get("serviceEventId") ?? searchParams.get("highlightServiceEventId");
 
   const [vehicleTitle, setVehicleTitle] = useState("Мотоцикл");
   const [vehicleOdometer, setVehicleOdometer] = useState<number | null>(null);
@@ -195,6 +216,26 @@ export default function VehicleServiceLogPage() {
     () => buildServiceLogTimelineProps(events, filters, sort, "default", effectiveNodeIds).monthGroups,
     [events, filters, sort, effectiveNodeIds]
   );
+  const wishlistItemIdByServiceEventId = useMemo(() => {
+    const byServiceEventId = new Map<string, string>();
+    for (const event of events) {
+      const wishlistItemId = getWishlistItemIdFromInstalledPartsJson(event.installedPartsJson);
+      if (wishlistItemId) {
+        byServiceEventId.set(event.id, wishlistItemId);
+      }
+    }
+    return byServiceEventId;
+  }, [events]);
+  useEffect(() => {
+    if (isLoading || !highlightedServiceEventId || groups.length === 0) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      const eventCard = document.getElementById(`service-log-event-${highlightedServiceEventId}`);
+      eventCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [groups, highlightedServiceEventId, isLoading]);
   const hasAnyPaid = useMemo(() => filterPaidServiceEvents(events).length > 0, [events]);
   const paidEventsForDashboard = useMemo(() => {
     const visibleIds = new Set(groups.flatMap((group) => group.entries.map((entry) => entry.id)));
@@ -1053,11 +1094,14 @@ export default function VehicleServiceLogPage() {
                   <div className="space-y-4">
                     {group.entries.map((entry) => {
                       const isStateUpdate = entry.eventKind === "STATE_UPDATE";
+                      const isHighlightedServiceEvent = entry.id === highlightedServiceEventId;
+                      const originWishlistItemId = wishlistItemIdByServiceEventId.get(entry.id);
                       return (
                         <article
                           key={entry.id}
                           id={`service-log-event-${entry.id}`}
-                          className="relative pl-10"
+                          className="relative scroll-mt-24 pl-10"
+                          aria-current={isHighlightedServiceEvent ? "true" : undefined}
                         >
                           <div
                             className="absolute bottom-0 left-4 top-0 w-px"
@@ -1073,10 +1117,15 @@ export default function VehicleServiceLogPage() {
                           <div
                             className={`rounded-2xl border px-4 py-3 sm:px-5 ${isStateUpdate ? "" : "shadow-sm"}`}
                             style={{
-                              borderColor: productSemanticColors.border,
+                              borderColor: isHighlightedServiceEvent
+                                ? productSemanticColors.primaryAction
+                                : productSemanticColors.border,
                               backgroundColor: isStateUpdate
                                 ? productSemanticColors.cardMuted
                                 : productSemanticColors.card,
+                              boxShadow: isHighlightedServiceEvent
+                                ? `0 0 0 2px ${productSemanticColors.primaryAction}`
+                                : undefined,
                             }}
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1169,9 +1218,27 @@ export default function VehicleServiceLogPage() {
                                     {entry.mainTitle}
                                   </h3>
                                   {entry.wishlistOriginLabelRu ? (
-                                    <p className="mt-0.5 text-xs text-gray-500" style={{ color: productSemanticColors.textSecondary }}>
-                                      {entry.wishlistOriginLabelRu}
-                                    </p>
+                                    originWishlistItemId ? (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          router.push(
+                                            `/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(originWishlistItemId)}`
+                                          )
+                                        }
+                                        className="mt-0.5 text-xs font-medium underline decoration-dotted underline-offset-2 transition hover:opacity-80"
+                                        style={{ color: productSemanticColors.textSecondary }}
+                                      >
+                                        {entry.wishlistOriginLabelRu}
+                                      </button>
+                                    ) : (
+                                      <p
+                                        className="mt-0.5 text-xs text-gray-500"
+                                        style={{ color: productSemanticColors.textSecondary }}
+                                      >
+                                        {entry.wishlistOriginLabelRu}
+                                      </p>
+                                    )
                                   ) : null}
                                 </>
                               )}

@@ -27,6 +27,7 @@ Supported route/query params:
 - `paidOnly=1` — pre-enables paid-only filter
 - `nodeId=<nodeId>` or `nodeIds=<id1,id2,...>` with optional `nodeLabel` — pre-applies node filter context
 - `expandExpenses=1` — opens inline expenses block on initial load
+- `serviceEventId=<eventId>` (alias: `highlightServiceEventId`) — scrolls the timeline to a concrete service event and highlights its row
 - optional lifecycle handoff params for add/edit flow may be used by client UI
 
 ## Expenses block (inline)
@@ -97,6 +98,21 @@ After creating `SERVICE` event, clients show:
 
 - `Сервисное событие добавлено`
 - optional detail: `Статусы и расходы обновлены`
+- on web, the notice includes **`В журнал`**; clicking it opens `/vehicles/[id]/service-log`
+
+## Wishlist origin links
+
+Wishlist-install events are stored as normal `SERVICE` rows. The origin is recognized by the shared wishlist install service type/comment prefix and, when available, by `installedPartsJson`:
+
+- `source: "wishlist"`
+- `wishlistItemId: <PartWishlistItem.id>`
+
+Web behavior:
+
+- if a wishlist-install row has `wishlistItemId`, the label **«Из списка покупок»** is rendered as a button
+- clicking it opens `/vehicles/[id]/parts?wishlistItemId=...`
+- the parts page expands/filters to the matching status group, highlights that part card, and scrolls it into view
+- the reverse link exists on installed part cards: **«В журнал»** opens `/vehicles/[id]/service-log?serviceEventId=...`, and the journal scrolls/highlights the corresponding event
 
 ## STATE_UPDATE in this flow
 

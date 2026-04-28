@@ -6,6 +6,7 @@ import {
   calculateGarageScore,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
+  getWishlistItemSkuDisplayLines,
   getVehicleSilhouetteClassLabel,
   resolveGarageVehicleSilhouette,
 } from "@mototwin/domain";
@@ -117,6 +118,7 @@ type VehicleDashboardProps = {
   onAddService: () => void;
   onAddExpense: () => void;
   onOpenParts: () => void;
+  onOpenPartItem: (itemId: string) => void;
   onOpenAttention: () => void;
   onOpenAllNodes: () => void;
   onOpenNode: (nodeId: string) => void;
@@ -477,7 +479,15 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
                   details="Откройте подбор деталей и добавьте первые расходники или запчасти."
                 />
               ) : (
-                wishlistItems.slice(0, 3).map((item) => <PartRecommendationRow key={item.id} item={item} />)
+                wishlistItems
+                  .slice(0, 3)
+                  .map((item) => (
+                    <PartRecommendationRow
+                      key={item.id}
+                      item={item}
+                      onOpen={() => props.onOpenPartItem(item.id)}
+                    />
+                  ))
               )}
             </div>
           ) : null}
@@ -984,17 +994,29 @@ function RecentEventRow({ event }: { event: ServiceEventItem }) {
   );
 }
 
-function PartRecommendationRow({ item }: { item: PartWishlistItemViewModel }) {
+function PartRecommendationRow({
+  item,
+  onOpen,
+}: {
+  item: PartWishlistItemViewModel;
+  onOpen: () => void;
+}) {
+  const skuLines = item.sku ? getWishlistItemSkuDisplayLines(item.sku) : null;
   return (
-    <div
+    <button
+      type="button"
+      onClick={onOpen}
       style={{
         display: "flex",
+        width: "100%",
         alignItems: "center",
         gap: 10,
         padding: 10,
         borderRadius: 14,
         border: `1px solid ${productSemanticColors.border}`,
         backgroundColor: productSemanticColors.cardMuted,
+        textAlign: "left",
+        cursor: "pointer",
       }}
     >
       <span
@@ -1017,12 +1039,17 @@ function PartRecommendationRow({ item }: { item: PartWishlistItemViewModel }) {
         <div style={{ color: productSemanticColors.textPrimary, fontSize: 13, fontWeight: 700 }}>
           {item.title}
         </div>
+        {skuLines ? (
+          <MutedText style={{ marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {skuLines.primaryLine}
+          </MutedText>
+        ) : null}
         <MutedText style={{ marginTop: 4 }}>
           {item.node?.name ? `${item.node.name} • ${item.statusLabelRu}` : item.statusLabelRu}
         </MutedText>
       </div>
       <span style={{ color: productSemanticColors.textTertiary, fontSize: 18 }}>›</span>
-    </div>
+    </button>
   );
 }
 

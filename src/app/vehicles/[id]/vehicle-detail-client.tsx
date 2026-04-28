@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   buildNodeTreeSectionProps,
   canOpenNodeStatusExplanationModal,
@@ -113,6 +113,7 @@ import type {
   PartRecommendationGroup,
   ServiceKitViewModel,
   ServiceKitPreviewViewModel,
+  PartWishlistItemStatus,
   PartWishlistFormValues,
   PartWishlistItem,
   PartSkuViewModel,
@@ -127,7 +128,7 @@ type VehiclePageProps = {
   params: Promise<{
     id: string;
   }>;
-  pageView?: "dashboard" | "nodeTree";
+  pageView?: "dashboard" | "nodeTree" | "partsSelection";
 };
 
 type OverlayReturnTarget =
@@ -141,12 +142,16 @@ type ServiceLogActionNotice = {
   details?: string;
 };
 
+type PartsStatusFilter = PartWishlistItemStatus | "ALL";
+
 const NODE_STATUS_FILTER_OPTIONS: NodeStatus[] = [
   "OVERDUE",
   "SOON",
   "RECENTLY_REPLACED",
   "OK",
 ];
+const PARTS_SELECTION_INITIAL_VISIBLE_COUNT = 10;
+const PARTS_SELECTION_VISIBLE_INCREMENT = 10;
 
 type NodeStatusFilter = NodeStatus | "ALL";
 
@@ -253,6 +258,25 @@ function isIssueNodeStatus(status: NodeStatus | null): status is "OVERDUE" | "SO
   return status === "OVERDUE" || status === "SOON";
 }
 
+function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
+  let parsed = payload;
+  if (typeof payload === "string") {
+    try {
+      parsed = JSON.parse(payload) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const record = parsed as { source?: unknown; wishlistItemId?: unknown };
+  if (record.source !== "wishlist" || typeof record.wishlistItemId !== "string") {
+    return null;
+  }
+  return record.wishlistItemId.trim() || null;
+}
+
 export function VehicleDetailClient({ params, pageView = "dashboard" }: VehiclePageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -293,6 +317,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [statusHighlightedNodeIds, setStatusHighlightedNodeIds] = useState<Set<string>>(new Set());
   const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
   const overlayReturnStackRef = useRef<OverlayReturnTarget[]>([]);
+  const serviceEventCommentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
     PartRecommendationViewModel[]
   >([]);
@@ -318,6 +343,19 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [wishlistFormError, setWishlistFormError] = useState("");
   const [wishlistNotice, setWishlistNotice] = useState("");
   const [isWishlistSaving, setIsWishlistSaving] = useState(false);
+  const [wishlistStatusUpdatingId, setWishlistStatusUpdatingId] = useState("");
+  const [wishlistDeletingId, setWishlistDeletingId] = useState("");
+  const [pendingWishlistInstallItemId, setPendingWishlistInstallItemId] = useState<string | null>(
+    null
+  );
+  const [partsStatusFilter, setPartsStatusFilter] = useState<PartsStatusFilter>("ALL");
+  const [partsSearchQuery, setPartsSearchQuery] = useState("");
+  const [collapsedPartsStatusGroups, setCollapsedPartsStatusGroups] = useState<
+    Partial<Record<PartWishlistItemStatus, boolean>>
+  >({ INSTALLED: true });
+  const [partsVisibleCountByStatus, setPartsVisibleCountByStatus] = useState<
+    Partial<Record<PartWishlistItemStatus, number>>
+  >({});
   const [wishlistSkuQuery, setWishlistSkuQuery] = useState("");
   const [wishlistSkuDebouncedQuery, setWishlistSkuDebouncedQuery] = useState("");
   const [wishlistSkuResults, setWishlistSkuResults] = useState<PartSkuViewModel[]>([]);
@@ -513,6 +551,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   );
   const targetNodeIdFromSearchParams = searchParams.get("nodeId");
   const highlightIssueNodeIdsFromSearchParams = searchParams.get("highlightIssueNodeIds");
+  const highlightedWishlistItemIdFromSearchParams = searchParams.get("wishlistItemId");
   const focusNodeInTree = useCallback(
     (nodeId: string) => {
       const path = findNodeViewModelPathById(topLevelNodeViewModels, nodeId);
@@ -656,6 +695,66 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     () => groupPartWishlistItemsByStatus(wishlistActiveViewModels),
     [wishlistActiveViewModels]
   );
+  const partsStatusCounts = useMemo(() => {
+    const counts = new Map<PartWishlistItemStatus, number>();
+    for (const status of PART_WISHLIST_STATUS_ORDER) {
+      counts.set(status, 0);
+    }
+    for (const item of wishlistViewModels) {
+      counts.set(item.status, (counts.get(item.status) ?? 0) + 1);
+    }
+    return counts;
+  }, [wishlistViewModels]);
+  const normalizedPartsSearchQuery = partsSearchQuery.trim().toLowerCase();
+  const filteredPartsWishlistViewModels = useMemo(() => {
+    return wishlistViewModels.filter((item) => {
+      if (partsStatusFilter !== "ALL" && item.status !== partsStatusFilter) {
+        return false;
+      }
+      if (!normalizedPartsSearchQuery) {
+        return true;
+      }
+      const skuLines = item.sku ? getWishlistItemSkuDisplayLines(item.sku) : null;
+      const haystack = [
+        item.title,
+        item.statusLabelRu,
+        item.node?.name ?? "",
+        item.costLabelRu ?? "",
+        item.kitOriginLabelRu ?? "",
+        item.commentBodyRu ?? "",
+        skuLines?.primaryLine ?? "",
+        skuLines?.secondaryLine ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(normalizedPartsSearchQuery);
+    });
+  }, [normalizedPartsSearchQuery, partsStatusFilter, wishlistViewModels]);
+  const filteredPartsWishlistGroups = useMemo(
+    () => groupPartWishlistItemsByStatus(filteredPartsWishlistViewModels),
+    [filteredPartsWishlistViewModels]
+  );
+  const installedWishlistServiceEventIdByItemId = useMemo(() => {
+    const byWishlistItemId = new Map<string, string>();
+    const newestEventsFirst = [...serviceEvents].sort((left, right) => {
+      const leftTime = new Date(left.eventDate || left.createdAt).getTime();
+      const rightTime = new Date(right.eventDate || right.createdAt).getTime();
+      if (rightTime !== leftTime) {
+        return rightTime - leftTime;
+      }
+      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+    });
+    for (const event of newestEventsFirst) {
+      if (event.eventKind === "STATE_UPDATE") {
+        continue;
+      }
+      const wishlistItemId = getWishlistItemIdFromInstalledPartsJson(event.installedPartsJson);
+      if (wishlistItemId && !byWishlistItemId.has(wishlistItemId)) {
+        byWishlistItemId.set(wishlistItemId, event.id);
+      }
+    }
+    return byWishlistItemId;
+  }, [serviceEvents]);
   const serviceKitNodesByCode = useMemo(() => {
     const out = new Map<string, { id: string; name: string; hasChildren: boolean }>();
     const stack = [...nodeTree];
@@ -1030,12 +1129,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       }
       setServiceEventFormError("");
       setEditingServiceEventId(serviceEvent.id);
+      setPendingWishlistInstallItemId(null);
       applyAddServiceEventFormValues(createInitialEditServiceEventValues(serviceEvent));
       setSelectedNodePath(nodePath);
       setIsAddServiceEventModalOpen(true);
       return;
     }
     setEditingServiceEventId(null);
+    setPendingWishlistInstallItemId(null);
     setSelectedNodePath([]);
     const empty = createInitialAddServiceEventFormValues();
     empty.currency = readDefaultCurrencySetting();
@@ -1086,6 +1187,47 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     });
     return () => window.cancelAnimationFrame(frame);
   }, [highlightedNodeId, selectedNodeSubtreeModalViewModel]);
+
+  useEffect(() => {
+    if (pageView !== "partsSelection" || !highlightedWishlistItemIdFromSearchParams) {
+      return;
+    }
+    const highlightedItem = wishlistViewModels.find(
+      (item) => item.id === highlightedWishlistItemIdFromSearchParams
+    );
+    if (highlightedItem) {
+      setPartsStatusFilter(highlightedItem.status);
+      setPartsSearchQuery("");
+      setCollapsedPartsStatusGroups((prev) => ({ ...prev, [highlightedItem.status]: false }));
+      const itemsInStatus = wishlistViewModels.filter((item) => item.status === highlightedItem.status);
+      const highlightedIndex = itemsInStatus.findIndex((item) => item.id === highlightedItem.id);
+      if (highlightedIndex >= 0) {
+        setPartsVisibleCountByStatus((prev) => ({
+          ...prev,
+          [highlightedItem.status]: Math.max(
+            prev[highlightedItem.status] ?? PARTS_SELECTION_INITIAL_VISIBLE_COUNT,
+            highlightedIndex + 1
+          ),
+        }));
+      }
+    }
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.querySelector(
+        `[data-wishlist-item-id="${CSS.escape(highlightedWishlistItemIdFromSearchParams)}"]`
+      );
+      target?.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [highlightedWishlistItemIdFromSearchParams, pageView, wishlistViewModels]);
+
+  useEffect(() => {
+    if (!isAddServiceEventModalOpen || !serviceEventCommentTextareaRef.current) {
+      return;
+    }
+    const textarea = serviceEventCommentTextareaRef.current;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.max(textarea.scrollHeight, 80)}px`;
+  }, [comment, isAddServiceEventModalOpen]);
 
   const loadServiceEvents = useCallback(async () => {
     if (!vehicleId) {
@@ -1242,23 +1384,27 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
     setServiceEventFormError("");
     setEditingServiceEventId(null);
+    setPendingWishlistInstallItemId(null);
     applyAddServiceEventFormValues(values);
     setSelectedNodePath(nodePath);
     setIsAddServiceEventModalOpen(true);
   };
 
-  const openAddServiceEventPrefilledFromWishlist = (item: PartWishlistItem) => {
+  const openAddServiceEventPrefilledFromWishlist = (
+    item: PartWishlistItem,
+    options: { pendingInstall?: boolean } = {}
+  ) => {
     if (!vehicle) {
       setServiceEventFormError("Не удалось загрузить данные мотоцикла.");
-      return;
+      return false;
     }
     if (!item.nodeId) {
-      return;
+      return false;
     }
     const nodePath = findNodePathById(nodeTree, item.nodeId);
     if (!nodePath) {
       setServiceEventFormError("Не удалось определить путь узла для позиции списка.");
-      return;
+      return false;
     }
     setServiceEventFormError("");
     setEditingServiceEventId(null);
@@ -1269,7 +1415,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     );
     applyAddServiceEventFormValues(values);
     setSelectedNodePath(nodePath);
+    setPendingWishlistInstallItemId(options.pendingInstall ? item.id : null);
     setIsAddServiceEventModalOpen(true);
+    return true;
   };
 
   const openServiceLogForAttentionItem = (item: AttentionItemViewModel) => {
@@ -1526,10 +1674,17 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       return;
     }
     try {
+      setWishlistNotice("");
+      setWishlistDeletingId(itemId);
       await vehicleDetailApi.deleteWishlistItem(vehicleId, itemId);
       await loadWishlist();
+      setWishlistNotice("Позиция удалена из списка покупок.");
     } catch (e) {
       console.error(e);
+      const msg = e instanceof Error ? e.message : "Не удалось удалить позицию.";
+      setWishlistNotice(`Ошибка: ${msg}`);
+    } finally {
+      setWishlistDeletingId("");
     }
   };
 
@@ -1541,14 +1696,41 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (!vehicleId) {
       return;
     }
+    if (status === previousStatus) {
+      return;
+    }
     try {
       setWishlistNotice("");
       const sourceItem = wishlistItems.find((w) => w.id === itemId);
-      const sourceNodeId = sourceItem?.nodeId?.trim() ?? "";
-      if (!sourceNodeId) {
-        setWishlistNotice("Ошибка: Выберите узел мотоцикла");
+      if (!sourceItem) {
+        setWishlistNotice("Ошибка: позиция списка не найдена.");
         return;
       }
+      const sourceNodeId = sourceItem?.nodeId?.trim() ?? "";
+      const shouldDeferInstalledStatus =
+        status === "INSTALLED" && isWishlistTransitionToInstalled(previousStatus, status);
+      if (!sourceNodeId) {
+        openWishlistModalForEdit(sourceItem);
+        setWishlistForm((prev) => ({ ...prev, status }));
+        setWishlistFormError(
+          status === "INSTALLED"
+            ? "Чтобы отметить позицию установленной, выберите конечный узел мотоцикла."
+            : "Чтобы менять статус позиции из блока покупок, выберите конечный узел мотоцикла."
+        );
+        return;
+      }
+      if (shouldDeferInstalledStatus) {
+        const didOpenServiceEventModal = openAddServiceEventPrefilledFromWishlist(sourceItem, {
+          pendingInstall: true,
+        });
+        if (didOpenServiceEventModal) {
+          setWishlistNotice(
+            "Статус «Установлено» применится после сохранения сервисного события."
+          );
+        }
+        return;
+      }
+      setWishlistStatusUpdatingId(itemId);
       const res = await vehicleDetailApi.updateWishlistItem(vehicleId, itemId, {
         status,
         nodeId: sourceNodeId,
@@ -1568,6 +1750,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       console.error(e);
       const msg = e instanceof Error ? e.message : "Не удалось обновить статус.";
       setWishlistNotice(`Ошибка: ${msg}`);
+    } finally {
+      setWishlistStatusUpdatingId("");
     }
   };
 
@@ -2356,6 +2540,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
   const resetServiceEventForm = () => {
     setEditingServiceEventId(null);
+    setPendingWishlistInstallItemId(null);
     setSelectedNodePath([]);
     const empty = createInitialAddServiceEventFormValues();
     empty.currency = readDefaultCurrencySetting();
@@ -2370,6 +2555,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   };
   const closeAddServiceEventModal = (options: { restorePrevious?: boolean } = {}) => {
     setIsAddServiceEventModalOpen(false);
+    setPendingWishlistInstallItemId(null);
     if (options.restorePrevious ?? true) {
       restorePreviousOverlay();
     }
@@ -2421,6 +2607,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         );
       }
 
+      if (!editingServiceEventId && pendingWishlistInstallItemId) {
+        await vehicleDetailApi.updateWishlistItem(vehicleId, pendingWishlistInstallItemId, {
+          status: "INSTALLED",
+          nodeId: serviceFormValues.nodeId,
+        });
+        setWishlistNotice("Позиция отмечена как установленная после добавления события.");
+      }
+
       setServiceLogActionNotice({
         tone: "success",
         title: editingServiceEventId
@@ -2428,6 +2622,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           : "Сервисное событие добавлено",
         details: "Статусы и расходы обновлены",
       });
+      setPendingWishlistInstallItemId(null);
       resetServiceEventForm();
       await Promise.all([loadServiceEvents(), loadNodeTree(), loadWishlist(), loadTopServiceNodes()]);
       closeAddServiceEventModal({ restorePrevious: false });
@@ -2916,6 +3111,514 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     );
   }
 
+  function renderPartsSelectionPage() {
+    if (!vehicle) {
+      return null;
+    }
+
+    return (
+      <div style={{ display: "grid", gap: 16 }}>
+        <div>
+          <button
+            type="button"
+            onClick={() => navigateBackWithFallback(`/vehicles/${vehicleId}`)}
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-600 bg-slate-900 px-3.5 text-sm font-medium text-slate-100 transition hover:bg-slate-800"
+            style={{
+              backgroundColor: productSemanticColors.card,
+              borderColor: productSemanticColors.borderStrong,
+              color: productSemanticColors.textPrimary,
+            }}
+          >
+            ← К мотоциклу
+          </button>
+        </div>
+
+        <section
+          className="parts-selection-surface garage-dark-surface-text rounded-3xl border border-gray-200 bg-white p-7 shadow-sm"
+          style={{
+            backgroundColor: productSemanticColors.card,
+            borderColor: productSemanticColors.borderStrong,
+            color: productSemanticColors.textPrimary,
+          }}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p
+                className="text-xs font-semibold uppercase tracking-wide"
+                style={{ color: productSemanticColors.textMuted }}
+              >
+                Подбор деталей
+              </p>
+              <h1
+                className="mt-1 text-3xl font-semibold tracking-tight"
+                style={{ color: productSemanticColors.textPrimary }}
+              >
+                Корзина замен и расходников
+              </h1>
+              <p
+                className="mt-2 max-w-3xl text-sm"
+                style={{ color: productSemanticColors.textSecondary }}
+              >
+                Здесь видны все позиции для замены: SKU, узел, стоимость, происхождение из
+                комплекта, комментарий и текущий статус от «Нужно купить» до «Установлено».
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => openWishlistModalForCreate()}
+              className="inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold transition"
+              style={{
+                backgroundColor: productSemanticColors.primaryAction,
+                color: productSemanticColors.onPrimaryAction,
+              }}
+            >
+              Подобрать новую позицию
+            </button>
+          </div>
+
+          {wishlistNotice ? (
+            <p
+              className={`mt-4 text-sm ${
+                wishlistNotice.startsWith("Ошибка:")
+                  ? "text-red-700"
+                  : wishlistNotice.includes("не открыто")
+                    ? "text-amber-800"
+                    : "text-emerald-800"
+              }`}
+              role="status"
+            >
+              {wishlistNotice}
+            </p>
+          ) : null}
+
+          {wishlistViewModels.length > 0 ? (
+            <div
+              className="mt-6 rounded-2xl border px-4 py-4"
+              style={{
+                backgroundColor: productSemanticColors.cardMuted,
+                borderColor: productSemanticColors.borderStrong,
+              }}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPartsStatusFilter("ALL")}
+                  className="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+                  style={{
+                    backgroundColor:
+                      partsStatusFilter === "ALL"
+                        ? productSemanticColors.primaryAction
+                        : productSemanticColors.cardSubtle,
+                    borderColor:
+                      partsStatusFilter === "ALL"
+                        ? productSemanticColors.primaryAction
+                        : productSemanticColors.borderStrong,
+                    color:
+                      partsStatusFilter === "ALL"
+                        ? productSemanticColors.onPrimaryAction
+                        : productSemanticColors.textPrimary,
+                  }}
+                >
+                  Все · {wishlistViewModels.length}
+                </button>
+                {PART_WISHLIST_STATUS_ORDER.map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setPartsStatusFilter(status)}
+                    className="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+                    style={{
+                      backgroundColor:
+                        partsStatusFilter === status
+                          ? productSemanticColors.primaryAction
+                          : productSemanticColors.cardSubtle,
+                      borderColor:
+                        partsStatusFilter === status
+                          ? productSemanticColors.primaryAction
+                          : productSemanticColors.borderStrong,
+                      color:
+                        partsStatusFilter === status
+                          ? productSemanticColors.onPrimaryAction
+                          : productSemanticColors.textPrimary,
+                    }}
+                  >
+                    {partWishlistStatusLabelsRu[status]} · {partsStatusCounts.get(status) ?? 0}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  value={partsSearchQuery}
+                  onChange={(event) => setPartsSearchQuery(event.target.value)}
+                  className="min-w-[240px] flex-1 rounded-xl border px-3 py-2 text-sm outline-none transition"
+                  style={{
+                    backgroundColor: productSemanticColors.cardSubtle,
+                    borderColor: productSemanticColors.borderStrong,
+                    color: productSemanticColors.textPrimary,
+                    colorScheme: "dark",
+                  }}
+                  placeholder="Поиск по названию, SKU, узлу или комментарию"
+                />
+                {(partsStatusFilter !== "ALL" || partsSearchQuery.trim()) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPartsStatusFilter("ALL");
+                      setPartsSearchQuery("");
+                    }}
+                    className="rounded-xl border px-3 py-2 text-xs font-semibold transition"
+                    style={{
+                      backgroundColor: productSemanticColors.cardSubtle,
+                      borderColor: productSemanticColors.borderStrong,
+                      color: productSemanticColors.textSecondary,
+                    }}
+                  >
+                    Сбросить
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {isWishlistLoading ? (
+            <p className="mt-6 text-sm" style={{ color: productSemanticColors.textSecondary }}>
+              Загрузка подбора деталей...
+            </p>
+          ) : null}
+          {wishlistError ? (
+            <p className="mt-6 text-sm" style={{ color: productSemanticColors.error }}>
+              {wishlistError}
+            </p>
+          ) : null}
+
+          {!isWishlistLoading && !wishlistError && wishlistViewModels.length === 0 ? (
+            <div
+              className="mt-6 rounded-2xl border border-dashed px-5 py-8 text-center"
+              style={{
+                backgroundColor: productSemanticColors.cardMuted,
+                borderColor: productSemanticColors.borderStrong,
+              }}
+            >
+              <p
+                className="text-sm font-semibold"
+                style={{ color: productSemanticColors.textPrimary }}
+              >
+                Позиции пока не добавлены
+              </p>
+              <p
+                className="mt-1 text-sm"
+                style={{ color: productSemanticColors.textSecondary }}
+              >
+                Добавьте расходники вручную, из дерева узлов, из рекомендаций SKU или комплектом.
+              </p>
+            </div>
+          ) : null}
+
+          {!isWishlistLoading &&
+          !wishlistError &&
+          wishlistViewModels.length > 0 &&
+          filteredPartsWishlistViewModels.length === 0 ? (
+            <div
+              className="mt-6 rounded-2xl border border-dashed px-5 py-8 text-center"
+              style={{
+                backgroundColor: productSemanticColors.cardMuted,
+                borderColor: productSemanticColors.borderStrong,
+              }}
+            >
+              <p
+                className="text-sm font-semibold"
+                style={{ color: productSemanticColors.textPrimary }}
+              >
+                Ничего не найдено
+              </p>
+              <p
+                className="mt-1 text-sm"
+                style={{ color: productSemanticColors.textSecondary }}
+              >
+                Измените статус-фильтр или поисковый запрос.
+              </p>
+            </div>
+          ) : null}
+
+          {!isWishlistLoading && !wishlistError && filteredPartsWishlistGroups.length > 0 ? (
+            <div className="mt-6 grid gap-6">
+              {filteredPartsWishlistGroups.map((group) => {
+                const isCollapsed =
+                  Boolean(collapsedPartsStatusGroups[group.status]) &&
+                  partsStatusFilter === "ALL" &&
+                  !normalizedPartsSearchQuery;
+                const visibleCount =
+                  partsVisibleCountByStatus[group.status] ??
+                  PARTS_SELECTION_INITIAL_VISIBLE_COUNT;
+                const visibleItems = isCollapsed ? [] : group.items.slice(0, visibleCount);
+                const hiddenCount = Math.max(0, group.items.length - visibleItems.length);
+                return (
+                <section key={group.status}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCollapsedPartsStatusGroups((prev) => ({
+                        ...prev,
+                        [group.status]: !prev[group.status],
+                      }))
+                    }
+                    className="flex w-full items-center justify-between gap-3 text-left"
+                  >
+                    <h2
+                      className="text-xs font-semibold uppercase tracking-wide"
+                      style={{ color: productSemanticColors.textMuted }}
+                    >
+                      {group.sectionTitleRu} · {group.items.length}
+                    </h2>
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: productSemanticColors.textSecondary }}
+                    >
+                      {isCollapsed ? "Развернуть" : "Свернуть"}
+                    </span>
+                  </button>
+                  <div className="mt-3 grid gap-3">
+                    {isCollapsed ? (
+                      <div
+                        className="rounded-2xl border border-dashed px-4 py-3 text-sm"
+                        style={{
+                          backgroundColor: productSemanticColors.cardMuted,
+                          borderColor: productSemanticColors.borderStrong,
+                          color: productSemanticColors.textSecondary,
+                        }}
+                      >
+                        Группа свернута. Позиций: {group.items.length}.
+                      </div>
+                    ) : null}
+                    {visibleItems.map((it) => {
+                      const isHighlighted = highlightedWishlistItemIdFromSearchParams === it.id;
+                      const isBusy =
+                        wishlistStatusUpdatingId === it.id || wishlistDeletingId === it.id;
+                      const skuLines = it.sku ? getWishlistItemSkuDisplayLines(it.sku) : null;
+                      const installedServiceEventId =
+                        it.status === "INSTALLED"
+                          ? installedWishlistServiceEventIdByItemId.get(it.id)
+                          : null;
+                      return (
+                        <article
+                          key={it.id}
+                          data-wishlist-item-id={it.id}
+                          className="rounded-2xl border px-4 py-4 text-sm"
+                          style={{
+                            backgroundColor: productSemanticColors.cardMuted,
+                            borderColor: isHighlighted
+                              ? productSemanticColors.primaryAction
+                              : productSemanticColors.border,
+                            boxShadow: isHighlighted
+                              ? `0 0 0 2px ${productSemanticColors.primaryAction}`
+                              : undefined,
+                          }}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3
+                                  className="text-base font-semibold"
+                                  style={{ color: productSemanticColors.textPrimary }}
+                                >
+                                  {it.title}
+                                </h3>
+                                <span
+                                  className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardSubtle,
+                                    borderColor: productSemanticColors.borderStrong,
+                                    color: productSemanticColors.textSecondary,
+                                  }}
+                                >
+                                  {it.statusLabelRu}
+                                </span>
+                              </div>
+
+                              {skuLines ? (
+                                <div
+                                  className="mt-3 rounded-xl border px-3 py-2"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardSubtle,
+                                    borderColor: productSemanticColors.borderStrong,
+                                  }}
+                                >
+                                  <p
+                                    className="text-sm font-semibold"
+                                    style={{ color: productSemanticColors.textPrimary }}
+                                  >
+                                    {skuLines.primaryLine}
+                                  </p>
+                                  <p
+                                    className="mt-0.5 text-xs"
+                                    style={{ color: productSemanticColors.textSecondary }}
+                                  >
+                                    {skuLines.secondaryLine}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p
+                                  className="mt-3 rounded-xl border border-dashed px-3 py-2 text-xs"
+                                  style={{
+                                    borderColor: productSemanticColors.borderStrong,
+                                    color: productSemanticColors.textSecondary,
+                                  }}
+                                >
+                                  SKU не выбран. Откройте редактирование, чтобы подобрать позицию из
+                                  каталога или оставить ручную запись.
+                                </p>
+                              )}
+
+                              <div
+                                className="mt-3 grid gap-1 text-xs sm:grid-cols-2"
+                                style={{ color: productSemanticColors.textSecondary }}
+                              >
+                                <p>Количество: {it.quantity}</p>
+                                <p>Узел: {it.node?.name ?? "Не выбран"}</p>
+                                <p>Стоимость: {it.costLabelRu ?? "Не указана"}</p>
+                                <p>ID позиции: {it.id}</p>
+                              </div>
+
+                              {it.kitOriginLabelRu ? (
+                                <p
+                                  className="mt-3 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
+                                  style={{
+                                    backgroundColor: productSemanticColors.serviceBadgeBg,
+                                    color: productSemanticColors.serviceBadgeText,
+                                  }}
+                                >
+                                  {it.kitOriginLabelRu}
+                                </p>
+                              ) : null}
+                              {it.commentBodyRu ? (
+                                <p
+                                  className="mt-2 text-xs leading-5"
+                                  style={{ color: productSemanticColors.textSecondary }}
+                                >
+                                  {it.commentBodyRu}
+                                </p>
+                              ) : null}
+                            </div>
+
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                              {installedServiceEventId ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    router.push(
+                                      `/vehicles/${vehicleId}/service-log?serviceEventId=${encodeURIComponent(installedServiceEventId)}`
+                                    )
+                                  }
+                                  className="rounded-lg border px-3 py-1.5 text-xs font-medium transition"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardSubtle,
+                                    borderColor: productSemanticColors.borderStrong,
+                                    color: productSemanticColors.textPrimary,
+                                  }}
+                                >
+                                  В журнал
+                                </button>
+                              ) : null}
+                              <select
+                                value={it.status}
+                                onChange={(e) =>
+                                  patchWishlistItemStatus(
+                                    it.id,
+                                    e.target.value as PartWishlistItem["status"],
+                                    it.status
+                                  )
+                                }
+                                disabled={isBusy}
+                                className="rounded-lg border px-2 py-1.5 text-xs disabled:cursor-wait disabled:opacity-60"
+                                style={{
+                                  backgroundColor: productSemanticColors.cardSubtle,
+                                  borderColor: productSemanticColors.borderStrong,
+                                  color: productSemanticColors.textPrimary,
+                                }}
+                                aria-label="Статус позиции"
+                              >
+                                {PART_WISHLIST_STATUS_ORDER.map((s) => (
+                                  <option key={s} value={s}>
+                                    {partWishlistStatusLabelsRu[s]}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const raw = wishlistItems.find((w) => w.id === it.id);
+                                  if (raw) {
+                                    openWishlistModalForEdit(raw);
+                                  }
+                                }}
+                                className="rounded-lg border px-3 py-1.5 text-xs font-medium transition"
+                                style={{
+                                  backgroundColor: productSemanticColors.cardSubtle,
+                                  borderColor: productSemanticColors.borderStrong,
+                                  color: productSemanticColors.textPrimary,
+                                }}
+                              >
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteWishlistItemById(it.id)}
+                                disabled={isBusy}
+                                className="rounded-lg border px-3 py-1.5 text-xs transition disabled:cursor-wait disabled:opacity-60"
+                                style={{
+                                  backgroundColor: productSemanticColors.cardSubtle,
+                                  borderColor: productSemanticColors.border,
+                                  color: productSemanticColors.textSecondary,
+                                }}
+                              >
+                                {wishlistDeletingId === it.id ? "Удаляем..." : "Удалить"}
+                              </button>
+                            </div>
+                          </div>
+                          {wishlistStatusUpdatingId === it.id ? (
+                            <p
+                              className="mt-3 text-xs"
+                              style={{ color: productSemanticColors.textSecondary }}
+                              role="status"
+                            >
+                              Обновляем статус...
+                            </p>
+                          ) : null}
+                        </article>
+                      );
+                    })}
+                    {!isCollapsed && hiddenCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPartsVisibleCountByStatus((prev) => ({
+                            ...prev,
+                            [group.status]:
+                              (prev[group.status] ?? PARTS_SELECTION_INITIAL_VISIBLE_COUNT) +
+                              PARTS_SELECTION_VISIBLE_INCREMENT,
+                          }))
+                        }
+                        className="rounded-2xl border border-dashed px-4 py-3 text-sm font-semibold transition"
+                        style={{
+                          backgroundColor: productSemanticColors.cardSubtle,
+                          borderColor: productSemanticColors.borderStrong,
+                          color: productSemanticColors.textPrimary,
+                        }}
+                      >
+                        Показать ещё {Math.min(PARTS_SELECTION_VISIBLE_INCREMENT, hiddenCount)}
+                      </button>
+                    ) : null}
+                  </div>
+                </section>
+                );
+              })}
+            </div>
+          ) : null}
+        </section>
+      </div>
+    );
+  }
+
   const selectedStatusExplanation = selectedStatusExplanationNode?.statusExplanation ?? null;
   const selectedStatusCurrent = selectedStatusExplanation?.current ?? null;
   const selectedStatusLastService = selectedStatusExplanation?.lastService ?? null;
@@ -2943,6 +3646,25 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     selectedStatusUsage?.elapsedDays,
     selectedStatusUsage?.remainingDays,
   ].some((value) => value != null);
+  const darkModalFormControlStyle = {
+    backgroundColor: productSemanticColors.cardMuted,
+    borderColor: productSemanticColors.borderStrong,
+    color: productSemanticColors.textPrimary,
+    colorScheme: "dark" as const,
+  };
+  const darkModalSectionStyle = {
+    backgroundColor: productSemanticColors.cardMuted,
+    borderColor: productSemanticColors.borderStrong,
+    color: productSemanticColors.textPrimary,
+  };
+  const darkModalButtonStyle = {
+    backgroundColor: productSemanticColors.cardSubtle,
+    borderColor: productSemanticColors.borderStrong,
+    color: productSemanticColors.textPrimary,
+  };
+  const darkModalInputLabelStyle = {
+    color: productSemanticColors.textSecondary,
+  };
 
   return (
     <>
@@ -3038,6 +3760,10 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               </div>
             ) : null}
 
+            {!isLoading && !error && vehicle && pageView === "partsSelection"
+              ? renderPartsSelectionPage()
+              : null}
+
             {!isLoading && !error && vehicle && pageView === "dashboard" ? (
               <div style={{ display: "grid", gap: 16 }}>
                 <VehicleDashboard
@@ -3064,7 +3790,10 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   onAddExpense={() =>
                     router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)
                   }
-                  onOpenParts={() => openWishlistModalForCreate()}
+                  onOpenParts={() => router.push(`/vehicles/${vehicleId}/parts`)}
+                  onOpenPartItem={(itemId) =>
+                    router.push(`/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(itemId)}`)
+                  }
                   onOpenAttention={() => setIsAttentionModalOpen(true)}
                   onOpenAllNodes={() => {
                     router.push(`/vehicles/${vehicleId}/nodes`);
@@ -3239,7 +3968,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 </button>
                 <button
                   type="button"
-                  onClick={() => openWishlistModalForCreate()}
+                  onClick={() => router.push(`/vehicles/${vehicleId}/parts`)}
                   className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
                 >
                   Подобрать деталь
@@ -3526,7 +4255,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                 ) : null}
                               </div>
                               <div className="flex shrink-0 flex-wrap items-center gap-1">
+                                <label className="sr-only" htmlFor={`wishlist-status-${it.id}`}>
+                                  Статус позиции
+                                </label>
                                 <select
+                                  id={`wishlist-status-${it.id}`}
                                   value={it.status}
                                   onChange={(e) =>
                                     patchWishlistItemStatus(
@@ -3535,8 +4268,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                       it.status
                                     )
                                   }
-                                  className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs"
+                                  disabled={wishlistStatusUpdatingId === it.id}
+                                  className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs disabled:cursor-wait disabled:opacity-60"
                                   aria-label="Статус позиции"
+                                  title={
+                                    it.node
+                                      ? "Сменить статус позиции"
+                                      : "Для смены статуса нужно выбрать конечный узел"
+                                  }
                                 >
                                   {PART_WISHLIST_STATUS_ORDER.map((s) => (
                                     <option key={s} value={s}>
@@ -3559,12 +4298,18 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                 <button
                                   type="button"
                                   onClick={() => deleteWishlistItemById(it.id)}
-                                  className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-white"
+                                  disabled={wishlistDeletingId === it.id}
+                                  className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-white disabled:cursor-wait disabled:opacity-60"
                                 >
-                                  Удалить
+                                  {wishlistDeletingId === it.id ? "Удаляем..." : "Удалить"}
                                 </button>
                               </div>
                             </div>
+                            {wishlistStatusUpdatingId === it.id ? (
+                              <p className="mt-2 text-xs text-gray-500" role="status">
+                                Обновляем статус...
+                              </p>
+                            ) : null}
                           </li>
                         ))}
                       </ul>
@@ -3859,10 +4604,30 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       ) : null}
 
       {isAddServiceEventModalOpen ? (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 px-4 py-6 sm:items-center">
-          <div className="garage-dark-surface-text w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+        <div
+          className="fixed inset-0 z-[60] flex items-start justify-center px-4 py-6 sm:items-center"
+          style={{ backgroundColor: productSemanticColors.overlayModal }}
+        >
+          <div
+            className="garage-dark-surface-text w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl"
+            style={{
+              backgroundColor: productSemanticColors.card,
+              borderColor: productSemanticColors.borderStrong,
+              color: productSemanticColors.textPrimary,
+            }}
+          >
+            <div
+              className="flex items-center justify-between border-b border-gray-200 px-5 py-3"
+              style={{
+                backgroundColor: productSemanticColors.card,
+                borderBottomColor: productSemanticColors.borderStrong,
+                color: productSemanticColors.textPrimary,
+              }}
+            >
+              <h2
+                className="text-xl font-semibold tracking-tight"
+                style={{ color: productSemanticColors.textPrimary }}
+              >
                 {editingServiceEventId
                   ? "Редактировать сервисное событие"
                   : "Добавить сервисное событие"}
@@ -3871,21 +4636,42 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 type="button"
                 onClick={() => closeAddServiceEventModal()}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                style={darkModalButtonStyle}
               >
                 Закрыть
               </button>
             </div>
 
-            <div className="max-h-[72vh] overflow-y-auto px-6 py-6">
-              <div className="space-y-5">
-                <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4">
-                  <h3 className="text-sm font-semibold text-gray-950">Выбор узла</h3>
-                  <div className="mt-3 grid gap-4">
+            <div
+              className="max-h-[78vh] overflow-y-auto px-5 py-4"
+              style={{
+                backgroundColor: productSemanticColors.card,
+                color: productSemanticColors.textPrimary,
+              }}
+            >
+              <div className="space-y-2.5">
+                <div
+                  className="rounded-2xl border border-gray-200 bg-gray-50/70 px-3 py-2.5"
+                  style={darkModalSectionStyle}
+                >
+                  <h3
+                    className="text-sm font-semibold"
+                    style={{ color: productSemanticColors.textPrimary }}
+                  >
+                    Выбор узла
+                  </h3>
+                  <div className="mt-1.5 flex flex-wrap items-end gap-2">
                     {nodeSelectLevels.map((nodesAtLevel, levelIndex) => (
-                      <InputField
+                      <div
                         key={`level-${levelIndex}`}
-                        label={`Уровень ${levelIndex + 1}`}
+                        className="min-w-[150px] flex-1"
                       >
+                        <label
+                          className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide"
+                          style={{ color: productSemanticColors.textSecondary }}
+                        >
+                          {`Уровень ${levelIndex + 1}`}
+                        </label>
                         <select
                           value={selectedNodePath[levelIndex] ?? ""}
                           onChange={(event) => {
@@ -3898,78 +4684,93 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                               return next;
                             });
                           }}
-                          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
+                          className="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-xs outline-none transition focus:border-gray-950"
+                          style={darkModalFormControlStyle}
                         >
-                          <option value="">{`Выберите узел уровня ${levelIndex + 1}`}</option>
+                          <option value="">{`Уровень ${levelIndex + 1}`}</option>
                           {nodesAtLevel.map((nodeAtLevel) => (
                             <option key={nodeAtLevel.id} value={nodeAtLevel.id}>
                               {nodeAtLevel.name}
                             </option>
                           ))}
                         </select>
-                      </InputField>
+                      </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                  <h3 className="text-sm font-semibold text-gray-950">Данные события</h3>
-                  <div className="mt-3 grid gap-4.5 sm:grid-cols-2">
-                    <InputField label="Тип сервиса">
+                <div
+                  className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5"
+                  style={darkModalSectionStyle}
+                >
+                  <h3
+                    className="text-sm font-semibold"
+                    style={{ color: productSemanticColors.textPrimary }}
+                  >
+                    Данные события
+                  </h3>
+                  <div className="mt-1.5 grid gap-x-3 gap-y-2 sm:grid-cols-2">
+                    <InputField label="Тип сервиса" labelStyle={darkModalInputLabelStyle}>
                       <input
                         value={serviceType}
                         onChange={(event) => setServiceType(event.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        style={darkModalFormControlStyle}
                         placeholder="Например: Oil change"
                       />
                     </InputField>
 
-                    <InputField label="Дата события">
+                    <InputField label="Дата события" labelStyle={darkModalInputLabelStyle}>
                       <input
                         type="date"
                         value={eventDate}
                         onChange={(event) => setEventDate(event.target.value)}
                         max={todayDate}
-                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        style={darkModalFormControlStyle}
                       />
                     </InputField>
 
-                    <InputField label="Пробег, км">
+                    <InputField label="Пробег, км" labelStyle={darkModalInputLabelStyle}>
                       <input
                         value={odometer}
                         onChange={(event) => setOdometer(event.target.value)}
                         inputMode="numeric"
                         max={vehicle?.odometer ?? undefined}
-                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        style={darkModalFormControlStyle}
                         placeholder="Например: 15000"
                       />
                     </InputField>
 
-                    <InputField label="Моточасы">
+                    <InputField label="Моточасы" labelStyle={darkModalInputLabelStyle}>
                       <input
                         value={engineHours}
                         onChange={(event) => setEngineHours(event.target.value)}
                         inputMode="numeric"
-                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        style={darkModalFormControlStyle}
                         placeholder="Если применимо"
                       />
                     </InputField>
 
-                    <InputField label="Стоимость">
+                    <InputField label="Стоимость" labelStyle={darkModalInputLabelStyle}>
                       <input
                         value={costAmount}
                         onChange={(event) => setCostAmount(event.target.value)}
                         inputMode="decimal"
-                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        style={darkModalFormControlStyle}
                         placeholder="Например: 120.5"
                       />
                     </InputField>
 
-                    <InputField label="Валюта">
+                    <InputField label="Валюта" labelStyle={darkModalInputLabelStyle}>
                       <select
                         value={currency}
                         onChange={(event) => setCurrency(event.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        style={darkModalFormControlStyle}
                       >
                         <option value="">Не выбрана</option>
                         <option value="EUR">EUR</option>
@@ -3979,19 +4780,24 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     </InputField>
                   </div>
 
-                  <div className="mt-4">
-                    <InputField label="Комментарий">
+                  <div className="mt-3">
+                    <InputField label="Комментарий" labelStyle={darkModalInputLabelStyle}>
                       <textarea
+                        ref={serviceEventCommentTextareaRef}
                         value={comment}
                         onChange={(event) => setComment(event.target.value)}
-                        className="min-h-28 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950"
+                        className="min-h-20 w-full resize-none overflow-hidden rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        style={darkModalFormControlStyle}
                         placeholder="Опционально"
                       />
                     </InputField>
                   </div>
                 </div>
 
-                <div className="border-t border-gray-100 pt-5">
+                <div
+                  className="border-t border-gray-100 pt-3"
+                  style={{ borderTopColor: productSemanticColors.borderStrong }}
+                >
                 <button
                   type="button"
                   onClick={handleSubmitServiceEvent}
@@ -4000,7 +4806,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     !isLeafNodeSelected ||
                     !eventDate
                   }
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-gray-950 px-6 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-gray-950 px-5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    backgroundColor: productSemanticColors.primaryAction,
+                    color: productSemanticColors.onPrimaryAction,
+                  }}
                 >
                   {isCreatingServiceEvent
                     ? "Сохраняем..."
@@ -4010,7 +4820,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 </button>
 
                 {!isLeafNodeSelected && selectedFinalNode ? (
-                  <p className="mt-3 text-sm text-amber-700">
+                  <p className="mt-3 text-sm" style={{ color: statusSemanticTokens.SOON.foreground }}>
                     Для создания события выберите узел последнего уровня.
                   </p>
                 ) : null}
@@ -5519,6 +6329,49 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           </div>
         </div>
       ) : null}
+      {serviceLogActionNotice ? (
+        <div
+          className="fixed bottom-5 right-5 z-[70] flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow"
+          style={{
+            backgroundColor:
+              serviceLogActionNotice.tone === "success"
+                ? productSemanticColors.successSurface
+                : productSemanticColors.errorSurface,
+            borderColor:
+              serviceLogActionNotice.tone === "success"
+                ? productSemanticColors.successBorder
+                : productSemanticColors.errorBorder,
+            color:
+              serviceLogActionNotice.tone === "success"
+                ? productSemanticColors.success
+                : productSemanticColors.error,
+          }}
+          role="status"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">{serviceLogActionNotice.title}</p>
+            {serviceLogActionNotice.details ? (
+              <p className="mt-0.5 text-xs opacity-85">{serviceLogActionNotice.details}</p>
+            ) : null}
+          </div>
+          {serviceLogActionNotice.tone === "success" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setServiceLogActionNotice(null);
+                openServiceLogModalFull();
+              }}
+              className="shrink-0 rounded-lg border px-2.5 py-1 text-xs font-semibold transition hover:opacity-85"
+              style={{
+                borderColor: productSemanticColors.borderStrong,
+                color: productSemanticColors.textPrimary,
+              }}
+            >
+              В журнал
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {profileFormSuccess ? (
         <div className="fixed bottom-5 right-5 z-[70] rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 shadow">
           {profileFormSuccess}
@@ -5531,13 +6384,15 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 function InputField({
   label,
   children,
+  labelStyle,
 }: {
   label: string;
   children: ReactNode;
+  labelStyle?: CSSProperties;
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-gray-900">
+      <label className="mb-1 block text-xs font-medium text-gray-900" style={labelStyle}>
         {label}
       </label>
       {children}
