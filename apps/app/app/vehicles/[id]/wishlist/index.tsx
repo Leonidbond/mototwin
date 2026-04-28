@@ -252,6 +252,46 @@ export default function VehicleWishlistScreen() {
     }
   }
 
+  async function createExpenseFromWishlist(item: PartWishlistItemViewModel) {
+    if (!vehicleId) {
+      return;
+    }
+    if (item.costAmount == null || item.costAmount <= 0 || !item.currency) {
+      Alert.alert("Расходы", "Укажите стоимость и валюту в карточке позиции перед переносом в расходы.");
+      return;
+    }
+    try {
+      setBusyId(item.id);
+      const client = createApiClient({ baseUrl: apiBaseUrl });
+      const endpoints = createMotoTwinEndpoints(client);
+      await endpoints.createExpenseFromShoppingListItem(item.id, {
+        amount: item.costAmount,
+        currency: item.currency,
+        purchasedAt: new Date().toISOString().slice(0, 10),
+        comment: item.commentBodyRu ?? item.comment ?? null,
+      });
+      await load();
+      Alert.alert("Расходы", "Позиция отмечена купленной и добавлена в расходы.");
+    } catch (e) {
+      console.error(e);
+      const message = e instanceof Error ? e.message : "Не удалось создать расход.";
+      Alert.alert("Ошибка", message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function confirmCreateExpense(item: PartWishlistItemViewModel) {
+    Alert.alert(
+      "Добавить в расходы?",
+      `${item.title}${item.costLabelRu ? `\n${item.costLabelRu}` : ""}`,
+      [
+        { text: "Отмена", style: "cancel" },
+        { text: "Добавить", onPress: () => void createExpenseFromWishlist(item) },
+      ]
+    );
+  }
+
   const confirmDelete = (item: PartWishlistItemViewModel) => {
     Alert.alert("Удалить позицию?", item.title, [
       { text: "Отмена", style: "cancel" },
@@ -509,6 +549,18 @@ export default function VehicleWishlistScreen() {
                             <Text style={styles.journalBtnText}>В журнал</Text>
                           </Pressable>
                         ) : null}
+                        {item.status !== "INSTALLED" ? (
+                          <Pressable
+                            onPress={() => confirmCreateExpense(item)}
+                            disabled={isBusy}
+                            style={({ pressed }) => [
+                              styles.expenseBtn,
+                              pressed && !isBusy && styles.statusBtnPressed,
+                            ]}
+                          >
+                            <Text style={styles.expenseBtnText}>В расходы</Text>
+                          </Pressable>
+                        ) : null}
                         <Pressable
                           onPress={() => promptStatus(item)}
                           disabled={isBusy}
@@ -752,6 +804,15 @@ const styles = StyleSheet.create({
     backgroundColor: c.cardSubtle,
   },
   journalBtnText: { fontSize: 13, fontWeight: "700", color: c.textPrimary },
+  expenseBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.primaryAction,
+    backgroundColor: c.cardSubtle,
+  },
+  expenseBtnText: { fontSize: 13, fontWeight: "800", color: c.primaryAction },
   showMoreButton: {
     borderWidth: 1,
     borderStyle: "dashed",

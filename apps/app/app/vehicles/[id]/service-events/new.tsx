@@ -27,10 +27,12 @@ import {
   normalizeAddServiceEventPayload,
   normalizeEditServiceEventPayload,
   validateAddServiceEventFormValuesMobile,
+  formatExpenseAmountRu,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
   AddServiceEventFormValues,
+  ExpenseItem,
   NodeTreeItem,
   PartSkuViewModel,
   PartWishlistItem,
@@ -94,6 +96,11 @@ export default function NewServiceEventScreen() {
   const [partName, setPartName] = useState("");
   const [installedPartsJson, setInstalledPartsJson] = useState("");
   const [currentVehicleOdometer, setCurrentVehicleOdometer] = useState<number | null>(null);
+  const [currentVehicleEngineHours, setCurrentVehicleEngineHours] = useState<number | null>(null);
+  const [uninstalledExpenses, setUninstalledExpenses] = useState<ExpenseItem[]>([]);
+  const [selectedExpenseIds, setSelectedExpenseIds] = useState<string[]>([]);
+  const [uninstalledExpensesError, setUninstalledExpensesError] = useState("");
+  const [isLoadingUninstalledExpenses, setIsLoadingUninstalledExpenses] = useState(false);
   const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
   const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
   const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
@@ -195,6 +202,7 @@ export default function NewServiceEventScreen() {
         }
         const vehicleOdometer = vehicleData.vehicle?.odometer;
         setCurrentVehicleOdometer(vehicleOdometer != null ? vehicleOdometer : null);
+        setCurrentVehicleEngineHours(vehicleData.vehicle?.engineHours ?? null);
         if (!prefillApplied && !isEditMode) {
           setOdometer(vehicleOdometer != null ? String(vehicleOdometer) : "");
           setEngineHours(
@@ -323,6 +331,85 @@ export default function NewServiceEventScreen() {
   const levels = getNodeSelectLevels(nodeTree, selectedPath);
   const selectedNode = getSelectedNodeFromPath(nodeTree, selectedPath);
   const isLeafSelected = Boolean(selectedNode && isLeafNode(selectedNode));
+  const selectedLeafNodeId = selectedNode && isLeafNode(selectedNode) ? selectedNode.id : "";
+
+  useEffect(() => {
+    if (!vehicleId || !selectedLeafNodeId) {
+      setUninstalledExpenses([]);
+      setSelectedExpenseIds([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingUninstalledExpenses(true);
+    setUninstalledExpensesError("");
+    const client = createApiClient({ baseUrl: apiBaseUrl });
+    const endpoints = createMotoTwinEndpoints(client);
+    void endpoints
+      .getUninstalledExpenses({ vehicleId, nodeId: selectedLeafNodeId })
+      .then((res) => {
+        if (cancelled) {
+          return;
+        }
+        setUninstalledExpenses(res.expenses ?? []);
+        setSelectedExpenseIds((prev) =>
+          prev.filter((id) => (res.expenses ?? []).some((expense) => expense.id === id))
+        );
+      })
+      .catch((requestError) => {
+        if (cancelled) {
+          return;
+        }
+        console.error(requestError);
+        setUninstalledExpenses([]);
+        setUninstalledExpensesError("Не удалось загрузить купленные детали.");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingUninstalledExpenses(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, selectedLeafNodeId, vehicleId]);
+
+  function toggleInstalledExpense(expense: ExpenseItem) {
+    const isSelected = selectedExpenseIds.includes(expense.id);
+    setSelectedExpenseIds((prev) =>
+      isSelected ? prev.filter((id) => id !== expense.id) : [...prev, expense.id]
+    );
+    if (isSelected) {
+      return;
+    }
+    if (!selectedNode && expense.nodeId) {
+      const path = getNodePathById(nodeTree, expense.nodeId);
+      if (path) {
+        setSelectedPath(path);
+      }
+    }
+    const title = expense.title?.trim() || "купленная деталь";
+    if (!eventDate.trim()) {
+      setEventDate(getTodayDateYmdLocal());
+    }
+    if (!serviceType.trim()) {
+      setServiceType(`Установка: ${title}`);
+    }
+    if (!partName.trim()) {
+      setPartName(title);
+    }
+    if (!partSku.trim() && expense.partSku?.trim()) {
+      setPartSku(expense.partSku.trim());
+    }
+    if (!comment.trim()) {
+      setComment(`Установка ранее купленной детали: ${title}`);
+    }
+    if (!odometer.trim() && currentVehicleOdometer != null) {
+      setOdometer(String(currentVehicleOdometer));
+    }
+    if (!engineHours.trim() && currentVehicleEngineHours != null) {
+      setEngineHours(String(currentVehicleEngineHours));
+    }
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -394,7 +481,7 @@ export default function NewServiceEventScreen() {
       partSku,
       partName,
       installedPartsJson,
-      installedExpenseItemIds: [],
+      installedExpenseItemIds: selectedExpenseIds,
     };
 
     const validation = validateAddServiceEventFormValuesMobile(serviceFormValues, {
@@ -503,6 +590,52 @@ export default function NewServiceEventScreen() {
               : "Выберите узел по уровням"}
           </Text>
         </View>
+
+        {selectedNode && isLeafSelected ? (
+          <View style={styles.uninstalledCard}>
+            <Text style={styles.uninstalledTitle}>Купленные, но не установленные детали</Text>
+            <Text style={styles.uninstalledHint}>
+              Выберите позиции, которые устанавливаются этим сервисным событием. После сохранения они будут связаны с журналом.
+            </Text>
+            {isLoadingUninstalledExpenses ? (
+              <Text style={styles.uninstalledHint}>Загружаю купленные детали...</Text>
+            ) : uninstalledExpensesError ? (
+              <Text style={styles.errorText}>{uninstalledExpensesError}</Text>
+            ) : uninstalledExpenses.length === 0 ? (
+              <Text style={styles.uninstalledHint}>Для выбранного узла нет купленных деталей в ожидании установки.</Text>
+            ) : (
+              <View style={styles.uninstalledList}>
+                {uninstalledExpenses.map((expense) => {
+                  const selected = selectedExpenseIds.includes(expense.id);
+                  return (
+                    <Pressable
+                      key={expense.id}
+                      onPress={() => toggleInstalledExpense(expense)}
+                      style={({ pressed }) => [
+                        styles.uninstalledItem,
+                        selected && styles.uninstalledItemSelected,
+                        pressed && styles.uninstalledItemPressed,
+                      ]}
+                    >
+                      <View style={styles.uninstalledCheckbox}>
+                        <Text style={styles.uninstalledCheckboxText}>{selected ? "✓" : ""}</Text>
+                      </View>
+                      <View style={styles.uninstalledBody}>
+                        <Text style={styles.uninstalledName}>{expense.title}</Text>
+                        <Text style={styles.uninstalledMeta}>
+                          {formatExpenseAmountRu(expense.amount)} {expense.currency} · {new Date(expense.expenseDate).toLocaleDateString("ru-RU")}
+                        </Text>
+                        {expense.partSku ? (
+                          <Text style={styles.uninstalledMeta}>SKU · {expense.partSku}</Text>
+                        ) : null}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        ) : null}
 
         <Text style={styles.sectionTitle}>Данные события</Text>
         <Field label="Дата (YYYY-MM-DD)">
@@ -756,6 +889,72 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: c.textMuted,
     marginTop: 4,
+  },
+  uninstalledCard: {
+    marginBottom: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    padding: 12,
+    gap: 8,
+  },
+  uninstalledTitle: {
+    color: c.textPrimary,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  uninstalledHint: {
+    color: c.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  uninstalledList: {
+    gap: 8,
+  },
+  uninstalledItem: {
+    flexDirection: "row",
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+    padding: 10,
+  },
+  uninstalledItemSelected: {
+    borderColor: c.primaryAction,
+    backgroundColor: c.cardSubtle,
+  },
+  uninstalledItemPressed: {
+    opacity: 0.85,
+  },
+  uninstalledCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uninstalledCheckboxText: {
+    color: c.primaryAction,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  uninstalledBody: {
+    flex: 1,
+  },
+  uninstalledName: {
+    color: c.textPrimary,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  uninstalledMeta: {
+    marginTop: 3,
+    color: c.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
   },
   field: {
     marginBottom: 10,

@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,7 @@ import {
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
   formatExpenseAmountRu,
+  buildExpenseAnalyticsFromItems,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -22,6 +24,8 @@ import type {
   ExpenseAnalyticsRow,
   ExpenseAnalyticsSummary,
   ExpenseItem,
+  ExpenseInstallStatus,
+  NodeTreeItem,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { ScreenHeader } from "../../components/screen-header";
@@ -34,12 +38,37 @@ function formatTotals(rows: ExpenseAmountByCurrency[]): string {
   return rows.map((row) => `${formatExpenseAmountRu(row.totalAmount)} ${row.currency}`).join(" · ");
 }
 
+function collectNodeAndDescendantIds(nodes: NodeTreeItem[], nodeId: string): Set<string> {
+  const result = new Set<string>();
+  const addSubtree = (node: NodeTreeItem) => {
+    result.add(node.id);
+    for (const child of node.children ?? []) {
+      addSubtree(child);
+    }
+  };
+  const findTarget = (node: NodeTreeItem): boolean => {
+    if (node.id === nodeId) {
+      addSubtree(node);
+      return true;
+    }
+    return (node.children ?? []).some(findTarget);
+  };
+  nodes.some(findTarget);
+  return result;
+}
+
 export default function VehicleExpensesScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; nodeId?: string; year?: string }>();
   const vehicleId = String(params.id ?? "");
+  const targetNodeId = typeof params.nodeId === "string" ? params.nodeId : "";
+  const requestedYear = typeof params.year === "string" ? Number.parseInt(params.year, 10) : NaN;
+  const selectedYear = Number.isFinite(requestedYear) ? requestedYear : new Date().getFullYear();
   const [analytics, setAnalytics] = useState<ExpenseAnalyticsSummary | null>(null);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [installStatusFilter, setInstallStatusFilter] = useState<ExpenseInstallStatus | "ALL">("ALL");
+  const [busyExpenseId, setBusyExpenseId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -49,7 +78,11 @@ export default function VehicleExpensesScreen() {
       setError("");
       const client = createApiClient({ baseUrl: getApiBaseUrl() });
       const endpoints = createMotoTwinEndpoints(client);
-      const result = await endpoints.getExpenses({ vehicleId });
+      const [result, treeData] = await Promise.all([
+        endpoints.getExpenses({ vehicleId, year: selectedYear }),
+        targetNodeId ? endpoints.getNodeTree(vehicleId) : Promise.resolve({ nodeTree: [] as NodeTreeItem[] }),
+      ]);
+      setNodeTree(treeData.nodeTree ?? []);
       setAnalytics(result.analytics);
       setExpenses(result.expenses);
     } catch (requestError) {
@@ -58,13 +91,49 @@ export default function VehicleExpensesScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [vehicleId]);
+  }, [selectedYear, targetNodeId, vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
       void load();
     }, [load])
   );
+
+  const scopedExpenses = useMemo(() => {
+    const nodeIds = targetNodeId ? collectNodeAndDescendantIds(nodeTree, targetNodeId) : null;
+    return expenses.filter((expense) => {
+      if (nodeIds && (!expense.nodeId || !nodeIds.has(expense.nodeId))) {
+        return false;
+      }
+      if (installStatusFilter !== "ALL" && expense.installStatus !== installStatusFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [expenses, installStatusFilter, nodeTree, targetNodeId]);
+  const scopedAnalytics = useMemo(
+    () => buildExpenseAnalyticsFromItems(scopedExpenses, selectedYear),
+    [scopedExpenses, selectedYear]
+  );
+
+  async function markInstalled(expense: ExpenseItem) {
+    try {
+      setBusyExpenseId(expense.id);
+      const client = createApiClient({ baseUrl: getApiBaseUrl() });
+      const endpoints = createMotoTwinEndpoints(client);
+      await endpoints.markExpenseInstalled(expense.id, {
+        installedAt: new Date().toISOString().slice(0, 10),
+        odometer: expense.odometer ?? null,
+        engineHours: expense.engineHours ?? null,
+      });
+      await load();
+    } catch (requestError) {
+      console.error(requestError);
+      Alert.alert("Расходы", "Не удалось отметить расход установленным.");
+    } finally {
+      setBusyExpenseId(null);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -102,40 +171,67 @@ export default function VehicleExpensesScreen() {
           </StateCard>
         ) : (
           <>
+            {targetNodeId ? (
+              <View style={styles.scopeCard}>
+                <Text style={styles.scopeTitle}>Фильтр по узлу и дочерним узлам</Text>
+                <Text style={styles.scopeText}>Показаны расходы выбранного поддерева за сезон {selectedYear}.</Text>
+              </View>
+            ) : null}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChips}>
+              {(["ALL", "BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"] as const).map((status) => (
+                <Pressable
+                  key={status}
+                  onPress={() => setInstallStatusFilter(status)}
+                  style={[
+                    styles.filterChip,
+                    installStatusFilter === status && styles.filterChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      installStatusFilter === status && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {status === "ALL" ? "Все" : expenseInstallStatusLabelsRu[status]}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
             <View style={styles.metricsGrid}>
-              <MetricCard label="Всего" value={formatTotals(analytics.totalsByCurrency)} />
+              <MetricCard label="Всего" value={formatTotals(scopedAnalytics.totalsByCurrency)} />
               <MetricCard
-                label={`Сезон ${analytics.selectedYear}`}
-                value={formatTotals(analytics.selectedYearTotalsByCurrency)}
+                label={`Сезон ${scopedAnalytics.selectedYear}`}
+                value={formatTotals(scopedAnalytics.selectedYearTotalsByCurrency)}
               />
               <MetricCard
                 label="Куплено, но не установлено"
-                value={`${analytics.boughtNotInstalledCount} · ${formatTotals(analytics.boughtNotInstalledTotalsByCurrency)}`}
+                value={`${scopedAnalytics.boughtNotInstalledCount} · ${formatTotals(scopedAnalytics.boughtNotInstalledTotalsByCurrency)}`}
               />
               <MetricCard
                 label="Операций в сезоне"
-                value={String(analytics.selectedYearExpenseCount)}
+                value={String(scopedAnalytics.selectedYearExpenseCount)}
               />
             </View>
 
             <ExpenseRowsSection
               title="По годам"
-              rows={analytics.byYear}
+              rows={scopedAnalytics.byYear}
             />
 
             <ExpenseRowsSection
               title="По месяцам"
-              rows={analytics.byMonth}
+              rows={scopedAnalytics.byMonth}
             />
 
             <ExpenseRowsSection
               title="По категориям"
-              rows={analytics.byCategory}
+              rows={scopedAnalytics.byCategory}
             />
 
             <Section title="По узлам">
               <View style={styles.rowsList}>
-                {analytics.byNode.map((node) => (
+                {scopedAnalytics.byNode.map((node) => (
                   <View key={node.key} style={styles.nodeRow}>
                     <Text style={styles.rowLabel}>{node.label}</Text>
                     <Text style={styles.rowAmount}>{formatTotals(node.totalsByCurrency)}</Text>
@@ -146,7 +242,12 @@ export default function VehicleExpensesScreen() {
 
             <Section title="Все расходы">
               <View style={styles.rowsList}>
-                {expenses.map((expense) => (
+                {scopedExpenses.length === 0 ? (
+                  <View style={styles.emptyInline}>
+                    <Text style={styles.stateText}>По выбранным фильтрам расходов нет.</Text>
+                  </View>
+                ) : null}
+                {scopedExpenses.map((expense) => (
                   <View key={expense.id} style={styles.eventCard}>
                     <Text style={styles.eventMeta}>
                       {new Date(expense.expenseDate).toLocaleDateString("ru-RU")} ·{" "}
@@ -157,6 +258,33 @@ export default function VehicleExpensesScreen() {
                     <Text style={styles.eventAmount}>
                       {formatExpenseAmountRu(expense.amount)} {expense.currency}
                     </Text>
+                    <View style={styles.eventActions}>
+                      {expense.installationStatus === "NOT_INSTALLED" &&
+                      expense.purchaseStatus === "PURCHASED" &&
+                      !expense.serviceEventId ? (
+                        <Pressable
+                          disabled={busyExpenseId === expense.id}
+                          onPress={() => void markInstalled(expense)}
+                          style={[styles.actionButton, busyExpenseId === expense.id && styles.actionButtonDisabled]}
+                        >
+                          <Text style={styles.actionButtonText}>
+                            {busyExpenseId === expense.id ? "Сохраняю..." : "Отметить установленным"}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                      {expense.serviceEventId ? (
+                        <Pressable
+                          onPress={() =>
+                            router.push(
+                              `/vehicles/${vehicleId}/service-log?expandExpenses=1&serviceEventId=${encodeURIComponent(expense.serviceEventId ?? "")}`
+                            )
+                          }
+                          style={styles.secondaryButton}
+                        >
+                          <Text style={styles.secondaryButtonText}>Открыть сервисное событие</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
                   </View>
                 ))}
               </View>
@@ -287,6 +415,48 @@ const styles = StyleSheet.create({
   metricsGrid: {
     gap: 10,
   },
+  scopeCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    padding: 14,
+    gap: 4,
+  },
+  scopeTitle: {
+    color: c.textPrimary,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  scopeText: {
+    color: c.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  filterChips: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  filterChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  filterChipActive: {
+    borderColor: c.primaryAction,
+    backgroundColor: c.primaryAction,
+  },
+  filterChipText: {
+    color: c.textSecondary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  filterChipTextActive: {
+    color: c.onPrimaryAction,
+  },
   metricCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -361,6 +531,43 @@ const styles = StyleSheet.create({
     color: c.primaryAction,
     fontSize: 14,
     fontWeight: "800",
+  },
+  eventActions: {
+    marginTop: 10,
+    gap: 8,
+  },
+  actionButton: {
+    borderRadius: 14,
+    backgroundColor: c.primaryAction,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  actionButtonDisabled: {
+    opacity: 0.6,
+  },
+  actionButtonText: {
+    color: c.onPrimaryAction,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  secondaryButton: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  secondaryButtonText: {
+    color: c.textPrimary,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  emptyInline: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+    padding: 12,
   },
   rowsList: {
     gap: 10,

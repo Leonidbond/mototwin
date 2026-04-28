@@ -42,11 +42,13 @@ import {
   searchNodeTree,
   formatIsoCalendarDateRu,
   formatExpenseAmountRu,
+  expenseCategoryLabelsRu,
   getRecentServiceEventsForNode,
   resolveGarageVehicleSilhouette,
 } from "@mototwin/domain";
 import type {
   AttentionItemViewModel,
+  ExpenseNodeSummaryItem,
   ExpenseSummaryViewModel,
   NodeSnoozeOption,
   NodeContextViewModel,
@@ -222,6 +224,23 @@ function isIssueNodeStatus(status: NodeStatus | null): status is "OVERDUE" | "SO
   return status === "OVERDUE" || status === "SOON";
 }
 
+function formatNodeExpenseTotals(totals: ExpenseNodeSummaryItem["totalByCurrency"]): string {
+  if (totals.length === 0) {
+    return "—";
+  }
+  return totals
+    .map((row) => `${formatExpenseAmountRu(row.amount)} ${row.currency === "RUB" ? "₽" : row.currency}`)
+    .join(" · ");
+}
+
+function formatNodeExpenseDate(date: string): string {
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) {
+    return date.slice(0, 10);
+  }
+  return parsed.toLocaleDateString("ru-RU");
+}
+
 
 
 // ─── Expandable node row ──────────────────────────────────────────────────────
@@ -236,6 +255,10 @@ type NodeRowProps = {
   onOpenContext?: (nodeId: string) => void;
   onOpenStatusExplanation?: (node: NodeTreeItemViewModel) => void;
   onOpenServiceLogForNode?: (node: NodeTreeItemViewModel) => void;
+  expenseSummary?: ExpenseNodeSummaryItem | null;
+  expenseSummaryByNodeId: Record<string, ExpenseNodeSummaryItem>;
+  expenseYear: number;
+  onOpenExpensesForNode?: (nodeId: string) => void;
   isMaintenanceModeEnabled: boolean;
   highlightedNodeId?: string | null;
   statusHighlightedNodeIds?: Set<string>;
@@ -253,6 +276,10 @@ function NodeRow({
   onOpenContext,
   onOpenStatusExplanation,
   onOpenServiceLogForNode,
+  expenseSummary,
+  expenseSummaryByNodeId,
+  expenseYear,
+  onOpenExpensesForNode,
   isMaintenanceModeEnabled,
   highlightedNodeId,
   statusHighlightedNodeIds,
@@ -413,6 +440,18 @@ function NodeRow({
             {isMaintenanceModeEnabled && summaryLine ? (
               <Text style={styles.planSummaryText}>{summaryLine}</Text>
             ) : null}
+            {expenseSummary ? (
+              <View style={styles.nodeExpenseCompact}>
+                <Text style={styles.nodeExpenseLine}>
+                  Расходы за сезон: {formatNodeExpenseTotals(expenseSummary.totalByCurrency)}
+                </Text>
+                {expenseSummary.purchasedNotInstalledCount > 0 ? (
+                  <Text style={styles.nodeExpenseLine}>
+                    Куплено, не установлено: {expenseSummary.purchasedNotInstalledCount}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
             {isMaintenanceModeEnabled &&
             maintenancePlan &&
             !hasChildren &&
@@ -535,8 +574,49 @@ function NodeRow({
         </View>
       </Pressable>
 
-      {hasChildren && isExpanded
-        ? rowNode.children.map((child) => (
+      {hasChildren && isExpanded ? (
+        <>
+          {expenseSummary ? (
+            <View style={[styles.nodeExpenseDetails, { marginLeft: indent + 12 }]}>
+              <View style={styles.nodeExpenseDetailsHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.nodeExpenseDetailsTitle}>Расходы по узлу</Text>
+                  <Text style={styles.nodeExpenseDetailsText}>
+                    {formatNodeExpenseTotals(expenseSummary.totalByCurrency)} за сезон {expenseYear}
+                  </Text>
+                  <Text style={styles.nodeExpenseDetailsText}>
+                    {expenseSummary.expenseCount} расход{expenseSummary.expenseCount === 1 ? "" : "а"}
+                  </Text>
+                  {expenseSummary.purchasedNotInstalledCount > 0 ? (
+                    <Text style={styles.nodeExpenseDetailsText}>
+                      Куплено, не установлено: {expenseSummary.purchasedNotInstalledCount}
+                    </Text>
+                  ) : null}
+                </View>
+                {onOpenExpensesForNode ? (
+                  <Pressable onPress={() => onOpenExpensesForNode(rowNode.id)} hitSlop={8}>
+                    <Text style={styles.nodeExpenseLink}>Все расходы →</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {expenseSummary.latestExpenses.length > 0 ? (
+                <View style={styles.nodeExpenseLatestList}>
+                  <Text style={styles.nodeExpenseLatestTitle}>Последние расходы</Text>
+                  {expenseSummary.latestExpenses.map((expense) => (
+                    <View key={expense.id} style={styles.nodeExpenseLatestRow}>
+                      <Text style={styles.nodeExpenseLatestText}>
+                        {formatNodeExpenseDate(expense.date)} {expense.title} · {expenseCategoryLabelsRu[expense.category]}
+                      </Text>
+                      <Text style={styles.nodeExpenseLatestAmount}>
+                        {formatExpenseAmountRu(expense.amount)} {expense.currency === "RUB" ? "₽" : expense.currency}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+          {rowNode.children.map((child) => (
             <NodeRow
               key={child.id}
               node={child}
@@ -548,14 +628,19 @@ function NodeRow({
               onOpenContext={onOpenContext}
               onOpenStatusExplanation={onOpenStatusExplanation}
               onOpenServiceLogForNode={onOpenServiceLogForNode}
+              expenseSummary={expenseSummaryByNodeId[child.id] ?? null}
+              expenseSummaryByNodeId={expenseSummaryByNodeId}
+              expenseYear={expenseYear}
+              onOpenExpensesForNode={onOpenExpensesForNode}
               isMaintenanceModeEnabled={isMaintenanceModeEnabled}
               highlightedNodeId={highlightedNodeId}
               statusHighlightedNodeIds={statusHighlightedNodeIds}
               highlightedScrollViewRef={highlightedScrollViewRef}
               highlightedScrollViewportHeight={highlightedScrollViewportHeight}
             />
-          ))
-        : null}
+          ))}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -599,6 +684,12 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [nodeExpenseYear, setNodeExpenseYear] = useState(() => new Date().getFullYear());
+  const [nodeExpenseSummaryByNodeId, setNodeExpenseSummaryByNodeId] = useState<
+    Record<string, ExpenseNodeSummaryItem>
+  >({});
+  const [isNodeExpenseSummaryLoading, setIsNodeExpenseSummaryLoading] = useState(false);
+  const [nodeExpenseSummaryError, setNodeExpenseSummaryError] = useState("");
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -668,10 +759,13 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
     setIsNodeTreeLoading(true);
     setIsTopServiceNodesLoading(true);
-    const [nodesResult, eventsResult, topNodesResult] = await Promise.allSettled([
+    setIsNodeExpenseSummaryLoading(true);
+    setNodeExpenseSummaryError("");
+    const [nodesResult, eventsResult, topNodesResult, expenseNodeSummaryResult] = await Promise.allSettled([
       endpoints.getNodeTree(vehicleId),
       endpoints.getServiceEvents(vehicleId),
       endpoints.getTopServiceNodes(),
+      endpoints.getExpenseNodeSummary({ vehicleId, year: nodeExpenseYear }),
     ]);
 
     if (nodesResult.status === "fulfilled") {
@@ -699,9 +793,21 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       setTopServiceNodesError("Не удалось загрузить основные узлы.");
     }
 
+    if (expenseNodeSummaryResult.status === "fulfilled") {
+      setNodeExpenseSummaryByNodeId(
+        Object.fromEntries((expenseNodeSummaryResult.value.nodes ?? []).map((summary) => [summary.nodeId, summary]))
+      );
+      setNodeExpenseSummaryError("");
+    } else {
+      console.error(expenseNodeSummaryResult.reason);
+      setNodeExpenseSummaryByNodeId({});
+      setNodeExpenseSummaryError("Не удалось загрузить расходы по узлам.");
+    }
+
     setIsNodeTreeLoading(false);
     setIsTopServiceNodesLoading(false);
-  }, [apiBaseUrl, vehicleId]);
+    setIsNodeExpenseSummaryLoading(false);
+  }, [apiBaseUrl, nodeExpenseYear, vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -978,6 +1084,14 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       router.push(buildVehicleWishlistNewHref(vehicleId, nodeId));
     },
     [router, vehicleId]
+  );
+  const openExpensesForTreeNode = useCallback(
+    (nodeId: string) => {
+      setSelectedTopLevelNodeId(null);
+      setHighlightedNodeId(null);
+      router.push(`/vehicles/${vehicleId}/expenses?nodeId=${encodeURIComponent(nodeId)}&year=${nodeExpenseYear}`);
+    },
+    [nodeExpenseYear, router, vehicleId]
   );
   const openAddServiceFromTreeNode = useCallback(
     (leafNodeId: string) => {
@@ -1527,6 +1641,36 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                     );
                   })}
                 </ScrollView>
+                <View style={styles.expenseYearRow}>
+                  <Text style={styles.searchLabel}>Сезон расходов</Text>
+                  <View style={styles.expenseYearChips}>
+                    {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((year) => (
+                      <Pressable
+                        key={year}
+                        onPress={() => setNodeExpenseYear(year)}
+                        style={[
+                          styles.statusFilterChip,
+                          nodeExpenseYear === year && styles.statusFilterChipActiveNeutral,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusFilterChipText,
+                            nodeExpenseYear === year && styles.statusFilterChipTextActiveNeutral,
+                          ]}
+                        >
+                          {year}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {isNodeExpenseSummaryLoading ? (
+                    <Text style={styles.searchHint}>Загружаю расходы по узлам...</Text>
+                  ) : null}
+                  {nodeExpenseSummaryError ? (
+                    <Text style={styles.treeErrorText}>{nodeExpenseSummaryError}</Text>
+                  ) : null}
+                </View>
                 {nodeSearchQuery.trim().length > 0 && nodeSearchQuery.trim().length < 2 ? (
                   <Text style={styles.searchHint}>Введите минимум 2 символа.</Text>
                 ) : null}
@@ -1654,6 +1798,10 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                           onOpenContext={openNodeContextModal}
                           onOpenStatusExplanation={openStatusExplanationFromTreeNode}
                           onOpenServiceLogForNode={openServiceLogForTreeNode}
+                          expenseSummary={nodeExpenseSummaryByNodeId[node.id] ?? null}
+                          expenseSummaryByNodeId={nodeExpenseSummaryByNodeId}
+                          expenseYear={nodeExpenseYear}
+                          onOpenExpensesForNode={openExpensesForTreeNode}
                           isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
                           highlightedNodeId={highlightedNodeId}
                           statusHighlightedNodeIds={statusHighlightedNodeIds}
@@ -2239,6 +2387,10 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                         onOpenContext={openNodeContextModal}
                         onOpenStatusExplanation={openStatusExplanationFromTreeNode}
                         onOpenServiceLogForNode={openServiceLogForTreeNode}
+                        expenseSummary={nodeExpenseSummaryByNodeId[selectedTopLevelNode.id] ?? null}
+                        expenseSummaryByNodeId={nodeExpenseSummaryByNodeId}
+                        expenseYear={nodeExpenseYear}
+                        onOpenExpensesForNode={openExpensesForTreeNode}
                         isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
                         highlightedNodeId={highlightedNodeId}
                         statusHighlightedNodeIds={statusHighlightedNodeIds}
@@ -2259,6 +2411,10 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                         onOpenContext={openNodeContextModal}
                         onOpenStatusExplanation={openStatusExplanationFromTreeNode}
                         onOpenServiceLogForNode={openServiceLogForTreeNode}
+                        expenseSummary={nodeExpenseSummaryByNodeId[child.id] ?? null}
+                        expenseSummaryByNodeId={nodeExpenseSummaryByNodeId}
+                        expenseYear={nodeExpenseYear}
+                        onOpenExpensesForNode={openExpensesForTreeNode}
                         isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
                         highlightedNodeId={highlightedNodeId}
                         statusHighlightedNodeIds={statusHighlightedNodeIds}
@@ -3896,6 +4052,15 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingBottom: 10,
   },
+  expenseYearRow: {
+    marginTop: 10,
+    gap: 8,
+  },
+  expenseYearChips: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
   statusFilterChip: {
     borderWidth: 1,
     borderColor: c.borderStrong,
@@ -4163,6 +4328,68 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: c.textSecondary,
     lineHeight: 16,
+  },
+  nodeExpenseCompact: {
+    marginTop: 5,
+    gap: 2,
+  },
+  nodeExpenseLine: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textSecondary,
+    lineHeight: 15,
+  },
+  nodeExpenseDetails: {
+    marginVertical: 6,
+    marginRight: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+    padding: 12,
+    gap: 8,
+  },
+  nodeExpenseDetailsHeader: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  nodeExpenseDetailsTitle: {
+    color: c.textPrimary,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  nodeExpenseDetailsText: {
+    marginTop: 3,
+    color: c.textSecondary,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  nodeExpenseLink: {
+    color: c.textPrimary,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  nodeExpenseLatestList: {
+    gap: 4,
+  },
+  nodeExpenseLatestTitle: {
+    color: c.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  nodeExpenseLatestRow: {
+    gap: 2,
+  },
+  nodeExpenseLatestText: {
+    color: c.textSecondary,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  nodeExpenseLatestAmount: {
+    color: c.textPrimary,
+    fontSize: 11,
+    fontWeight: "800",
   },
   planLeafBlock: {
     marginTop: 4,
