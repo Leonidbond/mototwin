@@ -16,8 +16,10 @@
 - `NodeStatus`: `OK`, `SOON`, `OVERDUE`, `RECENTLY_REPLACED`
 - `MaintenanceTriggerMode`: `WHICHEVER_COMES_FIRST`, `ANY`, `ALL`
 - `ServiceEventKind`: `SERVICE`, `STATE_UPDATE`
-- `ExpenseCategory`: `SERVICE`, `PARTS`, `REPAIR`, `DIAGNOSTICS`, `LABOR`, `OTHER_TECHNICAL`
+- `ExpenseCategory`: `PART`, `CONSUMABLE`, `SERVICE_WORK`, `REPAIR`, `DIAGNOSTICS`, `OTHER`
 - `ExpenseInstallStatus`: `BOUGHT_NOT_INSTALLED`, `INSTALLED`, `NOT_APPLICABLE`
+- `ExpensePurchaseStatus`: `PLANNED`, `PURCHASED`
+- `ExpenseInstallationStatus`: `NOT_INSTALLED`, `INSTALLED`
 
 ## 3. Core entities and relationships
 
@@ -89,16 +91,25 @@
   - `nodeId` -> `Node`
   - `serviceEventId` -> `ServiceEvent`
   - `shoppingListItemId` -> `PartWishlistItem` (the current implementation of product ShoppingListItem)
-- Required money fields: `amount`, `currency`.
+- Required money fields: `amount` (`Decimal(12,2)`), `currency`.
 - Required classification fields: `category`, `installStatus`.
+- Lifecycle fields:
+  - `purchaseStatus` (`PLANNED` / `PURCHASED`)
+  - `installationStatus` (`NOT_INSTALLED` / `INSTALLED`)
+  - `purchasedAt`
+  - `installedAt`
 - `expenseDate` drives calendar-year season and monthly grouping.
-- Snapshot fields `partSku` / `partName` preserve human-readable part info even if catalog/wishlist data changes.
+- Snapshot fields `partSku` / `partName` / `vendor` / `odometer` / `engineHours` preserve human-readable purchase/install context even if catalog/wishlist/service data changes.
 - Supported statuses:
   - `BOUGHT_NOT_INSTALLED`
   - `INSTALLED`
   - `NOT_APPLICABLE`
 
+The product metric **«куплено, но не установлено»** is intentionally stricter than legacy `installStatus`: it counts only `purchaseStatus = PURCHASED`, `installationStatus = NOT_INSTALLED`, and `serviceEventId = null`.
+
 Only technical expense categories exist in the enum. Fuel, insurance, fines, parking, wash, and gear are intentionally not representable in expense analytics.
+
+Expense node summaries for the full node tree are exposed by `GET /api/expenses/node-summary?vehicleId=...&year=...`. The API aggregates `ExpenseItem` totals separately by currency and rolls child-node expenses up to every parent node.
 
 ### NodeState / TopNodeState
 

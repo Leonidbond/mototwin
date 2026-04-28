@@ -2,6 +2,8 @@ import type {
   AddServiceKitToWishlistPayload,
   AddServiceKitToWishlistResponse,
   BrandsResponse,
+  CreateExpenseFromShoppingListInput,
+  CreateExpenseFromShoppingListResponse,
   CreateExpenseItemInput,
   CreateExpenseItemResponse,
   CreatePartWishlistItemInput,
@@ -21,8 +23,12 @@ import type {
   PartSkuSearchFilters,
   ProfileResponse,
   ExpensesResponse,
+  ExpenseNodeSummaryResponse,
+  MarkExpenseInstalledInput,
+  MarkExpenseInstalledResponse,
   ServiceEventsResponse,
   ServiceKitsResponse,
+  UninstalledExpensesResponse,
   VehicleTrashDeleteResponse,
   VehicleTrashListResponse,
   VehicleTrashMutationResponse,
@@ -177,6 +183,22 @@ export function createMotoTwinEndpoints(client: ApiClient) {
       return client.request<ExpensesResponse>(`/api/expenses${qs ? `?${qs}` : ""}`);
     },
 
+    getExpenseNodeSummary(params: { vehicleId: string; year: number }) {
+      const q = new URLSearchParams({
+        vehicleId: params.vehicleId.trim(),
+        year: String(params.year),
+      });
+      return client.request<ExpenseNodeSummaryResponse>(`/api/expenses/node-summary?${q.toString()}`);
+    },
+
+    getUninstalledExpenses(params: { vehicleId: string; nodeId?: string }) {
+      const q = new URLSearchParams({ vehicleId: params.vehicleId.trim() });
+      if (params.nodeId?.trim()) {
+        q.set("nodeId", params.nodeId.trim());
+      }
+      return client.request<UninstalledExpensesResponse>(`/api/expenses/uninstalled?${q.toString()}`);
+    },
+
     createExpense(input: CreateExpenseItemInput) {
       return client.request<CreateExpenseItemResponse>("/api/expenses", {
         method: "POST",
@@ -198,6 +220,29 @@ export function createMotoTwinEndpoints(client: ApiClient) {
       return client.request<DeleteExpenseItemResponse>(
         `/api/expenses/${encodeURIComponent(expenseId)}`,
         { method: "DELETE" }
+      );
+    },
+
+    markExpenseInstalled(expenseId: string, input: MarkExpenseInstalledInput) {
+      return client.request<MarkExpenseInstalledResponse>(
+        `/api/expenses/${encodeURIComponent(expenseId)}/mark-installed`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(input),
+        }
+      );
+    },
+
+    createExpenseFromShoppingListItem(
+      itemId: string,
+      input: CreateExpenseFromShoppingListInput
+    ) {
+      return client.request<CreateExpenseFromShoppingListResponse>(
+        `/api/shopping-list/${encodeURIComponent(itemId)}/create-expense`,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        }
       );
     },
 

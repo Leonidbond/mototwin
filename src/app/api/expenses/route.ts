@@ -6,8 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "../_shared/current-user-context";
 import { getVehicleInCurrentContext } from "../_shared/vehicle-context";
 
-type ExpenseRow = Omit<ExpenseItem, "expenseDate" | "createdAt" | "updatedAt"> & {
+type ExpenseRow = Omit<
+  ExpenseItem,
+  "amount" | "expenseDate" | "purchasedAt" | "installedAt" | "createdAt" | "updatedAt"
+> & {
+  amount: { toString(): string } | number;
   expenseDate: Date;
+  purchasedAt: Date | null;
+  installedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -20,12 +26,12 @@ type ExpenseModel = {
 const expenseModel = () => (prisma as unknown as { expenseItem: ExpenseModel }).expenseItem;
 
 const categorySchema = z.enum([
-  "SERVICE",
-  "PARTS",
+  "PART",
+  "CONSUMABLE",
+  "SERVICE_WORK",
   "REPAIR",
   "DIAGNOSTICS",
-  "LABOR",
-  "OTHER_TECHNICAL",
+  "OTHER",
 ]);
 
 const installStatusSchema = z.enum([
@@ -34,11 +40,16 @@ const installStatusSchema = z.enum([
   "NOT_APPLICABLE",
 ]);
 
+const purchaseStatusSchema = z.enum(["PLANNED", "PURCHASED"]);
+const installationStatusSchema = z.enum(["NOT_INSTALLED", "INSTALLED"]);
+
 const createExpenseSchema = z.object({
   vehicleId: z.string().trim().min(1),
   nodeId: z.string().trim().nullable().optional(),
   category: categorySchema,
   installStatus: installStatusSchema,
+  purchaseStatus: purchaseStatusSchema.optional(),
+  installationStatus: installationStatusSchema.optional(),
   expenseDate: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))),
   title: z.string().trim().min(1).max(300),
   amount: z.number().positive(),
@@ -47,12 +58,20 @@ const createExpenseSchema = z.object({
   comment: z.string().trim().nullable().optional(),
   partSku: z.string().trim().nullable().optional(),
   partName: z.string().trim().nullable().optional(),
+  vendor: z.string().trim().nullable().optional(),
+  purchasedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
+  installedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
+  odometer: z.number().int().min(0).nullable().optional(),
+  engineHours: z.number().int().min(0).nullable().optional(),
 });
 
 function toWire(row: ExpenseRow): ExpenseItem {
   return {
     ...row,
+    amount: Number(row.amount),
     expenseDate: row.expenseDate.toISOString(),
+    purchasedAt: row.purchasedAt?.toISOString() ?? null,
+    installedAt: row.installedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -151,13 +170,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const expenseDate = new Date(data.expenseDate);
+    const installationStatus =
+      data.installationStatus ??
+      (data.installStatus === "BOUGHT_NOT_INSTALLED" ? "NOT_INSTALLED" : "INSTALLED");
+
     const row = await expenseModel().create({
       data: {
         vehicleId: data.vehicleId,
         nodeId: data.nodeId || null,
         category: data.category,
         installStatus: data.installStatus,
-        expenseDate: new Date(data.expenseDate),
+        purchaseStatus: data.purchaseStatus ?? "PURCHASED",
+        installationStatus,
+        expenseDate,
         title: data.title,
         amount: data.amount,
         currency: data.currency.toUpperCase(),
@@ -165,6 +191,16 @@ export async function POST(request: NextRequest) {
         comment: data.comment?.trim() || null,
         partSku: data.partSku?.trim() || null,
         partName: data.partName?.trim() || null,
+        vendor: data.vendor?.trim() || null,
+        purchasedAt: data.purchasedAt ? new Date(data.purchasedAt) : expenseDate,
+        installedAt:
+          data.installedAt
+            ? new Date(data.installedAt)
+            : installationStatus === "NOT_INSTALLED"
+              ? null
+              : expenseDate,
+        odometer: data.odometer ?? null,
+        engineHours: data.engineHours ?? null,
       },
       include: {
         node: { select: { id: true, name: true } },

@@ -10,8 +10,14 @@ type RouteContext = {
   params: Promise<{ expenseId: string }>;
 };
 
-type ExpenseRow = Omit<ExpenseItem, "expenseDate" | "createdAt" | "updatedAt"> & {
+type ExpenseRow = Omit<
+  ExpenseItem,
+  "amount" | "expenseDate" | "purchasedAt" | "installedAt" | "createdAt" | "updatedAt"
+> & {
+  amount: { toString(): string } | number;
   expenseDate: Date;
+  purchasedAt: Date | null;
+  installedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -28,8 +34,10 @@ const expenseModel = () => (prisma as unknown as { expenseItem: ExpenseModel }).
 const patchExpenseSchema = z
   .object({
     nodeId: z.string().trim().nullable().optional(),
-    category: z.enum(["SERVICE", "PARTS", "REPAIR", "DIAGNOSTICS", "LABOR", "OTHER_TECHNICAL"]).optional(),
+    category: z.enum(["PART", "CONSUMABLE", "SERVICE_WORK", "REPAIR", "DIAGNOSTICS", "OTHER"]).optional(),
     installStatus: z.enum(["BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"]).optional(),
+    purchaseStatus: z.enum(["PLANNED", "PURCHASED"]).optional(),
+    installationStatus: z.enum(["NOT_INSTALLED", "INSTALLED"]).optional(),
     expenseDate: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).optional(),
     title: z.string().trim().min(1).max(300).optional(),
     amount: z.number().positive().optional(),
@@ -38,13 +46,21 @@ const patchExpenseSchema = z
     comment: z.string().trim().nullable().optional(),
     partSku: z.string().trim().nullable().optional(),
     partName: z.string().trim().nullable().optional(),
+    vendor: z.string().trim().nullable().optional(),
+    purchasedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
+    installedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
+    odometer: z.number().int().min(0).nullable().optional(),
+    engineHours: z.number().int().min(0).nullable().optional(),
   })
   .strict();
 
 function toWire(row: ExpenseRow): ExpenseItem {
   return {
     ...row,
+    amount: Number(row.amount),
     expenseDate: row.expenseDate.toISOString(),
+    purchasedAt: row.purchasedAt?.toISOString() ?? null,
+    installedAt: row.installedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -104,6 +120,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         comment: data.comment === undefined ? undefined : data.comment?.trim() || null,
         partSku: data.partSku === undefined ? undefined : data.partSku?.trim() || null,
         partName: data.partName === undefined ? undefined : data.partName?.trim() || null,
+        vendor: data.vendor === undefined ? undefined : data.vendor?.trim() || null,
+        purchasedAt: data.purchasedAt === undefined ? undefined : data.purchasedAt ? new Date(data.purchasedAt) : null,
+        installedAt: data.installedAt === undefined ? undefined : data.installedAt ? new Date(data.installedAt) : null,
       },
       include: { node: { select: { id: true, name: true } } },
     });

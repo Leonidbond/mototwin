@@ -1,15 +1,19 @@
 export type ExpenseCategory =
-  | "SERVICE"
-  | "PARTS"
+  | "PART"
+  | "CONSUMABLE"
+  | "SERVICE_WORK"
   | "REPAIR"
   | "DIAGNOSTICS"
-  | "LABOR"
-  | "OTHER_TECHNICAL";
+  | "OTHER";
 
 export type ExpenseInstallStatus =
   | "BOUGHT_NOT_INSTALLED"
   | "INSTALLED"
   | "NOT_APPLICABLE";
+
+export type ExpensePurchaseStatus = "PLANNED" | "PURCHASED";
+
+export type ExpenseInstallationStatus = "NOT_INSTALLED" | "INSTALLED";
 
 export type ExpenseItemNodeSummary = {
   id: string;
@@ -31,6 +35,8 @@ export type ExpenseItem = {
   shoppingListItemId: string | null;
   category: ExpenseCategory;
   installStatus: ExpenseInstallStatus;
+  purchaseStatus: ExpensePurchaseStatus;
+  installationStatus: ExpenseInstallationStatus;
   expenseDate: string;
   title: string;
   amount: number;
@@ -39,6 +45,11 @@ export type ExpenseItem = {
   comment: string | null;
   partSku: string | null;
   partName: string | null;
+  vendor: string | null;
+  purchasedAt: string | null;
+  installedAt: string | null;
+  odometer: number | null;
+  engineHours: number | null;
   createdAt: string;
   updatedAt: string;
   node: ExpenseItemNodeSummary;
@@ -52,6 +63,8 @@ export type CreateExpenseItemInput = {
   shoppingListItemId?: string | null;
   category: ExpenseCategory;
   installStatus: ExpenseInstallStatus;
+  purchaseStatus?: ExpensePurchaseStatus;
+  installationStatus?: ExpenseInstallationStatus;
   expenseDate: string;
   title: string;
   amount: number;
@@ -60,6 +73,11 @@ export type CreateExpenseItemInput = {
   comment?: string | null;
   partSku?: string | null;
   partName?: string | null;
+  vendor?: string | null;
+  purchasedAt?: string | null;
+  installedAt?: string | null;
+  odometer?: number | null;
+  engineHours?: number | null;
 };
 
 export type UpdateExpenseItemInput = Partial<
@@ -99,6 +117,34 @@ export type ExpensesResponse = {
   years: number[];
 };
 
+export type UninstalledExpensesResponse = {
+  expenses: ExpenseItem[];
+};
+
+export type ExpenseNodeSummaryItem = {
+  nodeId: string;
+  totalByCurrency: {
+    currency: string;
+    amount: number;
+  }[];
+  expenseCount: number;
+  purchasedNotInstalledCount: number;
+  latestExpenses: {
+    id: string;
+    date: string;
+    title: string;
+    amount: number;
+    currency: string;
+    category: ExpenseCategory;
+    installationStatus: ExpenseInstallationStatus;
+  }[];
+};
+
+export type ExpenseNodeSummaryResponse = {
+  year: number;
+  nodes: ExpenseNodeSummaryItem[];
+};
+
 export type CreateExpenseItemResponse = {
   expense: ExpenseItem;
   analytics: ExpenseAnalyticsSummary;
@@ -109,4 +155,27 @@ export type UpdateExpenseItemResponse = CreateExpenseItemResponse;
 export type DeleteExpenseItemResponse = {
   deleted: true;
   expenseId: string;
+};
+
+export type CreateExpenseFromShoppingListInput = {
+  amount: number;
+  currency: string;
+  purchasedAt?: string | null;
+  vendor?: string | null;
+  comment?: string | null;
+};
+
+export type CreateExpenseFromShoppingListResponse = {
+  expense: ExpenseItem;
+};
+
+export type MarkExpenseInstalledInput = {
+  installedAt: string;
+  serviceEventId?: string | null;
+  odometer?: number | null;
+  engineHours?: number | null;
+};
+
+export type MarkExpenseInstalledResponse = {
+  expense: ExpenseItem;
 };

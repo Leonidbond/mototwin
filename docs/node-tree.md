@@ -181,6 +181,30 @@
 - Это live snapshot, а не только seed-контракт.
 - При изменении taxonomy/seed этот документ нужно обновлять.
 
+## Expense Context In Full Tree
+
+Расходы остаются отдельной страницей `/expenses`, но полное дерево узлов показывает компактный финансовый контекст по узлам.
+
+Источник данных:
+
+- `GET /api/expenses/node-summary?vehicleId=<vehicleId>&year=<year>`
+
+Правила агрегации:
+
+- leaf node показывает только расходы своего `nodeId`;
+- parent node показывает расходы своего `nodeId` и всех descendants любого уровня;
+- сезон = календарный год (`YYYY-01-01` ... `YYYY-12-31`);
+- суммы разных валют не складываются и выводятся отдельными строками/частями;
+- `purchasedNotInstalledCount` считает только `purchaseStatus = PURCHASED`, `installationStatus = NOT_INSTALLED`, `serviceEventId = null`.
+
+UI-правила:
+
+- узлы без расходов не получают пустых строк;
+- в свернутом/карточном состоянии показывается только компактная строка `Расходы за сезон`;
+- при раскрытии узла показывается блок `Расходы по узлу`: итого, количество расходов, куплено/не установлено, последние 3 расхода;
+- ссылка `Все расходы по узлу →` ведёт на `/expenses?vehicleId=<vehicleId>&nodeId=<nodeId>&year=<year>`;
+- `/expenses` трактует `nodeId` как выбранный узел плюс всё поддерево, чтобы parent node открывал ту же финансовую область, что и дерево.
+
 ## Full Service Tree (UI contract)
 
 Источник для UI: `GET /api/vehicles/[id]/node-tree`

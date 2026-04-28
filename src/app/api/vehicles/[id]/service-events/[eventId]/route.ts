@@ -7,6 +7,7 @@ import {
   type NodeMaintenanceRuleView,
 } from "@/lib/maintenance-status";
 import { syncExpenseItemForServiceEvent } from "@/lib/expense-items";
+import { linkInstalledExpenseItemsToServiceEvent } from "@/lib/service-event-expense-links";
 import { prisma } from "@/lib/prisma";
 import { getVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
@@ -53,6 +54,7 @@ const updateServiceEventSchema = z
     comment: z.string().trim().nullable().optional(),
     partSku: z.union([z.string(), z.null()]).optional(),
     partName: z.union([z.string(), z.null()]).optional(),
+    installedExpenseItemIds: z.array(z.string().trim().min(1)).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.costAmount != null && !value.currency?.trim()) {
@@ -347,6 +349,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         await syncNodeStateForLeafNode(tx, vehicleId, nodeId);
       }
       await syncExpenseItemForServiceEvent(tx, updated);
+      await linkInstalledExpenseItemsToServiceEvent(tx, {
+        vehicleId,
+        serviceEventId: updated.id,
+        expenseItemIds: payload.installedExpenseItemIds ?? [],
+        installedAt: eventDate,
+        odometer: updated.odometer,
+        engineHours: updated.engineHours,
+      });
       await recomputeTopNodeStates(tx, vehicleId);
 
       return updated;
@@ -363,6 +373,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { error: "Validation failed", issues: error.issues },
         { status: 400 }
       );
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Selected expense items are not available for this service event"
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     console.error("Failed to update service event:", error);

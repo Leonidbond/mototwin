@@ -1225,6 +1225,506 @@ async function upsertOwnedVehicle(input: {
   });
 }
 
+async function upsertDemoServiceEvent(input: {
+  vehicleId: string;
+  nodeId: string;
+  eventDate: Date;
+  odometer: number;
+  engineHours: number | null;
+  serviceType: string;
+  comment: string;
+  partSku?: string | null;
+  partName?: string | null;
+}) {
+  const existing = await prisma.serviceEvent.findFirst({
+    where: {
+      vehicleId: input.vehicleId,
+      serviceType: input.serviceType,
+      comment: { contains: "[seed:expense-demo]" },
+    },
+    select: { id: true },
+  });
+
+  const data = {
+    nodeId: input.nodeId,
+    eventDate: input.eventDate,
+    odometer: input.odometer,
+    engineHours: input.engineHours,
+    serviceType: input.serviceType,
+    installedPartsJson: Prisma.JsonNull,
+    costAmount: null,
+    currency: null,
+    comment: input.comment,
+    partSku: input.partSku ?? null,
+    partName: input.partName ?? null,
+  };
+
+  if (existing) {
+    return prisma.serviceEvent.update({
+      where: { id: existing.id },
+      data,
+      select: { id: true },
+    });
+  }
+
+  return prisma.serviceEvent.create({
+    data: {
+      vehicleId: input.vehicleId,
+      ...data,
+    },
+    select: { id: true },
+  });
+}
+
+async function upsertDemoWishlistItem(input: {
+  vehicleId: string;
+  nodeId: string;
+  title: string;
+  status: "BOUGHT" | "INSTALLED";
+  costAmount: number;
+  currency: string;
+}) {
+  const existing = await prisma.partWishlistItem.findFirst({
+    where: {
+      vehicleId: input.vehicleId,
+      title: input.title,
+      comment: { contains: "[seed:expense-demo]" },
+    },
+    select: { id: true },
+  });
+
+  const data = {
+    nodeId: input.nodeId,
+    title: input.title,
+    quantity: 1,
+    status: input.status,
+    comment: "[seed:expense-demo] Демо-позиция для ручной проверки расходов.",
+    costAmount: input.costAmount,
+    currency: input.currency,
+  };
+
+  if (existing) {
+    return prisma.partWishlistItem.update({
+      where: { id: existing.id },
+      data,
+      select: { id: true },
+    });
+  }
+
+  return prisma.partWishlistItem.create({
+    data: {
+      vehicleId: input.vehicleId,
+      ...data,
+    },
+    select: { id: true },
+  });
+}
+
+async function upsertDemoExpense(input: {
+  vehicleId: string;
+  nodeId?: string | null;
+  serviceEventId?: string | null;
+  shoppingListItemId?: string | null;
+  title: string;
+  category: "PART" | "CONSUMABLE" | "SERVICE_WORK" | "REPAIR" | "DIAGNOSTICS" | "OTHER";
+  installStatus: "BOUGHT_NOT_INSTALLED" | "INSTALLED" | "NOT_APPLICABLE";
+  installationStatus: "NOT_INSTALLED" | "INSTALLED";
+  expenseDate: Date;
+  amount: number;
+  currency: string;
+  vendor?: string | null;
+  partSku?: string | null;
+  partName?: string | null;
+  installedAt?: Date | null;
+  odometer?: number | null;
+  engineHours?: number | null;
+}) {
+  const existing = await prisma.expenseItem.findFirst({
+    where: {
+      vehicleId: input.vehicleId,
+      title: input.title,
+      comment: { contains: "[seed:expense-demo]" },
+    },
+    select: { id: true },
+  });
+
+  const data = {
+    nodeId: input.nodeId ?? null,
+    serviceEventId: input.serviceEventId ?? null,
+    shoppingListItemId: input.shoppingListItemId ?? null,
+    category: input.category,
+    installStatus: input.installStatus,
+    purchaseStatus: "PURCHASED" as const,
+    installationStatus: input.installationStatus,
+    expenseDate: input.expenseDate,
+    title: input.title,
+    amount: new Prisma.Decimal(input.amount),
+    currency: input.currency,
+    quantity: 1,
+    comment: "[seed:expense-demo] Демо-расход для ручной проверки аналитики.",
+    partSku: input.partSku ?? null,
+    partName: input.partName ?? null,
+    vendor: input.vendor ?? null,
+    purchasedAt: input.expenseDate,
+    installedAt: input.installedAt ?? null,
+    odometer: input.odometer ?? null,
+    engineHours: input.engineHours ?? null,
+  };
+
+  if (existing) {
+    await prisma.expenseItem.update({
+      where: { id: existing.id },
+      data,
+    });
+    return 0;
+  }
+
+  await prisma.expenseItem.create({
+    data: {
+      vehicleId: input.vehicleId,
+      ...data,
+    },
+  });
+  return 1;
+}
+
+async function upsertTreeDemoExpense(input: {
+  vehicleId: string;
+  nodeId: string;
+  title: string;
+  category: "PART" | "CONSUMABLE" | "SERVICE_WORK" | "REPAIR" | "DIAGNOSTICS" | "OTHER";
+  installStatus: "BOUGHT_NOT_INSTALLED" | "INSTALLED" | "NOT_APPLICABLE";
+  installationStatus: "NOT_INSTALLED" | "INSTALLED";
+  expenseDate: Date;
+  amount: number;
+  currency: string;
+  serviceEventId?: string | null;
+  installedAt?: Date | null;
+}) {
+  const existing = await prisma.expenseItem.findFirst({
+    where: {
+      vehicleId: input.vehicleId,
+      title: input.title,
+      comment: { contains: "[seed:tree-expense]" },
+    },
+    select: { id: true },
+  });
+
+  const data = {
+    nodeId: input.nodeId,
+    serviceEventId: input.serviceEventId ?? null,
+    shoppingListItemId: null,
+    category: input.category,
+    installStatus: input.installStatus,
+    purchaseStatus: "PURCHASED" as const,
+    installationStatus: input.installationStatus,
+    expenseDate: input.expenseDate,
+    title: input.title,
+    amount: new Prisma.Decimal(input.amount),
+    currency: input.currency,
+    quantity: 1,
+    comment: "[seed:tree-expense] Демо-расход для проверки дерева узлов.",
+    partSku: null,
+    partName: input.title,
+    vendor: "tree demo seed",
+    purchasedAt: input.expenseDate,
+    installedAt: input.installedAt ?? null,
+    odometer: null,
+    engineHours: null,
+  };
+
+  if (existing) {
+    await prisma.expenseItem.update({
+      where: { id: existing.id },
+      data,
+    });
+    return 0;
+  }
+
+  await prisma.expenseItem.create({
+    data: {
+      vehicleId: input.vehicleId,
+      ...data,
+    },
+  });
+  return 1;
+}
+
+async function seedTreeExpenseCheckData(input: {
+  userId: string;
+  nodeIdByCode: Map<string, string>;
+}) {
+  const vehicle = await prisma.vehicle.findFirst({
+    where: {
+      userId: input.userId,
+      nickname: "QA — KTM 690 Enduro R 2022",
+    },
+    select: { id: true, odometer: true, engineHours: true },
+  });
+
+  if (!vehicle) {
+    console.warn("[seed] Tree expense check data skipped: QA vehicle not found");
+    return { treeDemoExpensesCreated: 0, treeDemoExpensesSkipped: 1 };
+  }
+
+  const requiredCodes = [
+    "BRAKES.FRONT.PADS",
+    "BRAKES.REAR.PADS",
+    "BRAKES.FLUID",
+    "ENGINE.LUBE.OIL",
+    "ENGINE.LUBE.FILTER",
+    "TIRES.REAR",
+  ] as const;
+  const nodeIds = Object.fromEntries(
+    requiredCodes.map((code) => [code, input.nodeIdByCode.get(code) ?? null])
+  ) as Record<(typeof requiredCodes)[number], string | null>;
+
+  if (Object.values(nodeIds).some((nodeId) => !nodeId)) {
+    console.warn("[seed] Tree expense check data skipped: required nodes not found");
+    return { treeDemoExpensesCreated: 0, treeDemoExpensesSkipped: 1 };
+  }
+
+  const oilServiceEvent = await upsertDemoServiceEvent({
+    vehicleId: vehicle.id,
+    nodeId: nodeIds["ENGINE.LUBE.OIL"]!,
+    eventDate: new Date("2026-04-14T10:00:00.000Z"),
+    odometer: Math.min(vehicle.odometer, 5200),
+    engineHours: vehicle.engineHours,
+    serviceType: "Tree demo: замена масла",
+    comment: "[seed:tree-expense] Демо-сервис для проверки расходов в дереве.",
+    partName: "Масло двигателя",
+  });
+
+  let treeDemoExpensesCreated = 0;
+  treeDemoExpensesCreated += await upsertTreeDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: nodeIds["BRAKES.FRONT.PADS"]!,
+    title: "Tree demo: передние тормозные колодки",
+    category: "PART",
+    installStatus: "INSTALLED",
+    installationStatus: "INSTALLED",
+    expenseDate: new Date("2026-04-14T10:00:00.000Z"),
+    amount: 6800,
+    currency: "RUB",
+    installedAt: new Date("2026-04-14T10:00:00.000Z"),
+  });
+  treeDemoExpensesCreated += await upsertTreeDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: nodeIds["BRAKES.REAR.PADS"]!,
+    title: "Tree demo: задние тормозные колодки",
+    category: "PART",
+    installStatus: "BOUGHT_NOT_INSTALLED",
+    installationStatus: "NOT_INSTALLED",
+    expenseDate: new Date("2026-04-15T10:00:00.000Z"),
+    amount: 4200,
+    currency: "RUB",
+  });
+  treeDemoExpensesCreated += await upsertTreeDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: nodeIds["BRAKES.FLUID"]!,
+    title: "Tree demo: тормозная жидкость",
+    category: "CONSUMABLE",
+    installStatus: "INSTALLED",
+    installationStatus: "INSTALLED",
+    expenseDate: new Date("2026-04-16T10:00:00.000Z"),
+    amount: 1500,
+    currency: "RUB",
+    installedAt: new Date("2026-04-16T10:00:00.000Z"),
+  });
+  treeDemoExpensesCreated += await upsertTreeDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: nodeIds["ENGINE.LUBE.OIL"]!,
+    serviceEventId: oilServiceEvent.id,
+    title: "Tree demo: масло двигателя",
+    category: "CONSUMABLE",
+    installStatus: "INSTALLED",
+    installationStatus: "INSTALLED",
+    expenseDate: new Date("2026-04-14T10:00:00.000Z"),
+    amount: 4200,
+    currency: "RUB",
+    installedAt: new Date("2026-04-14T10:00:00.000Z"),
+  });
+  treeDemoExpensesCreated += await upsertTreeDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: nodeIds["ENGINE.LUBE.FILTER"]!,
+    title: "Tree demo: масляный фильтр",
+    category: "PART",
+    installStatus: "BOUGHT_NOT_INSTALLED",
+    installationStatus: "NOT_INSTALLED",
+    expenseDate: new Date("2026-04-17T10:00:00.000Z"),
+    amount: 900,
+    currency: "RUB",
+  });
+  treeDemoExpensesCreated += await upsertTreeDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: nodeIds["TIRES.REAR"]!,
+    title: "Tree demo: задняя шина",
+    category: "PART",
+    installStatus: "INSTALLED",
+    installationStatus: "INSTALLED",
+    expenseDate: new Date("2026-04-18T10:00:00.000Z"),
+    amount: 120,
+    currency: "EUR",
+    installedAt: new Date("2026-04-18T10:00:00.000Z"),
+  });
+
+  return { treeDemoExpensesCreated, treeDemoExpensesSkipped: 0 };
+}
+
+async function seedExpenseDemoData(input: {
+  userId: string;
+  nodeIdByCode: Map<string, string>;
+}) {
+  const vehicle = await prisma.vehicle.findFirst({
+    where: {
+      userId: input.userId,
+      nickname: "QA — KTM 690 Enduro R 2022",
+    },
+    select: { id: true, odometer: true, engineHours: true },
+  });
+
+  if (!vehicle) {
+    console.warn("[seed] Expense demo data skipped: QA vehicle not found");
+    return { demoExpensesCreated: 0, demoExpensesSkipped: 1 };
+  }
+
+  const oilNodeId = input.nodeIdByCode.get("ENGINE.LUBE.OIL");
+  const filterNodeId = input.nodeIdByCode.get("ENGINE.LUBE.FILTER");
+  const brakePadsNodeId = input.nodeIdByCode.get("BRAKES.FRONT.PADS");
+  const chainNodeId = input.nodeIdByCode.get("DRIVETRAIN.CHAIN");
+  const diagnosticsNodeId = input.nodeIdByCode.get("ELECTRICS.CHARGING");
+  if (!oilNodeId || !filterNodeId || !brakePadsNodeId || !chainNodeId || !diagnosticsNodeId) {
+    console.warn("[seed] Expense demo data skipped: required nodes not found");
+    return { demoExpensesCreated: 0, demoExpensesSkipped: 1 };
+  }
+
+  let demoExpensesCreated = 0;
+  const oilServiceEvent = await upsertDemoServiceEvent({
+    vehicleId: vehicle.id,
+    nodeId: oilNodeId,
+    eventDate: new Date("2026-03-15T10:00:00.000Z"),
+    odometer: Math.min(vehicle.odometer, 4800),
+    engineHours: vehicle.engineHours,
+    serviceType: "Замена масла и фильтра",
+    comment: "[seed:expense-demo] Демо-сервис для проверки ExpenseItem -> ServiceEvent.",
+    partName: "Масло двигателя",
+  });
+
+  const filterWishlist = await upsertDemoWishlistItem({
+    vehicleId: vehicle.id,
+    nodeId: filterNodeId,
+    title: "Масляный фильтр HF155",
+    status: "INSTALLED",
+    costAmount: 900,
+    currency: "RUB",
+  });
+
+  const brakeWishlist = await upsertDemoWishlistItem({
+    vehicleId: vehicle.id,
+    nodeId: brakePadsNodeId,
+    title: "Передние тормозные колодки",
+    status: "BOUGHT",
+    costAmount: 4200,
+    currency: "RUB",
+  });
+
+  demoExpensesCreated += await upsertDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: brakePadsNodeId,
+    shoppingListItemId: brakeWishlist.id,
+    title: "Передние тормозные колодки",
+    category: "PART",
+    installStatus: "BOUGHT_NOT_INSTALLED",
+    installationStatus: "NOT_INSTALLED",
+    expenseDate: new Date("2026-04-10T10:00:00.000Z"),
+    amount: 4200,
+    currency: "RUB",
+    vendor: "тестовый магазин",
+    partName: "Передние тормозные колодки",
+  });
+
+  demoExpensesCreated += await upsertDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: filterNodeId,
+    serviceEventId: oilServiceEvent.id,
+    shoppingListItemId: filterWishlist.id,
+    title: "Масляный фильтр HF155",
+    category: "PART",
+    installStatus: "INSTALLED",
+    installationStatus: "INSTALLED",
+    expenseDate: new Date("2026-03-01T10:00:00.000Z"),
+    amount: 900,
+    currency: "RUB",
+    vendor: "тестовый магазин",
+    partSku: "HF155",
+    partName: "Масляный фильтр HF155",
+    installedAt: new Date("2026-03-15T10:00:00.000Z"),
+    odometer: Math.min(vehicle.odometer, 4800),
+    engineHours: vehicle.engineHours,
+  });
+
+  demoExpensesCreated += await upsertDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: oilNodeId,
+    serviceEventId: oilServiceEvent.id,
+    title: "Масло двигателя",
+    category: "CONSUMABLE",
+    installStatus: "INSTALLED",
+    installationStatus: "INSTALLED",
+    expenseDate: new Date("2026-03-15T10:00:00.000Z"),
+    amount: 3100,
+    currency: "RUB",
+    partName: "Масло двигателя",
+    installedAt: new Date("2026-03-15T10:00:00.000Z"),
+    odometer: Math.min(vehicle.odometer, 4800),
+    engineHours: vehicle.engineHours,
+  });
+
+  demoExpensesCreated += await upsertDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: oilNodeId,
+    serviceEventId: oilServiceEvent.id,
+    title: "Работа по замене масла",
+    category: "SERVICE_WORK",
+    installStatus: "NOT_APPLICABLE",
+    installationStatus: "INSTALLED",
+    expenseDate: new Date("2026-03-15T10:00:00.000Z"),
+    amount: 2500,
+    currency: "RUB",
+    installedAt: new Date("2026-03-15T10:00:00.000Z"),
+    odometer: Math.min(vehicle.odometer, 4800),
+    engineHours: vehicle.engineHours,
+  });
+
+  demoExpensesCreated += await upsertDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: diagnosticsNodeId,
+    title: "Диагностика зарядки",
+    category: "DIAGNOSTICS",
+    installStatus: "NOT_APPLICABLE",
+    installationStatus: "INSTALLED",
+    expenseDate: new Date("2026-02-08T10:00:00.000Z"),
+    amount: 1800,
+    currency: "RUB",
+    installedAt: new Date("2026-02-08T10:00:00.000Z"),
+  });
+
+  demoExpensesCreated += await upsertDemoExpense({
+    vehicleId: vehicle.id,
+    nodeId: chainNodeId,
+    title: "Ремонт цепи",
+    category: "REPAIR",
+    installStatus: "NOT_APPLICABLE",
+    installationStatus: "INSTALLED",
+    expenseDate: new Date("2026-01-20T10:00:00.000Z"),
+    amount: 5200,
+    currency: "RUB",
+    installedAt: new Date("2026-01-20T10:00:00.000Z"),
+  });
+
+  return { demoExpensesCreated, demoExpensesSkipped: 0 };
+}
+
 async function main() {
   const demoUser = await prisma.user.upsert({
     where: { email: "demo@mototwin.local" },
@@ -1690,6 +2190,14 @@ async function main() {
 
   const partCatalogStats = await seedPartCatalogFromJson(nodeIdByCode);
   const partCatalogQaStats = await seedPartCatalogQaFromJson(nodeIdByCode);
+  const expenseDemoStats = await seedExpenseDemoData({
+    userId: demoUser.id,
+    nodeIdByCode,
+  });
+  const treeExpenseDemoStats = await seedTreeExpenseCheckData({
+    userId: demoUser.id,
+    nodeIdByCode,
+  });
 
   const validNodeCodes = new Set(nodesForSeed.map((node) => node.code));
   const legacyDuplicateNodeCodes = ["engine_oil", "chain_drive"] as const;
@@ -1879,6 +2387,8 @@ async function main() {
     legacyNodesDeleted: removableLegacyNodes.length,
     ...partCatalogStats,
     ...partCatalogQaStats,
+    ...expenseDemoStats,
+    ...treeExpenseDemoStats,
     qaDemoCatalogVehicles,
   });
 }

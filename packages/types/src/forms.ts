@@ -29,6 +29,7 @@ export type AddServiceEventFormValues = {
   partSku: string;
   /** Наименование запчасти (опционально). */
   partName: string;
+  installedExpenseItemIds: string[];
 };
 
 /** API-ready shape; alias of existing contract. */

@@ -45,6 +45,7 @@ export function createInitialAddServiceEventFormValues(): AddServiceEventFormVal
     installedPartsJson: "",
     partSku: "",
     partName: "",
+    installedExpenseItemIds: [],
   };
 }
 
@@ -264,6 +265,7 @@ export function createInitialEditServiceEventValues(
     partName: event.partName?.trim() ?? "",
     installedPartsJson:
       event.installedPartsJson == null ? "" : JSON.stringify(event.installedPartsJson, null, 2),
+    installedExpenseItemIds: [],
   };
 }
 
@@ -355,6 +357,7 @@ export function normalizeAddServiceEventPayload(
     partSku: trimmedPartSku ? trimmedPartSku.slice(0, 200) : null,
     partName: trimmedPartName ? trimmedPartName.slice(0, 500) : null,
     installedPartsJson,
+    installedExpenseItemIds: values.installedExpenseItemIds,
   };
 }
 

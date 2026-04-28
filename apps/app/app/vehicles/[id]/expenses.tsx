@@ -112,6 +112,10 @@ export default function VehicleExpensesScreen() {
                 label="Куплено, но не установлено"
                 value={`${analytics.boughtNotInstalledCount} · ${formatTotals(analytics.boughtNotInstalledTotalsByCurrency)}`}
               />
+              <MetricCard
+                label="Операций в сезоне"
+                value={String(analytics.selectedYearExpenseCount)}
+              />
             </View>
 
             <ExpenseRowsSection

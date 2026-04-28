@@ -8,7 +8,9 @@ import {
   createInitialAddServiceEventFormValues,
   createInitialEditServiceEventValues,
   createInitialRepeatServiceEventValues,
+  expenseCategoryLabelsRu,
   filterPaidServiceEvents,
+  formatExpenseAmountRu,
   flattenNodeTreeToSelectOptions,
   getServiceLogEventKindBadgeLabel,
   isServiceLogTimelineQueryActive,
@@ -20,6 +22,7 @@ import {
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type {
   AddServiceEventFormValues,
+  ExpenseItem,
   NodeTreeItem,
   PartSkuViewModel,
   ServiceEventItem,
@@ -117,6 +120,9 @@ export default function VehicleServiceLogPage() {
   const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
   const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
   const [serviceEventSkuError, setServiceEventSkuError] = useState("");
+  const [uninstalledExpenses, setUninstalledExpenses] = useState<ExpenseItem[]>([]);
+  const [uninstalledExpensesLoading, setUninstalledExpensesLoading] = useState(false);
+  const [uninstalledExpensesError, setUninstalledExpensesError] = useState("");
   const serviceEventSkuSearchGen = useRef(0);
   const [filters, setFilters] = useState<ServiceEventsFilters>({
     dateFrom: "",
@@ -219,6 +225,37 @@ export default function VehicleServiceLogPage() {
       });
   }, [isServiceEventModalOpen, serviceEventForm.nodeId, serviceEventSkuLookup]);
 
+  useEffect(() => {
+    if (!isServiceEventModalOpen || !vehicleId) {
+      setUninstalledExpenses([]);
+      return;
+    }
+    let cancelled = false;
+    setUninstalledExpensesLoading(true);
+    setUninstalledExpensesError("");
+    void api
+      .getUninstalledExpenses({ vehicleId })
+      .then((res) => {
+        if (!cancelled) {
+          setUninstalledExpenses(res.expenses ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUninstalledExpenses([]);
+          setUninstalledExpensesError("Не удалось загрузить купленные детали.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setUninstalledExpensesLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isServiceEventModalOpen, vehicleId]);
+
   const load = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -266,6 +303,7 @@ export default function VehicleServiceLogPage() {
     }
     return byServiceEventId;
   }, [events]);
+  const serviceEventById = useMemo(() => new Map(events.map((event) => [event.id, event])), [events]);
   useEffect(() => {
     if (isLoading || !highlightedServiceEventId || groups.length === 0) {
       return;
@@ -291,6 +329,59 @@ export default function VehicleServiceLogPage() {
     () => flattenNodeTreeToSelectOptions(nodeTree).filter((option) => !option.hasChildren),
     [nodeTree]
   );
+  const orderedUninstalledExpenses = useMemo(() => {
+    const selectedNodeId = serviceEventForm.nodeId.trim();
+    return [...uninstalledExpenses].sort((left, right) => {
+      const leftMatches = selectedNodeId && left.nodeId === selectedNodeId ? 0 : 1;
+      const rightMatches = selectedNodeId && right.nodeId === selectedNodeId ? 0 : 1;
+      if (leftMatches !== rightMatches) {
+        return leftMatches - rightMatches;
+      }
+      return new Date(right.purchasedAt ?? right.expenseDate).getTime() - new Date(left.purchasedAt ?? left.expenseDate).getTime();
+    });
+  }, [serviceEventForm.nodeId, uninstalledExpenses]);
+
+  const toggleInstalledExpenseSelection = (expense: ExpenseItem) => {
+    setServiceEventForm((prev) => {
+      const selected = new Set(prev.installedExpenseItemIds);
+      const isSelecting = !selected.has(expense.id);
+      if (isSelecting) {
+        selected.add(expense.id);
+      } else {
+        selected.delete(expense.id);
+      }
+
+      if (!isSelecting) {
+        return { ...prev, installedExpenseItemIds: Array.from(selected) };
+      }
+
+      const expenseTitle = expense.partName?.trim() || expense.title.trim();
+      const commentLine = `Установлена ранее купленная деталь: ${expenseTitle}`;
+      const serviceType = `Установка: ${expenseTitle}`;
+      const nextComment = prev.comment.trim()
+        ? prev.comment.includes(commentLine)
+          ? prev.comment
+          : `${prev.comment.trim()}\n${commentLine}`
+        : commentLine;
+
+      return {
+        ...prev,
+        installedExpenseItemIds: Array.from(selected),
+        nodeId: prev.nodeId.trim() || expense.nodeId || "",
+        eventDate: prev.eventDate.trim() || new Date().toISOString().slice(0, 10),
+        serviceType: prev.serviceType.trim() || serviceType,
+        odometer:
+          prev.odometer.trim() ||
+          (vehicleOdometer != null ? String(vehicleOdometer) : ""),
+        engineHours:
+          prev.engineHours.trim() ||
+          (vehicleEngineHours != null ? String(vehicleEngineHours) : ""),
+        partName: prev.partName.trim() || expense.partName?.trim() || expense.title.trim(),
+        partSku: prev.partSku.trim() || expense.partSku?.trim() || "",
+        comment: nextComment,
+      };
+    });
+  };
 
   const resetFilters = () => {
     setFilters({
@@ -879,6 +970,19 @@ export default function VehicleServiceLogPage() {
                       const isStateUpdate = entry.eventKind === "STATE_UPDATE";
                       const isHighlightedServiceEvent = entry.id === highlightedServiceEventId;
                       const originWishlistItemId = wishlistItemIdByServiceEventId.get(entry.id);
+                      const linkedExpenses = serviceEventById.get(entry.id)?.expenseItems ?? [];
+                      const linkedExpenseTotals = new Map<string, number>();
+                      const linkedExpenseCategoryTotals = new Map<string, number>();
+                      for (const expense of linkedExpenses) {
+                        linkedExpenseTotals.set(
+                          expense.currency,
+                          (linkedExpenseTotals.get(expense.currency) ?? 0) + expense.amount
+                        );
+                        linkedExpenseCategoryTotals.set(
+                          expense.category,
+                          (linkedExpenseCategoryTotals.get(expense.category) ?? 0) + expense.amount
+                        );
+                      }
                       return (
                         <article
                           key={entry.id}
@@ -1123,6 +1227,36 @@ export default function VehicleServiceLogPage() {
                                   >
                                     {expandedComments[entry.id] ? "Скрыть" : "Показать"}
                                   </button>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            {!isStateUpdate && linkedExpenses.length > 0 ? (
+                              <div className="mt-3 rounded-xl border px-3 py-3" style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardSubtle }}>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <h4 className="text-sm font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                                    Расходы в этом сервисном событии
+                                  </h4>
+                                  <span className="text-xs font-semibold" style={{ color: productSemanticColors.textSecondary }}>
+                                    {Array.from(linkedExpenseTotals.entries()).map(([currency, amount]) => `${formatExpenseAmountRu(amount)} ${currency}`).join(" · ")}
+                                  </span>
+                                </div>
+                                <div className="mt-2 grid gap-2">
+                                  {linkedExpenses.map((expense) => (
+                                    <div key={expense.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-1.5" style={{ backgroundColor: productSemanticColors.cardMuted }}>
+                                      <span className="text-xs" style={{ color: productSemanticColors.textPrimary }}>
+                                        {expense.title} · {expenseCategoryLabelsRu[expense.category]}
+                                      </span>
+                                      <span className="text-xs font-semibold" style={{ color: productSemanticColors.textSecondary }}>
+                                        {formatExpenseAmountRu(expense.amount)} {expense.currency} · {expense.installationStatus === "INSTALLED" ? "Установлено" : "Куплено, не установлено"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                                {linkedExpenseCategoryTotals.size > 0 ? (
+                                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textMeta }}>
+                                    По категориям: {Array.from(linkedExpenseCategoryTotals.entries()).map(([category, amount]) => `${expenseCategoryLabelsRu[category as keyof typeof expenseCategoryLabelsRu] ?? category}: ${formatExpenseAmountRu(amount)}`).join(" · ")}
+                                  </p>
                                 ) : null}
                               </div>
                             ) : null}
@@ -1371,6 +1505,76 @@ export default function VehicleServiceLogPage() {
                       ) : null}
                     </div>
                   ) : null}
+
+                  <div
+                    className="mt-4 rounded-2xl border p-4"
+                    style={{
+                      backgroundColor: productSemanticColors.cardSubtle,
+                      borderColor: productSemanticColors.borderStrong,
+                    }}
+                  >
+                    <h3 className="text-sm font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                      Купленные, но не установленные детали
+                    </h3>
+                    {uninstalledExpensesLoading ? (
+                      <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                        Загружаю купленные детали...
+                      </p>
+                    ) : null}
+                    {uninstalledExpensesError ? (
+                      <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
+                        {uninstalledExpensesError}
+                      </p>
+                    ) : null}
+                    {!uninstalledExpensesLoading && !uninstalledExpensesError && orderedUninstalledExpenses.length === 0 ? (
+                      <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                        Нет купленных деталей без установки.
+                      </p>
+                    ) : null}
+                    {orderedUninstalledExpenses.length > 0 ? (
+                      <div className="mt-3 grid gap-2">
+                        {orderedUninstalledExpenses.map((expense) => {
+                          const isSelected = serviceEventForm.installedExpenseItemIds.includes(expense.id);
+                          const isSameNode = expense.nodeId === serviceEventForm.nodeId;
+                          return (
+                            <label
+                              key={expense.id}
+                              className="flex gap-3 rounded-xl border px-3 py-2 text-sm"
+                              style={{
+                                backgroundColor: productSemanticColors.cardMuted,
+                                borderColor: isSelected ? productSemanticColors.primaryAction : productSemanticColors.border,
+                                color: productSemanticColors.textPrimary,
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleInstalledExpenseSelection(expense)}
+                                className="mt-1"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block font-semibold">
+                                  {expense.title}
+                                  {isSameNode ? (
+                                    <span className="ml-2 text-[11px]" style={{ color: productSemanticColors.textMeta }}>
+                                      этот узел
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <span className="mt-1 block text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                                  {formatExpenseAmountRu(expense.amount)} {expense.currency}
+                                  {" · "}
+                                  {new Date(expense.purchasedAt ?? expense.expenseDate).toLocaleDateString("ru-RU")}
+                                  {expense.node?.name ? ` · ${expense.node.name}` : ""}
+                                  {expense.vendor ? ` · ${expense.vendor}` : ""}
+                                </span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
 
                   <label className="mt-4 block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                     Комментарий

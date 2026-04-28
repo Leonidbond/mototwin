@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { ExpenseItem } from "@mototwin/types";
 import { createLeafServiceEventInTransaction } from "@/lib/leaf-service-event-transaction";
 import { syncExpenseItemForServiceEvent } from "@/lib/expense-items";
+import { linkInstalledExpenseItemsToServiceEvent } from "@/lib/service-event-expense-links";
 import { prisma } from "@/lib/prisma";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
@@ -46,7 +48,28 @@ const createServiceEventSchema = z.object({
   comment: z.string().trim().nullable().optional(),
   partSku: z.union([z.string(), z.null()]).optional(),
   partName: z.union([z.string(), z.null()]).optional(),
+  installedExpenseItemIds: z.array(z.string().trim().min(1)).optional(),
 });
+
+function expenseItemToWire(row: {
+  amount: { toString(): string } | number;
+  expenseDate: Date;
+  purchasedAt: Date | null;
+  installedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  [key: string]: unknown;
+}): ExpenseItem {
+  return {
+    ...(row as unknown as Omit<ExpenseItem, "amount" | "expenseDate" | "purchasedAt" | "installedAt" | "createdAt" | "updatedAt">),
+    amount: Number(row.amount),
+    expenseDate: row.expenseDate.toISOString(),
+    purchasedAt: row.purchasedAt?.toISOString() ?? null,
+    installedAt: row.installedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
 
 export async function GET(_: NextRequest, context: RouteContext) {
   try {
@@ -71,10 +94,19 @@ export async function GET(_: NextRequest, context: RouteContext) {
             displayOrder: true,
           },
         },
+        expenseItems: {
+          include: { node: { select: { id: true, name: true } } },
+          orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
+        },
       },
     });
 
-    return NextResponse.json({ serviceEvents });
+    return NextResponse.json({
+      serviceEvents: serviceEvents.map((event) => ({
+        ...event,
+        expenseItems: event.expenseItems.map(expenseItemToWire),
+      })),
+    });
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
@@ -170,6 +202,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
         partName: normalizeServiceEventPartName(data.partName),
       });
       await syncExpenseItemForServiceEvent(tx, created);
+      await linkInstalledExpenseItemsToServiceEvent(tx, {
+        vehicleId: id,
+        serviceEventId: created.id,
+        expenseItemIds: data.installedExpenseItemIds ?? [],
+        installedAt: eventDate,
+        odometer: created.odometer,
+        engineHours: created.engineHours,
+      });
       return created;
     });
 
@@ -184,6 +224,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
         { error: "Validation failed", issues: error.issues },
         { status: 400 }
       );
+    }
+    if (
+      error instanceof Error &&
+      error.message === "Selected expense items are not available for this service event"
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     console.error("Failed to create service event:", error);

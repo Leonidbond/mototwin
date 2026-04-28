@@ -44,6 +44,7 @@ import {
   validateVehicleStateFormValues,
   buildExpenseSummaryFromServiceEvents,
   formatExpenseAmountRu,
+  expenseCategoryLabelsRu,
   buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
   calculateSnoozeUntilDate,
@@ -105,6 +106,7 @@ import type {
   NodeTreeSearchActionKey,
   NodeContextViewModel,
   SelectedNodePath,
+  ExpenseNodeSummaryItem,
   ServiceEventItem,
   VehicleDetail,
   VehicleDetailApiRecord,
@@ -293,6 +295,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false);
   const [serviceEventsError, setServiceEventsError] = useState("");
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [nodeExpenseYear, setNodeExpenseYear] = useState(() => new Date().getFullYear());
+  const [nodeExpenseSummaryByNodeId, setNodeExpenseSummaryByNodeId] = useState<
+    Record<string, ExpenseNodeSummaryItem>
+  >({});
+  const [isNodeExpenseSummaryLoading, setIsNodeExpenseSummaryLoading] = useState(false);
+  const [nodeExpenseSummaryError, setNodeExpenseSummaryError] = useState("");
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [nodeTreeError, setNodeTreeError] = useState("");
@@ -348,6 +356,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [wishlistNotice, setWishlistNotice] = useState("");
   const [isWishlistSaving, setIsWishlistSaving] = useState(false);
   const [wishlistStatusUpdatingId, setWishlistStatusUpdatingId] = useState("");
+  const [wishlistPurchaseExpenseItemId, setWishlistPurchaseExpenseItemId] = useState("");
+  const [isWishlistPurchaseSaving, setIsWishlistPurchaseSaving] = useState(false);
+  const [wishlistPurchaseExpenseForm, setWishlistPurchaseExpenseForm] = useState({
+    amount: "",
+    currency: "RUB",
+    purchasedAt: "",
+    vendor: "",
+    comment: "",
+  });
+  const [wishlistPurchaseExpenseError, setWishlistPurchaseExpenseError] = useState("");
   const [wishlistDeletingId, setWishlistDeletingId] = useState("");
   const [pendingWishlistInstallItemId, setPendingWishlistInstallItemId] = useState<string | null>(
     null
@@ -1357,6 +1375,34 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
   }, [vehicleId]);
 
+  const loadNodeExpenseSummary = useCallback(async () => {
+    if (!vehicleId) {
+      return;
+    }
+
+    try {
+      setIsNodeExpenseSummaryLoading(true);
+      setNodeExpenseSummaryError("");
+      const data = await vehicleDetailApi.getExpenseNodeSummary({
+        vehicleId,
+        year: nodeExpenseYear,
+      });
+      setNodeExpenseSummaryByNodeId(
+        Object.fromEntries((data.nodes ?? []).map((summary) => [summary.nodeId, summary]))
+      );
+    } catch (summaryLoadError) {
+      console.error(summaryLoadError);
+      setNodeExpenseSummaryByNodeId({});
+      setNodeExpenseSummaryError(
+        summaryLoadError instanceof Error
+          ? summaryLoadError.message
+          : "Не удалось загрузить расходы по узлам."
+      );
+    } finally {
+      setIsNodeExpenseSummaryLoading(false);
+    }
+  }, [nodeExpenseYear, vehicleId]);
+
   const loadTopServiceNodes = useCallback(async () => {
     try {
       setIsTopServiceNodesLoading(true);
@@ -1767,6 +1813,62 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
   };
 
+  const openWishlistPurchaseExpenseForm = (item: PartWishlistItem) => {
+    setWishlistPurchaseExpenseItemId(item.id);
+    setWishlistPurchaseExpenseError("");
+    setWishlistPurchaseExpenseForm({
+      amount: item.costAmount != null ? String(item.costAmount) : "",
+      currency: item.currency?.trim() || readDefaultCurrencySetting(),
+      purchasedAt: new Date().toISOString().slice(0, 10),
+      vendor: "",
+      comment: item.comment ?? "",
+    });
+  };
+
+  const closeWishlistPurchaseExpenseForm = () => {
+    setWishlistPurchaseExpenseItemId("");
+    setWishlistPurchaseExpenseError("");
+    setWishlistPurchaseExpenseForm({
+      amount: "",
+      currency: readDefaultCurrencySetting(),
+      purchasedAt: "",
+      vendor: "",
+      comment: "",
+    });
+  };
+
+  const submitWishlistPurchaseExpense = async () => {
+    const itemId = wishlistPurchaseExpenseItemId;
+    if (!itemId) {
+      return;
+    }
+    const amount = Number(wishlistPurchaseExpenseForm.amount.replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0 || !wishlistPurchaseExpenseForm.currency.trim()) {
+      setWishlistPurchaseExpenseError("Укажите положительную сумму и валюту.");
+      return;
+    }
+    try {
+      setIsWishlistPurchaseSaving(true);
+      setWishlistPurchaseExpenseError("");
+      await vehicleDetailApi.createExpenseFromShoppingListItem(itemId, {
+        amount,
+        currency: wishlistPurchaseExpenseForm.currency.trim().toUpperCase(),
+        purchasedAt: wishlistPurchaseExpenseForm.purchasedAt || null,
+        vendor: wishlistPurchaseExpenseForm.vendor.trim() || null,
+        comment: wishlistPurchaseExpenseForm.comment.trim() || null,
+      });
+      await loadWishlist();
+      closeWishlistPurchaseExpenseForm();
+      setWishlistNotice("Расход создан, позиция отмечена как купленная.");
+    } catch (e) {
+      setWishlistPurchaseExpenseError(
+        e instanceof Error ? e.message : "Не удалось создать расход из позиции списка."
+      );
+    } finally {
+      setIsWishlistPurchaseSaving(false);
+    }
+  };
+
   const patchWishlistItemStatus = async (
     itemId: string,
     status: PartWishlistItem["status"],
@@ -2162,6 +2264,31 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     return parts.length > 0 ? parts.join(" · ") : null;
   };
 
+  const formatNodeExpenseTotals = (
+    totals: ExpenseNodeSummaryItem["totalByCurrency"]
+  ): string => {
+    if (totals.length === 0) {
+      return "—";
+    }
+    return totals
+      .map((row) => `${formatExpenseAmountRu(row.amount)} ${row.currency === "RUB" ? "₽" : row.currency}`)
+      .join(" · ");
+  };
+
+  const formatNodeExpenseDate = (date: string): string => {
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) {
+      return date.slice(0, 10);
+    }
+    return parsed.toLocaleDateString("ru-RU");
+  };
+
+  const openExpensesForNode = (nodeId: string) => {
+    router.push(
+      `/expenses?vehicleId=${encodeURIComponent(vehicleId)}&nodeId=${encodeURIComponent(nodeId)}&year=${nodeExpenseYear}`
+    );
+  };
+
   const renderChildTreeNode = (node: NodeTreeItemViewModel, depth: number): ReactNode => {
     const hasChildren = node.hasChildren;
     const isExpanded = Boolean(expandedNodes[node.id]);
@@ -2169,6 +2296,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       ? buildNodeMaintenancePlanViewModel(node)
       : null;
     const parentMaintenanceSummary = formatNodeMaintenanceSummaryLine(maintenancePlan?.parentSummary ?? null);
+    const nodeExpenseSummary = nodeExpenseSummaryByNodeId[node.id] ?? null;
     const shouldUseMaintenanceShortExplanation =
       isNodeMaintenanceModeEnabled &&
       node.effectiveStatus === "OVERDUE" &&
@@ -2328,6 +2456,24 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   {parentMaintenanceSummary}
                 </p>
               ) : null}
+              {nodeExpenseSummary ? (
+                <div className="mt-1.5 space-y-1 pl-8 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                  <p>
+                    Расходы за сезон:{" "}
+                    <span className="font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                      {formatNodeExpenseTotals(nodeExpenseSummary.totalByCurrency)}
+                    </span>
+                  </p>
+                  {nodeExpenseSummary.purchasedNotInstalledCount > 0 ? (
+                    <p>
+                      Куплено, не установлено:{" "}
+                      <span className="font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                        {nodeExpenseSummary.purchasedNotInstalledCount}
+                      </span>
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               {isNodeMaintenanceModeEnabled &&
               maintenancePlan &&
               !hasChildren &&
@@ -2442,6 +2588,63 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
         {hasChildren && isExpanded ? (
           <div className="space-y-2">
+            {nodeExpenseSummary ? (
+              <div
+                className="rounded-xl border px-4 py-3"
+                style={{
+                  marginLeft: `${(depth + 1) * 16}px`,
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                  color: productSemanticColors.textSecondary,
+                }}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                      Расходы по узлу
+                    </p>
+                    <p className="mt-1 text-xs">
+                      {formatNodeExpenseTotals(nodeExpenseSummary.totalByCurrency)} за сезон {nodeExpenseYear}
+                    </p>
+                    <p className="mt-1 text-xs">
+                      {nodeExpenseSummary.expenseCount} расход{nodeExpenseSummary.expenseCount === 1 ? "" : "а"}
+                    </p>
+                    {nodeExpenseSummary.purchasedNotInstalledCount > 0 ? (
+                      <p className="mt-1 text-xs">
+                        Куплено, не установлено: {nodeExpenseSummary.purchasedNotInstalledCount}
+                      </p>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openExpensesForNode(node.id)}
+                    className="text-xs font-semibold underline decoration-dotted underline-offset-2"
+                    style={{ color: productSemanticColors.textPrimary }}
+                  >
+                    Все расходы по узлу →
+                  </button>
+                </div>
+                {nodeExpenseSummary.latestExpenses.length > 0 ? (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-xs font-semibold" style={{ color: productSemanticColors.textMuted }}>
+                      Последние расходы
+                    </p>
+                    {nodeExpenseSummary.latestExpenses.map((expense) => (
+                      <div key={expense.id} className="flex flex-wrap justify-between gap-2 text-xs">
+                        <span>
+                          {formatNodeExpenseDate(expense.date)} {expense.title}
+                          {" · "}
+                          {expenseCategoryLabelsRu[expense.category]}
+                        </span>
+                        <span className="font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                          {formatExpenseAmountRu(expense.amount)} {expense.currency === "RUB" ? "₽" : expense.currency}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {node.children.map((child) => renderChildTreeNode(child, depth + 1))}
           </div>
         ) : null}
@@ -2458,6 +2661,13 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     void loadTopServiceNodes();
     void loadWishlist();
   }, [vehicleId, loadNodeTree, loadTopServiceNodes, loadWishlist]);
+
+  useEffect(() => {
+    if (!vehicleId || (pageView !== "nodeTree" && !isFullNodeTreeOpen)) {
+      return;
+    }
+    void loadNodeExpenseSummary();
+  }, [isFullNodeTreeOpen, loadNodeExpenseSummary, pageView, vehicleId]);
 
   const openVehicleStateEditor = () => {
     if (!vehicle) {
@@ -2661,6 +2871,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         installedPartsJson,
         partSku,
         partName,
+        installedExpenseItemIds: [],
       };
 
       const validation = validateAddServiceEventFormValues(serviceFormValues, {
@@ -2933,7 +3144,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     >
                       Фильтр по статусу
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => setNodeStatusFilter("ALL")}
@@ -2973,7 +3184,37 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                           </button>
                         );
                       })}
+                      <label className="ml-auto flex items-center gap-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                        Сезон расходов
+                        <select
+                          value={nodeExpenseYear}
+                          onChange={(event) => setNodeExpenseYear(Number(event.target.value))}
+                          className="rounded-full border px-3 py-1.5 text-xs font-medium"
+                          style={{
+                            backgroundColor: productSemanticColors.cardMuted,
+                            borderColor: productSemanticColors.borderStrong,
+                            color: productSemanticColors.textPrimary,
+                            colorScheme: "dark",
+                          }}
+                        >
+                          {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     </div>
+                    {isNodeExpenseSummaryLoading ? (
+                      <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                        Загружаю расходы по узлам...
+                      </p>
+                    ) : null}
+                    {nodeExpenseSummaryError ? (
+                      <p className="text-xs" style={{ color: productSemanticColors.error }}>
+                        {nodeExpenseSummaryError}
+                      </p>
+                    ) : null}
                   </div>
                   {nodeSearchQuery.trim().length >= 2 ? (
                     nodeSearchResults.length > 0 ? (
@@ -3103,6 +3344,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                         maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
                       });
                       const canOpenSummaryExplanation = canOpenNodeStatusExplanationModal(rootNode);
+                      const nodeExpenseSummary = nodeExpenseSummaryByNodeId[rootNode.id] ?? null;
                       return (
                         <div
                           key={rootNode.id}
@@ -3168,6 +3410,24 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                     {summary.maintenanceSummaryLine}
                                   </p>
                                 )
+                              ) : null}
+                              {nodeExpenseSummary ? (
+                                <div className="mt-2 space-y-1 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                                  <p>
+                                    Расходы за сезон:{" "}
+                                    <span className="font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                                      {formatNodeExpenseTotals(nodeExpenseSummary.totalByCurrency)}
+                                    </span>
+                                  </p>
+                                  {nodeExpenseSummary.purchasedNotInstalledCount > 0 ? (
+                                    <p>
+                                      Куплено, не установлено:{" "}
+                                      <span className="font-semibold" style={{ color: productSemanticColors.textPrimary }}>
+                                        {nodeExpenseSummary.purchasedNotInstalledCount}
+                                      </span>
+                                    </p>
+                                  ) : null}
+                                </div>
                               ) : null}
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
@@ -3589,6 +3849,41 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                             </div>
 
                             <div className="flex shrink-0 flex-wrap items-center gap-2">
+                              {it.status === "NEEDED" || it.status === "ORDERED" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const raw = wishlistItems.find((w) => w.id === it.id);
+                                    if (raw) {
+                                      openWishlistPurchaseExpenseForm(raw);
+                                    }
+                                  }}
+                                  disabled={isBusy}
+                                  className="rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardSubtle,
+                                    borderColor: productSemanticColors.borderStrong,
+                                    color: productSemanticColors.textPrimary,
+                                  }}
+                                >
+                                  Отметить как куплено
+                                </button>
+                              ) : null}
+                              {it.status === "BOUGHT" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => patchWishlistItemStatus(it.id, "INSTALLED", it.status)}
+                                  disabled={isBusy}
+                                  className="rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardSubtle,
+                                    borderColor: productSemanticColors.borderStrong,
+                                    color: productSemanticColors.textPrimary,
+                                  }}
+                                >
+                                  Отметить как установленное
+                                </button>
+                              ) : null}
                               {installedServiceEventId ? (
                                 <button
                                   type="button"
@@ -3756,6 +4051,97 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
   return (
     <>
+      {wishlistPurchaseExpenseItemId ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+          style={{ backgroundColor: productSemanticColors.overlayModal }}
+        >
+          <section
+            className="w-full max-w-lg rounded-3xl border p-5 shadow-2xl"
+            style={{ backgroundColor: productSemanticColors.card, borderColor: productSemanticColors.borderStrong }}
+          >
+            <h2 className="text-xl font-bold" style={{ color: productSemanticColors.textPrimary }}>
+              Отметить как куплено
+            </h2>
+            <p className="mt-2 text-sm" style={{ color: productSemanticColors.textSecondary }}>
+              Создаём расход из позиции списка покупок. После сохранения он появится на странице расходов как куплено, но не установлено.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold" style={{ color: productSemanticColors.textSecondary }}>
+                Сумма
+                <input
+                  value={wishlistPurchaseExpenseForm.amount}
+                  onChange={(e) => setWishlistPurchaseExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  inputMode="decimal"
+                  className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
+                  style={darkModalFormControlStyle}
+                />
+              </label>
+              <label className="text-sm font-semibold" style={{ color: productSemanticColors.textSecondary }}>
+                Валюта
+                <input
+                  value={wishlistPurchaseExpenseForm.currency}
+                  onChange={(e) => setWishlistPurchaseExpenseForm((prev) => ({ ...prev, currency: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
+                  style={darkModalFormControlStyle}
+                />
+              </label>
+              <label className="text-sm font-semibold" style={{ color: productSemanticColors.textSecondary }}>
+                Дата покупки
+                <input
+                  type="date"
+                  value={wishlistPurchaseExpenseForm.purchasedAt}
+                  onChange={(e) => setWishlistPurchaseExpenseForm((prev) => ({ ...prev, purchasedAt: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
+                  style={darkModalFormControlStyle}
+                />
+              </label>
+              <label className="text-sm font-semibold" style={{ color: productSemanticColors.textSecondary }}>
+                Продавец
+                <input
+                  value={wishlistPurchaseExpenseForm.vendor}
+                  onChange={(e) => setWishlistPurchaseExpenseForm((prev) => ({ ...prev, vendor: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
+                  style={darkModalFormControlStyle}
+                />
+              </label>
+              <label className="sm:col-span-2 text-sm font-semibold" style={{ color: productSemanticColors.textSecondary }}>
+                Комментарий
+                <textarea
+                  value={wishlistPurchaseExpenseForm.comment}
+                  onChange={(e) => setWishlistPurchaseExpenseForm((prev) => ({ ...prev, comment: e.target.value }))}
+                  className="mt-1 min-h-20 w-full rounded-xl border px-3 py-2 text-sm"
+                  style={darkModalFormControlStyle}
+                />
+              </label>
+            </div>
+            {wishlistPurchaseExpenseError ? (
+              <p className="mt-3 text-sm" style={{ color: productSemanticColors.error }}>
+                {wishlistPurchaseExpenseError}
+              </p>
+            ) : null}
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeWishlistPurchaseExpenseForm}
+                className="rounded-xl border px-4 py-2 text-sm font-semibold"
+                style={darkModalButtonStyle}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={submitWishlistPurchaseExpense}
+                disabled={isWishlistPurchaseSaving}
+                className="rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60"
+                style={{ backgroundColor: productSemanticColors.primaryAction, color: productSemanticColors.onPrimaryAction }}
+              >
+                {isWishlistPurchaseSaving ? "Сохраняю..." : "Создать расход"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       <main
         style={{
           width: "100%",

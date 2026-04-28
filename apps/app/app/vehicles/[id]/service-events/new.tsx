@@ -394,6 +394,7 @@ export default function NewServiceEventScreen() {
       partSku,
       partName,
       installedPartsJson,
+      installedExpenseItemIds: [],
     };
 
     const validation = validateAddServiceEventFormValuesMobile(serviceFormValues, {

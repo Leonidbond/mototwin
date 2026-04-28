@@ -1,3 +1,5 @@
+import type { ExpenseItem } from "./expense-item";
+
 export type ServiceEventKind = "SERVICE" | "STATE_UPDATE";
 
 export type ServiceEventNode = {
@@ -25,6 +27,7 @@ export type ServiceEventItem = {
   partSku?: string | null;
   /** Наименование запчасти (если заполнено). */
   partName?: string | null;
+  expenseItems?: ExpenseItem[];
   createdAt: string;
 };
 
@@ -40,6 +43,7 @@ export type CreateServiceEventInput = {
   installedPartsJson?: unknown | null;
   partSku?: string | null;
   partName?: string | null;
+  installedExpenseItemIds?: string[];
 };
 
 export type UpdateServiceEventInput = CreateServiceEventInput;

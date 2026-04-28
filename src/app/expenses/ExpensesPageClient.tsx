@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  buildExpenseAnalyticsFromItems,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
   formatExpenseAmountRu,
+  getExpenseMonthKeyFromIso,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -16,17 +19,18 @@ import type {
   ExpenseInstallStatus,
   ExpenseItem,
   GarageVehicleItem,
+  NodeTreeItem,
 } from "@mototwin/types";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
 const categoryOptions: ExpenseCategory[] = [
-  "SERVICE",
-  "PARTS",
+  "PART",
+  "CONSUMABLE",
+  "SERVICE_WORK",
   "REPAIR",
   "DIAGNOSTICS",
-  "LABOR",
-  "OTHER_TECHNICAL",
+  "OTHER",
 ];
 
 const installStatusOptions: ExpenseInstallStatus[] = [
@@ -46,6 +50,48 @@ function formatTotals(rows: ExpenseAmountByCurrency[]): string {
   return rows.map((row) => `${formatExpenseAmountRu(row.totalAmount)} ${row.currency}`).join(" · ");
 }
 
+function formatAverageMonthly(rows: ExpenseAmountByCurrency[]): string {
+  if (rows.length === 0) {
+    return "—";
+  }
+  return rows
+    .map((row) => `${formatExpenseAmountRu(row.totalAmount / 12)} ${row.currency}`)
+    .join(" · ");
+}
+
+function getInstallationStatusLabel(expense: ExpenseItem): string {
+  if (expense.installStatus === "NOT_APPLICABLE") {
+    return expenseInstallStatusLabelsRu.NOT_APPLICABLE;
+  }
+  return expense.installationStatus === "NOT_INSTALLED"
+    ? "Куплено, не установлено"
+    : "Установлено";
+}
+
+function collectNodeAndDescendantIds(nodes: NodeTreeItem[], targetNodeId: string): Set<string> {
+  const collect = (node: NodeTreeItem): Set<string> => {
+    const ids = new Set([node.id]);
+    for (const child of node.children) {
+      for (const id of collect(child)) {
+        ids.add(id);
+      }
+    }
+    return ids;
+  };
+
+  for (const node of nodes) {
+    if (node.id === targetNodeId) {
+      return collect(node);
+    }
+    const childIds = collectNodeAndDescendantIds(node.children, targetNodeId);
+    if (childIds.size > 0) {
+      return childIds;
+    }
+  }
+
+  return new Set();
+}
+
 export function ExpensesPageClient(props: {
   vehicleId?: string;
   title: string;
@@ -53,24 +99,38 @@ export function ExpensesPageClient(props: {
   backHref?: string;
 }) {
   const router = useRouter();
-  const selectedYearDefault = new Date().getFullYear();
+  const searchParams = useSearchParams();
+  const selectedYearDefault = Number(searchParams.get("year")) || new Date().getFullYear();
+  const vehicleIdFromQuery = searchParams.get("vehicleId")?.trim() || "";
+  const nodeIdFromQuery = searchParams.get("nodeId")?.trim() || "";
+  const effectiveVehicleId = props.vehicleId ?? vehicleIdFromQuery;
   const [selectedYear, setSelectedYear] = useState(selectedYearDefault);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof api.getExpenses>>["analytics"] | null>(null);
   const [years, setYears] = useState<number[]>([]);
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
+  const [nodeScopeIds, setNodeScopeIds] = useState<Set<string> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
-    vehicleId: props.vehicleId ?? "",
+    vehicleId: effectiveVehicleId,
     title: "",
     amount: "",
     currency: "RUB",
-    category: "PARTS" as ExpenseCategory,
+    category: "PART" as ExpenseCategory,
     installStatus: "BOUGHT_NOT_INSTALLED" as ExpenseInstallStatus,
     expenseDate: todayYmd(),
     comment: "",
+  });
+  const [filters, setFilters] = useState({
+    category: "",
+    installStatus: "",
+    installationStatus: "",
+    currency: "",
+    nodeId: nodeIdFromQuery,
+    monthKey: "",
+    source: "",
   });
 
   const yearOptions = useMemo(() => {
@@ -78,17 +138,85 @@ export function ExpensesPageClient(props: {
     return Array.from(set).filter(Number.isFinite).sort((a, b) => b - a);
   }, [selectedYear, selectedYearDefault, years]);
 
+  const currencyOptions = useMemo(
+    () => Array.from(new Set(expenses.map((expense) => expense.currency).filter(Boolean))).sort((a, b) => a.localeCompare(b, "en")),
+    [expenses]
+  );
+
+  const nodeOptions = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          expenses
+            .filter((expense) => expense.nodeId && expense.node?.name)
+            .map((expense) => [expense.nodeId as string, expense.node!.name])
+        ).entries()
+      ).sort((a, b) => a[1].localeCompare(b[1], "ru-RU")),
+    [expenses]
+  );
+
+  const monthOptions = useMemo(
+    () =>
+      analytics?.byMonth.map((row) => ({ key: row.key, label: row.label })) ?? [],
+    [analytics]
+  );
+
+  const filteredExpenses = useMemo(
+    () =>
+      expenses.filter((expense) => {
+        if (filters.category && expense.category !== filters.category) return false;
+        if (filters.installStatus && expense.installStatus !== filters.installStatus) return false;
+        if (filters.installationStatus === "NOT_INSTALLED" && expense.installationStatus !== "NOT_INSTALLED") return false;
+        if (filters.installationStatus === "INSTALLED" && expense.installationStatus !== "INSTALLED") return false;
+        if (filters.installationStatus === "NOT_APPLICABLE" && expense.installStatus !== "NOT_APPLICABLE") return false;
+        if (filters.currency && expense.currency !== filters.currency) return false;
+        if (filters.nodeId) {
+          if (nodeScopeIds && nodeScopeIds.size > 0) {
+            if (!expense.nodeId || !nodeScopeIds.has(expense.nodeId)) return false;
+          } else if (expense.nodeId !== filters.nodeId) {
+            return false;
+          }
+        }
+        if (filters.monthKey && getExpenseMonthKeyFromIso(expense.expenseDate) !== filters.monthKey) return false;
+        if (filters.source === "service" && !expense.serviceEventId) return false;
+        if (filters.source === "wishlist" && !expense.shoppingListItemId) return false;
+        if (filters.source === "manual" && (expense.serviceEventId || expense.shoppingListItemId)) return false;
+        return true;
+      }),
+    [expenses, filters, nodeScopeIds]
+  );
+
+  const visibleAnalytics = useMemo(
+    () => (analytics ? buildExpenseAnalyticsFromItems(filteredExpenses, selectedYear) : null),
+    [analytics, filteredExpenses, selectedYear]
+  );
+  const topNodeLabel = useMemo(() => {
+    const topNode = visibleAnalytics?.byNode.find((row) => row.key !== "without-node");
+    if (!topNode) {
+      return "—";
+    }
+    return `${topNode.label} · ${formatTotals(topNode.totalsByCurrency)}`;
+  }, [visibleAnalytics]);
+  const hasFilters = Object.values(filters).some(Boolean);
+
   async function load(year = selectedYear) {
     try {
       setIsLoading(true);
       setError("");
-      const [expensesResult, vehiclesResult] = await Promise.all([
-        api.getExpenses({ year, vehicleId: props.vehicleId }),
-        props.vehicleId ? Promise.resolve(null) : api.getGarageVehicles(),
+      const shouldLoadNodeScope = Boolean(effectiveVehicleId && nodeIdFromQuery);
+      const [expensesResult, vehiclesResult, nodeTreeResult] = await Promise.all([
+        api.getExpenses({ year, vehicleId: effectiveVehicleId || undefined }),
+        effectiveVehicleId ? Promise.resolve(null) : api.getGarageVehicles(),
+        shouldLoadNodeScope ? api.getNodeTree(effectiveVehicleId) : Promise.resolve(null),
       ]);
       setExpenses(expensesResult.expenses);
       setAnalytics(expensesResult.analytics);
       setYears(expensesResult.years);
+      setNodeScopeIds(
+        nodeTreeResult && nodeIdFromQuery
+          ? collectNodeAndDescendantIds(nodeTreeResult.nodeTree ?? [], nodeIdFromQuery)
+          : null
+      );
       if (vehiclesResult) {
         setVehicles(vehiclesResult.vehicles ?? []);
         setForm((prev) => ({ ...prev, vehicleId: prev.vehicleId || vehiclesResult.vehicles?.[0]?.id || "" }));
@@ -104,7 +232,7 @@ export function ExpensesPageClient(props: {
   useEffect(() => {
     void load(selectedYear);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.vehicleId, selectedYear]);
+  }, [effectiveVehicleId, selectedYear]);
 
   async function createExpense() {
     const amount = Number(form.amount.replace(",", "."));
@@ -146,15 +274,48 @@ export function ExpensesPageClient(props: {
     }
   }
 
+  async function markExpenseInstalled(expenseId: string) {
+    try {
+      setError("");
+      await api.markExpenseInstalled(expenseId, {
+        installedAt: todayYmd(),
+      });
+      await load(selectedYear);
+    } catch (requestError) {
+      console.error(requestError);
+      setError("Не удалось отметить расход как установленный.");
+    }
+  }
+
+  function navigateBack() {
+    if (props.backHref) {
+      router.push(props.backHref);
+      return;
+    }
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+    if (effectiveVehicleId) {
+      router.push(`/vehicles/${effectiveVehicleId}`);
+      return;
+    }
+    router.push("/garage");
+  }
+
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8" style={{ background: c.canvas, color: c.textPrimary }}>
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         <header className="rounded-3xl border p-5 shadow-sm" style={{ borderColor: c.border, background: c.card }}>
           {props.backHref ? (
-            <button type="button" onClick={() => router.push(props.backHref!)} className="text-sm font-semibold" style={{ color: c.textMuted }}>
+            <button type="button" onClick={navigateBack} className="text-sm font-semibold" style={{ color: c.textMuted }}>
               ← Назад
             </button>
-          ) : null}
+          ) : (
+            <button type="button" onClick={navigateBack} className="text-sm font-semibold" style={{ color: c.textMuted }}>
+              ← Назад
+            </button>
+          )}
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: c.textMeta }}>
@@ -182,23 +343,79 @@ export function ExpensesPageClient(props: {
 
         {error ? <Section title="Ошибка"><p style={{ color: c.error }}>{error}</p></Section> : null}
 
-        {isLoading || !analytics ? (
+        {isLoading || !analytics || !visibleAnalytics ? (
           <Section title="Загрузка"><p style={{ color: c.textSecondary }}>Загружаю расходы...</p></Section>
         ) : (
           <>
-            <section className="grid gap-3 md:grid-cols-4">
-              <MetricCard label="Всего" value={formatTotals(analytics.totalsByCurrency)} />
-              <MetricCard label={`Сезон ${analytics.selectedYear}`} value={formatTotals(analytics.selectedYearTotalsByCurrency)} />
-              <MetricCard label="Операций в сезоне" value={String(analytics.selectedYearExpenseCount)} />
+            <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <MetricCard label="Всего по фильтрам" value={formatTotals(visibleAnalytics.totalsByCurrency)} />
+              <MetricCard label={`Сезон ${visibleAnalytics.selectedYear}`} value={formatTotals(visibleAnalytics.selectedYearTotalsByCurrency)} />
+              <MetricCard label="Операций в сезоне" value={String(visibleAnalytics.selectedYearExpenseCount)} />
+              <MetricCard label="Самый дорогой узел" value={topNodeLabel} />
               <MetricCard
                 label="Куплено, но не установлено"
-                value={`${analytics.boughtNotInstalledCount} · ${formatTotals(analytics.boughtNotInstalledTotalsByCurrency)}`}
+                value={`${visibleAnalytics.boughtNotInstalledCount} · ${formatTotals(visibleAnalytics.boughtNotInstalledTotalsByCurrency)}`}
               />
+              <MetricCard label="Средний расход в месяц" value={formatAverageMonthly(visibleAnalytics.selectedYearTotalsByCurrency)} />
             </section>
+
+            <Section title="Фильтры">
+              <div className="grid gap-3 md:grid-cols-7">
+                <Field label="Категория">
+                  <select value={filters.category} onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))} style={fieldStyle}>
+                    <option value="">Все</option>
+                    {categoryOptions.map((category) => <option key={category} value={category}>{expenseCategoryLabelsRu[category]}</option>)}
+                  </select>
+                </Field>
+                <Field label="Статус">
+                  <select value={filters.installStatus} onChange={(e) => setFilters((prev) => ({ ...prev, installStatus: e.target.value }))} style={fieldStyle}>
+                    <option value="">Все</option>
+                    {installStatusOptions.map((status) => <option key={status} value={status}>{expenseInstallStatusLabelsRu[status]}</option>)}
+                  </select>
+                </Field>
+                <Field label="Installation">
+                  <select value={filters.installationStatus} onChange={(e) => setFilters((prev) => ({ ...prev, installationStatus: e.target.value }))} style={fieldStyle}>
+                    <option value="">Все</option>
+                    <option value="NOT_INSTALLED">Куплено, не установлено</option>
+                    <option value="INSTALLED">Установлено</option>
+                    <option value="NOT_APPLICABLE">Не требует установки</option>
+                  </select>
+                </Field>
+                <Field label="Месяц">
+                  <select value={filters.monthKey} onChange={(e) => setFilters((prev) => ({ ...prev, monthKey: e.target.value }))} style={fieldStyle}>
+                    <option value="">Все</option>
+                    {monthOptions.map((month) => <option key={month.key} value={month.key}>{month.label}</option>)}
+                  </select>
+                </Field>
+                <Field label="Узел">
+                  <select value={filters.nodeId} onChange={(e) => setFilters((prev) => ({ ...prev, nodeId: e.target.value }))} style={fieldStyle}>
+                    <option value="">Все</option>
+                    {nodeOptions.map(([nodeId, nodeName]) => <option key={nodeId} value={nodeId}>{nodeName}</option>)}
+                  </select>
+                </Field>
+                <Field label="Валюта">
+                  <select value={filters.currency} onChange={(e) => setFilters((prev) => ({ ...prev, currency: e.target.value }))} style={fieldStyle}>
+                    <option value="">Все</option>
+                    {currencyOptions.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
+                  </select>
+                </Field>
+                <Field label="Источник">
+                  <select value={filters.source} onChange={(e) => setFilters((prev) => ({ ...prev, source: e.target.value }))} style={fieldStyle}>
+                    <option value="">Все</option>
+                    <option value="service">ServiceEvent</option>
+                    <option value="wishlist">Список покупок</option>
+                    <option value="manual">Ручной расход</option>
+                  </select>
+                </Field>
+              </div>
+              <button type="button" onClick={() => setFilters({ category: "", installStatus: "", installationStatus: "", currency: "", nodeId: "", monthKey: "", source: "" })} className="mt-4 text-sm font-semibold" style={{ color: c.textMuted }}>
+                Сбросить фильтры
+              </button>
+            </Section>
 
             <Section title="Добавить технический расход">
               <div className="grid gap-3 md:grid-cols-4">
-                {!props.vehicleId ? (
+                {!effectiveVehicleId ? (
                   <Field label="Мотоцикл">
                     <select value={form.vehicleId} onChange={(e) => setForm((prev) => ({ ...prev, vehicleId: e.target.value }))} style={fieldStyle}>
                       <option value="">Выберите</option>
@@ -241,29 +458,51 @@ export function ExpensesPageClient(props: {
               </button>
             </Section>
 
-            <ExpenseRowsSection title="По годам" rows={analytics.byYear} />
-            <ExpenseRowsSection title="По месяцам" rows={analytics.byMonth} />
-            <ExpenseRowsSection title="По категориям" rows={analytics.byCategory} />
-            <ExpenseRowsSection title="По узлам" rows={analytics.byNode} />
+            <ExpenseRowsSection title="По годам" rows={visibleAnalytics.byYear} />
+            <ExpenseRowsSection title="По месяцам" rows={visibleAnalytics.byMonth} />
+            <ExpenseRowsSection title="По категориям" rows={visibleAnalytics.byCategory} />
+            <ExpenseRowsSection title="По узлам" rows={visibleAnalytics.byNode} />
 
             <Section title="Все расходы">
               <div className="grid gap-2">
                 {expenses.length === 0 ? (
-                  <p style={{ color: c.textSecondary }}>Расходов пока нет.</p>
+                  <p style={{ color: c.textSecondary }}>
+                    Пока нет расходов. Добавьте первый расход на обслуживание, запчасти или ремонт.
+                  </p>
+                ) : filteredExpenses.length === 0 ? (
+                  <p style={{ color: c.textSecondary }}>
+                    {hasFilters ? "По выбранным фильтрам расходов нет." : "Пока нет расходов. Добавьте первый расход на обслуживание, запчасти или ремонт."}
+                  </p>
                 ) : (
-                  expenses.map((expense) => (
+                  filteredExpenses.map((expense) => (
                     <article key={expense.id} className="rounded-2xl border p-4" style={{ borderColor: c.border, background: c.cardMuted }}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="font-bold">{expense.title}</div>
                           <div className="mt-1 text-xs" style={{ color: c.textMeta }}>
-                            {new Date(expense.expenseDate).toLocaleDateString("ru-RU")} · {expenseCategoryLabelsRu[expense.category]} · {expenseInstallStatusLabelsRu[expense.installStatus]}
+                            {new Date(expense.expenseDate).toLocaleDateString("ru-RU")} · {expenseCategoryLabelsRu[expense.category]} · {getInstallationStatusLabel(expense)}
                             {expense.node?.name ? ` · ${expense.node.name}` : ""}
                             {expense.vehicle ? ` · ${expense.vehicle.nickname || `${expense.vehicle.brandName} ${expense.vehicle.modelName}`}` : ""}
+                            {expense.serviceEventId ? " · связано с ServiceEvent" : ""}
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="font-bold" style={{ color: c.primaryAction }}>{formatExpenseAmountRu(expense.amount)} {expense.currency}</div>
+                          {expense.installationStatus === "NOT_INSTALLED" && expense.serviceEventId == null ? (
+                            <button type="button" onClick={() => void markExpenseInstalled(expense.id)} className="mt-2 block text-xs font-semibold" style={{ color: c.textPrimary }}>
+                              Отметить как установленное
+                            </button>
+                          ) : null}
+                          {expense.serviceEventId ? (
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/vehicles/${expense.vehicleId}/service-log?serviceEventId=${encodeURIComponent(expense.serviceEventId!)}`)}
+                              className="mt-2 block text-xs font-semibold"
+                              style={{ color: c.textPrimary }}
+                            >
+                              Открыть сервисное событие
+                            </button>
+                          ) : null}
                           <button type="button" onClick={() => void deleteExpense(expense.id)} className="mt-2 text-xs font-semibold" style={{ color: c.error }}>
                             Удалить
                           </button>

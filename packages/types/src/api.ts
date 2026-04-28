@@ -5,8 +5,12 @@ import type { AddServiceKitToWishlistResult, ServiceKitViewModel } from "./servi
 import type { ServiceEventItem } from "./service-event";
 import type {
   CreateExpenseItemResponse,
+  CreateExpenseFromShoppingListResponse,
   DeleteExpenseItemResponse,
+  ExpenseNodeSummaryResponse,
   ExpensesResponse,
+  MarkExpenseInstalledResponse,
+  UninstalledExpensesResponse,
   UpdateExpenseItemResponse,
 } from "./expense-item";
 import type {
@@ -63,8 +67,12 @@ export type DeleteServiceEventResponse = {
 
 export type {
   CreateExpenseItemResponse,
+  CreateExpenseFromShoppingListResponse,
   DeleteExpenseItemResponse,
   ExpensesResponse,
+  ExpenseNodeSummaryResponse,
+  MarkExpenseInstalledResponse,
+  UninstalledExpensesResponse,
   UpdateExpenseItemResponse,
 };
 

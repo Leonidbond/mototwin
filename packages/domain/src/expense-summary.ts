@@ -15,18 +15,18 @@ import type {
 } from "@mototwin/types";
 
 export const expenseCategoryLabelsRu: Record<ExpenseCategory, string> = {
-  SERVICE: "Обслуживание",
-  PARTS: "Запчасти",
+  PART: "Запчасти",
+  CONSUMABLE: "Расходники",
+  SERVICE_WORK: "Работы сервиса",
   REPAIR: "Ремонт",
   DIAGNOSTICS: "Диагностика",
-  LABOR: "Работа сервиса",
-  OTHER_TECHNICAL: "Прочие технические",
+  OTHER: "Прочие технические",
 };
 
 export const expenseInstallStatusLabelsRu: Record<ExpenseInstallStatus, string> = {
-  BOUGHT_NOT_INSTALLED: "Куплено, но не установлено",
+  BOUGHT_NOT_INSTALLED: "Куплено, не установлено",
   INSTALLED: "Установлено",
-  NOT_APPLICABLE: "Не применимо",
+  NOT_APPLICABLE: "Не требует установки",
 };
 
 export function getExpenseCategoryLabelRu(category: ExpenseCategory): string {
@@ -225,7 +225,10 @@ export function buildExpenseAnalyticsFromItems(
   }
 
   const boughtNotInstalled = expenses.filter(
-    (expense) => expense.installStatus === "BOUGHT_NOT_INSTALLED"
+    (expense) =>
+      expense.purchaseStatus === "PURCHASED" &&
+      expense.installationStatus === "NOT_INSTALLED" &&
+      expense.serviceEventId == null
   );
   const boughtTotals = new Map<string, { total: number; count: number }>();
   for (const expense of boughtNotInstalled) {
