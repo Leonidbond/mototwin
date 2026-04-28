@@ -8,34 +8,76 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  buildExpenseAnalyticsFromItems,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
   formatExpenseAmountRu,
-  buildExpenseAnalyticsFromItems,
+  getExpenseMonthKeyFromIso,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
   ExpenseAmountByCurrency,
-  ExpenseAnalyticsRow,
-  ExpenseAnalyticsSummary,
-  ExpenseItem,
+  ExpenseCategory,
   ExpenseInstallStatus,
+  ExpenseItem,
   NodeTreeItem,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { ScreenHeader } from "../../components/screen-header";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 
+const categoryOptions: ExpenseCategory[] = [
+  "PART",
+  "CONSUMABLE",
+  "SERVICE_WORK",
+  "REPAIR",
+  "DIAGNOSTICS",
+  "OTHER",
+];
+
+const installStatusOptions: ExpenseInstallStatus[] = [
+  "BOUGHT_NOT_INSTALLED",
+  "INSTALLED",
+  "NOT_APPLICABLE",
+];
+
+const categoryColors: Record<ExpenseCategory, string> = {
+  PART: "#3b82f6",
+  CONSUMABLE: "#6fbf5f",
+  SERVICE_WORK: "#f59e0b",
+  REPAIR: "#ef4444",
+  DIAGNOSTICS: "#9ca3af",
+  OTHER: "#8b5cf6",
+};
+
+function todayYmd(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function formatTotals(rows: ExpenseAmountByCurrency[]): string {
   if (rows.length === 0) {
     return "—";
   }
   return rows.map((row) => `${formatExpenseAmountRu(row.totalAmount)} ${row.currency}`).join(" · ");
+}
+
+function formatAverageMonthly(rows: ExpenseAmountByCurrency[]): string {
+  if (rows.length === 0) {
+    return "—";
+  }
+  return rows
+    .map((row) => `${formatExpenseAmountRu(row.totalAmount / 12)} ${row.currency}`)
+    .join(" · ");
+}
+
+function formatCurrencyAmount(amount: number, currency: string): string {
+  return `${formatExpenseAmountRu(amount)} ${currency}`;
 }
 
 function collectNodeAndDescendantIds(nodes: NodeTreeItem[], nodeId: string): Set<string> {
@@ -57,6 +99,37 @@ function collectNodeAndDescendantIds(nodes: NodeTreeItem[], nodeId: string): Set
   return result;
 }
 
+function getMonthLabel(monthKey: string): string {
+  const date = new Date(`${monthKey}-01T12:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    return monthKey;
+  }
+  return date.toLocaleDateString("ru-RU", { month: "short" }).replace(".", "");
+}
+
+function getFullMonthLabel(monthKey: string): string {
+  const date = new Date(`${monthKey}-01T12:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    return monthKey || "—";
+  }
+  return date.toLocaleDateString("ru-RU", { month: "long" });
+}
+
+function sumByCurrency(expenses: ExpenseItem[], currency: string): number {
+  return expenses
+    .filter((expense) => expense.currency === currency)
+    .reduce((sum, expense) => sum + expense.amount, 0);
+}
+
+function getInstallationStatusLabel(expense: ExpenseItem): string {
+  if (expense.installStatus === "NOT_APPLICABLE") {
+    return expenseInstallStatusLabelsRu.NOT_APPLICABLE;
+  }
+  return expense.installationStatus === "NOT_INSTALLED"
+    ? "Куплено, не установлено"
+    : "Установлено";
+}
+
 export default function VehicleExpensesScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string; nodeId?: string; year?: string }>();
@@ -64,13 +137,28 @@ export default function VehicleExpensesScreen() {
   const targetNodeId = typeof params.nodeId === "string" ? params.nodeId : "";
   const requestedYear = typeof params.year === "string" ? Number.parseInt(params.year, 10) : NaN;
   const selectedYear = Number.isFinite(requestedYear) ? requestedYear : new Date().getFullYear();
-  const [analytics, setAnalytics] = useState<ExpenseAnalyticsSummary | null>(null);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [years, setYears] = useState<number[]>([]);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [installStatusFilter, setInstallStatusFilter] = useState<ExpenseInstallStatus | "ALL">("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | "ALL">("ALL");
+  const [currencyFilter, setCurrencyFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
   const [busyExpenseId, setBusyExpenseId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    title: "",
+    amount: "",
+    currency: "RUB",
+    category: "PART" as ExpenseCategory,
+    installStatus: "BOUGHT_NOT_INSTALLED" as ExpenseInstallStatus,
+    expenseDate: todayYmd(),
+    comment: "",
+  });
 
   const load = useCallback(async () => {
     try {
@@ -83,8 +171,8 @@ export default function VehicleExpensesScreen() {
         targetNodeId ? endpoints.getNodeTree(vehicleId) : Promise.resolve({ nodeTree: [] as NodeTreeItem[] }),
       ]);
       setNodeTree(treeData.nodeTree ?? []);
-      setAnalytics(result.analytics);
       setExpenses(result.expenses);
+      setYears(result.years ?? []);
     } catch (requestError) {
       console.error(requestError);
       setError("Не удалось загрузить расходы. Проверьте подключение к backend.");
@@ -99,22 +187,141 @@ export default function VehicleExpensesScreen() {
     }, [load])
   );
 
+  const currencyOptions = useMemo(
+    () => Array.from(new Set(expenses.map((expense) => expense.currency).filter(Boolean))).sort((a, b) => a.localeCompare(b, "en")),
+    [expenses]
+  );
+  const defaultCurrency = currencyOptions.includes("RUB") ? "RUB" : currencyOptions[0] || "RUB";
+  const primaryCurrency = currencyFilter || defaultCurrency;
+
+  const monthOptions = useMemo(() => {
+    const months = new Map<string, string>();
+    for (const expense of expenses) {
+      const key = getExpenseMonthKeyFromIso(expense.expenseDate);
+      months.set(key, getFullMonthLabel(key));
+    }
+    return Array.from(months.entries()).map(([key, label]) => ({ key, label })).sort((a, b) => b.key.localeCompare(a.key));
+  }, [expenses]);
+
   const scopedExpenses = useMemo(() => {
     const nodeIds = targetNodeId ? collectNodeAndDescendantIds(nodeTree, targetNodeId) : null;
+    const query = searchQuery.trim().toLowerCase();
     return expenses.filter((expense) => {
-      if (nodeIds && (!expense.nodeId || !nodeIds.has(expense.nodeId))) {
-        return false;
-      }
-      if (installStatusFilter !== "ALL" && expense.installStatus !== installStatusFilter) {
-        return false;
+      if (nodeIds && (!expense.nodeId || !nodeIds.has(expense.nodeId))) return false;
+      if (installStatusFilter !== "ALL" && expense.installStatus !== installStatusFilter) return false;
+      if (categoryFilter !== "ALL" && expense.category !== categoryFilter) return false;
+      if (currencyFilter && expense.currency !== currencyFilter) return false;
+      if (monthFilter && getExpenseMonthKeyFromIso(expense.expenseDate) !== monthFilter) return false;
+      if (query) {
+        const haystack = [
+          expense.title,
+          expense.comment ?? "",
+          expense.node?.name ?? "",
+          expense.partSku ?? "",
+          expenseCategoryLabelsRu[expense.category],
+          getInstallationStatusLabel(expense),
+        ].join(" ").toLowerCase();
+        if (!haystack.includes(query)) return false;
       }
       return true;
     });
-  }, [expenses, installStatusFilter, nodeTree, targetNodeId]);
-  const scopedAnalytics = useMemo(
+  }, [categoryFilter, currencyFilter, expenses, installStatusFilter, monthFilter, nodeTree, searchQuery, targetNodeId]);
+
+  const analytics = useMemo(
     () => buildExpenseAnalyticsFromItems(scopedExpenses, selectedYear),
     [scopedExpenses, selectedYear]
   );
+
+  const selectedYearExpenses = useMemo(
+    () => scopedExpenses.filter((expense) => {
+      const date = new Date(expense.expenseDate);
+      return !Number.isNaN(date.getTime()) && date.getFullYear() === selectedYear;
+    }),
+    [scopedExpenses, selectedYear]
+  );
+
+  const monthlySeries = useMemo(() => {
+    const rows = Array.from({ length: 12 }, (_, index) => {
+      const key = `${selectedYear}-${String(index + 1).padStart(2, "0")}`;
+      return { key, label: getMonthLabel(key), amount: 0 };
+    });
+    for (const expense of selectedYearExpenses) {
+      if (expense.currency !== primaryCurrency) continue;
+      const month = new Date(expense.expenseDate).getMonth();
+      if (month >= 0 && month < rows.length) {
+        rows[month].amount += expense.amount;
+      }
+    }
+    return rows;
+  }, [primaryCurrency, selectedYear, selectedYearExpenses]);
+
+  const categoryRows = useMemo(() => {
+    const total = Math.max(sumByCurrency(selectedYearExpenses, primaryCurrency), 1);
+    return categoryOptions
+      .map((category) => {
+        const amount = selectedYearExpenses
+          .filter((expense) => expense.currency === primaryCurrency && expense.category === category)
+          .reduce((sum, expense) => sum + expense.amount, 0);
+        return {
+          category,
+          amount,
+          percent: Math.round((amount / total) * 100),
+        };
+      })
+      .filter((row) => row.amount > 0);
+  }, [primaryCurrency, selectedYearExpenses]);
+
+  const nodeRows = useMemo(() => {
+    const rows = analytics.byNode
+      .map((row) => {
+        const amount = row.totalsByCurrency.find((total) => total.currency === primaryCurrency)?.totalAmount ?? 0;
+        return { key: row.key, label: row.label, amount, totalsLabel: formatTotals(row.totalsByCurrency) };
+      })
+      .filter((row) => row.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+    const max = Math.max(...rows.map((row) => row.amount), 1);
+    return rows.map((row) => ({ ...row, percent: Math.round((row.amount / max) * 100) }));
+  }, [analytics.byNode, primaryCurrency]);
+
+  const uninstalledExpenses = scopedExpenses
+    .filter((expense) => expense.purchaseStatus === "PURCHASED" && expense.installationStatus === "NOT_INSTALLED" && expense.serviceEventId == null)
+    .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime());
+  const topNode = nodeRows[0] ?? null;
+  const latestExpense = [...scopedExpenses].sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime())[0] ?? null;
+  const biggestMonth = monthlySeries.reduce((best, row) => row.amount > best.amount ? row : best, monthlySeries[0] ?? { key: "", label: "—", amount: 0 });
+
+  async function createExpense() {
+    const amount = Number(form.amount.replace(",", "."));
+    if (!form.title.trim() || !Number.isFinite(amount) || amount <= 0) {
+      setError("Заполните название и положительную сумму.");
+      return;
+    }
+    try {
+      setIsSaving(true);
+      setError("");
+      const client = createApiClient({ baseUrl: getApiBaseUrl() });
+      const endpoints = createMotoTwinEndpoints(client);
+      await endpoints.createExpense({
+        vehicleId,
+        title: form.title.trim(),
+        amount,
+        currency: form.currency.trim().toUpperCase(),
+        category: form.category,
+        installStatus: form.installStatus,
+        expenseDate: form.expenseDate,
+        comment: form.comment.trim() || null,
+      });
+      setForm((prev) => ({ ...prev, title: "", amount: "", comment: "" }));
+      setShowAddForm(false);
+      await load();
+    } catch (requestError) {
+      console.error(requestError);
+      setError("Не удалось сохранить расход.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   async function markInstalled(expense: ExpenseItem) {
     try {
@@ -122,7 +329,7 @@ export default function VehicleExpensesScreen() {
       const client = createApiClient({ baseUrl: getApiBaseUrl() });
       const endpoints = createMotoTwinEndpoints(client);
       await endpoints.markExpenseInstalled(expense.id, {
-        installedAt: new Date().toISOString().slice(0, 10),
+        installedAt: todayYmd(),
         odometer: expense.odometer ?? null,
         engineHours: expense.engineHours ?? null,
       });
@@ -135,23 +342,128 @@ export default function VehicleExpensesScreen() {
     }
   }
 
+  function openBoughtPartsPage() {
+    router.push(`/vehicles/${vehicleId}/wishlist?partsStatus=BOUGHT`);
+  }
+
+  function openInstallFromExpense(expense: ExpenseItem) {
+    if (expense.shoppingListItemId) {
+      router.push(
+        `/vehicles/${vehicleId}/wishlist?partsStatus=BOUGHT&wishlistItemId=${encodeURIComponent(expense.shoppingListItemId)}&installWishlistItemId=${encodeURIComponent(expense.shoppingListItemId)}`
+      );
+      return;
+    }
+    void markInstalled(expense);
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title="Расходы" onBack={() => router.push(`/vehicles/${vehicleId}`)} />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.heroCard}>
-          <Text style={styles.eyebrow}>Статистика расходов</Text>
-          <Text style={styles.title}>Расходы мотоцикла</Text>
-          <Text style={styles.subtitle}>
-            Технические расходы: обслуживание, запчасти, ремонт, диагностика и работа сервиса.
-          </Text>
-          <Pressable
-            onPress={() => router.push(`/vehicles/${vehicleId}/service-log?paidOnly=1`)}
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
-          >
-            <Text style={styles.primaryButtonText}>Открыть расходы в журнале</Text>
-          </Pressable>
+        <View style={styles.headerCard}>
+          <View style={styles.headerTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>Расходы</Text>
+              <Text style={styles.subtitle}>Техническая стоимость владения: обслуживание, запчасти и ремонт.</Text>
+            </View>
+            <Pressable onPress={() => setShowAddForm((prev) => !prev)} style={styles.addButton}>
+              <Text style={styles.addButtonText}>+ Добавить</Text>
+            </Pressable>
+          </View>
+          <View style={styles.filterRow}>
+            {years.length > 0 ? (
+              years.slice(0, 4).map((year) => (
+                <Pressable
+                  key={year}
+                  onPress={() => router.setParams({ year: String(year) })}
+                  style={[styles.chip, selectedYear === year && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, selectedYear === year && styles.chipTextActive]}>{year}</Text>
+                </Pressable>
+              ))
+            ) : (
+              <Text style={styles.scopeText}>Сезон {selectedYear}</Text>
+            )}
+          </View>
+          {targetNodeId ? (
+            <Text style={styles.scopeText}>Открыто из дерева: показан выбранный узел и дочерние узлы.</Text>
+          ) : null}
         </View>
+
+        {showAddForm ? (
+          <Section title="Добавить технический расход">
+            <Field label="Название">
+              <TextInput value={form.title} onChangeText={(title) => setForm((prev) => ({ ...prev, title }))} style={styles.input} />
+            </Field>
+            <View style={styles.twoCols}>
+              <Field label="Сумма">
+                <TextInput value={form.amount} onChangeText={(amount) => setForm((prev) => ({ ...prev, amount }))} keyboardType="decimal-pad" style={styles.input} />
+              </Field>
+              <Field label="Валюта">
+                <TextInput value={form.currency} onChangeText={(currency) => setForm((prev) => ({ ...prev, currency }))} autoCapitalize="characters" style={styles.input} />
+              </Field>
+            </View>
+            <Field label="Дата">
+              <TextInput value={form.expenseDate} onChangeText={(expenseDate) => setForm((prev) => ({ ...prev, expenseDate }))} style={styles.input} />
+            </Field>
+            <Text style={styles.smallLabel}>Категория</Text>
+            <ChipRow>
+              {categoryOptions.map((category) => (
+                <FilterChip key={category} active={form.category === category} label={expenseCategoryLabelsRu[category]} onPress={() => setForm((prev) => ({ ...prev, category }))} />
+              ))}
+            </ChipRow>
+            <Text style={styles.smallLabel}>Статус</Text>
+            <ChipRow>
+              {installStatusOptions.map((status) => (
+                <FilterChip key={status} active={form.installStatus === status} label={expenseInstallStatusLabelsRu[status]} onPress={() => setForm((prev) => ({ ...prev, installStatus: status }))} />
+              ))}
+            </ChipRow>
+            <Field label="Комментарий">
+              <TextInput value={form.comment} onChangeText={(comment) => setForm((prev) => ({ ...prev, comment }))} style={styles.input} />
+            </Field>
+            <Pressable disabled={isSaving} onPress={() => void createExpense()} style={[styles.primaryButton, isSaving && styles.disabledButton]}>
+              <Text style={styles.primaryButtonText}>{isSaving ? "Сохраняю..." : "Сохранить расход"}</Text>
+            </Pressable>
+          </Section>
+        ) : null}
+
+        <Section title="Фильтры">
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Поиск по расходам"
+            placeholderTextColor={c.textMuted}
+            style={styles.input}
+          />
+          <ChipRow>
+            {(["ALL", "BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"] as const).map((status) => (
+              <FilterChip
+                key={status}
+                active={installStatusFilter === status}
+                label={status === "ALL" ? "Все" : expenseInstallStatusLabelsRu[status]}
+                onPress={() => setInstallStatusFilter(status)}
+              />
+            ))}
+          </ChipRow>
+          <ChipRow>
+            <FilterChip active={categoryFilter === "ALL"} label="Все категории" onPress={() => setCategoryFilter("ALL")} />
+            {categoryOptions.map((category) => (
+              <FilterChip key={category} active={categoryFilter === category} label={expenseCategoryLabelsRu[category]} onPress={() => setCategoryFilter(category)} />
+            ))}
+          </ChipRow>
+          <ChipRow>
+            <FilterChip active={!currencyFilter} label="Все валюты" onPress={() => setCurrencyFilter("")} />
+            {currencyOptions.map((currency) => (
+              <FilterChip key={currency} active={currencyFilter === currency} label={currency} onPress={() => setCurrencyFilter(currency)} />
+            ))}
+          </ChipRow>
+          <ChipRow>
+            <FilterChip active={!monthFilter} label="Все месяцы" onPress={() => setMonthFilter("")} />
+            {monthOptions.slice(0, 12).map((month) => (
+              <FilterChip key={month.key} active={monthFilter === month.key} label={month.label} onPress={() => setMonthFilter(month.key)} />
+            ))}
+          </ChipRow>
+        </Section>
 
         {isLoading ? (
           <StateCard>
@@ -162,82 +474,51 @@ export default function VehicleExpensesScreen() {
           <StateCard>
             <Text style={[styles.stateText, { color: c.error }]}>{error}</Text>
           </StateCard>
-        ) : !analytics || expenses.length === 0 ? (
+        ) : expenses.length === 0 ? (
           <StateCard>
             <Text style={styles.stateTitle}>Расходов пока нет</Text>
-            <Text style={styles.stateText}>
-              Добавьте технический расход или стоимость в сервисное событие.
-            </Text>
+            <Text style={styles.stateText}>Добавьте технический расход или стоимость в сервисное событие.</Text>
           </StateCard>
         ) : (
           <>
-            {targetNodeId ? (
-              <View style={styles.scopeCard}>
-                <Text style={styles.scopeTitle}>Фильтр по узлу и дочерним узлам</Text>
-                <Text style={styles.scopeText}>Показаны расходы выбранного поддерева за сезон {selectedYear}.</Text>
-              </View>
-            ) : null}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChips}>
-              {(["ALL", "BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"] as const).map((status) => (
-                <Pressable
-                  key={status}
-                  onPress={() => setInstallStatusFilter(status)}
-                  style={[
-                    styles.filterChip,
-                    installStatusFilter === status && styles.filterChipActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      installStatusFilter === status && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {status === "ALL" ? "Все" : expenseInstallStatusLabelsRu[status]}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
             <View style={styles.metricsGrid}>
-              <MetricCard label="Всего" value={formatTotals(scopedAnalytics.totalsByCurrency)} />
-              <MetricCard
-                label={`Сезон ${scopedAnalytics.selectedYear}`}
-                value={formatTotals(scopedAnalytics.selectedYearTotalsByCurrency)}
-              />
-              <MetricCard
-                label="Куплено, но не установлено"
-                value={`${scopedAnalytics.boughtNotInstalledCount} · ${formatTotals(scopedAnalytics.boughtNotInstalledTotalsByCurrency)}`}
-              />
-              <MetricCard
-                label="Операций в сезоне"
-                value={String(scopedAnalytics.selectedYearExpenseCount)}
-              />
+              <MetricCard tone="blue" label="Всего расходов" value={formatTotals(analytics.totalsByCurrency)} hint="за выбранный период" />
+              <MetricCard tone="green" label={`За сезон ${selectedYear}`} value={formatTotals(analytics.selectedYearTotalsByCurrency)} hint="с начала сезона" />
+              <MetricCard tone="violet" label="Событий" value={String(analytics.selectedYearExpenseCount)} hint="всего расходов" />
+              <MetricCard tone="amber" label="Средний расход в месяц" value={formatAverageMonthly(analytics.selectedYearTotalsByCurrency)} hint="среднее значение" />
+              <MetricCard tone="orange" label="Куплено, не установлено" value={`${analytics.boughtNotInstalledCount} позиции`} hint={formatTotals(analytics.boughtNotInstalledTotalsByCurrency)} />
+              <MetricCard tone="red" label="Самый дорогой узел" value={topNode?.label ?? "—"} hint={topNode ? formatCurrencyAmount(topNode.amount, primaryCurrency) : "нет данных"} />
             </View>
 
-            <ExpenseRowsSection
-              title="По годам"
-              rows={scopedAnalytics.byYear}
-            />
+            <Section title="Расходы по месяцам">
+              <MonthlyBars rows={monthlySeries} currency={primaryCurrency} />
+            </Section>
 
-            <ExpenseRowsSection
-              title="По месяцам"
-              rows={scopedAnalytics.byMonth}
-            />
-
-            <ExpenseRowsSection
-              title="По категориям"
-              rows={scopedAnalytics.byCategory}
-            />
+            <Section title="Структура расходов">
+              <CategoryStructure rows={categoryRows} currency={primaryCurrency} />
+            </Section>
 
             <Section title="По узлам">
-              <View style={styles.rowsList}>
-                {scopedAnalytics.byNode.map((node) => (
-                  <View key={node.key} style={styles.nodeRow}>
-                    <Text style={styles.rowLabel}>{node.label}</Text>
-                    <Text style={styles.rowAmount}>{formatTotals(node.totalsByCurrency)}</Text>
-                  </View>
-                ))}
-              </View>
+              <NodeBars rows={nodeRows} currency={primaryCurrency} />
+            </Section>
+
+            <Section
+              title="Куплено, не установлено"
+              actionLabel="›"
+              onAction={openBoughtPartsPage}
+            >
+              <UninstalledList
+                expenses={uninstalledExpenses.slice(0, 4)}
+                onOpenExpense={openInstallFromExpense}
+                busyExpenseId={busyExpenseId}
+              />
+            </Section>
+
+            <Section title="Быстрые выводы">
+              <Insight label="Самый дорогой месяц" value={biggestMonth.amount > 0 ? getFullMonthLabel(biggestMonth.key) : "—"} />
+              <Insight label="Больше всего затрат" value={topNode?.label ?? "—"} />
+              <Insight label="Последний расход" value={latestExpense ? new Date(latestExpense.expenseDate).toLocaleDateString("ru-RU") : "—"} />
+              <Insight label="Валюты" value={currencyOptions.length > 0 ? `${currencyOptions.join(", ")} отдельно` : "—"} />
             </Section>
 
             <Section title="Все расходы">
@@ -250,35 +531,24 @@ export default function VehicleExpensesScreen() {
                 {scopedExpenses.map((expense) => (
                   <View key={expense.id} style={styles.eventCard}>
                     <Text style={styles.eventMeta}>
-                      {new Date(expense.expenseDate).toLocaleDateString("ru-RU")} ·{" "}
-                      {expenseCategoryLabelsRu[expense.category]} ·{" "}
-                      {expenseInstallStatusLabelsRu[expense.installStatus]}
+                      {new Date(expense.expenseDate).toLocaleDateString("ru-RU")} · {expenseCategoryLabelsRu[expense.category]} · {getInstallationStatusLabel(expense)}
                     </Text>
                     <Text style={styles.eventTitle}>{expense.title}</Text>
-                    <Text style={styles.eventAmount}>
-                      {formatExpenseAmountRu(expense.amount)} {expense.currency}
-                    </Text>
+                    <Text style={styles.eventNode}>{expense.node?.name ?? "Без узла"}</Text>
+                    <Text style={styles.eventAmount}>{formatCurrencyAmount(expense.amount, expense.currency)}</Text>
                     <View style={styles.eventActions}>
-                      {expense.installationStatus === "NOT_INSTALLED" &&
-                      expense.purchaseStatus === "PURCHASED" &&
-                      !expense.serviceEventId ? (
+                      {expense.installationStatus === "NOT_INSTALLED" && expense.purchaseStatus === "PURCHASED" && !expense.serviceEventId ? (
                         <Pressable
                           disabled={busyExpenseId === expense.id}
                           onPress={() => void markInstalled(expense)}
-                          style={[styles.actionButton, busyExpenseId === expense.id && styles.actionButtonDisabled]}
+                          style={[styles.actionButton, busyExpenseId === expense.id && styles.disabledButton]}
                         >
-                          <Text style={styles.actionButtonText}>
-                            {busyExpenseId === expense.id ? "Сохраняю..." : "Отметить установленным"}
-                          </Text>
+                          <Text style={styles.actionButtonText}>{busyExpenseId === expense.id ? "Сохраняю..." : "Отметить установленным"}</Text>
                         </Pressable>
                       ) : null}
                       {expense.serviceEventId ? (
                         <Pressable
-                          onPress={() =>
-                            router.push(
-                              `/vehicles/${vehicleId}/service-log?expandExpenses=1&serviceEventId=${encodeURIComponent(expense.serviceEventId ?? "")}`
-                            )
-                          }
+                          onPress={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&serviceEventId=${encodeURIComponent(expense.serviceEventId ?? "")}`)}
                           style={styles.secondaryButton}
                         >
                           <Text style={styles.secondaryButtonText}>Открыть сервисное событие</Text>
@@ -309,53 +579,166 @@ function StateCard(props: { children: ReactNode }) {
   return <View style={styles.stateCard}>{props.children}</View>;
 }
 
-function Section(props: { title: string; children: ReactNode }) {
+function Section(props: {
+  title: string;
+  children: ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{props.title}</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{props.title}</Text>
+        {props.onAction && props.actionLabel ? (
+          <Pressable onPress={props.onAction} hitSlop={8} style={styles.sectionAction}>
+            <Text style={styles.sectionActionText}>{props.actionLabel}</Text>
+          </Pressable>
+        ) : null}
+      </View>
       <View style={styles.sectionBody}>{props.children}</View>
     </View>
   );
 }
 
-function MetricCard(props: { label: string; value: string }) {
+function Field(props: { label: string; children: ReactNode }) {
   return (
-    <View style={styles.metricCard}>
-      <Text style={styles.metricLabel}>{props.label}</Text>
-      <Text style={styles.metricValue}>{props.value}</Text>
+    <View style={styles.field}>
+      <Text style={styles.smallLabel}>{props.label}</Text>
+      {props.children}
     </View>
   );
 }
 
-function ExpenseRowsSection(props: {
-  title: string;
-  rows: ExpenseAnalyticsRow[];
-}) {
+function ChipRow(props: { children: ReactNode }) {
   return (
-    <Section title={props.title}>
-      <View style={styles.rowsList}>
-        {props.rows.map((row) => (
-          <ExpenseRow
-            key={row.key}
-            label={row.label}
-            totals={row.totalsByCurrency}
-          />
-        ))}
-      </View>
-    </Section>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChips}>
+      {props.children}
+    </ScrollView>
   );
 }
 
-function ExpenseRow(props: {
-  label: string;
-  totals: ExpenseAmountByCurrency[];
-}) {
+function FilterChip(props: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <View style={styles.expenseRow}>
-      <View style={styles.rowHeader}>
-        <Text style={styles.rowLabel}>{props.label}</Text>
-        <Text style={styles.rowAmount}>{formatTotals(props.totals)}</Text>
+    <Pressable onPress={props.onPress} style={[styles.filterChip, props.active && styles.filterChipActive]}>
+      <Text style={[styles.filterChipText, props.active && styles.filterChipTextActive]}>{props.label}</Text>
+    </Pressable>
+  );
+}
+
+function MetricCard(props: { tone: "blue" | "green" | "violet" | "amber" | "orange" | "red"; label: string; value: string; hint: string }) {
+  const toneStyle =
+    props.tone === "blue" ? styles.metricIcon_blue :
+    props.tone === "green" ? styles.metricIcon_green :
+    props.tone === "violet" ? styles.metricIcon_violet :
+    props.tone === "amber" ? styles.metricIcon_amber :
+    props.tone === "orange" ? styles.metricIcon_orange :
+    styles.metricIcon_red;
+  return (
+    <View style={styles.metricCard}>
+      <View style={[styles.metricIcon, toneStyle]} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.metricLabel}>{props.label}</Text>
+        <Text style={styles.metricValue}>{props.value}</Text>
+        <Text style={styles.metricHint}>{props.hint}</Text>
       </View>
+    </View>
+  );
+}
+
+function MonthlyBars(props: { rows: { key: string; label: string; amount: number }[]; currency: string }) {
+  const max = Math.max(...props.rows.map((row) => row.amount), 1);
+  return (
+    <View style={styles.monthChart}>
+      {props.rows.map((row) => {
+        const height = Math.max(4, Math.round((row.amount / max) * 120));
+        return (
+          <View key={row.key} style={styles.monthColumn}>
+            <View style={styles.monthBarTrack}>
+              <View style={[styles.monthBarFill, { height }]} />
+            </View>
+            <Text style={styles.monthLabel}>{row.label}</Text>
+          </View>
+        );
+      })}
+      <Text style={styles.chartHint}>Пиковое значение: {formatCurrencyAmount(max, props.currency)}</Text>
+    </View>
+  );
+}
+
+function CategoryStructure(props: { rows: { category: ExpenseCategory; amount: number; percent: number }[]; currency: string }) {
+  if (props.rows.length === 0) {
+    return <Text style={styles.stateText}>Нет данных за сезон.</Text>;
+  }
+  return (
+    <View style={styles.structureList}>
+      {props.rows.map((row) => (
+        <View key={row.category} style={styles.structureRow}>
+          <View style={[styles.categoryDot, { backgroundColor: categoryColors[row.category] }]} />
+          <Text style={styles.structureLabel}>{expenseCategoryLabelsRu[row.category]}</Text>
+          <Text style={styles.structureAmount}>{formatCurrencyAmount(row.amount, props.currency)}</Text>
+          <Text style={styles.structurePercent}>{row.percent}%</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function NodeBars(props: { rows: { key: string; label: string; amount: number; totalsLabel: string; percent: number }[]; currency: string }) {
+  if (props.rows.length === 0) {
+    return <Text style={styles.stateText}>Нет расходов по узлам.</Text>;
+  }
+  return (
+    <View style={styles.nodeBars}>
+      {props.rows.map((row) => (
+        <View key={row.key} style={styles.nodeBarRow}>
+          <View style={styles.nodeBarHeader}>
+            <Text style={styles.nodeBarLabel}>{row.label}</Text>
+            <Text style={styles.nodeBarAmount}>{row.totalsLabel || formatCurrencyAmount(row.amount, props.currency)}</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${row.percent}%` }]} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function UninstalledList(props: {
+  expenses: ExpenseItem[];
+  busyExpenseId: string | null;
+  onOpenExpense: (expense: ExpenseItem) => void;
+}) {
+  if (props.expenses.length === 0) {
+    return <Text style={styles.stateText}>Нет купленных деталей в ожидании установки.</Text>;
+  }
+  return (
+    <View style={styles.rowsList}>
+      {props.expenses.map((expense) => (
+        <Pressable
+          key={expense.id}
+          onPress={() => props.onOpenExpense(expense)}
+          style={({ pressed }) => [styles.uninstalledRow, pressed && styles.uninstalledRowPressed]}
+        >
+          <View style={styles.partIcon}><Text style={styles.partIconText}>▣</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.eventTitle}>{expense.title}</Text>
+            <Text style={styles.eventMeta}>{expense.node?.name ?? "Без узла"} · {formatCurrencyAmount(expense.amount, expense.currency)}</Text>
+          </View>
+          <View style={[styles.smallAction, props.busyExpenseId === expense.id && styles.disabledButton]}>
+            <Text style={styles.smallActionText}>Установлено</Text>
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function Insight(props: { label: string; value: string }) {
+  return (
+    <View style={styles.insightRow}>
+      <Text style={styles.insightLabel}>{props.label}</Text>
+      <Text style={styles.insightValue}>{props.value}</Text>
     </View>
   );
 }
@@ -368,80 +751,196 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingBottom: 24,
-    gap: 14,
+    gap: 12,
   },
-  heroCard: {
+  headerCard: {
     borderRadius: 24,
     borderWidth: 1,
     borderColor: c.border,
     backgroundColor: c.card,
-    padding: 18,
+    padding: 16,
+    gap: 12,
   },
-  eyebrow: {
-    color: c.textMeta,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
   },
   title: {
-    marginTop: 8,
     color: c.textPrimary,
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 28,
+    fontWeight: "900",
   },
   subtitle: {
-    marginTop: 8,
+    marginTop: 4,
     color: c.textSecondary,
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 18,
   },
-  primaryButton: {
-    marginTop: 16,
-    borderRadius: 16,
+  addButton: {
+    borderRadius: 14,
     backgroundColor: c.primaryAction,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  primaryButtonText: {
+  addButtonText: {
     color: c.onPrimaryAction,
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 12,
+    fontWeight: "900",
   },
-  buttonPressed: {
-    opacity: 0.82,
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
-  metricsGrid: {
-    gap: 10,
-  },
-  scopeCard: {
-    borderRadius: 18,
+  chip: {
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: c.border,
-    backgroundColor: c.card,
-    padding: 14,
-    gap: 4,
+    backgroundColor: c.cardSubtle,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  scopeTitle: {
-    color: c.textPrimary,
-    fontSize: 14,
+  chipActive: {
+    borderColor: c.primaryAction,
+    backgroundColor: c.primaryAction,
+  },
+  chipText: {
+    color: c.textSecondary,
+    fontSize: 12,
     fontWeight: "800",
+  },
+  chipTextActive: {
+    color: c.onPrimaryAction,
   },
   scopeText: {
     color: c.textSecondary,
     fontSize: 12,
     lineHeight: 17,
   },
+  section: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    padding: 14,
+  },
+  sectionTitle: {
+    color: c.textPrimary,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  sectionAction: {
+    minWidth: 28,
+    minHeight: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionActionText: {
+    color: c.textMuted,
+    fontSize: 26,
+    fontWeight: "800",
+    lineHeight: 28,
+  },
+  sectionBody: {
+    marginTop: 12,
+    gap: 10,
+  },
+  stateCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    padding: 18,
+    gap: 8,
+  },
+  stateTitle: {
+    color: c.textPrimary,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  stateText: {
+    color: c.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  metricsGrid: {
+    gap: 10,
+  },
+  metricCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    padding: 14,
+  },
+  metricIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+  },
+  metricIcon_blue: { backgroundColor: "rgba(37,99,235,0.35)" },
+  metricIcon_green: { backgroundColor: "rgba(34,197,94,0.3)" },
+  metricIcon_violet: { backgroundColor: "rgba(139,92,246,0.32)" },
+  metricIcon_amber: { backgroundColor: "rgba(245,158,11,0.34)" },
+  metricIcon_orange: { backgroundColor: "rgba(234,88,12,0.34)" },
+  metricIcon_red: { backgroundColor: "rgba(239,68,68,0.34)" },
+  metricLabel: {
+    color: c.textMeta,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  metricValue: {
+    marginTop: 4,
+    color: c.textPrimary,
+    fontSize: 21,
+    fontWeight: "900",
+  },
+  metricHint: {
+    marginTop: 2,
+    color: c.textMuted,
+    fontSize: 11,
+  },
+  field: {
+    gap: 5,
+  },
+  smallLabel: {
+    color: c.textMeta,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  input: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+    color: c.textPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+  },
+  twoCols: {
+    flexDirection: "row",
+    gap: 10,
+  },
   filterChips: {
     gap: 8,
-    paddingVertical: 2,
+    paddingRight: 8,
   },
   filterChip: {
     borderRadius: 999,
     borderWidth: 1,
     borderColor: c.border,
-    backgroundColor: c.card,
+    backgroundColor: c.cardSubtle,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -452,85 +951,210 @@ const styles = StyleSheet.create({
   filterChipText: {
     color: c.textSecondary,
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   filterChipTextActive: {
     color: c.onPrimaryAction,
   },
-  metricCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.card,
-    padding: 16,
+  primaryButton: {
+    borderRadius: 14,
+    backgroundColor: c.primaryAction,
+    paddingVertical: 12,
+    alignItems: "center",
   },
-  metricLabel: {
-    color: c.textMeta,
-    fontSize: 12,
-    fontWeight: "700",
+  primaryButtonText: {
+    color: c.onPrimaryAction,
+    fontSize: 13,
+    fontWeight: "900",
   },
-  metricValue: {
-    marginTop: 6,
-    color: c.textPrimary,
-    fontSize: 22,
-    fontWeight: "800",
+  disabledButton: {
+    opacity: 0.6,
   },
-  section: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.card,
-    padding: 16,
+  monthChart: {
+    minHeight: 170,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 7,
+    paddingTop: 12,
   },
-  sectionTitle: {
-    color: c.textPrimary,
-    fontSize: 18,
-    fontWeight: "800",
+  monthColumn: {
+    flex: 1,
+    alignItems: "center",
+    gap: 6,
   },
-  sectionBody: {
-    marginTop: 12,
+  monthBarTrack: {
+    height: 128,
+    width: "100%",
+    borderRadius: 999,
+    backgroundColor: c.cardSubtle,
+    justifyContent: "flex-end",
+    overflow: "hidden",
   },
-  stateCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.card,
-    padding: 18,
+  monthBarFill: {
+    width: "100%",
+    borderRadius: 999,
+    backgroundColor: c.primaryAction,
+  },
+  monthLabel: {
+    color: c.textMuted,
+    fontSize: 10,
+  },
+  chartHint: {
+    position: "absolute",
+    left: 0,
+    bottom: -18,
+    color: c.textMuted,
+    fontSize: 11,
+  },
+  structureList: {
+    gap: 10,
+  },
+  structureRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
-  stateTitle: {
+  categoryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
+  structureLabel: {
+    flex: 1,
+    color: c.textSecondary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  structureAmount: {
     color: c.textPrimary,
-    fontSize: 18,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  structurePercent: {
+    width: 40,
+    color: c.textMuted,
+    fontSize: 12,
+    textAlign: "right",
+  },
+  nodeBars: {
+    gap: 12,
+  },
+  nodeBarRow: {
+    gap: 7,
+  },
+  nodeBarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  nodeBarLabel: {
+    flex: 1,
+    color: c.textSecondary,
+    fontSize: 13,
     fontWeight: "800",
   },
-  stateText: {
-    color: c.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
+  nodeBarAmount: {
+    color: c.textPrimary,
+    fontSize: 12,
+    fontWeight: "900",
   },
-  eventCard: {
-    borderRadius: 18,
+  progressTrack: {
+    height: 7,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: c.cardSubtle,
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: c.primaryAction,
+  },
+  rowsList: {
+    gap: 10,
+  },
+  uninstalledRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: c.border,
     backgroundColor: c.cardMuted,
-    padding: 14,
+    padding: 10,
+  },
+  uninstalledRowPressed: {
+    opacity: 0.82,
+  },
+  partIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: c.cardSubtle,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  partIconText: {
+    color: c.primaryAction,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  smallAction: {
+    borderRadius: 999,
+    backgroundColor: "rgba(245,158,11,0.18)",
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  smallActionText: {
+    color: "#fbbf24",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  insightRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: c.border,
+    paddingVertical: 10,
+  },
+  insightLabel: {
+    color: c.textSecondary,
+    fontSize: 13,
+  },
+  insightValue: {
+    color: c.textPrimary,
+    fontSize: 13,
+    fontWeight: "900",
+    textAlign: "right",
+  },
+  eventCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+    padding: 12,
   },
   eventMeta: {
     color: c.textMeta,
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 11,
+    fontWeight: "700",
   },
   eventTitle: {
-    marginTop: 6,
+    marginTop: 5,
     color: c.textPrimary,
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  eventNode: {
+    marginTop: 4,
+    color: c.textSecondary,
+    fontSize: 12,
   },
   eventAmount: {
     marginTop: 6,
     color: c.primaryAction,
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "900",
   },
   eventActions: {
     marginTop: 10,
@@ -542,13 +1166,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: "center",
   },
-  actionButtonDisabled: {
-    opacity: 0.6,
-  },
   actionButtonText: {
     color: c.onPrimaryAction,
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "900",
   },
   secondaryButton: {
     borderRadius: 14,
@@ -560,7 +1181,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: c.textPrimary,
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "900",
   },
   emptyInline: {
     borderRadius: 16,
@@ -568,52 +1189,5 @@ const styles = StyleSheet.create({
     borderColor: c.border,
     backgroundColor: c.cardMuted,
     padding: 12,
-  },
-  rowsList: {
-    gap: 10,
-  },
-  expenseRow: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.cardMuted,
-    padding: 14,
-  },
-  nodeRow: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.cardMuted,
-    padding: 14,
-    gap: 5,
-  },
-  rowHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  rowLabel: {
-    flex: 1,
-    color: c.textPrimary,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  rowAmount: {
-    color: c.primaryAction,
-    fontSize: 13,
-    fontWeight: "800",
-    textAlign: "right",
-  },
-  progressTrack: {
-    marginTop: 10,
-    height: 7,
-    borderRadius: 999,
-    overflow: "hidden",
-    backgroundColor: c.cardSubtle,
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: c.primaryAction,
   },
 });

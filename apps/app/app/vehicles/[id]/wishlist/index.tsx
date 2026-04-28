@@ -59,10 +59,18 @@ function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | nul
 
 export default function VehicleWishlistScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; wishlistItemId?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    wishlistItemId?: string;
+    partsStatus?: string;
+    installWishlistItemId?: string;
+  }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
   const highlightedWishlistItemId =
     typeof params.wishlistItemId === "string" ? params.wishlistItemId : "";
+  const partsStatusParam = typeof params.partsStatus === "string" ? params.partsStatus : "";
+  const installWishlistItemId =
+    typeof params.installWishlistItemId === "string" ? params.installWishlistItemId : "";
   const apiBaseUrl = getApiBaseUrl();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -133,6 +141,18 @@ export default function VehicleWishlistScreen() {
     }, [load])
   );
 
+  useEffect(() => {
+    if (
+      partsStatusParam === "NEEDED" ||
+      partsStatusParam === "ORDERED" ||
+      partsStatusParam === "BOUGHT" ||
+      partsStatusParam === "INSTALLED"
+    ) {
+      setStatusFilter(partsStatusParam);
+      setCollapsedGroups((prev) => ({ ...prev, [partsStatusParam]: false }));
+    }
+  }, [partsStatusParam]);
+
   const statusCounts = useMemo(() => {
     const counts = new Map<PartWishlistItemStatus, number>();
     for (const status of PART_WISHLIST_STATUS_ORDER) {
@@ -200,6 +220,17 @@ export default function VehicleWishlistScreen() {
     }, 120);
     return () => clearTimeout(timeoutId);
   }, [highlightedWishlistItemId, items]);
+
+  useEffect(() => {
+    if (!installWishlistItemId || items.length === 0 || !vehicleId) {
+      return;
+    }
+    const item = items.find((candidate) => candidate.id === installWishlistItemId);
+    if (!item || item.status !== "BOUGHT") {
+      return;
+    }
+    router.replace(buildServiceEventNewFromWishlistHref(vehicleId, item));
+  }, [installWishlistItemId, items, router, vehicleId]);
 
   const promptStatus = (item: PartWishlistItemViewModel) => {
     const previousStatus = item.status;

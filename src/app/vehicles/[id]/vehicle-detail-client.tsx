@@ -581,6 +581,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const targetNodeIdFromSearchParams = searchParams.get("nodeId");
   const highlightIssueNodeIdsFromSearchParams = searchParams.get("highlightIssueNodeIds");
   const highlightedWishlistItemIdFromSearchParams = searchParams.get("wishlistItemId");
+  const partsStatusFromSearchParams = searchParams.get("partsStatus");
+  const installWishlistItemIdFromSearchParams = searchParams.get("installWishlistItemId");
   const focusNodeInTree = useCallback(
     (nodeId: string) => {
       const path = findNodeViewModelPathById(topLevelNodeViewModels, nodeId);
@@ -1218,6 +1220,24 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   }, [highlightedNodeId, selectedNodeSubtreeModalViewModel]);
 
   useEffect(() => {
+    if (pageView !== "partsSelection") {
+      return;
+    }
+    if (
+      partsStatusFromSearchParams === "NEEDED" ||
+      partsStatusFromSearchParams === "ORDERED" ||
+      partsStatusFromSearchParams === "BOUGHT" ||
+      partsStatusFromSearchParams === "INSTALLED"
+    ) {
+      setPartsStatusFilter(partsStatusFromSearchParams);
+      setCollapsedPartsStatusGroups((prev) => ({
+        ...prev,
+        [partsStatusFromSearchParams]: false,
+      }));
+    }
+  }, [pageView, partsStatusFromSearchParams]);
+
+  useEffect(() => {
     if (pageView !== "partsSelection" || !highlightedWishlistItemIdFromSearchParams) {
       return;
     }
@@ -1248,6 +1268,34 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     });
     return () => window.cancelAnimationFrame(frame);
   }, [highlightedWishlistItemIdFromSearchParams, pageView, wishlistViewModels]);
+
+  useEffect(() => {
+    if (pageView !== "partsSelection" || !installWishlistItemIdFromSearchParams) {
+      return;
+    }
+    const item = wishlistItems.find((candidate) => candidate.id === installWishlistItemIdFromSearchParams);
+    if (!item || item.status !== "BOUGHT") {
+      return;
+    }
+    const didOpenServiceEventModal = openAddServiceEventPrefilledFromWishlist(item, {
+      pendingInstall: true,
+    });
+    if (didOpenServiceEventModal) {
+      const q = new URLSearchParams(searchParams.toString());
+      q.delete("installWishlistItemId");
+      router.replace(`/vehicles/${vehicleId}/parts${q.toString() ? `?${q.toString()}` : ""}`, { scroll: false });
+    }
+    // `openAddServiceEventPrefilledFromWishlist` is declared later in this component and
+    // reads the latest loaded vehicle/node state when the deep link is handled.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    installWishlistItemIdFromSearchParams,
+    pageView,
+    router,
+    searchParams,
+    vehicleId,
+    wishlistItems,
+  ]);
 
   useEffect(() => {
     if (!isAddServiceEventModalOpen || !serviceEventCommentTextareaRef.current) {
