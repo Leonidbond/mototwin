@@ -1,11 +1,41 @@
 import type {
+  ExpenseAnalyticsRow,
+  ExpenseAnalyticsSummary,
+  ExpenseAmountByCurrency,
+  ExpenseCategory,
   ExpenseByCurrencyViewModel,
   ExpenseByMonthViewModel,
   ExpenseByNodeViewModel,
+  ExpenseByYearViewModel,
   ExpenseLatestPaidEventViewModel,
+  ExpenseInstallStatus,
+  ExpenseItem,
   ExpenseSummaryViewModel,
   ServiceEventItem,
 } from "@mototwin/types";
+
+export const expenseCategoryLabelsRu: Record<ExpenseCategory, string> = {
+  SERVICE: "Обслуживание",
+  PARTS: "Запчасти",
+  REPAIR: "Ремонт",
+  DIAGNOSTICS: "Диагностика",
+  LABOR: "Работа сервиса",
+  OTHER_TECHNICAL: "Прочие технические",
+};
+
+export const expenseInstallStatusLabelsRu: Record<ExpenseInstallStatus, string> = {
+  BOUGHT_NOT_INSTALLED: "Куплено, но не установлено",
+  INSTALLED: "Установлено",
+  NOT_APPLICABLE: "Не применимо",
+};
+
+export function getExpenseCategoryLabelRu(category: ExpenseCategory): string {
+  return expenseCategoryLabelsRu[category] ?? category;
+}
+
+export function getExpenseInstallStatusLabelRu(status: ExpenseInstallStatus): string {
+  return expenseInstallStatusLabelsRu[status] ?? status;
+}
 
 /** Calendar month key `YYYY-MM` from event ISO date (local interpretation). */
 export function getExpenseMonthKeyFromIso(value: string): string {
@@ -95,6 +125,143 @@ function currencyMapToViewModels(
     .sort((a, b) => a.currency.localeCompare(b.currency, "en"));
 }
 
+function expenseCurrencyMapToRows(
+  map: Map<string, { total: number; count: number }>
+): ExpenseAmountByCurrency[] {
+  return Array.from(map.entries())
+    .map(([currency, { total, count }]) => ({
+      currency,
+      totalAmount: total,
+      expenseCount: count,
+    }))
+    .sort((a, b) => a.currency.localeCompare(b.currency, "en"));
+}
+
+function addExpenseToCurrencyMap(
+  map: Map<string, { total: number; count: number }>,
+  expense: ExpenseItem
+): void {
+  addToCurrencyMap(map, expense.currency.trim(), expense.amount);
+}
+
+function getExpenseYear(expense: ExpenseItem): number {
+  const date = new Date(expense.expenseDate);
+  if (!Number.isNaN(date.getTime())) {
+    return date.getFullYear();
+  }
+  const year = Number(expense.expenseDate.slice(0, 4));
+  return Number.isFinite(year) ? year : 0;
+}
+
+function groupExpenseItems(
+  expenses: ExpenseItem[],
+  getKeyAndLabel: (expense: ExpenseItem) => { key: string; label: string; sort: number | string }
+): ExpenseAnalyticsRow[] {
+  const groups = new Map<
+    string,
+    { label: string; sort: number | string; count: number; totals: Map<string, { total: number; count: number }> }
+  >();
+
+  for (const expense of expenses) {
+    const { key, label, sort } = getKeyAndLabel(expense);
+    const bucket = groups.get(key) ?? {
+      label,
+      sort,
+      count: 0,
+      totals: new Map<string, { total: number; count: number }>(),
+    };
+    bucket.count += 1;
+    addExpenseToCurrencyMap(bucket.totals, expense);
+    groups.set(key, bucket);
+  }
+
+  return Array.from(groups.entries())
+    .map(([key, bucket]) => ({
+      key,
+      label: bucket.label,
+      expenseCount: bucket.count,
+      totalsByCurrency: expenseCurrencyMapToRows(bucket.totals),
+      sort: bucket.sort,
+    }))
+    .sort((a, b) => {
+      if (typeof a.sort === "number" && typeof b.sort === "number") {
+        return b.sort - a.sort;
+      }
+      return String(a.sort).localeCompare(String(b.sort), "ru-RU");
+    })
+    .map((row) => ({
+      key: row.key,
+      label: row.label,
+      expenseCount: row.expenseCount,
+      totalsByCurrency: row.totalsByCurrency,
+    }));
+}
+
+export function getCurrentExpenseYear(now: Date = new Date()): number {
+  return now.getFullYear();
+}
+
+export function getExpenseYearDateRange(year: number): { dateFrom: string; dateTo: string } {
+  const safeYear = Number.isFinite(year) && year > 0 ? Math.trunc(year) : getCurrentExpenseYear();
+  return {
+    dateFrom: `${safeYear}-01-01`,
+    dateTo: `${safeYear + 1}-01-01`,
+  };
+}
+
+export function buildExpenseAnalyticsFromItems(
+  expenses: ExpenseItem[],
+  selectedYear: number = getCurrentExpenseYear()
+): ExpenseAnalyticsSummary {
+  const totals = new Map<string, { total: number; count: number }>();
+  for (const expense of expenses) {
+    addExpenseToCurrencyMap(totals, expense);
+  }
+
+  const selectedYearExpenses = expenses.filter((expense) => getExpenseYear(expense) === selectedYear);
+  const selectedYearTotals = new Map<string, { total: number; count: number }>();
+  for (const expense of selectedYearExpenses) {
+    addExpenseToCurrencyMap(selectedYearTotals, expense);
+  }
+
+  const boughtNotInstalled = expenses.filter(
+    (expense) => expense.installStatus === "BOUGHT_NOT_INSTALLED"
+  );
+  const boughtTotals = new Map<string, { total: number; count: number }>();
+  for (const expense of boughtNotInstalled) {
+    addExpenseToCurrencyMap(boughtTotals, expense);
+  }
+
+  return {
+    totalExpenseCount: expenses.length,
+    totalsByCurrency: expenseCurrencyMapToRows(totals),
+    selectedYear,
+    selectedYearExpenseCount: selectedYearExpenses.length,
+    selectedYearTotalsByCurrency: expenseCurrencyMapToRows(selectedYearTotals),
+    boughtNotInstalledCount: boughtNotInstalled.length,
+    boughtNotInstalledTotalsByCurrency: expenseCurrencyMapToRows(boughtTotals),
+    byYear: groupExpenseItems(expenses, (expense) => {
+      const year = getExpenseYear(expense);
+      return { key: String(year), label: String(year), sort: year };
+    }),
+    byMonth: groupExpenseItems(selectedYearExpenses, (expense) => {
+      const monthKey = getExpenseMonthKeyFromIso(expense.expenseDate);
+      const meta = getExpenseMonthMeta(monthKey);
+      return { key: monthKey, label: meta.monthLabel, sort: meta.monthStart };
+    }),
+    byNode: groupExpenseItems(selectedYearExpenses, (expense) => ({
+      key: expense.nodeId ?? "without-node",
+      label: expense.node?.name?.trim() || "Без узла",
+      sort: expense.node?.name?.trim() || "Без узла",
+    })),
+    byCategory: groupExpenseItems(selectedYearExpenses, (expense) => ({
+      key: expense.category,
+      label: getExpenseCategoryLabelRu(expense.category),
+      sort: getExpenseCategoryLabelRu(expense.category),
+    })),
+  };
+}
+
 /** Roll up paid SERVICE events by currency (no mixing). */
 export function groupExpensesByCurrency(
   paidEvents: ServiceEventItem[]
@@ -138,6 +305,36 @@ export function groupExpensesByMonth(
   }
 
   return rows.sort((a, b) => b.monthStart - a.monthStart);
+}
+
+/** Group by calendar year (local interpretation of ISO date). */
+export function groupExpensesByCalendarYear(
+  paidEvents: ServiceEventItem[]
+): ExpenseByYearViewModel[] {
+  const byYear = new Map<number, Map<string, { total: number; count: number }>>();
+
+  for (const e of paidEvents) {
+    const date = new Date(e.eventDate);
+    const year = Number.isNaN(date.getTime())
+      ? Number(e.eventDate.slice(0, 4))
+      : date.getFullYear();
+    if (!Number.isFinite(year)) {
+      continue;
+    }
+    let curMap = byYear.get(year);
+    if (!curMap) {
+      curMap = new Map();
+      byYear.set(year, curMap);
+    }
+    addToCurrencyMap(curMap, e.currency!.trim(), e.costAmount!);
+  }
+
+  return Array.from(byYear.entries())
+    .map(([year, curMap]) => ({
+      year,
+      totalsByCurrency: currencyMapToViewModels(curMap),
+    }))
+    .sort((a, b) => b.year - a.year);
 }
 
 /** Group by nodeId for paid SERVICE costs. */

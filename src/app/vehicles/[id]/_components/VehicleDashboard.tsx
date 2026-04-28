@@ -124,6 +124,7 @@ type VehicleDashboardProps = {
   onOpenNode: (nodeId: string) => void;
   onOpenNodeIssues: (nodeIds: string[]) => void;
   onOpenServiceLog: () => void;
+  onOpenServiceLogEvent: (eventId: string) => void;
   onOpenExpenseDetails: () => void;
   onOpenAttentionItemService: (item: AttentionItemViewModel) => void;
   onOpenAttentionItemLog: (item: AttentionItemViewModel) => void;
@@ -388,7 +389,9 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
                   details="После первого ТО или расхода здесь появятся последние события."
                 />
               ) : (
-                recentEvents.map((event) => <RecentEventRow key={event.id} event={event} />)
+                recentEvents.map((event) => (
+                  <RecentEventRow key={event.id} event={event} onOpen={() => props.onOpenServiceLogEvent(event.id)} />
+                ))
               )}
             </div>
           ) : null}
@@ -512,22 +515,6 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
         </div>
       </Card>
 
-      <Card variant="subtle" padding="md">
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <div>
-            <div style={{ color: productSemanticColors.textPrimary, fontSize: 15, fontWeight: 600 }}>
-              Расширенные данные и управление
-            </div>
-            <MutedText style={{ marginTop: 4 }}>
-              Полное дерево узлов, редактирование состояния, техническая сводка и рабочие панели
-              доступны ниже одним раскрытием.
-            </MutedText>
-          </div>
-          <Button variant="secondary" onClick={props.onOpenAllNodes}>
-            Открыть расширенные данные
-          </Button>
-        </div>
-      </Card>
     </div>
   );
 }
@@ -952,14 +939,27 @@ function SystemStatusCard(props: {
   );
 }
 
-function RecentEventRow({ event }: { event: ServiceEventItem }) {
+function RecentEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: () => void }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`${formatIsoCalendarDateRu(event.eventDate)} · ${event.serviceType}. Открыть в журнале`}
       style={{
         display: "grid",
         gap: 3,
         padding: "7px 0",
         borderBottom: `1px solid ${productSemanticColors.divider}`,
+        borderTop: "none",
+        borderLeft: "none",
+        borderRight: "none",
+        background: "transparent",
+        margin: 0,
+        width: "100%",
+        cursor: "pointer",
+        textAlign: "left",
+        font: "inherit",
+        color: "inherit",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -990,7 +990,7 @@ function RecentEventRow({ event }: { event: ServiceEventItem }) {
       <MutedText style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {event.node?.name || "Без привязки к узлу"}
       </MutedText>
-    </div>
+    </button>
   );
 }
 

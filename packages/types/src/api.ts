@@ -4,6 +4,12 @@ import type { PartRecommendationViewModel } from "./part-recommendation";
 import type { AddServiceKitToWishlistResult, ServiceKitViewModel } from "./service-kit";
 import type { ServiceEventItem } from "./service-event";
 import type {
+  CreateExpenseItemResponse,
+  DeleteExpenseItemResponse,
+  ExpensesResponse,
+  UpdateExpenseItemResponse,
+} from "./expense-item";
+import type {
   BrandItem,
   GarageVehicleItem,
   ModelItem,
@@ -53,6 +59,13 @@ export type DeleteServiceEventResponse = {
   deleted: true;
   eventId: string;
   affectedNodeId: string;
+};
+
+export type {
+  CreateExpenseItemResponse,
+  DeleteExpenseItemResponse,
+  ExpensesResponse,
+  UpdateExpenseItemResponse,
 };
 
 export type UpdateVehicleStateResponse = {

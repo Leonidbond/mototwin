@@ -91,7 +91,7 @@ export default function HomeScreen() {
   }, [primaryVehicleId, router]);
   const openExpenses = useCallback(() => {
     if (!primaryVehicleId) return;
-    router.push(`/vehicles/${primaryVehicleId}/service-log`);
+    router.push(`/vehicles/${primaryVehicleId}/expenses`);
   }, [primaryVehicleId, router]);
 
   if (isLoading) {

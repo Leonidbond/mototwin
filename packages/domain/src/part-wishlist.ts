@@ -53,12 +53,20 @@ export function isLikelyWishlistInstallServiceEvent(event: {
   eventKind?: ServiceEventKind;
   serviceType: string;
   comment: string | null;
+  installedPartsJson?: unknown | null;
 }): boolean {
   if (event.eventKind === "STATE_UPDATE") {
     return false;
   }
   if (event.serviceType !== WISHLIST_INSTALL_SERVICE_TYPE_RU) {
     return false;
+  }
+  const json = event.installedPartsJson;
+  if (json && typeof json === "object" && !Array.isArray(json)) {
+    const o = json as Record<string, unknown>;
+    if (o.source === "wishlist") {
+      return true;
+    }
   }
   const c = event.comment?.trim() ?? "";
   return c.startsWith(WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU);

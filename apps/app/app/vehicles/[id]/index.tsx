@@ -30,7 +30,6 @@ import {
   buildRideProfileViewModel,
   buildVehicleDetailViewModel,
   buildVehicleStateViewModel,
-  buildVehicleTechnicalInfoViewModel,
   canOpenNodeStatusExplanationModal,
   calculateGarageScore,
   createServiceLogNodeFilter,
@@ -608,8 +607,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [isTopServiceNodesLoading, setIsTopServiceNodesLoading] = useState(false);
   const [topServiceNodesError, setTopServiceNodesError] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [isRideProfileExpanded, setIsRideProfileExpanded] = useState(true);
-  const [isTechnicalExpanded, setIsTechnicalExpanded] = useState(true);
   const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
   const [selectedTopLevelNodeId, setSelectedTopLevelNodeId] = useState<string | null>(null);
   const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
@@ -715,17 +712,9 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   useEffect(() => {
     if (!vehicleId) return;
     void (async () => {
-      const usage = await readCollapsiblePreference(
-        `vehicleDetail.${vehicleId}.usageProfile.expanded`
-      );
-      const technical = await readCollapsiblePreference(
-        `vehicleDetail.${vehicleId}.technicalSummary.expanded`
-      );
       const maintenanceMode = await readCollapsiblePreference(
         `vehicleDetail.${vehicleId}.nodeMaintenanceMode.enabled`
       );
-      setIsRideProfileExpanded(usage ?? true);
-      setIsTechnicalExpanded(technical ?? true);
       setIsNodeMaintenanceModeEnabled(maintenanceMode ?? false);
       setHasLoadedCollapsePrefs(true);
     })();
@@ -811,22 +800,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         setNodeContextServiceKitsLoading(false);
       });
   }, [apiBaseUrl, vehicleId, selectedNodeContextId]);
-
-  useEffect(() => {
-    if (!vehicleId || !hasLoadedCollapsePrefs) return;
-    void writeCollapsiblePreference(
-      `vehicleDetail.${vehicleId}.usageProfile.expanded`,
-      isRideProfileExpanded
-    );
-  }, [vehicleId, hasLoadedCollapsePrefs, isRideProfileExpanded]);
-
-  useEffect(() => {
-    if (!vehicleId || !hasLoadedCollapsePrefs) return;
-    void writeCollapsiblePreference(
-      `vehicleDetail.${vehicleId}.technicalSummary.expanded`,
-      isTechnicalExpanded
-    );
-  }, [vehicleId, hasLoadedCollapsePrefs, isTechnicalExpanded]);
 
   useEffect(() => {
     if (!vehicleId || !hasLoadedCollapsePrefs) return;
@@ -1411,10 +1384,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     engineHours: vehicle.engineHours,
   });
   const rideProfileViewModel = buildRideProfileViewModel(vehicle.rideProfile);
-  const technicalInfoViewModel = buildVehicleTechnicalInfoViewModel({
-    modelVariant: vehicle.modelVariant,
-  });
-  const hasTechnicalInfo = technicalInfoViewModel.items.length > 0;
   const dashboardSectionStyle = isWideLayout ? styles.dashboardSectionWide : undefined;
   const score = calculateGarageScore({
     totalCount: attentionSummary.totalCount,
@@ -1784,7 +1753,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                 <DashboardActionButton
                   label="Добавить расход"
                   iconName="account-balance-wallet"
-                  onPress={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
+                  onPress={() => router.push(`/vehicles/${vehicleId}/expenses`)}
                 />
                 <DashboardActionButton
                   label="Подобрать деталь"
@@ -1843,13 +1812,9 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                   key={event.id}
                   event={event}
                   onOpen={() => {
-                    const nodeFilter = event.nodeId
-                      ? {
-                          nodeIds: [event.nodeId],
-                          displayLabel: event.node?.name?.trim() || "Узел",
-                        }
-                      : null;
-                    router.push(buildVehicleServiceLogHref(vehicleId, nodeFilter, false));
+                    router.push(
+                      buildVehicleServiceLogHref(vehicleId, null, false, { serviceEventId: event.id })
+                    );
                   }}
                 />
               ))
@@ -1858,7 +1823,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
           <ExpenseDashboardCard
             summary={expenseSummary}
-            onPress={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
+            onPress={() => router.push(`/vehicles/${vehicleId}/expenses`)}
           />
 
           <PartsDashboardCard
@@ -1868,57 +1833,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
           />
         </View>
 
-        <View style={styles.secondarySectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.sectionHeaderToggle,
-                pressed && styles.sectionHeaderRowPressed,
-              ]}
-              onPress={() => setIsRideProfileExpanded((prev) => !prev)}
-            >
-              <Text style={styles.secondarySectionTitle}>Профиль эксплуатации</Text>
-              <Text style={styles.sectionChevron}>{isRideProfileExpanded ? "▾" : "▸"}</Text>
-            </Pressable>
-          </View>
-          {isRideProfileExpanded ? (
-            rideProfileViewModel ? (
-              <View style={styles.secondarySectionGrid}>
-                <SpecRow label="Сценарий" value={rideProfileViewModel.usageType} />
-                <SpecRow label="Стиль" value={rideProfileViewModel.ridingStyle} />
-                <SpecRow label="Нагрузка" value={rideProfileViewModel.loadType} />
-                <SpecRow
-                  label="Интенсивность"
-                  value={rideProfileViewModel.usageIntensity}
-                />
-              </View>
-            ) : (
-              <Text style={styles.secondaryEmptyText}>Профиль эксплуатации пока не задан.</Text>
-            )
-          ) : null}
-        </View>
-
-        {hasTechnicalInfo ? (
-          <View style={styles.secondarySectionCard}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.sectionHeaderToggle,
-                pressed && styles.sectionHeaderRowPressed,
-              ]}
-              onPress={() => setIsTechnicalExpanded((prev) => !prev)}
-            >
-              <Text style={styles.secondarySectionTitle}>Техническая сводка</Text>
-              <Text style={styles.sectionChevron}>{isTechnicalExpanded ? "▾" : "▸"}</Text>
-            </Pressable>
-            {isTechnicalExpanded ? (
-              <View style={styles.secondarySectionGrid}>
-                {technicalInfoViewModel.items.map((item) => (
-                  <SpecRow key={item.label} label={item.label} value={item.value || "—"} />
-                ))}
-              </View>
-            ) : null}
-          </View>
-        ) : null}
           </>
         )}
       </ScrollView>
@@ -1931,7 +1845,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
           }
         }}
         onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
-        onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
+        onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
         onOpenProfile={() => router.push(`/vehicles/${vehicleId}/profile`)}
         hasVehicleContext
       />
@@ -2791,15 +2705,6 @@ function pluralizeRu(value: number, variants: [string, string, string]) {
 
 function capitalizeFirst(value: string) {
   return value.length ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
-}
-
-function SpecRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.specRow}>
-      <Text style={styles.specLabel}>{label}</Text>
-      <Text style={styles.specValue}>{value}</Text>
-    </View>
-  );
 }
 
 const styles = StyleSheet.create({
@@ -3688,72 +3593,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 
-  secondarySectionCard: {
-    backgroundColor: c.card,
-    borderColor: c.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
-  },
-  secondarySectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: c.textPrimary,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  sectionHeaderToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flex: 1,
-    marginRight: 8,
-  },
-  sectionHeaderRowPressed: {
-    opacity: 0.92,
-  },
-  sectionHeaderActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  sectionChevron: {
-    fontSize: 16,
-    color: c.textMuted,
-    width: 16,
-    textAlign: "center",
-  },
-  secondarySectionGrid: {
-    gap: 8,
-  },
-  secondaryEmptyText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: c.textMuted,
-  },
-  specRow: {
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: 10,
-    backgroundColor: c.chipBackground,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-  },
-  specLabel: {
-    fontSize: 12,
-    color: c.textMuted,
-  },
-  specValue: {
-    marginTop: 3,
-    fontSize: 14,
-    fontWeight: "600",
-    color: c.textPrimary,
-  },
   expenseCard: {
     backgroundColor: c.card,
     borderColor: c.border,

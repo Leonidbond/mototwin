@@ -43,6 +43,8 @@ export function createInitialAddServiceEventFormValues(): AddServiceEventFormVal
     currency: DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
     comment: "",
     installedPartsJson: "",
+    partSku: "",
+    partName: "",
   };
 }
 
@@ -211,6 +213,7 @@ export function createInitialAddServiceEventFromWishlistItem(
   const currency = hasCost
     ? (item.currency?.trim() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY).toUpperCase()
     : base.currency;
+  const skuPartNumber = item.sku?.primaryPartNumber?.trim() ?? "";
   return {
     ...base,
     nodeId: item.nodeId ?? "",
@@ -220,6 +223,8 @@ export function createInitialAddServiceEventFromWishlistItem(
     engineHours: vehicle.engineHours != null ? String(vehicle.engineHours) : "",
     costAmount,
     currency,
+    partName: item.title.trim(),
+    partSku: skuPartNumber,
     comment: buildAddServiceEventCommentFromWishlistItem(item),
     installedPartsJson: buildWishlistInstalledPartsJsonString(item),
   };
@@ -255,8 +260,43 @@ export function createInitialEditServiceEventValues(
       options?.fallbackCurrency ||
       DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
     comment: event.comment ?? "",
+    partSku: event.partSku?.trim() ?? "",
+    partName: event.partName?.trim() ?? "",
     installedPartsJson:
       event.installedPartsJson == null ? "" : JSON.stringify(event.installedPartsJson, null, 2),
+  };
+}
+
+export type CreateInitialRepeatServiceEventValuesOptions = {
+  fallbackCurrency?: string;
+  /** Локальная дата нового события `YYYY-MM-DD`. По умолчанию — сегодня на клиенте. */
+  todayDateYmd?: string;
+};
+
+/**
+ * Форма **нового** события с тем же узлом, типом работ, суммами, комментарием и полями запчасти, что у исходного;
+ * дата — «сегодня» (или `todayDateYmd`); пробег и моточасы — из актуального состояния мотоцикла.
+ */
+export function createInitialRepeatServiceEventValues(
+  event: ServiceEventItem,
+  vehicle: VehicleOdometerStateForServiceEvent,
+  options?: CreateInitialRepeatServiceEventValuesOptions
+): AddServiceEventFormValues {
+  if (event.eventKind === "STATE_UPDATE") {
+    return createInitialAddServiceEventFormValues();
+  }
+  const fromSource = createInitialEditServiceEventValues(event, {
+    fallbackCurrency: options?.fallbackCurrency,
+  });
+  const today =
+    typeof options?.todayDateYmd === "string" && options.todayDateYmd.trim()
+      ? options.todayDateYmd.trim().slice(0, 10)
+      : getTodayDateYmdLocal();
+  return {
+    ...fromSource,
+    eventDate: today,
+    odometer: String(vehicle.odometer),
+    engineHours: vehicle.engineHours != null ? String(vehicle.engineHours) : "",
   };
 }
 
@@ -300,6 +340,9 @@ export function normalizeAddServiceEventPayload(
     }
   }
 
+  const trimmedPartSku = values.partSku.trim();
+  const trimmedPartName = values.partName.trim();
+
   return {
     nodeId: values.nodeId.trim(),
     eventDate: eventDateIso,
@@ -309,6 +352,8 @@ export function normalizeAddServiceEventPayload(
     costAmount,
     currency: costAmount !== null && trimmedCurrency ? trimmedCurrency.toUpperCase() : null,
     comment: values.comment.trim() || null,
+    partSku: trimmedPartSku ? trimmedPartSku.slice(0, 200) : null,
+    partName: trimmedPartName ? trimmedPartName.slice(0, 500) : null,
     installedPartsJson,
   };
 }

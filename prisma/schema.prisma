@@ -76,6 +76,21 @@ enum PartWishlistItemStatus {
   INSTALLED
 }
 
+enum ExpenseCategory {
+  SERVICE
+  PARTS
+  REPAIR
+  DIAGNOSTICS
+  LABOR
+  OTHER_TECHNICAL
+}
+
+enum ExpenseInstallStatus {
+  BOUGHT_NOT_INSTALLED
+  INSTALLED
+  NOT_APPLICABLE
+}
+
 model User {
   id            String        @id @default(cuid())
   email         String?       @unique
@@ -212,6 +227,7 @@ model Vehicle {
   topNodeStates       TopNodeState[]
   nodeStates          NodeState[]
   partWishlistItems   PartWishlistItem[]
+  expenseItems        ExpenseItem[]
 
   @@index([userId])
   @@index([garageId])
@@ -236,10 +252,15 @@ model ServiceEvent {
   costAmount         Float?
   currency           String?
   comment            String?
+  /** Артикул / номер SKU установленной запчасти (отдельно от комментария). */
+  partSku            String?
+  /** Наименование установленной запчасти. */
+  partName           String?
   createdAt          DateTime @default(now())
 
   vehicle            Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   node               Node     @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  expenseItems       ExpenseItem[]
 
   @@index([vehicleId])
   @@index([nodeId])
@@ -270,6 +291,7 @@ model Node {
   nodeStates          NodeState[]
   maintenanceRule   NodeMaintenanceRule?
   partWishlistItems   PartWishlistItem[]
+  expenseItems        ExpenseItem[]
   partSkusPrimary     PartSku[]          @relation("PartSkuPrimaryNode")
   partSkuNodeLinks    PartSkuNodeLink[]
 
@@ -427,12 +449,46 @@ model PartWishlistItem {
   vehicle   Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   node      Node?                   @relation(fields: [nodeId], references: [id], onDelete: SetNull)
   sku       PartSku?                @relation(fields: [skuId], references: [id], onDelete: SetNull)
+  expenseItems ExpenseItem[]
 
   @@index([vehicleId])
   @@index([nodeId])
   @@index([skuId])
   @@index([status])
   @@map("part_wishlist_items")
+}
+
+model ExpenseItem {
+  id                 String               @id @default(cuid())
+  vehicleId          String
+  nodeId             String?
+  serviceEventId     String?
+  shoppingListItemId String?
+  category           ExpenseCategory
+  installStatus      ExpenseInstallStatus
+  expenseDate        DateTime
+  title              String
+  amount             Float
+  currency           String
+  quantity           Int                  @default(1)
+  comment            String?
+  partSku            String?
+  partName           String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  vehicle            Vehicle              @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node               Node?                @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  serviceEvent       ServiceEvent?        @relation(fields: [serviceEventId], references: [id], onDelete: SetNull)
+  shoppingListItem   PartWishlistItem?    @relation(fields: [shoppingListItemId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId, expenseDate])
+  @@index([vehicleId, category])
+  @@index([vehicleId, installStatus])
+  @@index([nodeId])
+  @@index([serviceEventId])
+  @@index([shoppingListItemId])
+  @@map("expense_items")
 }
 
 model TopNodeState {

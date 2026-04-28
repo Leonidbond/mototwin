@@ -1,74 +1,122 @@
-# Expense tracking MVP (derived from service events)
+# Expense tracking MVP (`ExpenseItem`)
 
-**Дата:** 2026-04-18  
-**Статус:** MVP без отдельной модели расходов в Prisma.
+**Дата:** 2026-04-28  
+**Статус:** реализована отдельная модель расходов `ExpenseItem`.
 
 ## Источник данных
 
-- Только существующие поля **`ServiceEvent.costAmount`** и **`ServiceEvent.currency`** (через API журнала / тот же список, что для service log).
-- Отдельный модуль «расходы» в БД **не** вводится: итоги считаются на клиенте и в shared `@mototwin/domain`, чтобы web и Expo совпадали по смыслу.
+Expense analytics строится только из таблицы **`expense_items`** (`ExpenseItem`), а не напрямую из журнала обслуживания.
+
+`ExpenseItem` может быть создан из трёх источников:
+
+- `ServiceEvent` с валидной стоимостью и валютой;
+- `PartWishlistItem` со статусом `BOUGHT`, стоимостью и валютой;
+- ручной технический расход без `ServiceEvent` (например диагностика, работа сервиса, ремонт).
+
+Старые поля **`ServiceEvent.costAmount/currency`** и **`PartWishlistItem.costAmount/currency`** остаются для совместимости форм, но аналитика читает `ExpenseItem`.
 
 ## Что входит в сводку
 
-- События с **`eventKind === "SERVICE"`** (или отсутствующим kind, трактуемым как сервис).
-- **`costAmount > 0`** и непустая **`currency`** после `trim`.
-- **`STATE_UPDATE`** в расходы **не** включаются.
+- Только технические расходы: обслуживание, запчасти, ремонт, диагностика, работа сервиса, прочие технические расходы.
+- **`amount > 0`** и непустая **`currency`**.
+- Сезон = календарный год: `YYYY-01-01` включительно до `(YYYY+1)-01-01` исключительно.
 
 ## Что исключается
 
-- `costAmount === null`, `≤ 0`, пустая или отсутствующая валюта.
-- Любые записи, помеченные как обновление состояния.
+- Бензин, страховка, штрафы, парковка, мойка, экипировка.
+- Любые нетехнические категории: они не представлены в `ExpenseCategory`, поэтому не попадают в UI/API аналитики.
+- `STATE_UPDATE` не создаёт расход.
+
+## Data model
+
+Prisma:
+
+- `ExpenseCategory`: `SERVICE`, `PARTS`, `REPAIR`, `DIAGNOSTICS`, `LABOR`, `OTHER_TECHNICAL`.
+- `ExpenseInstallStatus`: `BOUGHT_NOT_INSTALLED`, `INSTALLED`, `NOT_APPLICABLE`.
+- `ExpenseItem`:
+  - обязательные: `vehicleId`, `category`, `installStatus`, `expenseDate`, `title`, `amount`, `currency`;
+  - optional links: `nodeId`, `serviceEventId`, `shoppingListItemId` (`PartWishlistItem`);
+  - snapshots: `partSku`, `partName`;
+  - `quantity`, `comment`, `createdAt`, `updatedAt`.
+
+Связь `shoppingListItemId` — это продуктовый `ShoppingListItem`, который в текущем коде реализован моделью `PartWishlistItem`.
+
+## Статус установки
+
+- `BOUGHT_NOT_INSTALLED` — деталь куплена заранее, но ещё не установлена.
+- `INSTALLED` — расход связан с установленной деталью/сервисным событием.
+- `NOT_APPLICABLE` — расход без установки: диагностика, работа сервиса и подобные.
+
+Отдельная метрика **«куплено, но не установлено»** считается по `installStatus === BOUGHT_NOT_INSTALLED`.
 
 ## Агрегация
 
-- **По валютам:** отдельные суммы и число платных записей; **нет** одной «фиктивной» суммы в смешанных валютах.
-- **По месяцам:** календарный месяц из даты события (локальная интерпретация ISO-даты, как в хелперах).
-- **По узлам:** в модели `ExpenseSummaryViewModel` есть `byNode` для будущего UI; в компактном блоке на карточке ТС может не отображаться.
-- **Текущий месяц:** итоги только за локальный календарный месяц устройства.
-- **Последняя оплаченная запись:** по максимальной `eventDate` среди отфильтрованных.
+- **По валютам:** отдельные суммы и число расходов; смешанные валюты не складываются в одну сумму.
+- **По году/сезону:** календарный год по `expenseDate`.
+- **По месяцам:** календарный месяц внутри выбранного года.
+- **По узлам:** `nodeId` / `node.name`, если узел задан; иначе группа «Без узла».
+- **По категориям:** русские подписи из shared domain labels.
 
 ## Поведение клиентов
 
 | Клиент | Где | Данные |
 |--------|-----|--------|
-| Web | `src/app/vehicles/[id]/page.tsx` | `serviceEvents` уже подгружаются для модалки журнала |
-| Expo | `apps/app/app/vehicles/[id]/index.tsx` | `getServiceEvents` параллельно с `getNodeTree` после успешного `getVehicleDetail` |
+| Web | `/expenses` | общая страница расходов гаража/пользователя |
+| Web | `/vehicles/[id]/expenses` | та же аналитика, отфильтрованная по одному мотоциклу |
+| Expo | `vehicles/[id]/expenses` | vehicle-scoped аналитика по `ExpenseItem` |
 
-Пустое состояние сводки: **«Расходы пока не указаны»** с коротким пояснением.
+Пустое состояние: **«Расходов пока нет»** с подсказкой добавить технический расход или стоимость в сервисное событие.
 
-**Блок «Расходы на обслуживание»** на карточке ТС **свёрнут по умолчанию** (локальное состояние, без сохранения). В свёрнутом виде: заголовок, краткая строка-сводка (загрузка / ошибка / «не указаны» / число записей с суммой), индикатор разворота. После разворота — полная сводка как раньше. Отдельная кнопка **«Журнал»** в этом блоке **не используется**; полный журнал открывается с экрана ТС из секции дерева узлов (**«Открыть журнал обслуживания»** / **«Журнал обслуживания»**).
+## API
 
-**Детализация расходов** не вынесена в отдельный экран или модалку: действие **«Детали расходов»** (только в **развёрнутом** блоке расходов, если есть платные записи) открывает **тот же журнал обслуживания** с фильтром **только события с расходами** (`ServiceEventsFilters.paidOnly` / `?paidOnly=1`).
+- `GET /api/expenses?year=2026&vehicleId=...` — список расходов + analytics.
+- `POST /api/expenses` — ручной технический расход.
+- `PATCH /api/expenses/[expenseId]` — редактирование.
+- `DELETE /api/expenses/[expenseId]` — удаление.
 
-| Клиент | Как открыть детализацию (платные события в журнале) | Как открыть полный журнал |
-|--------|-----------------------------------------------------|---------------------------|
-| Web | В развёрнутом блоке расходов: **«Детали расходов»** → модалка журнала с `paidOnly: true` | **«Открыть журнал обслуживания»** в секции дерева узлов → модалка без фильтра по расходам |
-| Expo | В развёрнутом блоке расходов: **«Детали расходов»** → `vehicles/[id]/service-log?paidOnly=1` | **«Журнал обслуживания»** у дерева узлов → полный экран журнала без query |
+API возвращает:
 
-В журнале при активном фильтре показывается подпись (например **«Показаны события с расходами»**) и действие **«Сбросить фильтр»**, возвращающее полный список (на web сбрасывается только режим расходов; полный **«Сбросить»** в панели фильтров сбрасывает все поля, сортировку и фильтр по узлу, как раньше).
+- `expenses: ExpenseItem[]`;
+- `analytics: ExpenseAnalyticsSummary`;
+- `years: number[]`.
 
-Правило отбора **платной записи** для журнала (`isPaidServiceEvent`): **`costAmount`** — конечное число **`> 0`**, **`currency`** после `trim` непустая. Это не дублируется в web/Expo — только в `packages/domain/src/service-log.ts`.
+## Синхронизация источников
 
-## Shared API (сводка)
+### ServiceEvent
 
-- Типы: `packages/types/src/expense-summary.ts` (`ExpenseSummaryViewModel`, `ExpenseByCurrencyViewModel`, …).
-- Хелперы: `packages/domain/src/expense-summary.ts` — `buildExpenseSummaryFromServiceEvents`, `groupExpensesBy*`, `filterPaidServiceExpenseEvents`, `formatExpenseAmountRu`.
+При создании/редактировании `SERVICE` события с валидными `costAmount/currency` backend создаёт или пересоздаёт связанный `ExpenseItem`:
 
-## Shared API (журнал + расходы в одном списке)
+- `serviceEventId = ServiceEvent.id`;
+- `nodeId = ServiceEvent.nodeId`;
+- `expenseDate = ServiceEvent.eventDate`;
+- `title = ServiceEvent.serviceType`;
+- category классифицируется эвристически: parts/repair/diagnostics/labor/service;
+- `installedPartsJson.source === "wishlist"` + `wishlistItemId` заполняет `shoppingListItemId`.
 
-- Фильтр: `ServiceEventsFilters.paidOnly` в `packages/types/src/service-log.ts`.
-- Хелперы: `isPaidServiceEvent`, `filterPaidServiceEvents`, `buildPaidEventsServiceLogFilter`, `applyServiceLogFilters`, `filterServiceLogEntries` в `packages/domain/src/service-log.ts`.
-- Фильтр по поддереву узла (`restrictToNodeIds` / query `nodeIds` на Expo) **сочетается** с `paidOnly`: сначала ограничение по узлам, затем остальные условия.
+При удалении `SERVICE` события связанный `ExpenseItem` удаляется.
 
-## Почему нет новой Prisma-модели
+### PartWishlistItem
 
-Первый шаг продукта — **прозрачная сводка по уже вводимым пользователем суммам** в сервисных событиях. Отдельная сущность «расход» (категории, вне сервиса, импорт) вынесена за рамки MVP и потребует отдельного контракта и миграций.
+При создании/редактировании wishlist-строки со статусом `BOUGHT`, валидной суммой и валютой создаётся standalone `ExpenseItem`:
+
+- `shoppingListItemId = PartWishlistItem.id`;
+- `category = PARTS`;
+- `installStatus = BOUGHT_NOT_INSTALLED`;
+- `expenseDate = updatedAt`.
+
+При смене статуса или стоимости этот расход пересинхронизируется.
+
+## Shared API
+
+- Типы: `packages/types/src/expense-item.ts` (`ExpenseItem`, `ExpenseAnalyticsSummary`, DTO create/update).
+- Доменные хелперы: `packages/domain/src/expense-summary.ts` — `buildExpenseAnalyticsFromItems`, labels категорий/статусов, форматирование сумм.
+- HTTP client: `packages/api-client/src/mototwin-endpoints.ts` — `getExpenses`, `createExpense`, `updateExpense`, `deleteExpense`.
 
 ## QA (кратко)
 
-1. Сервисные события с суммой + RUB и с другой валютой — две строки итого, без сложения валют.  
-2. Событие без суммы / `STATE_UPDATE` — не в счётчике платных записей **в сводке**; в журнале при **«только расходы»** отбираются все события с валидной суммой и валютой (включая теоретические `STATE_UPDATE` с полями стоимости).  
-3. Сверка итогов web vs Expo на одном `vehicleId`.  
-4. **Детали расходов:** открывается журнал с `paidOnly`, видны только записи с `costAmount > 0` и валютой; месячные группы и сводки соответствуют отфильтрованному набору; сброс фильтра расходов возвращает полный журнал.  
-5. Сочетание фильтра по узлу (клик по статусу) и `paidOnly` даёт пересечение условий.  
-6. Журнал и месячные сводки без фильтра не регрессируют.
+1. Расходы в RUB и EUR отображаются отдельными итогами, без конвертации и сложения.
+2. `POST /api/expenses` создаёт ручной технический расход без `ServiceEvent`.
+3. `ServiceEvent` с суммой создаёт связанный `ExpenseItem`; редактирование стоимости пересинхронизирует его.
+4. Wishlist item `BOUGHT` со стоимостью создаёт метрику «куплено, но не установлено».
+5. Сезон 2026 включает даты `2026-01-01` … `2026-12-31`.
+6. `/expenses` показывает общий гараж, `/vehicles/[id]/expenses` — один мотоцикл.

@@ -6,9 +6,26 @@ import {
   type LatestServiceEventView,
   type NodeMaintenanceRuleView,
 } from "@/lib/maintenance-status";
+import { syncExpenseItemForServiceEvent } from "@/lib/expense-items";
 import { prisma } from "@/lib/prisma";
 import { getVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
+
+function normalizeServiceEventPartSku(value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+  const t = value.trim().slice(0, 200);
+  return t.length > 0 ? t : null;
+}
+
+function normalizeServiceEventPartName(value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+  const t = value.trim().slice(0, 500);
+  return t.length > 0 ? t : null;
+}
 
 type RouteContext = {
   params: Promise<{
@@ -34,6 +51,8 @@ const updateServiceEventSchema = z
     costAmount: z.number().min(0).nullable().optional(),
     currency: z.string().trim().nullable().optional(),
     comment: z.string().trim().nullable().optional(),
+    partSku: z.union([z.string(), z.null()]).optional(),
+    partName: z.union([z.string(), z.null()]).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.costAmount != null && !value.currency?.trim()) {
@@ -307,6 +326,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           costAmount: payload.costAmount ?? null,
           currency: payload.costAmount != null ? payload.currency?.trim().toUpperCase() ?? null : null,
           comment: payload.comment || null,
+          partSku: normalizeServiceEventPartSku(payload.partSku),
+          partName: normalizeServiceEventPartName(payload.partName),
         },
         include: {
           node: {
@@ -325,6 +346,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       for (const nodeId of affectedNodeIds) {
         await syncNodeStateForLeafNode(tx, vehicleId, nodeId);
       }
+      await syncExpenseItemForServiceEvent(tx, updated);
       await recomputeTopNodeStates(tx, vehicleId);
 
       return updated;
@@ -380,6 +402,10 @@ export async function DELETE(_: NextRequest, context: RouteContext) {
     }
 
     await prisma.$transaction(async (tx) => {
+      const expenseDb = tx as unknown as {
+        expenseItem: { deleteMany(args: unknown): Promise<unknown> };
+      };
+      await expenseDb.expenseItem.deleteMany({ where: { serviceEventId: serviceEvent.id } });
       await tx.serviceEvent.delete({
         where: { id: serviceEvent.id },
       });

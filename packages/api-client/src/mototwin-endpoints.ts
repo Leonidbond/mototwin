@@ -2,6 +2,8 @@ import type {
   AddServiceKitToWishlistPayload,
   AddServiceKitToWishlistResponse,
   BrandsResponse,
+  CreateExpenseItemInput,
+  CreateExpenseItemResponse,
   CreatePartWishlistItemInput,
   CreateServiceEventInput,
   CreateServiceEventResponse,
@@ -9,6 +11,7 @@ import type {
   CreateVehicleInput,
   CreateVehicleResponse,
   CreateWishlistItemResponse,
+  DeleteExpenseItemResponse,
   GarageVehiclesResponse,
   ModelVariantsResponse,
   ModelsResponse,
@@ -17,6 +20,7 @@ import type {
   PartSkusResponse,
   PartSkuSearchFilters,
   ProfileResponse,
+  ExpensesResponse,
   ServiceEventsResponse,
   ServiceKitsResponse,
   VehicleTrashDeleteResponse,
@@ -25,6 +29,8 @@ import type {
   UserSettingsPayload,
   UserSettingsResponse,
   UpdatePartWishlistItemInput,
+  UpdateExpenseItemInput,
+  UpdateExpenseItemResponse,
   UpdateVehicleProfileInput,
   UpdateVehicleProfileResponse,
   UpdateServiceEventInput,
@@ -156,6 +162,42 @@ export function createMotoTwinEndpoints(client: ApiClient) {
     getServiceEvents(vehicleId: string) {
       return client.request<ServiceEventsResponse>(
         `/api/vehicles/${vehicleId}/service-events`
+      );
+    },
+
+    getExpenses(params: { year?: number; vehicleId?: string } = {}) {
+      const q = new URLSearchParams();
+      if (params.year) {
+        q.set("year", String(params.year));
+      }
+      if (params.vehicleId?.trim()) {
+        q.set("vehicleId", params.vehicleId.trim());
+      }
+      const qs = q.toString();
+      return client.request<ExpensesResponse>(`/api/expenses${qs ? `?${qs}` : ""}`);
+    },
+
+    createExpense(input: CreateExpenseItemInput) {
+      return client.request<CreateExpenseItemResponse>("/api/expenses", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    updateExpense(expenseId: string, input: UpdateExpenseItemInput) {
+      return client.request<UpdateExpenseItemResponse>(
+        `/api/expenses/${encodeURIComponent(expenseId)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(input),
+        }
+      );
+    },
+
+    deleteExpense(expenseId: string) {
+      return client.request<DeleteExpenseItemResponse>(
+        `/api/expenses/${encodeURIComponent(expenseId)}`,
+        { method: "DELETE" }
       );
     },
 

@@ -435,9 +435,22 @@ export default function VehicleWishlistScreen() {
                   <Text style={styles.groupToggle}>{isCollapsed ? "Развернуть" : "Свернуть"}</Text>
                 </Pressable>
                 {isCollapsed ? (
-                  <View style={styles.collapsedBox}>
-                    <Text style={styles.collapsedText}>Группа свернута. Позиций: {group.items.length}.</Text>
-                  </View>
+                  <Pressable
+                    onPress={() =>
+                      setCollapsedGroups((prev) => ({
+                        ...prev,
+                        [group.status]: false,
+                      }))
+                    }
+                    style={({ pressed }) => [
+                      styles.collapsedBox,
+                      pressed && styles.collapsedBoxPressed,
+                    ]}
+                  >
+                    <Text style={styles.collapsedText}>
+                      Группа свернута. Позиций: {group.items.length}. Нажмите, чтобы развернуть.
+                    </Text>
+                  </Pressable>
                 ) : null}
                 {visibleItems.map((item) => {
                   const isBusy = busyId === item.id;
@@ -672,6 +685,7 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: c.cardMuted,
   },
+  collapsedBoxPressed: { opacity: 0.88 },
   collapsedText: { color: c.textSecondary, fontSize: 13 },
   card: {
     borderWidth: 1,

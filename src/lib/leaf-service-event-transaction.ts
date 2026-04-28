@@ -16,6 +16,8 @@ export type CreateLeafServiceEventInTxInput = {
   costAmount: number | null;
   currency: string | null;
   comment: string | null;
+  partSku: string | null;
+  partName: string | null;
 };
 
 /**
@@ -67,6 +69,8 @@ export async function createLeafServiceEventInTransaction(
       costAmount: input.costAmount ?? null,
       currency: input.currency || null,
       comment: input.comment || null,
+      partSku: input.partSku,
+      partName: input.partName,
     },
     include: {
       node: {

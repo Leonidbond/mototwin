@@ -25,6 +25,10 @@ export type AddServiceEventFormValues = {
    * Used e.g. when prefilling from a wishlist item.
    */
   installedPartsJson: string;
+  /** Артикул / номер SKU (опционально). */
+  partSku: string;
+  /** Наименование запчасти (опционально). */
+  partName: string;
 };
 
 /** API-ready shape; alias of existing contract. */

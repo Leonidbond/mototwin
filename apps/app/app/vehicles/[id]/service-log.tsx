@@ -14,7 +14,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import type {
-  NodeTreeItem,
   ServiceEventItem,
   ServiceEventsFilters,
   ServiceEventsSortDirection,
@@ -24,18 +23,8 @@ import type {
   ServiceLogNodeFilter,
 } from "@mototwin/types";
 import {
-  buildExpenseSummaryFromServiceEvents,
   buildServiceLogTimelineProps,
   filterPaidServiceEvents,
-  filterPaidServiceExpenseEvents,
-  formatExpenseAmountRu,
-  formatExpenseMonthLabelRu,
-  formatIsoCalendarDateRu,
-  getCurrentExpenseMonthKey,
-  getExpenseMonthDateRange,
-  addMonthsToExpenseMonthKey,
-  getNodeAndDescendantIds,
-  getTopLevelNodeTreeItems,
   getServiceLogEventKindBadgeLabel,
   isServiceLogTimelineQueryActive,
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
@@ -117,7 +106,7 @@ export function buildVehicleServiceLogHref(
   vehicleId: string,
   nodeFilter: ServiceLogNodeFilter | null,
   paidOnly: boolean,
-  options?: { expandExpenses?: boolean; month?: string }
+  options?: { expandExpenses?: boolean; month?: string; serviceEventId?: string }
 ): string {
   const q: string[] = [];
   if (nodeFilter?.nodeIds.length) {
@@ -134,6 +123,9 @@ export function buildVehicleServiceLogHref(
   if (options?.month) {
     q.push(`month=${options.month}`);
   }
+  if (options?.serviceEventId) {
+    q.push(`serviceEventId=${encodeURIComponent(options.serviceEventId)}`);
+  }
   return `/vehicles/${vehicleId}/service-log${q.length ? `?${q.join("&")}` : ""}`;
 }
 
@@ -146,6 +138,7 @@ function ServiceCard({
   isCommentExpanded,
   onToggleComment,
   onOpenWishlistOrigin,
+  onRepeat,
   onEdit,
   onDelete,
 }: {
@@ -155,6 +148,7 @@ function ServiceCard({
   isCommentExpanded: boolean;
   onToggleComment: () => void;
   onOpenWishlistOrigin: (wishlistItemId: string) => void;
+  onRepeat: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -172,6 +166,12 @@ function ServiceCard({
       <View style={styles.serviceCardHeaderRow}>
         <Text style={styles.eventTitle}>{entry.mainTitle}</Text>
         <View style={styles.rowActionsTop}>
+          <ActionIconButton
+            onPress={onRepeat}
+            accessibilityLabel="Повторить сервисное событие с актуальными пробегом и моточасами"
+            variant="subtle"
+            icon={<MaterialIcons name="autorenew" size={15} color={c.textSecondary} />}
+          />
           <ActionIconButton
             onPress={onEdit}
             accessibilityLabel="Редактировать сервисное событие"
@@ -196,6 +196,22 @@ function ServiceCard({
         ) : (
           <Text style={styles.wishlistOriginLabel}>{entry.wishlistOriginLabelRu}</Text>
         )
+      ) : null}
+      {entry.partName || entry.partSku ? (
+        <View style={styles.partDetails}>
+          {entry.partName ? (
+            <Text style={styles.partDetailLine}>
+              <Text style={styles.partDetailLabel}>Запчасть · </Text>
+              {entry.partName}
+            </Text>
+          ) : null}
+          {entry.partSku ? (
+            <Text style={styles.partDetailLine}>
+              <Text style={styles.partDetailLabel}>SKU · </Text>
+              {entry.partSku}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
       <Text style={styles.eventNode}>{entry.secondaryTitle}</Text>
       <View style={styles.eventMeta}>
@@ -298,6 +314,7 @@ function MonthGroup({
   onToggleComment,
   onOpenWishlistOrigin,
   onEditServiceEvent,
+  onRepeatServiceEvent,
   onDeleteServiceEvent,
 }: {
   group: ServiceLogMonthGroupViewModel;
@@ -308,6 +325,7 @@ function MonthGroup({
   onToggleComment: (entryId: string) => void;
   onOpenWishlistOrigin: (wishlistItemId: string) => void;
   onEditServiceEvent: (entryId: string) => void;
+  onRepeatServiceEvent: (entryId: string) => void;
   onDeleteServiceEvent: (entryId: string) => void;
 }) {
   const hasServiceCount = group.summary.serviceCount > 0;
@@ -390,6 +408,7 @@ function MonthGroup({
                     isCommentExpanded={Boolean(expandedComments[entry.id])}
                     onToggleComment={() => onToggleComment(entry.id)}
                     onOpenWishlistOrigin={onOpenWishlistOrigin}
+                    onRepeat={() => onRepeatServiceEvent(entry.id)}
                     onEdit={() => onEditServiceEvent(entry.id)}
                     onDelete={() => onDeleteServiceEvent(entry.id)}
                   />
@@ -427,7 +446,6 @@ export default function ServiceLogScreen() {
         : "";
 
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
-  const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState<ServiceEventsFilters>({
@@ -441,11 +459,6 @@ export default function ServiceLogScreen() {
   const [sortDirection, setSortDirection] = useState<ServiceEventsSortDirection>("desc");
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
-  const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
-  const [isExpenseMonthPickerOpen, setIsExpenseMonthPickerOpen] = useState(false);
-  const expenseMonthWheelRef = useRef<ScrollView | null>(null);
-  const [expenseMonthKey, setExpenseMonthKey] = useState<string>(getCurrentExpenseMonthKey());
-  const [expenseSectionFilter, setExpenseSectionFilter] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{
     tone: "success" | "error";
     title: string;
@@ -465,40 +478,6 @@ export default function ServiceLogScreen() {
     () => parsePaidOnlyFromParams(params.paidOnly),
     [params.paidOnly]
   );
-  const expandExpensesActive = useMemo(
-    () => parsePaidOnlyFromParams(params.expandExpenses),
-    [params.expandExpenses]
-  );
-  const monthFromParams = useMemo(
-    () => readSearchParam(params.month),
-    [params.month]
-  );
-
-  useEffect(() => {
-    if (expandExpensesActive) {
-      setIsExpenseExpanded(true);
-    }
-  }, [expandExpensesActive]);
-
-  useEffect(() => {
-    const raw = (monthFromParams ?? "").toLowerCase();
-    if (/^\d{4}-\d{2}$/.test(raw)) {
-      setExpenseMonthKey(raw);
-    }
-  }, [monthFromParams]);
-
-  useEffect(() => {
-    const range = getExpenseMonthDateRange(expenseMonthKey);
-    const inclusiveTo = new Date(`${range.dateTo}T00:00:00.000Z`);
-    inclusiveTo.setUTCDate(inclusiveTo.getUTCDate() - 1);
-    setFilters((prev) => ({
-      ...prev,
-      dateFrom: range.dateFrom,
-      dateTo: inclusiveTo.toISOString().slice(0, 10),
-      paidOnly: true,
-    }));
-  }, [expenseMonthKey]);
-
   useEffect(() => {
     const feedback = typeof params.feedback === "string" ? params.feedback : "";
     if (!feedback) {
@@ -535,26 +514,15 @@ export default function ServiceLogScreen() {
   const effectiveFilters = useMemo(
     (): ServiceEventsFilters => ({
       ...filters,
-      paidOnly: paidOnlyActive || isExpenseExpanded ? true : undefined,
+      paidOnly: paidOnlyActive ? true : undefined,
     }),
-    [filters, paidOnlyActive, isExpenseExpanded]
+    [filters, paidOnlyActive]
   );
 
   const hasAnyPaidInEvents = useMemo(
     () => filterPaidServiceEvents(events).length > 0,
     [events]
   );
-  const topLevelNodes = useMemo(() => getTopLevelNodeTreeItems(nodeTree), [nodeTree]);
-  const expenseSectionNodeIds = useMemo(() => {
-    if (!expenseSectionFilter) {
-      return null;
-    }
-    const section = topLevelNodes.find((node) => node.id === expenseSectionFilter);
-    if (!section) {
-      return null;
-    }
-    return getNodeAndDescendantIds(section);
-  }, [expenseSectionFilter, topLevelNodes]);
 
   const load = useCallback(async () => {
       if (!vehicleId) {
@@ -568,12 +536,10 @@ export default function ServiceLogScreen() {
         setError("");
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
-        const [data, tree] = await Promise.all([
+        const [data] = await Promise.all([
           endpoints.getServiceEvents(vehicleId),
-          endpoints.getNodeTree(vehicleId),
         ]);
         setEvents(data.serviceEvents ?? []);
-        setNodeTree(tree.nodeTree ?? []);
       } catch (err) {
         console.error(err);
         setError("Не удалось загрузить журнал обслуживания.");
@@ -598,9 +564,9 @@ export default function ServiceLogScreen() {
           direction: sortDirection,
         },
         "compact",
-        expenseSectionNodeIds ?? nodeSubtreeFilter?.nodeIds ?? null
+        nodeSubtreeFilter?.nodeIds ?? null
       ).monthGroups,
-    [events, effectiveFilters, sortField, sortDirection, nodeSubtreeFilter, expenseSectionNodeIds]
+    [events, effectiveFilters, sortField, sortDirection, nodeSubtreeFilter]
   );
   const wishlistItemIdByServiceEventId = useMemo(() => {
     const byServiceEventId = new Map<string, string>();
@@ -636,62 +602,6 @@ export default function ServiceLogScreen() {
       ),
     [effectiveFilters, sortField, sortDirection, nodeSubtreeFilter]
   );
-
-  const paidEventsForDashboard = useMemo(() => {
-    const ids = new Set(visibleGroups.flatMap((group) => group.entries.map((entry) => entry.id)));
-    return filterPaidServiceExpenseEvents(events.filter((event) => ids.has(event.id))).sort(
-      (a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime()
-    );
-  }, [events, visibleGroups]);
-  const dashboardSummary = useMemo(
-    () => buildExpenseSummaryFromServiceEvents(paidEventsForDashboard),
-    [paidEventsForDashboard]
-  );
-  const sectionBreakdown = useMemo(() => {
-    const topLevelById = new Map(topLevelNodes.map((node) => [node.id, node]));
-    const bySection = new Map<string, { sectionId: string | null; label: string; amount: number; currency: string }>();
-    for (const event of paidEventsForDashboard) {
-      const topLevel =
-        event.node?.topLevelNodeId && topLevelById.has(event.node.topLevelNodeId)
-          ? topLevelById.get(event.node.topLevelNodeId)!
-          : null;
-      const key = `${topLevel?.id ?? "none"}:${event.currency}`;
-      const prev = bySection.get(key) ?? {
-        sectionId: topLevel?.id ?? null,
-        label: topLevel?.name ?? "Без раздела",
-        amount: 0,
-        currency: event.currency ?? "",
-      };
-      bySection.set(key, { ...prev, amount: prev.amount + (event.costAmount ?? 0) });
-    }
-    return Array.from(bySection.values()).sort((a, b) => b.amount - a.amount).slice(0, 4);
-  }, [paidEventsForDashboard, topLevelNodes]);
-  const expenseMonthOptions = useMemo(() => {
-    const base = new Date();
-    const options: string[] = [];
-    for (let offset = -24; offset <= 24; offset += 1) {
-      const next = new Date(base.getFullYear(), base.getMonth() + offset, 1);
-      const y = next.getFullYear();
-      const m = String(next.getMonth() + 1).padStart(2, "0");
-      options.push(`${y}-${m}`);
-    }
-    return options.sort().reverse();
-  }, []);
-  const expenseMonthItemHeight = 40;
-
-  useEffect(() => {
-    if (!isExpenseMonthPickerOpen || !expenseMonthWheelRef.current) {
-      return;
-    }
-    const index = expenseMonthOptions.findIndex((item) => item === expenseMonthKey);
-    if (index < 0) {
-      return;
-    }
-    expenseMonthWheelRef.current.scrollTo({
-      y: index * expenseMonthItemHeight,
-      animated: true,
-    });
-  }, [isExpenseMonthPickerOpen, expenseMonthKey, expenseMonthOptions]);
 
   const updateFilter = (field: keyof ServiceEventsFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -729,6 +639,12 @@ export default function ServiceLogScreen() {
   const openEditServiceEvent = (eventId: string) => {
     router.push(
       `/vehicles/${vehicleId}/service-events/new?source=service-log&eventId=${encodeURIComponent(eventId)}`
+    );
+  };
+
+  const openRepeatServiceEvent = (eventId: string) => {
+    router.push(
+      `/vehicles/${vehicleId}/service-events/new?source=service-log&repeatFrom=${encodeURIComponent(eventId)}`
     );
   };
 
@@ -816,25 +732,16 @@ export default function ServiceLogScreen() {
       >
         <View style={styles.topActionsRow}>
           <Pressable
-            style={({ pressed }) => [styles.expensesButton, pressed && styles.expensesButtonPressed]}
-            onPress={() =>
-              setIsExpenseExpanded((prev) => {
-                if (prev) {
-                  setExpenseSectionFilter(null);
-                }
-                return !prev;
-              })
-            }
-          >
-            <Text style={styles.expensesButtonText}>
-              Окно расходов {isExpenseExpanded ? "▾" : "▸"}
-            </Text>
-          </Pressable>
-          <Pressable
             style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
             onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
           >
             <Text style={styles.addButtonText}>Добавить сервисное событие</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.expensesButton, pressed && styles.expensesButtonPressed]}
+            onPress={() => router.push(`/vehicles/${vehicleId}/expenses`)}
+          >
+            <Text style={styles.expensesButtonText}>Статистика расходов</Text>
           </Pressable>
         </View>
 
@@ -856,155 +763,6 @@ export default function ServiceLogScreen() {
             <Pressable onPress={() => setActionMessage(null)}>
               <Text style={styles.actionMessageDismiss}>Скрыть</Text>
             </Pressable>
-          </View>
-        ) : null}
-
-        {isExpenseExpanded ? (
-          <View style={styles.expenseInlineCard}>
-            <Text style={styles.expenseInlineTitle}>Расходы на обслуживание</Text>
-            <View style={styles.expensePeriodRow}>
-              <Pressable
-                style={styles.expenseMonthArrow}
-                onPress={() =>
-                  setExpenseMonthKey((prev) => addMonthsToExpenseMonthKey(prev, -1))
-                }
-              >
-                <Text style={styles.expenseMonthArrowText}>‹</Text>
-              </Pressable>
-              <Pressable onPress={() => setIsExpenseMonthPickerOpen((prev) => !prev)}>
-                <Text style={styles.expensePeriodLabel}>
-                  Период: {formatExpenseMonthLabelRu(expenseMonthKey)} ▼
-                </Text>
-              </Pressable>
-              <Pressable
-                style={styles.expenseMonthArrow}
-                onPress={() =>
-                  setExpenseMonthKey((prev) => addMonthsToExpenseMonthKey(prev, 1))
-                }
-              >
-                <Text style={styles.expenseMonthArrowText}>›</Text>
-              </Pressable>
-            </View>
-            {isExpenseMonthPickerOpen ? (
-              <View style={styles.expenseMonthPickerListCard}>
-                <View style={styles.expenseMonthPickerCenterMarker} />
-                <ScrollView
-                  ref={expenseMonthWheelRef}
-                  style={styles.expenseMonthPickerList}
-                  contentContainerStyle={styles.expenseMonthPickerListContent}
-                  snapToInterval={expenseMonthItemHeight}
-                  decelerationRate="fast"
-                  showsVerticalScrollIndicator={false}
-                  onMomentumScrollEnd={(event) => {
-                    const offsetY = event.nativeEvent.contentOffset.y;
-                    const index = Math.round(offsetY / expenseMonthItemHeight);
-                    const normalizedIndex = Math.min(
-                      Math.max(index, 0),
-                      expenseMonthOptions.length - 1
-                    );
-                    const monthKey = expenseMonthOptions[normalizedIndex];
-                    if (monthKey && monthKey !== expenseMonthKey) {
-                      setExpenseMonthKey(monthKey);
-                    }
-                  }}
-                >
-                  {expenseMonthOptions.map((monthKey) => {
-                    const active = monthKey === expenseMonthKey;
-                    return (
-                      <Pressable
-                        key={monthKey}
-                        style={[
-                          styles.expenseMonthPickerItem,
-                          active && styles.expenseMonthPickerItemActive,
-                        ]}
-                        onPress={() => {
-                          setExpenseMonthKey(monthKey);
-                          setIsExpenseMonthPickerOpen(false);
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.expenseMonthPickerItemText,
-                            active && styles.expenseMonthPickerItemTextActive,
-                          ]}
-                        >
-                          {formatExpenseMonthLabelRu(monthKey)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : null}
-            <Text style={styles.expenseInlineHint}>
-              Расходы считаются по сервисным событиям с указанной стоимостью. Суммы в разных
-              валютах не объединяются.
-            </Text>
-            {dashboardSummary.paidEventCount === 0 ? (
-              <View style={styles.expenseModalEmptyBox}>
-                <Text style={styles.expenseModalEmptyTitle}>Расходов за выбранный месяц нет</Text>
-              </View>
-            ) : (
-              <View style={styles.expenseModalBody}>
-                <View style={styles.expenseTotalBox}>
-                  {dashboardSummary.totalsByCurrency.map((row) => (
-                    <Text key={row.currency} style={styles.expenseTotalValue}>
-                      {dashboardSummary.totalsByCurrency.length === 1
-                        ? ""
-                        : `${row.currency}: `}
-                      {formatExpenseAmountRu(row.totalAmount)} {row.currency}
-                    </Text>
-                  ))}
-                  <Text style={styles.expenseModalStatLabel}>
-                    {dashboardSummary.paidEventCount} событий с затратами
-                  </Text>
-                </View>
-                <Text style={styles.expenseModalSubheading}>По разделам</Text>
-                {sectionBreakdown.map((row) => (
-                  <Pressable
-                    key={`${row.sectionId ?? "none"}:${row.currency}`}
-                    style={[
-                      styles.expenseModalCurrencyRow,
-                      expenseSectionFilter === row.sectionId && styles.expenseSectionRowActive,
-                    ]}
-                    onPress={() => setExpenseSectionFilter(row.sectionId)}
-                  >
-                    <Text style={styles.expenseModalCurrencyCode}>{row.label}</Text>
-                    <Text style={styles.expenseModalCurrencyAmount}>
-                      {formatExpenseAmountRu(row.amount)} {row.currency}
-                    </Text>
-                  </Pressable>
-                ))}
-                {expenseSectionFilter ? (
-                  <Pressable onPress={() => setExpenseSectionFilter(null)}>
-                    <Text style={styles.expenseClearSectionText}>Все разделы</Text>
-                  </Pressable>
-                ) : null}
-                <Text style={styles.expenseModalSubheading}>Последние расходы</Text>
-                {paidEventsForDashboard.slice(0, 5).map((event) => (
-                  <View key={event.id} style={styles.expenseModalCurrencyRow}>
-                    <Text style={styles.expenseModalCurrencyCode}>
-                      {formatIsoCalendarDateRu(event.eventDate)} {event.serviceType}
-                    </Text>
-                    <Text style={styles.expenseModalCurrencyAmount}>
-                      {formatExpenseAmountRu(event.costAmount ?? 0)} {event.currency}
-                    </Text>
-                  </View>
-                ))}
-                <Pressable
-                  onPress={() =>
-                    router.replace(
-                      buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, true, {
-                        expandExpenses: true,
-                        month: expenseMonthKey,
-                      })
-                    )
-                  }
-                >
-                  <Text style={styles.expenseAllInJournalText}>Все расходы в журнале →</Text>
-                </Pressable>
-              </View>
-            )}
           </View>
         ) : null}
 
@@ -1223,6 +981,7 @@ export default function ServiceLogScreen() {
               eventYByIdRef.current[entryId] = y;
             }}
             onEditServiceEvent={openEditServiceEvent}
+            onRepeatServiceEvent={openRepeatServiceEvent}
             onDeleteServiceEvent={openDeleteServiceEventConfirm}
             onOpenWishlistOrigin={(wishlistItemId) =>
               router.push(buildVehicleWishlistItemHighlightHref(vehicleId, wishlistItemId))
@@ -1812,6 +1571,19 @@ const styles = StyleSheet.create({
   wishlistOriginLink: {
     textDecorationLine: "underline",
     color: c.textSecondary,
+  },
+  partDetails: {
+    marginTop: 6,
+    gap: 4,
+  },
+  partDetailLine: {
+    fontSize: 12,
+    color: c.textSecondary,
+    lineHeight: 16,
+  },
+  partDetailLabel: {
+    fontWeight: "600",
+    color: c.textMuted,
   },
   stateUpdateMainTitle: {
     fontSize: 14,

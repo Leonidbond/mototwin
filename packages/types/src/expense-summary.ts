@@ -13,6 +13,12 @@ export type ExpenseByMonthViewModel = {
   totalsByCurrency: ExpenseByCurrencyViewModel[];
 };
 
+/** Paid service costs grouped by calendar year. */
+export type ExpenseByYearViewModel = {
+  year: number;
+  totalsByCurrency: ExpenseByCurrencyViewModel[];
+};
+
 /** Paid service costs grouped by maintenance node (leaf / service target). */
 export type ExpenseByNodeViewModel = {
   nodeId: string;

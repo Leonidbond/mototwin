@@ -16,6 +16,8 @@
 - `NodeStatus`: `OK`, `SOON`, `OVERDUE`, `RECENTLY_REPLACED`
 - `MaintenanceTriggerMode`: `WHICHEVER_COMES_FIRST`, `ANY`, `ALL`
 - `ServiceEventKind`: `SERVICE`, `STATE_UPDATE`
+- `ExpenseCategory`: `SERVICE`, `PARTS`, `REPAIR`, `DIAGNOSTICS`, `LABOR`, `OTHER_TECHNICAL`
+- `ExpenseInstallStatus`: `BOUGHT_NOT_INSTALLED`, `INSTALLED`, `NOT_APPLICABLE`
 
 ## 3. Core entities and relationships
 
@@ -55,7 +57,7 @@
 - `Vehicle` links to `User`, optional `Garage`, `Brand`, `Model`, `ModelVariant`.
 - `Vehicle` has soft-delete fields: `trashedAt`, `trashExpiresAt`.
 - `RideProfile` is effectively 1:1 with `Vehicle` via unique `vehicleId`.
-- `Vehicle` also links to `ServiceEvent`, `NodeState`, `TopNodeState`.
+- `Vehicle` also links to `ServiceEvent`, `ExpenseItem`, `NodeState`, `TopNodeState`.
 - Ownership canonical source: `Vehicle.garageId -> Garage.ownerUserId`.
 - `Vehicle.userId` is transitional/denormalized compatibility field and should match `Garage.ownerUserId`.
 - Seed includes safe repair step for mismatched `Vehicle.userId` vs `Garage.ownerUserId`.
@@ -77,6 +79,26 @@
   - `SERVICE`
   - `STATE_UPDATE`
 - Stores operation facts: `eventDate`, `odometer`, `engineHours`, `serviceType`, optional cost/comment/parts json.
+- A service event with valid `costAmount/currency` is mirrored into linked `ExpenseItem` for analytics.
+
+### ExpenseItem
+
+- `ExpenseItem` is the canonical source for expense analytics.
+- It belongs to `Vehicle`.
+- Optional links:
+  - `nodeId` -> `Node`
+  - `serviceEventId` -> `ServiceEvent`
+  - `shoppingListItemId` -> `PartWishlistItem` (the current implementation of product ShoppingListItem)
+- Required money fields: `amount`, `currency`.
+- Required classification fields: `category`, `installStatus`.
+- `expenseDate` drives calendar-year season and monthly grouping.
+- Snapshot fields `partSku` / `partName` preserve human-readable part info even if catalog/wishlist data changes.
+- Supported statuses:
+  - `BOUGHT_NOT_INSTALLED`
+  - `INSTALLED`
+  - `NOT_APPLICABLE`
+
+Only technical expense categories exist in the enum. Fuel, insurance, fines, parking, wash, and gear are intentionally not representable in expense analytics.
 
 ### NodeState / TopNodeState
 
@@ -103,11 +125,13 @@
 - `Vehicle 1:1 RideProfile` (optional, enforced by unique)
 - `Vehicle` soft-delete timeline: active (`trashedAt = null`) or trashed (`trashedAt != null`).
 - `Vehicle 1:N ServiceEvent`
+- `Vehicle 1:N ExpenseItem`
 - `Vehicle 1:N NodeState`
 - `Vehicle 1:N TopNodeState`
 - `Node self-tree (parent/children)`
 - `Node 1:1 NodeMaintenanceRule` (optional)
 - `Node 1:N ServiceEvent`
+- `Node 1:N ExpenseItem`
 - `Node 1:N NodeState`
 - `Node 1:N TopNodeState`
 

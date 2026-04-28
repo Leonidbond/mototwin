@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   createInitialEditServiceEventValues,
+  createInitialRepeatServiceEventValues,
   createInitialAddServiceEventFromNode,
   createInitialAddServiceEventFormValues,
   createInitialAddServiceEventFromWishlistItem,
@@ -31,6 +32,7 @@ import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
   AddServiceEventFormValues,
   NodeTreeItem,
+  PartSkuViewModel,
   PartWishlistItem,
   SelectedNodePath,
 } from "@mototwin/types";
@@ -45,6 +47,7 @@ export default function NewServiceEventScreen() {
     id?: string;
     nodeId?: string;
     eventId?: string;
+    repeatFrom?: string;
     source?: string;
     wlTitle?: string;
     wlQty?: string;
@@ -56,6 +59,7 @@ export default function NewServiceEventScreen() {
   const vehicleId = typeof params.id === "string" ? params.id : "";
   const initialNodeId = typeof params.nodeId === "string" ? params.nodeId : "";
   const editingEventId = typeof params.eventId === "string" ? params.eventId : "";
+  const repeatFromId = typeof params.repeatFrom === "string" ? params.repeatFrom.trim() : "";
   const source = typeof params.source === "string" ? params.source : "service-log";
   const wlTitle = typeof params.wlTitle === "string" ? params.wlTitle.trim() : "";
   const wlQty = typeof params.wlQty === "string" ? params.wlQty : "";
@@ -86,9 +90,17 @@ export default function NewServiceEventScreen() {
     () => createInitialAddServiceEventFormValues().currency
   );
   const [comment, setComment] = useState("");
+  const [partSku, setPartSku] = useState("");
+  const [partName, setPartName] = useState("");
   const [installedPartsJson, setInstalledPartsJson] = useState("");
   const [currentVehicleOdometer, setCurrentVehicleOdometer] = useState<number | null>(null);
+  const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
+  const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
+  const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
+  const [serviceEventSkuError, setServiceEventSkuError] = useState("");
+  const serviceEventSkuSearchGen = useRef(0);
   const isEditMode = editingEventId.length > 0;
+  const isRepeatMode = !isEditMode && repeatFromId.length > 0;
 
   useEffect(() => {
     const load = async () => {
@@ -105,14 +117,17 @@ export default function NewServiceEventScreen() {
         const defaultCurrency = getDefaultCurrencyFromSettings(localSettings);
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
+        const needsServiceEventsForForm = isEditMode || isRepeatMode;
         const [vehicleData, treeData, eventsData] = await Promise.all([
           endpoints.getVehicleDetail(vehicleId),
           endpoints.getNodeTree(vehicleId),
-          isEditMode ? endpoints.getServiceEvents(vehicleId) : Promise.resolve(null),
+          needsServiceEventsForForm ? endpoints.getServiceEvents(vehicleId) : Promise.resolve(null),
         ]);
         const nextTree = treeData.nodeTree ?? [];
         setNodeTree(nextTree);
         let initialPath = initialNodeId ? getNodePathById(nextTree, initialNodeId) : null;
+        let prefillApplied = false;
+
         if (isEditMode && eventsData) {
           const editableEvent = (eventsData.serviceEvents ?? []).find(
             (event) => event.id === editingEventId
@@ -136,7 +151,42 @@ export default function NewServiceEventScreen() {
           setCostAmount(prefill.costAmount);
           setCurrency(prefill.currency);
           setComment(prefill.comment);
+          setPartSku(prefill.partSku);
+          setPartName(prefill.partName);
           setInstalledPartsJson(prefill.installedPartsJson);
+          prefillApplied = true;
+        } else if (isRepeatMode && eventsData && vehicleData.vehicle) {
+          const sourceEvent = (eventsData.serviceEvents ?? []).find(
+            (event) => event.id === repeatFromId
+          );
+          if (!sourceEvent) {
+            setError("Исходное событие не найдено.");
+            setIsLoading(false);
+            return;
+          }
+          if (sourceEvent.eventKind === "STATE_UPDATE") {
+            setError("Это событие нельзя повторить.");
+            setIsLoading(false);
+            return;
+          }
+          initialPath = getNodePathById(nextTree, sourceEvent.nodeId);
+          const v = vehicleData.vehicle;
+          const prefill = createInitialRepeatServiceEventValues(
+            sourceEvent,
+            { odometer: v.odometer, engineHours: v.engineHours ?? null },
+            { todayDateYmd: getTodayDateYmdLocal() }
+          );
+          setServiceType(prefill.serviceType);
+          setEventDate(prefill.eventDate);
+          setOdometer(prefill.odometer);
+          setEngineHours(prefill.engineHours);
+          setCostAmount(prefill.costAmount);
+          setCurrency(prefill.currency);
+          setComment(prefill.comment);
+          setPartSku(prefill.partSku);
+          setPartName(prefill.partName);
+          setInstalledPartsJson(prefill.installedPartsJson);
+          prefillApplied = true;
         } else if (initialNodeId) {
           initialPath = getNodePathById(nextTree, initialNodeId);
         }
@@ -145,7 +195,7 @@ export default function NewServiceEventScreen() {
         }
         const vehicleOdometer = vehicleData.vehicle?.odometer;
         setCurrentVehicleOdometer(vehicleOdometer != null ? vehicleOdometer : null);
-        if (!isEditMode) {
+        if (!prefillApplied && !isEditMode) {
           setOdometer(vehicleOdometer != null ? String(vehicleOdometer) : "");
           setEngineHours(
             vehicleData.vehicle?.engineHours != null ? String(vehicleData.vehicle.engineHours) : ""
@@ -154,7 +204,11 @@ export default function NewServiceEventScreen() {
         }
 
         const fromWishlist =
-          !isEditMode && source === "wishlist" && wlTitle.length > 0 && vehicleData.vehicle;
+          !isEditMode &&
+          !isRepeatMode &&
+          source === "wishlist" &&
+          wlTitle.length > 0 &&
+          vehicleData.vehicle;
         if (fromWishlist) {
           const v = vehicleData.vehicle!;
           const parsedWlCost =
@@ -195,9 +249,12 @@ export default function NewServiceEventScreen() {
           setCostAmount(prefill.costAmount);
           setCurrency(prefill.currency);
           setComment(prefill.comment);
+          setPartSku(prefill.partSku);
+          setPartName(prefill.partName);
           setInstalledPartsJson(prefill.installedPartsJson);
         } else if (
           !isEditMode &&
+          !isRepeatMode &&
           initialNodeId &&
           (source === "tree" || source === "attention" || source === "search" || source === "node-context")
         ) {
@@ -221,15 +278,21 @@ export default function NewServiceEventScreen() {
             setOdometer(prefill.odometer);
             setEngineHours(prefill.engineHours);
             setCostAmount(prefill.costAmount);
-          setCurrency(defaultCurrency);
+            setCurrency(defaultCurrency);
             setComment(prefill.comment);
+            setPartSku(prefill.partSku);
+            setPartName(prefill.partName);
             setInstalledPartsJson(prefill.installedPartsJson);
           } else {
-          setCurrency(defaultCurrency);
+            setCurrency(defaultCurrency);
             setInstalledPartsJson("");
+            setPartSku("");
+            setPartName("");
           }
-        } else {
+        } else if (!prefillApplied && !isEditMode && !fromWishlist) {
           setInstalledPartsJson("");
+          setPartSku("");
+          setPartName("");
         }
       } catch (requestError) {
         console.error(requestError);
@@ -247,6 +310,8 @@ export default function NewServiceEventScreen() {
     source,
     editingEventId,
     isEditMode,
+    isRepeatMode,
+    repeatFromId,
     wlTitle,
     wlQty,
     wlId,
@@ -258,6 +323,53 @@ export default function NewServiceEventScreen() {
   const levels = getNodeSelectLevels(nodeTree, selectedPath);
   const selectedNode = getSelectedNodeFromPath(nodeTree, selectedPath);
   const isLeafSelected = Boolean(selectedNode && isLeafNode(selectedNode));
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setServiceEventSkuLookup(partSku.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [partSku]);
+
+  useEffect(() => {
+    const query = serviceEventSkuLookup;
+    if (query.length < 2) {
+      setServiceEventSkuResults([]);
+      setServiceEventSkuError("");
+      setServiceEventSkuLoading(false);
+      return;
+    }
+    const gen = serviceEventSkuSearchGen.current + 1;
+    serviceEventSkuSearchGen.current = gen;
+    setServiceEventSkuLoading(true);
+    setServiceEventSkuError("");
+    const client = createApiClient({ baseUrl: apiBaseUrl });
+    const endpoints = createMotoTwinEndpoints(client);
+    void endpoints
+      .getPartSkus({
+        search: query,
+        nodeId: selectedNode?.id || undefined,
+      })
+      .then((res) => {
+        if (serviceEventSkuSearchGen.current !== gen) {
+          return;
+        }
+        setServiceEventSkuResults((res.skus ?? []).slice(0, 6));
+      })
+      .catch(() => {
+        if (serviceEventSkuSearchGen.current !== gen) {
+          return;
+        }
+        setServiceEventSkuResults([]);
+        setServiceEventSkuError("Не удалось выполнить поиск в каталоге.");
+      })
+      .finally(() => {
+        if (serviceEventSkuSearchGen.current !== gen) {
+          return;
+        }
+        setServiceEventSkuLoading(false);
+      });
+  }, [apiBaseUrl, selectedNode?.id, serviceEventSkuLookup]);
 
   async function save() {
     if (!vehicleId) {
@@ -279,6 +391,8 @@ export default function NewServiceEventScreen() {
       costAmount,
       currency,
       comment,
+      partSku,
+      partName,
       installedPartsJson,
     };
 
@@ -423,6 +537,65 @@ export default function NewServiceEventScreen() {
             onChangeText={setServiceType}
             style={styles.input}
             placeholder="Замена масла"
+          />
+        </Field>
+        <Field label="Артикул (SKU)">
+          <TextInput
+            value={partSku}
+            onChangeText={setPartSku}
+            style={styles.input}
+            placeholder="Опционально"
+            maxLength={200}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </Field>
+        {partSku.trim().length >= 2 ? (
+          <View style={styles.skuLookupCard}>
+            <Text style={styles.skuLookupTitle}>Поиск в каталоге по артикулу</Text>
+            {serviceEventSkuLoading ? <Text style={styles.skuLookupHint}>Ищем совпадения...</Text> : null}
+            {!serviceEventSkuLoading && serviceEventSkuError ? (
+              <Text style={styles.skuLookupError}>{serviceEventSkuError}</Text>
+            ) : null}
+            {!serviceEventSkuLoading && !serviceEventSkuError && serviceEventSkuResults.length === 0 ? (
+              <Text style={styles.skuLookupHint}>Ничего не найдено.</Text>
+            ) : null}
+            {!serviceEventSkuLoading && serviceEventSkuResults.length > 0 ? (
+              <View style={styles.skuLookupList}>
+                {serviceEventSkuResults.map((sku) => {
+                  const firstPartNumber = sku.partNumbers[0]?.number?.trim() ?? "";
+                  return (
+                    <Pressable
+                      key={sku.id}
+                      onPress={() => {
+                        setPartSku(firstPartNumber || partSku.trim());
+                        setPartName(sku.canonicalName?.trim() || partName);
+                      }}
+                      style={({ pressed }) => [
+                        styles.skuLookupItem,
+                        pressed && styles.skuLookupItemPressed,
+                      ]}
+                    >
+                      <Text style={styles.skuLookupItemPrimary}>
+                        {firstPartNumber || "Без артикула"}
+                      </Text>
+                      <Text style={styles.skuLookupItemSecondary}>
+                        {sku.brandName} · {sku.canonicalName}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+        <Field label="Наименование запчасти">
+          <TextInput
+            value={partName}
+            onChangeText={setPartName}
+            style={styles.input}
+            placeholder="Опционально"
+            maxLength={500}
           />
         </Field>
         <View style={styles.row}>
@@ -604,6 +777,56 @@ const styles = StyleSheet.create({
   multilineInput: {
     minHeight: 80,
     textAlignVertical: "top",
+  },
+  skuLookupCard: {
+    marginTop: -2,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  skuLookupTitle: {
+    fontSize: 12,
+    color: c.textSecondary,
+    fontWeight: "600",
+  },
+  skuLookupHint: {
+    marginTop: 4,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  skuLookupError: {
+    marginTop: 4,
+    fontSize: 12,
+    color: c.error,
+  },
+  skuLookupList: {
+    marginTop: 8,
+    gap: 6,
+  },
+  skuLookupItem: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardMuted,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  skuLookupItemPressed: {
+    opacity: 0.88,
+  },
+  skuLookupItemPrimary: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  skuLookupItemSecondary: {
+    marginTop: 2,
+    fontSize: 12,
+    color: c.textSecondary,
   },
   row: {
     flexDirection: "row",

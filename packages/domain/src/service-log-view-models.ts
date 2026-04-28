@@ -288,6 +288,8 @@ export function buildServiceLogEntryViewModel(
     costAmount: hasCost ? event.costAmount : null,
     costCurrency: hasCost ? event.currency : null,
     comment: event.comment,
+    partSku: event.partSku?.trim() ? event.partSku.trim() : null,
+    partName: event.partName?.trim() ? event.partName.trim() : null,
     wishlistOriginLabelRu,
   };
 }

@@ -1,24 +1,15 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
-  buildExpenseSummaryFromServiceEvents,
   buildServiceLogTimelineProps,
-  filterPaidServiceExpenseEvents,
   createInitialAddServiceEventFormValues,
   createInitialEditServiceEventValues,
+  createInitialRepeatServiceEventValues,
   filterPaidServiceEvents,
   flattenNodeTreeToSelectOptions,
-  formatExpenseAmountRu,
-  formatExpenseMonthLabelRu,
-  formatIsoCalendarDateRu,
-  getCurrentExpenseMonthKey,
-  getExpenseMonthDateRange,
-  addMonthsToExpenseMonthKey,
-  getNodeAndDescendantIds,
-  getTopLevelNodeTreeItems,
   getServiceLogEventKindBadgeLabel,
   isServiceLogTimelineQueryActive,
   normalizeAddServiceEventPayload,
@@ -30,6 +21,7 @@ import { productSemanticColors } from "@mototwin/design-tokens";
 import type {
   AddServiceEventFormValues,
   NodeTreeItem,
+  PartSkuViewModel,
   ServiceEventItem,
   ServiceEventsFilters,
   ServiceEventsSortDirection,
@@ -37,10 +29,39 @@ import type {
   ServiceLogNodeFilter,
 } from "@mototwin/types";
 
+/** Native controls default to browser light styling; anchor them to Garage dark palette. */
+const SERVICE_EVENT_MODAL_FIELD_BASE: CSSProperties = {
+  marginTop: 4,
+  width: "100%",
+  borderRadius: "0.75rem",
+  border: `1px solid ${productSemanticColors.borderStrong}`,
+  backgroundColor: productSemanticColors.cardSubtle,
+  color: productSemanticColors.textPrimary,
+  padding: "12px 16px",
+  fontSize: "0.875rem",
+  outline: "none",
+};
+
+const SERVICE_EVENT_MODAL_LABEL_STYLE: CSSProperties = {
+  color: productSemanticColors.textMeta,
+};
+
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
 function parsePaidOnly(v: string | null): boolean {
   return v === "1" || v === "true";
+}
+
+function normalizePartNumber(value: string): string {
+  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
+
+function pickSkuPartNumberOrFallback(
+  sku: PartSkuViewModel,
+  fallback: string
+): string {
+  const first = sku.partNumbers[0]?.number?.trim() ?? "";
+  return first || fallback;
 }
 
 function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
@@ -72,24 +93,18 @@ export default function VehicleServiceLogPage() {
   const nodeIdsFromQuery = searchParams.get("nodeIds");
   const nodeLabelFromQuery = searchParams.get("nodeLabel");
   const expandExpensesFromQuery = searchParams.get("expandExpenses");
-  const monthFromQuery = searchParams.get("month");
   const highlightedServiceEventId =
     searchParams.get("serviceEventId") ?? searchParams.get("highlightServiceEventId");
 
   const [vehicleTitle, setVehicleTitle] = useState("Мотоцикл");
   const [vehicleOdometer, setVehicleOdometer] = useState<number | null>(null);
+  const [vehicleEngineHours, setVehicleEngineHours] = useState<number | null>(null);
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
-  const [isExpenseExpanded, setIsExpenseExpanded] = useState(false);
-  const [isExpenseMonthPickerOpen, setIsExpenseMonthPickerOpen] = useState(false);
-  const expenseMonthWheelRef = useRef<HTMLDivElement | null>(null);
-  const expenseMonthScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [expenseMonthKey, setExpenseMonthKey] = useState<string>(getCurrentExpenseMonthKey());
-  const [expenseSectionFilter, setExpenseSectionFilter] = useState<string | null>(null);
   const [isServiceEventModalOpen, setIsServiceEventModalOpen] = useState(false);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const [editingServiceEventId, setEditingServiceEventId] = useState<string | null>(null);
@@ -98,6 +113,11 @@ export default function VehicleServiceLogPage() {
   );
   const [serviceEventFormError, setServiceEventFormError] = useState("");
   const [isSavingServiceEvent, setIsSavingServiceEvent] = useState(false);
+  const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
+  const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
+  const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
+  const [serviceEventSkuError, setServiceEventSkuError] = useState("");
+  const serviceEventSkuSearchGen = useRef(0);
   const [filters, setFilters] = useState<ServiceEventsFilters>({
     dateFrom: "",
     dateTo: "",
@@ -132,41 +152,74 @@ export default function VehicleServiceLogPage() {
 
   useEffect(() => {
     if (expandExpensesFromQuery === "1" || expandExpensesFromQuery === "true") {
-      setIsExpenseExpanded(true);
       setFilters((prev) => ({ ...prev, paidOnly: true }));
     }
   }, [expandExpensesFromQuery]);
 
   useEffect(() => {
-    const raw = (monthFromQuery ?? "").toLowerCase();
-    if (/^\d{4}-\d{2}$/.test(raw)) {
-      setExpenseMonthKey(raw);
+    if (!isServiceEventModalOpen) {
+      setServiceEventSkuLookup("");
+      setServiceEventSkuResults([]);
+      setServiceEventSkuError("");
+      setServiceEventSkuLoading(false);
       return;
     }
-    if (raw === "month") {
-      setExpenseMonthKey(getCurrentExpenseMonthKey());
-    }
-  }, [monthFromQuery]);
+    const timer = window.setTimeout(() => {
+      setServiceEventSkuLookup(serviceEventForm.partSku.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [isServiceEventModalOpen, serviceEventForm.partSku]);
 
   useEffect(() => {
-    const range = getExpenseMonthDateRange(expenseMonthKey);
-    const inclusiveTo = new Date(`${range.dateTo}T00:00:00.000Z`);
-    inclusiveTo.setUTCDate(inclusiveTo.getUTCDate() - 1);
-    setFilters((prev) => ({
-      ...prev,
-      dateFrom: range.dateFrom,
-      dateTo: inclusiveTo.toISOString().slice(0, 10),
-    }));
-  }, [expenseMonthKey]);
-
-  useEffect(() => {
-    if (isExpenseExpanded && filters.paidOnly !== true) {
-      setIsExpenseExpanded(false);
-      setExpenseSectionFilter(null);
+    if (!isServiceEventModalOpen) {
+      return;
     }
-  }, [filters.paidOnly, isExpenseExpanded]);
+    const query = serviceEventSkuLookup;
+    if (query.length < 2) {
+      setServiceEventSkuResults([]);
+      setServiceEventSkuError("");
+      setServiceEventSkuLoading(false);
+      return;
+    }
+    const gen = serviceEventSkuSearchGen.current + 1;
+    serviceEventSkuSearchGen.current = gen;
+    setServiceEventSkuLoading(true);
+    setServiceEventSkuError("");
+    void api
+      .getPartSkus({
+        search: query,
+        nodeId: serviceEventForm.nodeId.trim() || undefined,
+      })
+      .then((res) => {
+        if (serviceEventSkuSearchGen.current !== gen) {
+          return;
+        }
+        const list = res.skus ?? [];
+        const normalizedQuery = normalizePartNumber(query);
+        const exact = list.find((sku) =>
+          sku.partNumbers.some((partNumber) => normalizePartNumber(partNumber.number) === normalizedQuery)
+        );
+        const ordered = exact
+          ? [exact, ...list.filter((candidate) => candidate.id !== exact.id)]
+          : list;
+        setServiceEventSkuResults(ordered.slice(0, 6));
+      })
+      .catch(() => {
+        if (serviceEventSkuSearchGen.current !== gen) {
+          return;
+        }
+        setServiceEventSkuResults([]);
+        setServiceEventSkuError("Не удалось выполнить поиск по каталогу.");
+      })
+      .finally(() => {
+        if (serviceEventSkuSearchGen.current !== gen) {
+          return;
+        }
+        setServiceEventSkuLoading(false);
+      });
+  }, [isServiceEventModalOpen, serviceEventForm.nodeId, serviceEventSkuLookup]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setIsLoading(true);
       setError("");
@@ -182,6 +235,7 @@ export default function VehicleServiceLogPage() {
         "Мотоцикл";
       setVehicleTitle(title);
       setVehicleOdometer(vehicle?.odometer ?? null);
+      setVehicleEngineHours(vehicle?.engineHours ?? null);
       setEvents(service.serviceEvents ?? []);
       setNodeTree(tree.nodeTree ?? []);
     } catch (e) {
@@ -190,27 +244,13 @@ export default function VehicleServiceLogPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [vehicleId]);
 
   useEffect(() => {
     void load();
-  }, [vehicleId]);
+  }, [load]);
 
-  const topLevelNodes = useMemo(() => getTopLevelNodeTreeItems(nodeTree), [nodeTree]);
-  const expenseSectionNodeIds = useMemo(() => {
-    if (!expenseSectionFilter) {
-      return null;
-    }
-    const sectionNode = topLevelNodes.find((node) => node.id === expenseSectionFilter);
-    if (!sectionNode) {
-      return null;
-    }
-    return getNodeAndDescendantIds(sectionNode);
-  }, [expenseSectionFilter, topLevelNodes]);
-  const effectiveNodeIds = useMemo(
-    () => expenseSectionNodeIds ?? nodeFilter?.nodeIds ?? null,
-    [expenseSectionNodeIds, nodeFilter]
-  );
+  const effectiveNodeIds = useMemo(() => nodeFilter?.nodeIds ?? null, [nodeFilter]);
 
   const groups = useMemo(
     () => buildServiceLogTimelineProps(events, filters, sort, "default", effectiveNodeIds).monthGroups,
@@ -237,81 +277,6 @@ export default function VehicleServiceLogPage() {
     return () => window.cancelAnimationFrame(frame);
   }, [groups, highlightedServiceEventId, isLoading]);
   const hasAnyPaid = useMemo(() => filterPaidServiceEvents(events).length > 0, [events]);
-  const paidEventsForDashboard = useMemo(() => {
-    const visibleIds = new Set(groups.flatMap((group) => group.entries.map((entry) => entry.id)));
-    return filterPaidServiceExpenseEvents(events.filter((event) => visibleIds.has(event.id))).sort(
-      (left, right) => new Date(right.eventDate).getTime() - new Date(left.eventDate).getTime()
-    );
-  }, [events, groups]);
-  const dashboardSummary = useMemo(
-    () => buildExpenseSummaryFromServiceEvents(paidEventsForDashboard),
-    [paidEventsForDashboard]
-  );
-  const sectionBreakdown = useMemo(() => {
-    const totals = new Map<string, { label: string; amount: number; currency: string; count: number }>();
-    const topLevelById = new Map(topLevelNodes.map((node) => [node.id, node]));
-    for (const event of paidEventsForDashboard) {
-      const topLevel =
-        event.node?.topLevelNodeId && topLevelById.has(event.node.topLevelNodeId)
-          ? topLevelById.get(event.node.topLevelNodeId)!
-          : topLevelNodes.find((node) => getNodeAndDescendantIds(node).includes(event.nodeId)) ?? null;
-      const key = `${topLevel?.id ?? "none"}:${event.currency}`;
-      const prev = totals.get(key) ?? {
-        label: topLevel?.name ?? "Без раздела",
-        amount: 0,
-        currency: event.currency ?? "",
-        count: 0,
-      };
-      totals.set(key, {
-        label: prev.label,
-        amount: prev.amount + (event.costAmount ?? 0),
-        currency: prev.currency,
-        count: prev.count + 1,
-      });
-    }
-    return Array.from(totals.entries())
-      .map(([key, value]) => {
-        const [sectionId] = key.split(":");
-        return { sectionId: sectionId === "none" ? null : sectionId, ...value };
-      })
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 4);
-  }, [paidEventsForDashboard, topLevelNodes]);
-  const expenseMonthOptions = useMemo(() => {
-    const base = new Date();
-    const options: string[] = [];
-    for (let offset = -24; offset <= 24; offset += 1) {
-      const next = new Date(base.getFullYear(), base.getMonth() + offset, 1);
-      const y = next.getFullYear();
-      const m = String(next.getMonth() + 1).padStart(2, "0");
-      options.push(`${y}-${m}`);
-    }
-    return options.sort().reverse();
-  }, []);
-  const expenseMonthOptionHeight = 44;
-  const expenseMonthWheelVisibleItems = 5;
-  const expenseMonthWheelHeight = expenseMonthOptionHeight * expenseMonthWheelVisibleItems;
-  const expenseMonthWheelPadding = expenseMonthOptionHeight * Math.floor(expenseMonthWheelVisibleItems / 2);
-
-  useEffect(() => {
-    if (!isExpenseMonthPickerOpen || !expenseMonthWheelRef.current) {
-      return;
-    }
-    const index = expenseMonthOptions.findIndex((item) => item === expenseMonthKey);
-    if (index < 0) {
-      return;
-    }
-    const target = index * expenseMonthOptionHeight;
-    expenseMonthWheelRef.current.scrollTo({ top: target, behavior: "auto" });
-  }, [isExpenseMonthPickerOpen, expenseMonthKey, expenseMonthOptions]);
-
-  useEffect(() => {
-    return () => {
-      if (expenseMonthScrollTimeout.current) {
-        clearTimeout(expenseMonthScrollTimeout.current);
-      }
-    };
-  }, []);
   const isQueryActive = useMemo(
     () =>
       isServiceLogTimelineQueryActive(filters, sort, effectiveNodeIds ? { nodeIds: effectiveNodeIds, displayLabel: "" } : null),
@@ -362,6 +327,24 @@ export default function VehicleServiceLogPage() {
     setIsServiceEventModalOpen(true);
   };
 
+  const openRepeat = (eventId: string) => {
+    const event = events.find((item) => item.id === eventId);
+    if (!event || event.eventKind === "STATE_UPDATE") {
+      return;
+    }
+    const odometerForForm = vehicleOdometer ?? event.odometer;
+    setEditingServiceEventId(null);
+    setServiceEventForm(
+      createInitialRepeatServiceEventValues(
+        event,
+        { odometer: odometerForForm, engineHours: vehicleEngineHours ?? null },
+        { todayDateYmd: new Date().toISOString().slice(0, 10) }
+      )
+    );
+    setServiceEventFormError("");
+    setIsServiceEventModalOpen(true);
+  };
+
   const openEdit = (eventId: string) => {
     const event = events.find((item) => item.id === eventId);
     if (!event || event.eventKind === "STATE_UPDATE") {
@@ -371,6 +354,14 @@ export default function VehicleServiceLogPage() {
     setServiceEventForm(createInitialEditServiceEventValues(event));
     setServiceEventFormError("");
     setIsServiceEventModalOpen(true);
+  };
+
+  const applyServiceEventSkuSuggestion = (sku: PartSkuViewModel) => {
+    setServiceEventForm((prev) => ({
+      ...prev,
+      partSku: pickSkuPartNumberOrFallback(sku, prev.partSku.trim()),
+      partName: sku.canonicalName?.trim() || prev.partName,
+    }));
   };
 
   const saveServiceEvent = async () => {
@@ -494,25 +485,15 @@ export default function VehicleServiceLogPage() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setIsExpenseExpanded((prev) => {
-                    const next = !prev;
-                    if (next) {
-                      setFilters((current) => ({ ...current, paidOnly: true }));
-                    } else {
-                      setExpenseSectionFilter(null);
-                    }
-                    return next;
-                  });
-                }}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                onClick={() => router.push(`/vehicles/${vehicleId}/expenses`)}
+                className="inline-flex h-9 items-center justify-center rounded-lg border px-3.5 text-sm font-medium transition hover:opacity-90"
                 style={{
-                  backgroundColor: productSemanticColors.cardSubtle,
                   borderColor: productSemanticColors.borderStrong,
+                  backgroundColor: productSemanticColors.cardSubtle,
                   color: productSemanticColors.textPrimary,
                 }}
               >
-                Окно расходов {isExpenseExpanded ? "▾" : "▸"}
+                Статистика расходов
               </button>
               <button
                 type="button"
@@ -540,204 +521,6 @@ export default function VehicleServiceLogPage() {
           >
             {actionMessage}
           </div>
-        ) : null}
-
-        {isExpenseExpanded ? (
-          <section
-            className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5"
-            style={{
-              backgroundColor: productSemanticColors.card,
-              borderColor: productSemanticColors.borderStrong,
-              color: productSemanticColors.textPrimary,
-            }}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold tracking-tight text-gray-950" style={{ color: productSemanticColors.textPrimary }}>
-                Расходы на обслуживание
-              </h2>
-              <div className="flex items-center gap-2 text-sm text-gray-700">
-                <button
-                  type="button"
-                  onClick={() => setExpenseMonthKey((prev) => addMonthsToExpenseMonthKey(prev, -1))}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 bg-white"
-                  aria-label="Предыдущий месяц"
-                >
-                  ‹
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsExpenseMonthPickerOpen((prev) => !prev)}
-                  className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm"
-                >
-                  Период: {formatExpenseMonthLabelRu(expenseMonthKey)} ▼
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExpenseMonthKey((prev) => addMonthsToExpenseMonthKey(prev, 1))}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 bg-white"
-                  aria-label="Следующий месяц"
-                >
-                  ›
-                </button>
-              </div>
-              {isExpenseMonthPickerOpen ? (
-                <div className="mt-2 w-full max-w-xs rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
-                  <div className="relative">
-                    <div
-                      className="pointer-events-none absolute inset-x-1 z-20 rounded-md border border-gray-400/70 bg-white/30"
-                      style={{
-                        top: expenseMonthWheelPadding,
-                        height: expenseMonthOptionHeight,
-                      }}
-                    />
-                    <div
-                      className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-white via-white/70 to-transparent"
-                      style={{ height: expenseMonthWheelPadding }}
-                    />
-                    <div
-                      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-white via-white/70 to-transparent"
-                      style={{ height: expenseMonthWheelPadding }}
-                    />
-                    <div
-                      ref={expenseMonthWheelRef}
-                      className="overflow-y-auto snap-y snap-mandatory"
-                      style={{
-                        height: expenseMonthWheelHeight,
-                        paddingTop: expenseMonthWheelPadding,
-                        paddingBottom: expenseMonthWheelPadding,
-                      }}
-                      onScroll={(event) => {
-                        const offsetY = event.currentTarget.scrollTop;
-                        const index = Math.round(offsetY / expenseMonthOptionHeight);
-                        const normalizedIndex = Math.min(Math.max(index, 0), expenseMonthOptions.length - 1);
-                        const monthKey = expenseMonthOptions[normalizedIndex];
-                        if (monthKey && monthKey !== expenseMonthKey) {
-                          if (expenseMonthScrollTimeout.current) {
-                            clearTimeout(expenseMonthScrollTimeout.current);
-                          }
-                          expenseMonthScrollTimeout.current = setTimeout(() => {
-                            setExpenseMonthKey(monthKey);
-                          }, 40);
-                        }
-                      }}
-                    >
-                      {expenseMonthOptions.map((monthKey) => (
-                        <div
-                          key={monthKey}
-                          className={`flex w-full snap-center items-center justify-center px-2 text-center text-sm transition ${
-                            monthKey === expenseMonthKey ? "font-semibold text-gray-950" : "text-gray-500"
-                          }`}
-                          style={{ height: expenseMonthOptionHeight }}
-                        >
-                          {formatExpenseMonthLabelRu(monthKey)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            <p className="mt-1 text-sm text-gray-600" style={{ color: productSemanticColors.textSecondary }}>
-              Расходы считаются по сервисным событиям с указанной стоимостью.
-            </p>
-            {dashboardSummary.paidEventCount === 0 ? (
-              <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
-                <p className="font-medium text-gray-900">Расходов за выбранный месяц нет</p>
-              </div>
-            ) : (
-              <div className="mt-4 space-y-4">
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                  <div className="space-y-1">
-                    {dashboardSummary.totalsByCurrency.map((row) => (
-                      <p key={row.currency} className="text-2xl font-semibold text-gray-950">
-                        {dashboardSummary.totalsByCurrency.length === 1 ? "" : `${row.currency}: `}
-                        {formatExpenseAmountRu(row.totalAmount)} {row.currency}
-                      </p>
-                    ))}
-                    <p className="text-sm text-gray-600">
-                      {dashboardSummary.paidEventCount} событий с затратами
-                    </p>
-                    {dashboardSummary.totalsByCurrency.length > 1 ? (
-                      <p className="text-xs text-gray-500">
-                        Суммы в разных валютах не объединяются
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900">По разделам:</p>
-                    {expenseSectionFilter ? (
-                      <button
-                        type="button"
-                        onClick={() => setExpenseSectionFilter(null)}
-                        className="text-xs text-gray-600 underline"
-                      >
-                        Все разделы
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="space-y-2">
-                    {sectionBreakdown.map((row) => (
-                      <button
-                        key={`${row.sectionId ?? "none"}:${row.currency}`}
-                        type="button"
-                        onClick={() => setExpenseSectionFilter(row.sectionId)}
-                        className={`flex w-full items-center justify-between rounded-xl border px-4 py-2 text-left text-sm transition ${
-                          expenseSectionFilter === row.sectionId
-                            ? "border-gray-900 bg-gray-100"
-                            : "border-gray-200 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        <span className="text-gray-900">{row.label}</span>
-                        <span className="font-medium text-gray-900">
-                          {formatExpenseAmountRu(row.amount)} {row.currency}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="mb-2 text-sm font-medium text-gray-900">Последние расходы:</p>
-                  <div className="space-y-2">
-                    {paidEventsForDashboard.slice(0, 5).map((event) => (
-                      <button
-                        key={event.id}
-                        type="button"
-                        onClick={() => {
-                          const el = document.getElementById(`service-log-event-${event.id}`);
-                          el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                        }}
-                        className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-2 text-left text-sm hover:bg-gray-50"
-                      >
-                        <span className="text-gray-700">
-                          {formatIsoCalendarDateRu(event.eventDate)} {event.serviceType}
-                        </span>
-                        <span className="font-medium text-gray-900">
-                          {formatExpenseAmountRu(event.costAmount ?? 0)} {event.currency}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilters((prev) => ({ ...prev, paidOnly: true }));
-                    document.getElementById("service-log-events-list")?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
-                    });
-                  }}
-                  className="text-sm font-medium text-gray-700 underline"
-                >
-                  Все расходы в журнале →
-                </button>
-              </div>
-            )}
-          </section>
         ) : null}
 
         {nodeFilter ? (
@@ -1152,6 +935,23 @@ export default function VehicleServiceLogPage() {
                                     <div className="group relative">
                                       <button
                                         type="button"
+                                        onClick={() => openRepeat(entry.id)}
+                                        title="Повторить событие"
+                                        aria-label="Повторить сервисное событие с актуальными пробегом и моточасами"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-gray-950"
+                                        style={{
+                                          backgroundColor: productSemanticColors.cardSubtle,
+                                          borderColor: productSemanticColors.borderStrong,
+                                          color: productSemanticColors.textPrimary,
+                                        }}
+                                      >
+                                        <RepeatIcon />
+                                      </button>
+                                      <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">Повторить</span>
+                                    </div>
+                                    <div className="group relative">
+                                      <button
+                                        type="button"
                                         onClick={() => openEdit(entry.id)}
                                         title="Редактировать"
                                         aria-label="Редактировать"
@@ -1239,6 +1039,32 @@ export default function VehicleServiceLogPage() {
                                         {entry.wishlistOriginLabelRu}
                                       </p>
                                     )
+                                  ) : null}
+                                  {!isStateUpdate && (entry.partName || entry.partSku) ? (
+                                    <div className="mt-2 space-y-1 text-sm">
+                                      {entry.partName ? (
+                                        <p style={{ color: productSemanticColors.textSecondary }}>
+                                          <span
+                                            className="font-medium"
+                                            style={{ color: productSemanticColors.textMeta }}
+                                          >
+                                            Запчасть:{" "}
+                                          </span>
+                                          {entry.partName}
+                                        </p>
+                                      ) : null}
+                                      {entry.partSku ? (
+                                        <p style={{ color: productSemanticColors.textSecondary }}>
+                                          <span
+                                            className="font-medium"
+                                            style={{ color: productSemanticColors.textMeta }}
+                                          >
+                                            SKU / артикул:{" "}
+                                          </span>
+                                          {entry.partSku}
+                                        </p>
+                                      ) : null}
+                                    </div>
                                   ) : null}
                                 </>
                               )}
@@ -1357,16 +1183,35 @@ export default function VehicleServiceLogPage() {
                   <h3 className="text-sm font-semibold text-gray-950" style={{ color: productSemanticColors.textPrimary }}>
                     Выбор узла
                   </h3>
-                  <label className="mt-3 block text-xs font-medium text-gray-600">
+                  <label className="mt-3 block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                     Узел (leaf)
                     <select
                       value={serviceEventForm.nodeId}
                       onChange={(e) => setServiceEventForm((prev) => ({ ...prev, nodeId: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-950"
+                      style={{
+                        ...SERVICE_EVENT_MODAL_FIELD_BASE,
+                        colorScheme: "dark",
+                      }}
+                      className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
                     >
-                      <option value="">Выберите узел</option>
+                      <option
+                        value=""
+                        style={{
+                          backgroundColor: productSemanticColors.card,
+                          color: productSemanticColors.textPrimary,
+                        }}
+                      >
+                        Выберите узел
+                      </option>
                       {leafNodeOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
+                        <option
+                          key={option.id}
+                          value={option.id}
+                          style={{
+                            backgroundColor: productSemanticColors.card,
+                            color: productSemanticColors.textPrimary,
+                          }}
+                        >
                           {`${"— ".repeat(Math.max(0, option.level - 1))}${option.name}`}
                         </option>
                       ))}
@@ -1385,77 +1230,173 @@ export default function VehicleServiceLogPage() {
                     Данные события
                   </h3>
                   <div className="mt-3 grid gap-4.5 sm:grid-cols-2">
-                    <label className="text-xs font-medium text-gray-600">
+                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                       Дата события
                       <input
                         type="date"
                         value={serviceEventForm.eventDate}
                         onChange={(e) => setServiceEventForm((prev) => ({ ...prev, eventDate: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-950"
+                        style={{ ...SERVICE_EVENT_MODAL_FIELD_BASE, colorScheme: "dark" }}
+                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
                       />
                     </label>
-                    <label className="text-xs font-medium text-gray-600">
+                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                       Тип сервиса
                       <input
                         value={serviceEventForm.serviceType}
                         onChange={(e) => setServiceEventForm((prev) => ({ ...prev, serviceType: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-950"
                         placeholder="Например: Oil change"
+                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                        className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
                       />
                     </label>
-                    <label className="text-xs font-medium text-gray-600">
+                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                       Пробег, км
                       <input
                         value={serviceEventForm.odometer}
                         onChange={(e) => setServiceEventForm((prev) => ({ ...prev, odometer: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-950"
                         inputMode="numeric"
+                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
                       />
                     </label>
-                    <label className="text-xs font-medium text-gray-600">
+                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                       Моточасы
                       <input
                         value={serviceEventForm.engineHours}
                         onChange={(e) => setServiceEventForm((prev) => ({ ...prev, engineHours: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-950"
                         inputMode="numeric"
+                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
                       />
                     </label>
-                    <label className="text-xs font-medium text-gray-600">
+                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                       Стоимость
                       <input
                         value={serviceEventForm.costAmount}
                         onChange={(e) => setServiceEventForm((prev) => ({ ...prev, costAmount: e.target.value }))}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-950"
                         inputMode="decimal"
+                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
                       />
                     </label>
-                    <label className="text-xs font-medium text-gray-600">
+                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                       Валюта
                       <input
                         value={serviceEventForm.currency}
-                        onChange={(e) => setServiceEventForm((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-950"
+                        onChange={(e) =>
+                          setServiceEventForm((prev) => ({
+                            ...prev,
+                            currency: e.target.value.toUpperCase(),
+                          }))
+                        }
+                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
                       />
                     </label>
                   </div>
 
-                  <label className="mt-4 block text-xs font-medium text-gray-600">
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                      Артикул (SKU)
+                      <input
+                        value={serviceEventForm.partSku}
+                        onChange={(e) =>
+                          setServiceEventForm((prev) => ({ ...prev, partSku: e.target.value }))
+                        }
+                        maxLength={200}
+                        placeholder="Опционально"
+                        autoComplete="off"
+                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                        className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                      />
+                    </label>
+                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                      Наименование запчасти
+                      <input
+                        value={serviceEventForm.partName}
+                        onChange={(e) =>
+                          setServiceEventForm((prev) => ({ ...prev, partName: e.target.value }))
+                        }
+                        maxLength={500}
+                        placeholder="Опционально"
+                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                        className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                      />
+                    </label>
+                  </div>
+
+                  {serviceEventForm.partSku.trim().length >= 2 ? (
+                    <div className="mt-2 rounded-xl border px-3 py-2" style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardSubtle }}>
+                      <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                        Поиск в каталоге по артикулу
+                      </p>
+                      {serviceEventSkuLoading ? (
+                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
+                          Ищем совпадения...
+                        </p>
+                      ) : null}
+                      {!serviceEventSkuLoading && serviceEventSkuError ? (
+                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
+                          {serviceEventSkuError}
+                        </p>
+                      ) : null}
+                      {!serviceEventSkuLoading && !serviceEventSkuError && serviceEventSkuResults.length === 0 ? (
+                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
+                          Ничего не найдено.
+                        </p>
+                      ) : null}
+                      {!serviceEventSkuLoading && serviceEventSkuResults.length > 0 ? (
+                        <div className="mt-2 space-y-1.5">
+                          {serviceEventSkuResults.map((sku) => {
+                            const partNumber = pickSkuPartNumberOrFallback(sku, "");
+                            return (
+                              <button
+                                key={sku.id}
+                                type="button"
+                                onClick={() => applyServiceEventSkuSuggestion(sku)}
+                                className="w-full rounded-lg border px-2.5 py-2 text-left text-xs transition hover:opacity-90"
+                                style={{
+                                  borderColor: productSemanticColors.borderStrong,
+                                  backgroundColor: productSemanticColors.cardMuted,
+                                  color: productSemanticColors.textPrimary,
+                                }}
+                              >
+                                <div style={{ fontWeight: 600 }}>{partNumber || "Без артикула"}</div>
+                                <div style={{ color: productSemanticColors.textSecondary }}>{sku.brandName} · {sku.canonicalName}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <label className="mt-4 block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                     Комментарий
                     <textarea
                       value={serviceEventForm.comment}
                       onChange={(e) => setServiceEventForm((prev) => ({ ...prev, comment: e.target.value }))}
-                      className="mt-1 min-h-28 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-950"
                       placeholder="Опционально"
+                      style={{ ...SERVICE_EVENT_MODAL_FIELD_BASE, minHeight: "7rem" }}
+                      className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40 resize-y"
                     />
                   </label>
 
-                  <label className="mt-4 block text-xs font-medium text-gray-600">
+                  <label className="mt-4 block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                     Установленные запчасти (JSON)
                     <textarea
                       value={serviceEventForm.installedPartsJson}
-                      onChange={(e) => setServiceEventForm((prev) => ({ ...prev, installedPartsJson: e.target.value }))}
-                      className="mt-1 min-h-28 w-full rounded-xl border border-gray-300 px-4 py-3 font-mono text-xs text-gray-900 outline-none transition focus:border-gray-950"
+                      onChange={(e) =>
+                        setServiceEventForm((prev) => ({ ...prev, installedPartsJson: e.target.value }))
+                      }
+                      style={{
+                        ...SERVICE_EVENT_MODAL_FIELD_BASE,
+                        minHeight: "7rem",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                        fontSize: "0.75rem",
+                      }}
+                      className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40 resize-y"
                     />
                   </label>
                 </div>
@@ -1499,6 +1440,27 @@ export default function VehicleServiceLogPage() {
       ) : null}
 
     </main>
+  );
+}
+
+function RepeatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <title>Повторить</title>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M17 3.34V7a5 5 0 015 5"
+      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M22 12h-4" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 20.66V17a5 5 0 01-5-5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h4" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M17 3.34A10 10 0 019.71 21M7 20.66A10 10 0 0014.29 3"
+      />
+    </svg>
   );
 }
 

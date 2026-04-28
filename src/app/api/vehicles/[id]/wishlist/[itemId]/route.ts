@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { PartWishlistItemStatus } from "@prisma/client";
 import { z } from "zod";
 import { buildWishlistItemSkuInfo, normalizePartWishlistCostMutationArgs } from "@mototwin/domain";
+import { syncExpenseItemForWishlistItem } from "@/lib/expense-items";
 import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
 import { isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
@@ -266,13 +267,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       updateData.currency = nextCurrency;
     }
 
-    const updated = await prisma.partWishlistItem.update({
-      where: { id: itemId },
-      data: updateData,
-      include: {
-        node: { select: { id: true, name: true } },
-        sku: { select: wishlistSkuSelect },
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const item = await tx.partWishlistItem.update({
+        where: { id: itemId },
+        data: updateData,
+        include: {
+          node: { select: { id: true, name: true } },
+          sku: { select: wishlistSkuSelect },
+        },
+      });
+      await syncExpenseItemForWishlistItem(tx, item);
+      return item;
     });
 
     return NextResponse.json({ item: toWire(updated) });
@@ -308,8 +313,14 @@ export async function DELETE(_: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Позиция списка не найдена." }, { status: 404 });
     }
 
-    await prisma.partWishlistItem.delete({
-      where: { id: itemId },
+    await prisma.$transaction(async (tx) => {
+      const expenseDb = tx as unknown as {
+        expenseItem: { deleteMany(args: unknown): Promise<unknown> };
+      };
+      await expenseDb.expenseItem.deleteMany({ where: { shoppingListItemId: itemId } });
+      await tx.partWishlistItem.delete({
+        where: { id: itemId },
+      });
     });
 
     return NextResponse.json({ ok: true });

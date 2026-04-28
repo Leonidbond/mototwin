@@ -102,6 +102,10 @@ export type ServiceLogEntryViewModel = {
   costAmount: number | null;
   costCurrency: string | null;
   comment: string | null;
+  /** Артикул / SKU для отображения в журнале (если задано в событии). */
+  partSku?: string | null;
+  /** Наименование запчасти в журнале (если задано). */
+  partName?: string | null;
   /**
    * Short label when the row likely came from «установлено из списка покупок» (serviceType + comment prefix).
    * `null` for other events.

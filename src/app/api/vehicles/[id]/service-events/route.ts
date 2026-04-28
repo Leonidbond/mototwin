@@ -1,9 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createLeafServiceEventInTransaction } from "@/lib/leaf-service-event-transaction";
+import { syncExpenseItemForServiceEvent } from "@/lib/expense-items";
 import { prisma } from "@/lib/prisma";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
+
+function normalizeServiceEventPartSku(value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+  const t = value.trim().slice(0, 200);
+  return t.length > 0 ? t : null;
+}
+
+function normalizeServiceEventPartName(value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+  const t = value.trim().slice(0, 500);
+  return t.length > 0 ? t : null;
+}
 
 type RouteContext = {
   params: Promise<{
@@ -27,6 +44,8 @@ const createServiceEventSchema = z.object({
   costAmount: z.number().nullable().optional(),
   currency: z.string().trim().nullable().optional(),
   comment: z.string().trim().nullable().optional(),
+  partSku: z.union([z.string(), z.null()]).optional(),
+  partName: z.union([z.string(), z.null()]).optional(),
 });
 
 export async function GET(_: NextRequest, context: RouteContext) {
@@ -136,7 +155,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const serviceEvent = await prisma.$transaction(async (tx) => {
-      return createLeafServiceEventInTransaction(tx, {
+      const created = await createLeafServiceEventInTransaction(tx, {
         vehicleId: id,
         leafNodeId: data.nodeId,
         eventDate,
@@ -147,7 +166,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
         costAmount: data.costAmount ?? null,
         currency: data.currency || null,
         comment: data.comment || null,
+        partSku: normalizeServiceEventPartSku(data.partSku),
+        partName: normalizeServiceEventPartName(data.partName),
       });
+      await syncExpenseItemForServiceEvent(tx, created);
+      return created;
     });
 
     return NextResponse.json({ serviceEvent }, { status: 201 });

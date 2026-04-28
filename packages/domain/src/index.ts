@@ -80,11 +80,19 @@ export {
 } from "./service-log-node-filter";
 export {
   filterPaidServiceExpenseEvents,
+  buildExpenseAnalyticsFromItems,
+  expenseCategoryLabelsRu,
+  expenseInstallStatusLabelsRu,
   groupExpensesByCurrency,
   groupExpensesByMonth,
+  groupExpensesByCalendarYear,
   groupExpensesByNode,
   buildExpenseSummaryFromServiceEvents,
   formatExpenseAmountRu,
+  getCurrentExpenseYear,
+  getExpenseCategoryLabelRu,
+  getExpenseInstallStatusLabelRu,
+  getExpenseYearDateRange,
   getCurrentExpenseMonthKey,
   parseExpenseMonthKey,
   formatExpenseMonthLabelRu,
@@ -128,7 +136,7 @@ export {
   RIDE_LOAD_TYPE_OPTIONS,
   RIDE_USAGE_INTENSITY_OPTIONS,
 } from "./ride-profile-form-options";
-export type { VehicleOdometerStateForServiceEvent } from "./forms";
+export type { VehicleOdometerStateForServiceEvent, CreateInitialRepeatServiceEventValuesOptions } from "./forms";
 export {
   getTodayDateYmdLocal,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
@@ -138,6 +146,7 @@ export {
   buildWishlistInstalledPartsJsonString,
   createInitialAddServiceEventFromWishlistItem,
   createInitialEditServiceEventValues,
+  createInitialRepeatServiceEventValues,
   createInitialAddServiceEventFormValues,
   normalizeAddServiceEventPayload,
   normalizeEditServiceEventPayload,

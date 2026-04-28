@@ -7,7 +7,7 @@ Service Log stores and shows two event kinds:
 - `SERVICE`
 - `STATE_UPDATE`
 
-Both web and Expo show grouped timeline, filters, sorting, and expense rollups from `SERVICE` cost fields.
+Both web and Expo show grouped timeline, filters, sorting, and paid-service filtering. Full expense analytics lives on dedicated expenses pages backed by `ExpenseItem`.
 
 Node source for add/filter flows:
 
@@ -26,33 +26,24 @@ Supported route/query params:
 
 - `paidOnly=1` — pre-enables paid-only filter
 - `nodeId=<nodeId>` or `nodeIds=<id1,id2,...>` with optional `nodeLabel` — pre-applies node filter context
-- `expandExpenses=1` — opens inline expenses block on initial load
 - `serviceEventId=<eventId>` (alias: `highlightServiceEventId`) — scrolls the timeline to a concrete service event and highlights its row
 - optional lifecycle handoff params for add/edit flow may be used by client UI
 
-## Expenses block (inline)
+## Expenses integration
 
-Expense view is inline inside Service Log on both clients and is toggled by the existing
-`Окно расходов` action.
+The old inline **`Окно расходов`** block is removed from Service Log. Expense analytics is page/screen-first:
 
-- no expense modal/overlay
-- block is collapsed by default
-- toggle behavior: first click/tap opens, second closes
-- opening expense block enables paid-only mode for journal
-- period selector uses concrete month/year (`<Месяц Год>`) and updates journal date filter immediately
-- default expense period is current calendar month
-- supported query: `month=YYYY-MM` (applies to expense dashboard + journal date filter)
-- section rows in expense block apply journal node filter by top-level section/subtree
-- `Все расходы в журнале` keeps paid-only mode and keeps current period/section focus
-- totals are grouped per currency (no cross-currency merge)
-- helper note: sums in different currencies are shown separately
+- **Web:** `/expenses` for garage-wide analytics, `/vehicles/[id]/expenses` for one motorcycle.
+- **Expo:** `vehicles/[id]/expenses` for one motorcycle.
+- Service Log header exposes **«Статистика расходов»** as an entry point to the vehicle-scoped expenses page.
+- `paidOnly=1` remains a journal filter for rows with service costs, not the primary analytics surface.
 
-Expense source semantics are unchanged:
+Expense source semantics changed:
 
-- only `SERVICE` events are considered
-- include only events with `costAmount > 0` and currency
-- exclude `STATE_UPDATE`
-- exclude wishlist rows (wishlist affects expenses only after explicit service-event save)
+- analytics is built from `ExpenseItem`;
+- `SERVICE` events with `costAmount/currency` create linked `ExpenseItem`;
+- wishlist rows with status `BOUGHT` and cost create `BOUGHT_NOT_INSTALLED` `ExpenseItem`;
+- standalone technical expenses can exist without `ServiceEvent`.
 
 ## Editing SERVICE events
 
@@ -143,7 +134,7 @@ After `SERVICE` event edit:
 - affected leaf `NodeState` rows are synchronized for old/new node context
 - top-level status cache (`TopNodeState`) is recalculated
 - `/api/vehicles/[id]/node-tree` reflects updated maintenance statuses
-- expense blocks/totals update from edited `costAmount`/`currency` values
+- linked `ExpenseItem` is updated from edited `costAmount`/`currency` values
 
 This keeps service history correction compatible with existing create flows (node context, wishlist install, kits, direct add).
 
@@ -154,4 +145,4 @@ After `SERVICE` event delete:
 - affected leaf `NodeState` is re-synced against latest remaining service event for that node
 - top-level status cache (`TopNodeState`) is recalculated
 - `/api/vehicles/[id]/node-tree` reflects updated maintenance statuses
-- expense blocks/totals update after removed service cost
+- linked `ExpenseItem` is removed after deleted service cost

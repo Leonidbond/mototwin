@@ -21,6 +21,10 @@ export type ServiceEventItem = {
   costAmount: number | null;
   currency: string | null;
   comment: string | null;
+  /** Артикул / номер SKU установленной позиции (если заполнено). */
+  partSku?: string | null;
+  /** Наименование запчасти (если заполнено). */
+  partName?: string | null;
   createdAt: string;
 };
 
@@ -34,6 +38,8 @@ export type CreateServiceEventInput = {
   currency?: string | null;
   comment?: string | null;
   installedPartsJson?: unknown | null;
+  partSku?: string | null;
+  partName?: string | null;
 };
 
 export type UpdateServiceEventInput = CreateServiceEventInput;

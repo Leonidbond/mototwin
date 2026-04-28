@@ -6,6 +6,7 @@ import {
   buildWishlistItemSkuInfo,
   normalizePartWishlistCostMutationArgs,
 } from "@mototwin/domain";
+import { syncExpenseItemForWishlistItem } from "@/lib/expense-items";
 import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
 import { isVehicleInCurrentContext } from "../../../_shared/vehicle-context";
@@ -229,22 +230,26 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const quantity = data.quantity ?? 1;
 
-    const created = await prisma.partWishlistItem.create({
-      data: {
-        vehicleId,
-        skuId: data.skuId,
-        title: draft.title,
-        quantity,
-        status: data.status ?? PartWishlistItemStatus.NEEDED,
-        comment: data.comment?.trim() ? data.comment.trim() : null,
-        nodeId,
-        costAmount,
-        currency,
-      },
-      include: {
-        node: { select: { id: true, name: true } },
-        sku: { select: wishlistSkuSelect },
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      const item = await tx.partWishlistItem.create({
+        data: {
+          vehicleId,
+          skuId: data.skuId,
+          title: draft.title,
+          quantity,
+          status: data.status ?? PartWishlistItemStatus.NEEDED,
+          comment: data.comment?.trim() ? data.comment.trim() : null,
+          nodeId,
+          costAmount,
+          currency,
+        },
+        include: {
+          node: { select: { id: true, name: true } },
+          sku: { select: wishlistSkuSelect },
+        },
+      });
+      await syncExpenseItemForWishlistItem(tx, item);
+      return item;
     });
 
     return NextResponse.json({ item: toWire(created) });

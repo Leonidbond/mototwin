@@ -90,10 +90,27 @@ export type {
 export type {
   ExpenseByCurrencyViewModel,
   ExpenseByMonthViewModel,
+  ExpenseByYearViewModel,
   ExpenseByNodeViewModel,
   ExpenseLatestPaidEventViewModel,
   ExpenseSummaryViewModel,
 } from "./expense-summary";
+export type {
+  CreateExpenseItemInput,
+  CreateExpenseItemResponse,
+  DeleteExpenseItemResponse,
+  ExpenseAmountByCurrency,
+  ExpenseAnalyticsRow,
+  ExpenseAnalyticsSummary,
+  ExpenseCategory,
+  ExpenseInstallStatus,
+  ExpenseItem,
+  ExpenseItemNodeSummary,
+  ExpenseItemVehicleSummary,
+  ExpensesResponse,
+  UpdateExpenseItemInput,
+  UpdateExpenseItemResponse,
+} from "./expense-item";
 export type {
   ServiceEventsSortField,
   ServiceEventsSortDirection,

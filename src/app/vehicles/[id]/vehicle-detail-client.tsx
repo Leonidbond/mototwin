@@ -122,6 +122,10 @@ import type {
 } from "@mototwin/types";
 
 const vehicleDetailApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+
+function normalizePartNumberForLookup(value: string): string {
+  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
 const SIDEBAR_COLLAPSED_KEY = "vehicle.detail.sidebar.collapsed";
 
 type VehiclePageProps = {
@@ -399,7 +403,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     () => createInitialAddServiceEventFormValues().currency
   );
   const [comment, setComment] = useState("");
+  const [partSku, setPartSku] = useState("");
+  const [partName, setPartName] = useState("");
   const [installedPartsJson, setInstalledPartsJson] = useState("");
+  const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
+  const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
+  const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
+  const [serviceEventSkuError, setServiceEventSkuError] = useState("");
+  const serviceEventSkuSearchGen = useRef(0);
   useEffect(() => {
     try {
       if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
@@ -1229,6 +1240,72 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     textarea.style.height = `${Math.max(textarea.scrollHeight, 80)}px`;
   }, [comment, isAddServiceEventModalOpen]);
 
+  useEffect(() => {
+    if (!isAddServiceEventModalOpen) {
+      setServiceEventSkuLookup("");
+      setServiceEventSkuResults([]);
+      setServiceEventSkuError("");
+      setServiceEventSkuLoading(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setServiceEventSkuLookup(partSku.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [isAddServiceEventModalOpen, partSku]);
+
+  useEffect(() => {
+    if (!isAddServiceEventModalOpen) {
+      return;
+    }
+    const query = serviceEventSkuLookup;
+    if (query.length < 2) {
+      setServiceEventSkuResults([]);
+      setServiceEventSkuError("");
+      setServiceEventSkuLoading(false);
+      return;
+    }
+    const gen = serviceEventSkuSearchGen.current + 1;
+    serviceEventSkuSearchGen.current = gen;
+    setServiceEventSkuLoading(true);
+    setServiceEventSkuError("");
+    void vehicleDetailApi
+      .getPartSkus({
+        search: query,
+        nodeId: selectedFinalNode?.id || undefined,
+      })
+      .then((res) => {
+        if (serviceEventSkuSearchGen.current !== gen) {
+          return;
+        }
+        const list = res.skus ?? [];
+        const normalizedQuery = normalizePartNumberForLookup(query);
+        const exact = list.find((sku) =>
+          sku.partNumbers.some(
+            (partNumber) =>
+              normalizePartNumberForLookup(partNumber.number) === normalizedQuery
+          )
+        );
+        const ordered = exact
+          ? [exact, ...list.filter((candidate) => candidate.id !== exact.id)]
+          : list;
+        setServiceEventSkuResults(ordered.slice(0, 6));
+      })
+      .catch(() => {
+        if (serviceEventSkuSearchGen.current !== gen) {
+          return;
+        }
+        setServiceEventSkuResults([]);
+        setServiceEventSkuError("Не удалось выполнить поиск в каталоге.");
+      })
+      .finally(() => {
+        if (serviceEventSkuSearchGen.current !== gen) {
+          return;
+        }
+        setServiceEventSkuLoading(false);
+      });
+  }, [isAddServiceEventModalOpen, selectedFinalNode?.id, serviceEventSkuLookup]);
+
   const loadServiceEvents = useCallback(async () => {
     if (!vehicleId) {
       return;
@@ -1334,6 +1411,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setCostAmount(values.costAmount);
     setCurrency(values.currency);
     setComment(values.comment);
+    setPartSku(values.partSku);
+    setPartName(values.partName);
     setInstalledPartsJson(values.installedPartsJson);
   };
 
@@ -2580,6 +2659,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         currency,
         comment,
         installedPartsJson,
+        partSku,
+        partName,
       };
 
       const validation = validateAddServiceEventFormValues(serviceFormValues, {
@@ -3379,16 +3460,23 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   </button>
                   <div className="mt-3 grid gap-3">
                     {isCollapsed ? (
-                      <div
-                        className="rounded-2xl border border-dashed px-4 py-3 text-sm"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCollapsedPartsStatusGroups((prev) => ({
+                            ...prev,
+                            [group.status]: false,
+                          }))
+                        }
+                        className="rounded-2xl border border-dashed px-4 py-3 text-left text-sm transition hover:opacity-85"
                         style={{
                           backgroundColor: productSemanticColors.cardMuted,
                           borderColor: productSemanticColors.borderStrong,
                           color: productSemanticColors.textSecondary,
                         }}
                       >
-                        Группа свернута. Позиций: {group.items.length}.
-                      </div>
+                        Группа свернута. Позиций: {group.items.length}. Нажмите, чтобы развернуть.
+                      </button>
                     ) : null}
                     {visibleItems.map((it) => {
                       const isHighlighted = highlightedWishlistItemIdFromSearchParams === it.id;
@@ -3788,7 +3876,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   onUpdateMileage={openVehicleStateEditor}
                   onAddService={openCreateServiceEventModal}
                   onAddExpense={() =>
-                    router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)
+                    router.push(`/vehicles/${vehicleId}/expenses`)
                   }
                   onOpenParts={() => router.push(`/vehicles/${vehicleId}/parts`)}
                   onOpenPartItem={(itemId) =>
@@ -3807,12 +3895,18 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     );
                   }}
                   onOpenServiceLog={openServiceLogModalFull}
-                  onOpenExpenseDetails={() => setIsExpenseDetailsModalOpen(true)}
+                  onOpenServiceLogEvent={(eventId) =>
+                    router.push(
+                      `/vehicles/${vehicleId}/service-log?serviceEventId=${encodeURIComponent(eventId)}`
+                    )
+                  }
+                  onOpenExpenseDetails={() => router.push(`/vehicles/${vehicleId}/expenses`)}
                   onOpenAttentionItemService={openAddServiceFromAttentionItem}
                   onOpenAttentionItemLog={openServiceLogForAttentionItem}
                   onOpenAttentionItemContext={openNodeContextFromAttentionItem}
                 />
 
+                {false ? (
                 <section
                   style={{
                     borderRadius: 24,
@@ -3961,7 +4055,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 </button>
                 <button
                   type="button"
-                  onClick={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&paidOnly=1`)}
+                  onClick={() => router.push(`/vehicles/${vehicleId}/expenses`)}
                   className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
                 >
                   Добавить расход
@@ -4324,6 +4418,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     </div>
                   ) : null}
                 </section>
+                ) : null}
               </div>
             ) : null}
           </section>
@@ -4779,6 +4874,89 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       </select>
                     </InputField>
                   </div>
+
+                  <div className="mt-3 grid gap-x-3 gap-y-2 sm:grid-cols-2">
+                    <InputField label="Артикул (SKU)" labelStyle={darkModalInputLabelStyle}>
+                      <input
+                        value={partSku}
+                        onChange={(event) => setPartSku(event.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        style={darkModalFormControlStyle}
+                        placeholder="Опционально"
+                        maxLength={200}
+                        autoComplete="off"
+                      />
+                    </InputField>
+                    <InputField label="Наименование запчасти" labelStyle={darkModalInputLabelStyle}>
+                      <input
+                        value={partName}
+                        onChange={(event) => setPartName(event.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        style={darkModalFormControlStyle}
+                        placeholder="Опционально"
+                        maxLength={500}
+                      />
+                    </InputField>
+                  </div>
+
+                  {partSku.trim().length >= 2 ? (
+                    <div
+                      className="mt-2 rounded-xl border px-3 py-2"
+                      style={{
+                        borderColor: productSemanticColors.borderStrong,
+                        backgroundColor: productSemanticColors.cardSubtle,
+                      }}
+                    >
+                      <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                        Поиск в каталоге по артикулу
+                      </p>
+                      {serviceEventSkuLoading ? (
+                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
+                          Ищем совпадения...
+                        </p>
+                      ) : null}
+                      {!serviceEventSkuLoading && serviceEventSkuError ? (
+                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
+                          {serviceEventSkuError}
+                        </p>
+                      ) : null}
+                      {!serviceEventSkuLoading &&
+                      !serviceEventSkuError &&
+                      serviceEventSkuResults.length === 0 ? (
+                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
+                          Ничего не найдено.
+                        </p>
+                      ) : null}
+                      {!serviceEventSkuLoading && serviceEventSkuResults.length > 0 ? (
+                        <div className="mt-2 space-y-1.5">
+                          {serviceEventSkuResults.map((sku) => {
+                            const partNumber = sku.partNumbers[0]?.number?.trim() ?? "";
+                            return (
+                              <button
+                                key={sku.id}
+                                type="button"
+                                onClick={() => {
+                                  setPartSku(partNumber || partSku.trim());
+                                  setPartName(sku.canonicalName?.trim() || partName);
+                                }}
+                                className="w-full rounded-lg border px-2.5 py-2 text-left text-xs transition hover:opacity-90"
+                                style={{
+                                  borderColor: productSemanticColors.borderStrong,
+                                  backgroundColor: productSemanticColors.cardMuted,
+                                  color: productSemanticColors.textPrimary,
+                                }}
+                              >
+                                <div style={{ fontWeight: 600 }}>{partNumber || "Без артикула"}</div>
+                                <div style={{ color: productSemanticColors.textSecondary }}>
+                                  {sku.brandName} · {sku.canonicalName}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   <div className="mt-3">
                     <InputField label="Комментарий" labelStyle={darkModalInputLabelStyle}>
@@ -5259,7 +5437,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           style={{ backgroundColor: productSemanticColors.overlayModal }}
         >
           <div
-            className="garage-dark-surface-text w-full max-w-lg rounded-3xl border shadow-xl sm:max-w-xl"
+            className="garage-dark-surface-text w-full max-w-3xl rounded-3xl border shadow-xl sm:max-w-4xl"
             style={{
               backgroundColor: productSemanticColors.card,
               borderColor: productSemanticColors.borderStrong,
