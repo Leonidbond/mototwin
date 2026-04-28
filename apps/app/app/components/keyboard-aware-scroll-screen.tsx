@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,6 +12,7 @@ type KeyboardAwareScrollScreenProps = {
   children: ReactNode;
   contentContainerStyle?: StyleProp<ViewStyle>;
   keyboardVerticalOffset?: number;
+  scrollViewRef?: Ref<ScrollView>;
   scrollViewProps?: Omit<
     ScrollViewProps,
     "children" | "contentContainerStyle" | "keyboardShouldPersistTaps" | "keyboardDismissMode"
@@ -22,6 +23,7 @@ export function KeyboardAwareScrollScreen({
   children,
   contentContainerStyle,
   keyboardVerticalOffset = 8,
+  scrollViewRef,
   scrollViewProps,
 }: KeyboardAwareScrollScreenProps) {
   return (
@@ -31,6 +33,7 @@ export function KeyboardAwareScrollScreen({
       keyboardVerticalOffset={Platform.OS === "ios" ? keyboardVerticalOffset : 0}
     >
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={contentContainerStyle}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"

@@ -45,6 +45,7 @@ import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
 import { ScreenHeader } from "../../components/screen-header";
 import { ActionIconButton } from "../../components/action-icon-button";
+import { buildVehicleWishlistItemHighlightHref } from "./wishlist/hrefs";
 
 function readSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) {
@@ -93,6 +94,25 @@ function parsePaidOnlyFromParams(
   return v === "1" || v === "true";
 }
 
+function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
+  let parsed = payload;
+  if (typeof payload === "string") {
+    try {
+      parsed = JSON.parse(payload) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const record = parsed as { source?: unknown; wishlistItemId?: unknown };
+  if (record.source !== "wishlist" || typeof record.wishlistItemId !== "string") {
+    return null;
+  }
+  return record.wishlistItemId.trim() || null;
+}
+
 export function buildVehicleServiceLogHref(
   vehicleId: string,
   nodeFilter: ServiceLogNodeFilter | null,
@@ -121,14 +141,20 @@ export function buildVehicleServiceLogHref(
 
 function ServiceCard({
   entry,
+  isHighlighted,
+  originWishlistItemId,
   isCommentExpanded,
   onToggleComment,
+  onOpenWishlistOrigin,
   onEdit,
   onDelete,
 }: {
   entry: ServiceLogEntryViewModel;
+  isHighlighted: boolean;
+  originWishlistItemId: string | null;
   isCommentExpanded: boolean;
   onToggleComment: () => void;
+  onOpenWishlistOrigin: (wishlistItemId: string) => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -137,7 +163,7 @@ function ServiceCard({
     comment != null && comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS;
 
   return (
-    <View style={[styles.eventCard, styles.serviceCard]}>
+    <View style={[styles.eventCard, styles.serviceCard, isHighlighted && styles.eventCardHighlighted]}>
       <View style={styles.eventKindBadge}>
         <Text style={styles.eventKindText}>
           {getServiceLogEventKindBadgeLabel(entry.eventKind)}
@@ -161,7 +187,15 @@ function ServiceCard({
         </View>
       </View>
       {entry.wishlistOriginLabelRu ? (
-        <Text style={styles.wishlistOriginLabel}>{entry.wishlistOriginLabelRu}</Text>
+        originWishlistItemId ? (
+          <Pressable onPress={() => onOpenWishlistOrigin(originWishlistItemId)} hitSlop={8}>
+            <Text style={[styles.wishlistOriginLabel, styles.wishlistOriginLink]}>
+              {entry.wishlistOriginLabelRu}
+            </Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.wishlistOriginLabel}>{entry.wishlistOriginLabelRu}</Text>
+        )
       ) : null}
       <Text style={styles.eventNode}>{entry.secondaryTitle}</Text>
       <View style={styles.eventMeta}>
@@ -196,10 +230,12 @@ function ServiceCard({
 
 function StateUpdateCard({
   entry,
+  isHighlighted,
   isCommentExpanded,
   onToggleComment,
 }: {
   entry: ServiceLogEntryViewModel;
+  isHighlighted: boolean;
   isCommentExpanded: boolean;
   onToggleComment: () => void;
 }) {
@@ -208,7 +244,7 @@ function StateUpdateCard({
     comment != null && comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS;
 
   return (
-    <View style={[styles.eventCard, styles.stateUpdateCard]}>
+    <View style={[styles.eventCard, styles.stateUpdateCard, isHighlighted && styles.eventCardHighlighted]}>
       <View style={[styles.eventKindBadge, styles.stateUpdateBadge]}>
         <Text style={[styles.eventKindText, styles.stateUpdateBadgeText]}>
           {getServiceLogEventKindBadgeLabel(entry.eventKind)}
@@ -255,23 +291,38 @@ function StateUpdateCard({
 
 function MonthGroup({
   group,
+  highlightedServiceEventId,
+  wishlistItemIdByServiceEventId,
   expandedComments,
+  onEventLayout,
   onToggleComment,
+  onOpenWishlistOrigin,
   onEditServiceEvent,
   onDeleteServiceEvent,
 }: {
   group: ServiceLogMonthGroupViewModel;
+  highlightedServiceEventId: string;
+  wishlistItemIdByServiceEventId: Map<string, string>;
   expandedComments: Record<string, boolean>;
+  onEventLayout: (entryId: string, y: number) => void;
   onToggleComment: (entryId: string) => void;
+  onOpenWishlistOrigin: (wishlistItemId: string) => void;
   onEditServiceEvent: (entryId: string) => void;
   onDeleteServiceEvent: (entryId: string) => void;
 }) {
   const hasServiceCount = group.summary.serviceCount > 0;
   const hasStateUpdates = group.summary.stateUpdateCount > 0;
   const hasCost = Boolean(group.summary.costLabel);
+  const groupYRef = useRef(0);
+  const listYRef = useRef(0);
 
   return (
-    <View style={styles.monthGroup}>
+    <View
+      style={styles.monthGroup}
+      onLayout={(event) => {
+        groupYRef.current = event.nativeEvent.layout.y;
+      }}
+    >
       <View style={styles.monthHeaderCard}>
         <Text style={styles.monthLabel}>{group.label}</Text>
         <View style={styles.monthSummaryRow}>
@@ -296,11 +347,24 @@ function MonthGroup({
           ) : null}
         </View>
       </View>
-      <View style={styles.timelineList}>
+      <View
+        style={styles.timelineList}
+        onLayout={(event) => {
+          listYRef.current = event.nativeEvent.layout.y;
+        }}
+      >
         {group.entries.map((entry) => {
           const isStateUpdate = entry.eventKind === "STATE_UPDATE";
+          const isHighlighted = entry.id === highlightedServiceEventId;
+          const originWishlistItemId = wishlistItemIdByServiceEventId.get(entry.id) ?? null;
           return (
-            <View key={entry.id} style={styles.timelineItem}>
+            <View
+              key={entry.id}
+              style={styles.timelineItem}
+              onLayout={(event) =>
+                onEventLayout(entry.id, groupYRef.current + listYRef.current + event.nativeEvent.layout.y)
+              }
+            >
               <View style={styles.timelineRail}>
                 <View style={styles.timelineLine} />
                 <View
@@ -314,14 +378,18 @@ function MonthGroup({
                 {isStateUpdate ? (
                   <StateUpdateCard
                     entry={entry}
+                    isHighlighted={isHighlighted}
                     isCommentExpanded={Boolean(expandedComments[entry.id])}
                     onToggleComment={() => onToggleComment(entry.id)}
                   />
                 ) : (
                   <ServiceCard
                     entry={entry}
+                    isHighlighted={isHighlighted}
+                    originWishlistItemId={originWishlistItemId}
                     isCommentExpanded={Boolean(expandedComments[entry.id])}
                     onToggleComment={() => onToggleComment(entry.id)}
+                    onOpenWishlistOrigin={onOpenWishlistOrigin}
                     onEdit={() => onEditServiceEvent(entry.id)}
                     onDelete={() => onDeleteServiceEvent(entry.id)}
                   />
@@ -347,8 +415,16 @@ export default function ServiceLogScreen() {
     feedback?: string;
     expandExpenses?: string;
     month?: string;
+    serviceEventId?: string;
+    highlightServiceEventId?: string;
   }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
+  const highlightedServiceEventId =
+    typeof params.serviceEventId === "string"
+      ? params.serviceEventId
+      : typeof params.highlightServiceEventId === "string"
+        ? params.highlightServiceEventId
+        : "";
 
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
@@ -377,6 +453,8 @@ export default function ServiceLogScreen() {
   } | null>(null);
 
   const apiBaseUrl = getApiBaseUrl();
+  const scrollRef = useRef<ScrollView | null>(null);
+  const eventYByIdRef = useRef<Record<string, number>>({});
 
   const nodeSubtreeFilter = useMemo(
     () => parseServiceLogNodeFilterFromParams(params.nodeIds, params.nodeLabel),
@@ -524,6 +602,28 @@ export default function ServiceLogScreen() {
       ).monthGroups,
     [events, effectiveFilters, sortField, sortDirection, nodeSubtreeFilter, expenseSectionNodeIds]
   );
+  const wishlistItemIdByServiceEventId = useMemo(() => {
+    const byServiceEventId = new Map<string, string>();
+    for (const event of events) {
+      const wishlistItemId = getWishlistItemIdFromInstalledPartsJson(event.installedPartsJson);
+      if (wishlistItemId) {
+        byServiceEventId.set(event.id, wishlistItemId);
+      }
+    }
+    return byServiceEventId;
+  }, [events]);
+  useEffect(() => {
+    if (!highlightedServiceEventId || visibleGroups.length === 0) {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      const y = eventYByIdRef.current[highlightedServiceEventId];
+      if (typeof y === "number") {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 90), animated: true });
+      }
+    }, 120);
+    return () => clearTimeout(timeoutId);
+  }, [highlightedServiceEventId, visibleGroups]);
   const hasActiveFilters = useMemo(
     () =>
       isServiceLogTimelineQueryActive(
@@ -710,7 +810,10 @@ export default function ServiceLogScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title="Журнал обслуживания" />
-      <KeyboardAwareScrollScreen contentContainerStyle={styles.scrollContent}>
+      <KeyboardAwareScrollScreen
+        contentContainerStyle={styles.scrollContent}
+        scrollViewRef={scrollRef}
+      >
         <View style={styles.topActionsRow}>
           <Pressable
             style={({ pressed }) => [styles.expensesButton, pressed && styles.expensesButtonPressed]}
@@ -1113,9 +1216,17 @@ export default function ServiceLogScreen() {
           <MonthGroup
             key={group.monthKey}
             group={group}
+            highlightedServiceEventId={highlightedServiceEventId}
+            wishlistItemIdByServiceEventId={wishlistItemIdByServiceEventId}
             expandedComments={expandedComments}
+            onEventLayout={(entryId, y) => {
+              eventYByIdRef.current[entryId] = y;
+            }}
             onEditServiceEvent={openEditServiceEvent}
             onDeleteServiceEvent={openDeleteServiceEventConfirm}
+            onOpenWishlistOrigin={(wishlistItemId) =>
+              router.push(buildVehicleWishlistItemHighlightHref(vehicleId, wishlistItemId))
+            }
             onToggleComment={(entryId) =>
               setExpandedComments((prev) => ({
                 ...prev,
@@ -1643,6 +1754,14 @@ const styles = StyleSheet.create({
     padding: 13,
     marginBottom: 0,
   },
+  eventCardHighlighted: {
+    borderColor: c.primaryAction,
+    shadowColor: c.primaryAction,
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 3,
+  },
   serviceCard: {
     shadowColor: c.shadow,
     shadowOpacity: 0.03,
@@ -1689,6 +1808,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     color: c.textMuted,
+  },
+  wishlistOriginLink: {
+    textDecorationLine: "underline",
+    color: c.textSecondary,
   },
   stateUpdateMainTitle: {
     fontSize: 14,

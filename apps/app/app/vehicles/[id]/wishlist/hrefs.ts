@@ -8,6 +8,14 @@ export function buildVehicleWishlistNewHref(vehicleId: string, nodeId?: string):
   return `/vehicles/${vehicleId}/wishlist/new${q}`;
 }
 
+export function buildVehicleWishlistItemHighlightHref(vehicleId: string, itemId: string): string {
+  return `/vehicles/${vehicleId}/wishlist?wishlistItemId=${encodeURIComponent(itemId)}`;
+}
+
+export function buildVehicleServiceLogEventHref(vehicleId: string, eventId: string): string {
+  return `/vehicles/${vehicleId}/service-log?serviceEventId=${encodeURIComponent(eventId)}`;
+}
+
 /** Opens Add Service Event with wishlist-driven prefill (query params read in `service-events/new`). */
 export function buildServiceEventNewFromWishlistHref(
   vehicleId: string,

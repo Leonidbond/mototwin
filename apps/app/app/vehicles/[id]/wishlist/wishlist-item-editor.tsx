@@ -439,11 +439,14 @@ export function WishlistItemEditor({
       const endpoints = createMotoTwinEndpoints(client);
 
       const prevStatus = statusWhenLoadedRef.current ?? "NEEDED";
+      const shouldDeferInstalledStatus = isWishlistTransitionToInstalled(prevStatus, form.status);
 
       if (mode === "create") {
-        const input = normalizeCreatePartWishlistPayload(form);
+        const input = normalizeCreatePartWishlistPayload(
+          shouldDeferInstalledStatus ? { ...form, status: prevStatus } : form
+        );
         const res = await endpoints.createWishlistItem(vehicleId, input);
-        if (isWishlistTransitionToInstalled(prevStatus, res.item.status)) {
+        if (shouldDeferInstalledStatus) {
           if (res.item.nodeId) {
             router.replace(buildServiceEventNewFromWishlistHref(vehicleId, res.item));
           } else {
@@ -459,9 +462,11 @@ export function WishlistItemEditor({
           setSaveError("Не указана позиция списка.");
           return;
         }
-        const input = normalizeUpdatePartWishlistPayload(form);
+        const input = normalizeUpdatePartWishlistPayload(
+          shouldDeferInstalledStatus ? { ...form, status: prevStatus } : form
+        );
         const res = await endpoints.updateWishlistItem(vehicleId, itemIdSafe, input);
-        if (isWishlistTransitionToInstalled(prevStatus, res.item.status)) {
+        if (shouldDeferInstalledStatus) {
           if (res.item.nodeId) {
             router.replace(buildServiceEventNewFromWishlistHref(vehicleId, res.item));
           } else {

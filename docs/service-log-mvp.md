@@ -107,12 +107,12 @@ Wishlist-install events are stored as normal `SERVICE` rows. The origin is recog
 - `source: "wishlist"`
 - `wishlistItemId: <PartWishlistItem.id>`
 
-Web behavior:
+Web and Expo behavior:
 
 - if a wishlist-install row has `wishlistItemId`, the label **«Из списка покупок»** is rendered as a button
-- clicking it opens `/vehicles/[id]/parts?wishlistItemId=...`
-- the parts page expands/filters to the matching status group, highlights that part card, and scrolls it into view
-- the reverse link exists on installed part cards: **«В журнал»** opens `/vehicles/[id]/service-log?serviceEventId=...`, and the journal scrolls/highlights the corresponding event
+- clicking it opens the full parts/wishlist screen with `wishlistItemId=...`
+- the parts/wishlist screen expands/filters to the matching status group, highlights that part card, and scrolls it into view
+- the reverse link exists on installed part cards: **«В журнал»** opens the service log with `serviceEventId=...`, and the journal scrolls/highlights the corresponding event
 
 ## STATE_UPDATE in this flow
 

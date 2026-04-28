@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,7 +19,6 @@ import {
   getPartWishlistStatusLabelRu,
   getWishlistItemSkuDisplayLines,
   groupPartWishlistItemsByStatus,
-  filterActiveWishlistItems,
   isWishlistTransitionToInstalled,
   partWishlistStatusLabelsRu,
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
@@ -26,20 +26,62 @@ import {
 import type { PartWishlistItemStatus, PartWishlistItemViewModel } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
-import { buildServiceEventNewFromWishlistHref, buildVehicleWishlistNewHref } from "./hrefs";
+import {
+  buildServiceEventNewFromWishlistHref,
+  buildVehicleServiceLogEventHref,
+  buildVehicleWishlistNewHref,
+} from "./hrefs";
 import { ActionIconButton } from "../../../components/action-icon-button";
 import { ScreenHeader } from "../../../components/screen-header";
 
+type PartsStatusFilter = PartWishlistItemStatus | "ALL";
+const INITIAL_VISIBLE_COUNT = 10;
+const VISIBLE_INCREMENT = 10;
+
+function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
+  let parsed = payload;
+  if (typeof payload === "string") {
+    try {
+      parsed = JSON.parse(payload) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const record = parsed as { source?: unknown; wishlistItemId?: unknown };
+  if (record.source !== "wishlist" || typeof record.wishlistItemId !== "string") {
+    return null;
+  }
+  return record.wishlistItemId.trim() || null;
+}
+
 export default function VehicleWishlistScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; wishlistItemId?: string }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
+  const highlightedWishlistItemId =
+    typeof params.wishlistItemId === "string" ? params.wishlistItemId : "";
   const apiBaseUrl = getApiBaseUrl();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [items, setItems] = useState<PartWishlistItemViewModel[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [serviceEventIdByWishlistItemId, setServiceEventIdByWishlistItemId] = useState<
+    Map<string, string>
+  >(() => new Map());
+  const [statusFilter, setStatusFilter] = useState<PartsStatusFilter>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState<
+    Partial<Record<PartWishlistItemStatus, boolean>>
+  >({ INSTALLED: true });
+  const [visibleCountByStatus, setVisibleCountByStatus] = useState<
+    Partial<Record<PartWishlistItemStatus, number>>
+  >({});
+  const scrollRef = useRef<ScrollView | null>(null);
+  const itemYByIdRef = useRef<Record<string, number>>({});
 
   const load = useCallback(async () => {
     if (!vehicleId) {
@@ -52,8 +94,30 @@ export default function VehicleWishlistScreen() {
       setError("");
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
-      const data = await endpoints.getVehicleWishlist(vehicleId);
-      setItems((data.items ?? []).map(buildPartWishlistItemViewModel));
+      const [wishlistData, serviceData] = await Promise.all([
+        endpoints.getVehicleWishlist(vehicleId),
+        endpoints.getServiceEvents(vehicleId),
+      ]);
+      setItems((wishlistData.items ?? []).map(buildPartWishlistItemViewModel));
+      const byWishlistItemId = new Map<string, string>();
+      const newestEventsFirst = [...(serviceData.serviceEvents ?? [])].sort((left, right) => {
+        const leftTime = new Date(left.eventDate || left.createdAt).getTime();
+        const rightTime = new Date(right.eventDate || right.createdAt).getTime();
+        if (rightTime !== leftTime) {
+          return rightTime - leftTime;
+        }
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      });
+      for (const event of newestEventsFirst) {
+        if (event.eventKind === "STATE_UPDATE") {
+          continue;
+        }
+        const wishlistItemId = getWishlistItemIdFromInstalledPartsJson(event.installedPartsJson);
+        if (wishlistItemId && !byWishlistItemId.has(wishlistItemId)) {
+          byWishlistItemId.set(wishlistItemId, event.id);
+        }
+      }
+      setServiceEventIdByWishlistItemId(byWishlistItemId);
     } catch (e) {
       console.error(e);
       setError("Не удалось загрузить список покупок.");
@@ -69,8 +133,73 @@ export default function VehicleWishlistScreen() {
     }, [load])
   );
 
-  const activeItems = useMemo(() => filterActiveWishlistItems(items), [items]);
-  const groups = useMemo(() => groupPartWishlistItemsByStatus(activeItems), [activeItems]);
+  const statusCounts = useMemo(() => {
+    const counts = new Map<PartWishlistItemStatus, number>();
+    for (const status of PART_WISHLIST_STATUS_ORDER) {
+      counts.set(status, 0);
+    }
+    for (const item of items) {
+      counts.set(item.status, (counts.get(item.status) ?? 0) + 1);
+    }
+    return counts;
+  }, [items]);
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      if (statusFilter !== "ALL" && item.status !== statusFilter) {
+        return false;
+      }
+      if (!normalizedSearchQuery) {
+        return true;
+      }
+      const skuLines = item.sku ? getWishlistItemSkuDisplayLines(item.sku) : null;
+      const haystack = [
+        item.title,
+        item.statusLabelRu,
+        item.node?.name ?? "",
+        item.costLabelRu ?? "",
+        item.kitOriginLabelRu ?? "",
+        item.commentBodyRu ?? "",
+        skuLines?.primaryLine ?? "",
+        skuLines?.secondaryLine ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(normalizedSearchQuery);
+    });
+  }, [items, normalizedSearchQuery, statusFilter]);
+  const groups = useMemo(() => groupPartWishlistItemsByStatus(filteredItems), [filteredItems]);
+
+  useEffect(() => {
+    if (!highlightedWishlistItemId || items.length === 0) {
+      return;
+    }
+    const highlightedItem = items.find((item) => item.id === highlightedWishlistItemId);
+    if (!highlightedItem) {
+      return;
+    }
+    setStatusFilter(highlightedItem.status);
+    setSearchQuery("");
+    setCollapsedGroups((prev) => ({ ...prev, [highlightedItem.status]: false }));
+    const itemsInStatus = items.filter((item) => item.status === highlightedItem.status);
+    const highlightedIndex = itemsInStatus.findIndex((item) => item.id === highlightedItem.id);
+    if (highlightedIndex >= 0) {
+      setVisibleCountByStatus((prev) => ({
+        ...prev,
+        [highlightedItem.status]: Math.max(
+          prev[highlightedItem.status] ?? INITIAL_VISIBLE_COUNT,
+          highlightedIndex + 1
+        ),
+      }));
+    }
+    const timeoutId = setTimeout(() => {
+      const y = itemYByIdRef.current[highlightedWishlistItemId];
+      if (typeof y === "number") {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+      }
+    }, 120);
+    return () => clearTimeout(timeoutId);
+  }, [highlightedWishlistItemId, items]);
 
   const promptStatus = (item: PartWishlistItemViewModel) => {
     const previousStatus = item.status;
@@ -95,6 +224,10 @@ export default function VehicleWishlistScreen() {
     const nodeId = item.nodeId?.trim() ?? "";
     if (!nodeId) {
       Alert.alert("Список покупок", "Выберите узел мотоцикла");
+      return;
+    }
+    if (isWishlistTransitionToInstalled(previousStatus, status)) {
+      router.push(buildServiceEventNewFromWishlistHref(vehicleId, item));
       return;
     }
     try {
@@ -182,12 +315,15 @@ export default function VehicleWishlistScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScreenHeader title="Что нужно купить" />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScreenHeader title="Корзина замен и расходников" />
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.sectionHint}>
-          Активный список: статусы «Нужно купить» — «Куплено». Установленные позиции сохраняются в
-          журнале обслуживания после создания сервисного события (отдельной вкладки «Установленные»
-          нет).
+          Все позиции для замены: от «Нужно купить» до «Установлено». Установленные позиции
+          связаны с журналом обслуживания, если сервисное событие было сохранено.
         </Text>
         <Pressable
           onPress={() => router.push(buildVehicleWishlistNewHref(vehicleId))}
@@ -196,26 +332,128 @@ export default function VehicleWishlistScreen() {
           <Text style={styles.addPrimaryText}>+ Добавить позицию</Text>
         </Pressable>
 
-        {groups.length === 0 ? (
+        {items.length > 0 ? (
+          <View style={styles.filterPanel}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.filterChips}>
+                <Pressable
+                  onPress={() => setStatusFilter("ALL")}
+                  style={[
+                    styles.filterChip,
+                    statusFilter === "ALL" && styles.filterChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      statusFilter === "ALL" && styles.filterChipTextActive,
+                    ]}
+                  >
+                    Все · {items.length}
+                  </Text>
+                </Pressable>
+                {PART_WISHLIST_STATUS_ORDER.map((status) => (
+                  <Pressable
+                    key={status}
+                    onPress={() => setStatusFilter(status)}
+                    style={[
+                      styles.filterChip,
+                      statusFilter === status && styles.filterChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        statusFilter === status && styles.filterChipTextActive,
+                      ]}
+                    >
+                      {partWishlistStatusLabelsRu[status]} · {statusCounts.get(status) ?? 0}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+            <View style={styles.searchRow}>
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Поиск по детали, SKU, узлу или комментарию"
+                placeholderTextColor={c.textMuted}
+                style={styles.searchInput}
+              />
+              {statusFilter !== "ALL" || searchQuery.trim() ? (
+                <Pressable
+                  onPress={() => {
+                    setStatusFilter("ALL");
+                    setSearchQuery("");
+                  }}
+                  style={styles.resetButton}
+                >
+                  <Text style={styles.resetButtonText}>Сбросить</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
+        {items.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>
-              {items.length === 0 ? "Список пуст" : "Список покупок пуст"}
-            </Text>
+            <Text style={styles.emptyTitle}>Список пуст</Text>
             <Text style={styles.emptyText}>
-              {items.length === 0
-                ? "Добавьте расходники и запчасти, которые планируете купить для этого мотоцикла."
-                : "Все позиции установлены."}
+              Добавьте расходники и запчасти, которые планируете купить для этого мотоцикла.
             </Text>
+          </View>
+        ) : groups.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyTitle}>Ничего не найдено</Text>
+            <Text style={styles.emptyText}>Измените статус-фильтр или поисковый запрос.</Text>
           </View>
         ) : (
           <View style={styles.groups}>
-            {groups.map((group) => (
+            {groups.map((group) => {
+              const isCollapsed =
+                Boolean(collapsedGroups[group.status]) &&
+                statusFilter === "ALL" &&
+                !normalizedSearchQuery;
+              const visibleCount = visibleCountByStatus[group.status] ?? INITIAL_VISIBLE_COUNT;
+              const visibleItems = isCollapsed ? [] : group.items.slice(0, visibleCount);
+              const hiddenCount = Math.max(0, group.items.length - visibleItems.length);
+              return (
               <View key={group.status} style={styles.group}>
-                <Text style={styles.groupTitle}>{group.sectionTitleRu}</Text>
-                {group.items.map((item) => {
+                <Pressable
+                  onPress={() =>
+                    setCollapsedGroups((prev) => ({
+                      ...prev,
+                      [group.status]: !prev[group.status],
+                    }))
+                  }
+                  style={styles.groupHeader}
+                >
+                  <Text style={styles.groupTitle}>
+                    {group.sectionTitleRu} · {group.items.length}
+                  </Text>
+                  <Text style={styles.groupToggle}>{isCollapsed ? "Развернуть" : "Свернуть"}</Text>
+                </Pressable>
+                {isCollapsed ? (
+                  <View style={styles.collapsedBox}>
+                    <Text style={styles.collapsedText}>Группа свернута. Позиций: {group.items.length}.</Text>
+                  </View>
+                ) : null}
+                {visibleItems.map((item) => {
                   const isBusy = busyId === item.id;
+                  const isHighlighted = highlightedWishlistItemId === item.id;
+                  const serviceEventId =
+                    item.status === "INSTALLED"
+                      ? serviceEventIdByWishlistItemId.get(item.id)
+                      : null;
                   return (
-                    <View key={item.id} style={styles.card}>
+                    <View
+                      key={item.id}
+                      onLayout={(event) => {
+                        itemYByIdRef.current[item.id] = event.nativeEvent.layout.y;
+                      }}
+                      style={[styles.card, isHighlighted && styles.cardHighlighted]}
+                    >
                       <Pressable
                         onPress={() => router.push(`/vehicles/${vehicleId}/wishlist/${item.id}`)}
                         disabled={isBusy}
@@ -246,6 +484,18 @@ export default function VehicleWishlistScreen() {
                         ) : null}
                       </Pressable>
                       <View style={styles.cardActions}>
+                        {serviceEventId ? (
+                          <Pressable
+                            onPress={() => router.push(buildVehicleServiceLogEventHref(vehicleId, serviceEventId))}
+                            disabled={isBusy}
+                            style={({ pressed }) => [
+                              styles.journalBtn,
+                              pressed && !isBusy && styles.statusBtnPressed,
+                            ]}
+                          >
+                            <Text style={styles.journalBtnText}>В журнал</Text>
+                          </Pressable>
+                        ) : null}
                         <Pressable
                           onPress={() => promptStatus(item)}
                           disabled={isBusy}
@@ -274,8 +524,25 @@ export default function VehicleWishlistScreen() {
                     </View>
                   );
                 })}
+                {!isCollapsed && hiddenCount > 0 ? (
+                  <Pressable
+                    onPress={() =>
+                      setVisibleCountByStatus((prev) => ({
+                        ...prev,
+                        [group.status]:
+                          (prev[group.status] ?? INITIAL_VISIBLE_COUNT) + VISIBLE_INCREMENT,
+                      }))
+                    }
+                    style={styles.showMoreButton}
+                  >
+                    <Text style={styles.showMoreText}>
+                      Показать ещё {Math.min(VISIBLE_INCREMENT, hiddenCount)}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -320,6 +587,51 @@ const styles = StyleSheet.create({
   },
   addPrimaryPressed: { opacity: 0.92 },
   addPrimaryText: { color: c.onPrimaryAction, fontSize: 16, fontWeight: "700" },
+  filterPanel: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 14,
+    backgroundColor: c.cardMuted,
+    padding: 12,
+    marginBottom: 16,
+    gap: 10,
+  },
+  filterChips: { flexDirection: "row", gap: 8, paddingRight: 8 },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: c.cardSubtle,
+  },
+  filterChipActive: {
+    backgroundColor: c.primaryAction,
+    borderColor: c.primaryAction,
+  },
+  filterChipText: { color: c.textPrimary, fontSize: 12, fontWeight: "700" },
+  filterChipTextActive: { color: c.onPrimaryAction },
+  searchRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  searchInput: {
+    flex: 1,
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 12,
+    backgroundColor: c.cardSubtle,
+    color: c.textPrimary,
+    paddingHorizontal: 12,
+    fontSize: 13,
+  },
+  resetButton: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    backgroundColor: c.cardSubtle,
+  },
+  resetButtonText: { color: c.textSecondary, fontSize: 12, fontWeight: "700" },
   emptyBox: {
     borderWidth: 1,
     borderStyle: "dashed",
@@ -338,6 +650,12 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, color: c.textMuted, textAlign: "center", lineHeight: 20 },
   groups: { gap: 20 },
   group: { gap: 10 },
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   groupTitle: {
     fontSize: 11,
     fontWeight: "700",
@@ -345,12 +663,30 @@ const styles = StyleSheet.create({
     color: c.textMuted,
     textTransform: "uppercase",
   },
+  groupToggle: { color: c.textSecondary, fontSize: 12, fontWeight: "700" },
+  collapsedBox: {
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: c.borderStrong,
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: c.cardMuted,
+  },
+  collapsedText: { color: c.textSecondary, fontSize: 13 },
   card: {
     borderWidth: 1,
     borderColor: c.border,
     borderRadius: 14,
     padding: 14,
     backgroundColor: c.card,
+  },
+  cardHighlighted: {
+    borderColor: c.primaryAction,
+    shadowColor: c.primaryAction,
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 3,
   },
   itemTitle: { fontSize: 16, fontWeight: "700", color: c.textPrimary },
   skuBlock: {
@@ -393,5 +729,24 @@ const styles = StyleSheet.create({
   },
   statusBtnPressed: { opacity: 0.88 },
   statusBtnText: { fontSize: 13, fontWeight: "600", color: c.textPrimary },
+  journalBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+  },
+  journalBtnText: { fontSize: 13, fontWeight: "700", color: c.textPrimary },
+  showMoreButton: {
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: c.borderStrong,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: c.cardSubtle,
+  },
+  showMoreText: { color: c.textPrimary, fontSize: 13, fontWeight: "700" },
   busyRow: { marginTop: 8, alignItems: "flex-start" },
 });

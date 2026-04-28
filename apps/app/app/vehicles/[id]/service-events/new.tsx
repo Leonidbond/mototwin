@@ -307,12 +307,22 @@ export default function NewServiceEventScreen() {
         );
       } else {
         await endpoints.createServiceEvent(vehicleId, input);
+        if (source === "wishlist" && wlId.trim()) {
+          await endpoints.updateWishlistItem(vehicleId, wlId.trim(), {
+            status: "INSTALLED",
+            nodeId: selectedNode.id,
+          });
+        }
       }
       const feedback = isEditMode ? "updated" : "created";
       if (source === "tree" || source === "attention" || source === "search" || source === "node-context") {
         router.replace(`/vehicles/${vehicleId}`);
       } else if (source === "wishlist") {
-        router.replace(`/vehicles/${vehicleId}/wishlist`);
+        router.replace(
+          wlId.trim()
+            ? `/vehicles/${vehicleId}/wishlist?wishlistItemId=${encodeURIComponent(wlId.trim())}`
+            : `/vehicles/${vehicleId}/wishlist`
+        );
       } else {
         router.replace(`/vehicles/${vehicleId}/service-log?feedback=${feedback}&refreshed=1`);
       }
