@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -112,7 +113,7 @@ function getFullMonthLabel(monthKey: string): string {
   if (Number.isNaN(date.getTime())) {
     return monthKey || "—";
   }
-  return date.toLocaleDateString("ru-RU", { month: "long" });
+  return date.toLocaleDateString("ru-RU", { month: "short" }).replace(".", "");
 }
 
 function sumByCurrency(expenses: ExpenseItem[], currency: string): number {
@@ -132,6 +133,9 @@ function getInstallationStatusLabel(expense: ExpenseItem): string {
 
 export default function VehicleExpensesScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isMobileLayout = width < 720;
+  const scrollViewRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{ id: string; nodeId?: string; year?: string }>();
   const vehicleId = String(params.id ?? "");
   const targetNodeId = typeof params.nodeId === "string" ? params.nodeId : "";
@@ -143,7 +147,9 @@ export default function VehicleExpensesScreen() {
   const [installStatusFilter, setInstallStatusFilter] = useState<ExpenseInstallStatus | "ALL">("ALL");
   const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | "ALL">("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("");
-  const [monthFilter, setMonthFilter] = useState("");
+  const [monthFilters, setMonthFilters] = useState<string[]>([]);
+  const [isMobileFiltersCollapsed, setIsMobileFiltersCollapsed] = useState(true);
+  const [filtersSectionY, setFiltersSectionY] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [busyExpenseId, setBusyExpenseId] = useState<string | null>(null);
@@ -211,7 +217,7 @@ export default function VehicleExpensesScreen() {
       if (installStatusFilter !== "ALL" && expense.installStatus !== installStatusFilter) return false;
       if (categoryFilter !== "ALL" && expense.category !== categoryFilter) return false;
       if (currencyFilter && expense.currency !== currencyFilter) return false;
-      if (monthFilter && getExpenseMonthKeyFromIso(expense.expenseDate) !== monthFilter) return false;
+      if (monthFilters.length > 0 && !monthFilters.includes(getExpenseMonthKeyFromIso(expense.expenseDate))) return false;
       if (query) {
         const haystack = [
           expense.title,
@@ -225,7 +231,13 @@ export default function VehicleExpensesScreen() {
       }
       return true;
     });
-  }, [categoryFilter, currencyFilter, expenses, installStatusFilter, monthFilter, nodeTree, searchQuery, targetNodeId]);
+  }, [categoryFilter, currencyFilter, expenses, installStatusFilter, monthFilters, nodeTree, searchQuery, targetNodeId]);
+
+  const toggleMonthFilter = useCallback((monthKey: string) => {
+    setMonthFilters((prev) =>
+      prev.includes(monthKey) ? prev.filter((key) => key !== monthKey) : [...prev, monthKey]
+    );
+  }, []);
 
   const analytics = useMemo(
     () => buildExpenseAnalyticsFromItems(scopedExpenses, selectedYear),
@@ -356,10 +368,19 @@ export default function VehicleExpensesScreen() {
     void markInstalled(expense);
   }
 
+  function openFiltersSection() {
+    if (isMobileLayout) {
+      setIsMobileFiltersCollapsed(false);
+    }
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: Math.max(filtersSectionY - 10, 0), animated: true });
+    });
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title="Расходы" onBack={() => router.push(`/vehicles/${vehicleId}`)} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.content}>
         <View style={styles.headerCard}>
           <View style={styles.headerTop}>
             <View style={{ flex: 1 }}>
@@ -370,21 +391,50 @@ export default function VehicleExpensesScreen() {
               <Text style={styles.addButtonText}>+ Добавить</Text>
             </Pressable>
           </View>
-          <View style={styles.filterRow}>
-            {years.length > 0 ? (
-              years.slice(0, 4).map((year) => (
-                <Pressable
-                  key={year}
-                  onPress={() => router.setParams({ year: String(year) })}
-                  style={[styles.chip, selectedYear === year && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, selectedYear === year && styles.chipTextActive]}>{year}</Text>
-                </Pressable>
-              ))
-            ) : (
-              <Text style={styles.scopeText}>Сезон {selectedYear}</Text>
-            )}
-          </View>
+          {isMobileLayout ? (
+            <ChipRow>
+              {years.length > 0 ? (
+                years.slice(0, 4).map((year) => (
+                  <Pressable
+                    key={year}
+                    onPress={() => router.setParams({ year: String(year) })}
+                    style={[styles.chip, selectedYear === year && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, selectedYear === year && styles.chipTextActive]}>{year}</Text>
+                  </Pressable>
+                ))
+              ) : (
+                <View style={styles.chip}>
+                  <Text style={styles.chipText}>Сезон {selectedYear}</Text>
+                </View>
+              )}
+              <FilterChip active={monthFilters.length === 0} label="Все месяцы" onPress={() => setMonthFilters([])} />
+              {monthOptions.slice(0, 12).map((month) => (
+                <FilterChip
+                  key={month.key}
+                  active={monthFilters.includes(month.key)}
+                  label={month.label}
+                  onPress={() => toggleMonthFilter(month.key)}
+                />
+              ))}
+            </ChipRow>
+          ) : (
+            <View style={styles.filterRow}>
+              {years.length > 0 ? (
+                years.slice(0, 4).map((year) => (
+                  <Pressable
+                    key={year}
+                    onPress={() => router.setParams({ year: String(year) })}
+                    style={[styles.chip, selectedYear === year && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, selectedYear === year && styles.chipTextActive]}>{year}</Text>
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={styles.scopeText}>Сезон {selectedYear}</Text>
+              )}
+            </View>
+          )}
           {targetNodeId ? (
             <Text style={styles.scopeText}>Открыто из дерева: показан выбранный узел и дочерние узлы.</Text>
           ) : null}
@@ -428,41 +478,55 @@ export default function VehicleExpensesScreen() {
         ) : null}
 
         <Section title="Фильтры">
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Поиск по расходам"
-            placeholderTextColor={c.textMuted}
-            style={styles.input}
-          />
-          <ChipRow>
-            {(["ALL", "BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"] as const).map((status) => (
-              <FilterChip
-                key={status}
-                active={installStatusFilter === status}
-                label={status === "ALL" ? "Все" : expenseInstallStatusLabelsRu[status]}
-                onPress={() => setInstallStatusFilter(status)}
-              />
-            ))}
-          </ChipRow>
-          <ChipRow>
-            <FilterChip active={categoryFilter === "ALL"} label="Все категории" onPress={() => setCategoryFilter("ALL")} />
-            {categoryOptions.map((category) => (
-              <FilterChip key={category} active={categoryFilter === category} label={expenseCategoryLabelsRu[category]} onPress={() => setCategoryFilter(category)} />
-            ))}
-          </ChipRow>
-          <ChipRow>
-            <FilterChip active={!currencyFilter} label="Все валюты" onPress={() => setCurrencyFilter("")} />
-            {currencyOptions.map((currency) => (
-              <FilterChip key={currency} active={currencyFilter === currency} label={currency} onPress={() => setCurrencyFilter(currency)} />
-            ))}
-          </ChipRow>
-          <ChipRow>
-            <FilterChip active={!monthFilter} label="Все месяцы" onPress={() => setMonthFilter("")} />
-            {monthOptions.slice(0, 12).map((month) => (
-              <FilterChip key={month.key} active={monthFilter === month.key} label={month.label} onPress={() => setMonthFilter(month.key)} />
-            ))}
-          </ChipRow>
+          <View onLayout={(event) => setFiltersSectionY(event.nativeEvent.layout.y)} style={styles.filtersSectionContent}>
+            {isMobileLayout ? (
+              <Pressable
+                onPress={() => setIsMobileFiltersCollapsed((prev) => !prev)}
+                style={({ pressed }) => [styles.filtersCollapseButton, pressed && styles.filtersCollapseButtonPressed]}
+              >
+                <Text style={styles.filtersCollapseButtonText}>{isMobileFiltersCollapsed ? "Показать фильтры" : "Скрыть фильтры"}</Text>
+              </Pressable>
+            ) : null}
+            {!isMobileLayout || !isMobileFiltersCollapsed ? (
+              <View style={styles.filtersExpandedContent}>
+                <ChipRow>
+                  {(["ALL", "BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"] as const).map((status) => (
+                    <FilterChip
+                      key={status}
+                      active={installStatusFilter === status}
+                      label={status === "ALL" ? "Все" : expenseInstallStatusLabelsRu[status]}
+                      onPress={() => setInstallStatusFilter(status)}
+                    />
+                  ))}
+                </ChipRow>
+                <ChipRow>
+                  <FilterChip active={categoryFilter === "ALL"} label="Все категории" onPress={() => setCategoryFilter("ALL")} />
+                  {categoryOptions.map((category) => (
+                    <FilterChip key={category} active={categoryFilter === category} label={expenseCategoryLabelsRu[category]} onPress={() => setCategoryFilter(category)} />
+                  ))}
+                </ChipRow>
+                <ChipRow>
+                  <FilterChip active={!currencyFilter} label="Все валюты" onPress={() => setCurrencyFilter("")} />
+                  {currencyOptions.map((currency) => (
+                    <FilterChip key={currency} active={currencyFilter === currency} label={currency} onPress={() => setCurrencyFilter(currency)} />
+                  ))}
+                </ChipRow>
+                {!isMobileLayout ? (
+                  <ChipRow>
+                    <FilterChip active={monthFilters.length === 0} label="Все месяцы" onPress={() => setMonthFilters([])} />
+                    {monthOptions.slice(0, 12).map((month) => (
+                      <FilterChip
+                        key={month.key}
+                        active={monthFilters.includes(month.key)}
+                        label={month.label}
+                        onPress={() => toggleMonthFilter(month.key)}
+                      />
+                    ))}
+                  </ChipRow>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
         </Section>
 
         {isLoading ? (
@@ -521,8 +585,20 @@ export default function VehicleExpensesScreen() {
               <Insight label="Валюты" value={currencyOptions.length > 0 ? `${currencyOptions.join(", ")} отдельно` : "—"} />
             </Section>
 
-            <Section title="Все расходы">
+            <Section
+              title="Все расходы"
+              actionLabel={isMobileLayout ? "Фильтры" : undefined}
+              onAction={isMobileLayout ? openFiltersSection : undefined}
+              compactAction={isMobileLayout}
+            >
               <View style={styles.rowsList}>
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Поиск по расходам"
+                  placeholderTextColor={c.textMuted}
+                  style={styles.input}
+                />
                 {scopedExpenses.length === 0 ? (
                   <View style={styles.emptyInline}>
                     <Text style={styles.stateText}>По выбранным фильтрам расходов нет.</Text>
@@ -568,7 +644,7 @@ export default function VehicleExpensesScreen() {
         onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
         onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
         onOpenExpenses={() => undefined}
-        onOpenProfile={() => router.push(`/vehicles/${vehicleId}/profile`)}
+        onOpenProfile={() => router.push("/profile")}
         hasVehicleContext
       />
     </SafeAreaView>
@@ -584,14 +660,21 @@ function Section(props: {
   children: ReactNode;
   actionLabel?: string;
   onAction?: () => void;
+  compactAction?: boolean;
 }) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{props.title}</Text>
         {props.onAction && props.actionLabel ? (
-          <Pressable onPress={props.onAction} hitSlop={8} style={styles.sectionAction}>
-            <Text style={styles.sectionActionText}>{props.actionLabel}</Text>
+          <Pressable
+            onPress={props.onAction}
+            hitSlop={8}
+            style={[styles.sectionAction, props.compactAction && styles.sectionActionCompact]}
+          >
+            <Text style={[styles.sectionActionText, props.compactAction && styles.sectionActionCompactText]}>
+              {props.actionLabel}
+            </Text>
           </Pressable>
         ) : null}
       </View>
@@ -793,6 +876,30 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+  filtersCollapseButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filtersCollapseButtonPressed: {
+    opacity: 0.85,
+  },
+  filtersCollapseButtonText: {
+    color: c.textSecondary,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  filtersSectionContent: {
+    gap: 10,
+  },
+  filtersExpandedContent: {
+    gap: 10,
+  },
   chip: {
     borderRadius: 999,
     borderWidth: 1,
@@ -847,6 +954,22 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "800",
     lineHeight: 28,
+  },
+  sectionActionCompact: {
+    minWidth: 0,
+    minHeight: 0,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  sectionActionCompactText: {
+    color: c.textSecondary,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "800",
   },
   sectionBody: {
     marginTop: 12,

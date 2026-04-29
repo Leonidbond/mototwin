@@ -33,6 +33,7 @@ import type {
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
 import { ScreenHeader } from "../../components/screen-header";
+import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 
 const USAGE_TYPES = RIDE_USAGE_TYPE_OPTIONS as Array<{ value: RideUsageType; label: string }>;
 const RIDING_STYLES = RIDE_RIDING_STYLE_OPTIONS as Array<{ value: RideStyle; label: string }>;
@@ -236,6 +237,15 @@ export default function EditVehicleProfileScreen() {
           </Pressable>
         </View>
       </KeyboardAwareScrollScreen>
+      <GarageBottomNav
+        activeKey="profile"
+        onOpenGarage={() => router.push("/")}
+        onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
+        onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
+        onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
+        onOpenProfile={() => undefined}
+        hasVehicleContext
+      />
     </SafeAreaView>
   );
 }

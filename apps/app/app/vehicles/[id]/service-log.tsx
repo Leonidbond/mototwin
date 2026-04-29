@@ -34,6 +34,7 @@ import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
 import { ScreenHeader } from "../../components/screen-header";
 import { ActionIconButton } from "../../components/action-icon-button";
+import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import { buildVehicleWishlistItemHighlightHref } from "./wishlist/hrefs";
 
 function readSearchParam(value: string | string[] | undefined): string | undefined {
@@ -995,6 +996,15 @@ export default function ServiceLogScreen() {
           />
         ))}
       </KeyboardAwareScrollScreen>
+      <GarageBottomNav
+        activeKey="journal"
+        onOpenGarage={() => router.push("/")}
+        onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
+        onOpenJournal={() => undefined}
+        onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
+        onOpenProfile={() => router.push("/profile")}
+        hasVehicleContext
+      />
 
     </SafeAreaView>
   );

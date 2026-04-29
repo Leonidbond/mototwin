@@ -20,6 +20,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildAttentionSummaryFromNodeTree,
+  getCurrentExpenseMonthKey,
+  getExpenseMonthKeyFromIso,
   buildExpenseSummaryFromServiceEvents,
   buildNodeTreeSectionProps,
   buildNodeContextViewModel,
@@ -48,6 +50,7 @@ import {
 } from "@mototwin/domain";
 import type {
   AttentionItemViewModel,
+  ExpenseItem,
   ExpenseNodeSummaryItem,
   ExpenseSummaryViewModel,
   NodeSnoozeOption,
@@ -671,6 +674,12 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const viewParam = params.view;
   const queryView = Array.isArray(viewParam) ? viewParam[0] : viewParam;
   const shouldRedirectLegacyNodesView = !forcedView && queryView === "nodes";
+  const resolvedView = forcedView ?? queryView;
+  const isNodeTreePage = resolvedView === "nodes";
+  const isLandscape = width > height;
+  const isWideLayout = width >= 720 || isLandscape;
+  const isTabletLayout = width >= 900;
+  const contentMaxWidth = isTabletLayout ? 1080 : 760;
   const nodeContextIdParam =
     typeof params.nodeContextId === "string" ? params.nodeContextId : "";
   const targetNodeIdParam = typeof params.nodeId === "string" ? params.nodeId : "";
@@ -720,6 +729,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [statusExplanationNode, setStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
   const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
+  const [yearExpenses, setYearExpenses] = useState<ExpenseItem[]>([]);
   const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
   const [isMovingToTrash, setIsMovingToTrash] = useState(false);
 
@@ -740,6 +750,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     setNodeTreeError("");
     setTopServiceNodesError("");
     setServiceEvents([]);
+    setYearExpenses([]);
 
     try {
       const detailData = await endpoints.getVehicleDetail(vehicleId);
@@ -751,6 +762,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       setNodeTree([]);
       setTopServiceNodes([]);
       setServiceEvents([]);
+      setYearExpenses([]);
       setIsLoading(false);
       return;
     }
@@ -761,11 +773,12 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     setIsTopServiceNodesLoading(true);
     setIsNodeExpenseSummaryLoading(true);
     setNodeExpenseSummaryError("");
-    const [nodesResult, eventsResult, topNodesResult, expenseNodeSummaryResult] = await Promise.allSettled([
+    const [nodesResult, eventsResult, topNodesResult, expenseNodeSummaryResult, yearExpensesResult] = await Promise.allSettled([
       endpoints.getNodeTree(vehicleId),
       endpoints.getServiceEvents(vehicleId),
       endpoints.getTopServiceNodes(),
       endpoints.getExpenseNodeSummary({ vehicleId, year: nodeExpenseYear }),
+      endpoints.getExpenses({ vehicleId, year: new Date().getFullYear() }),
     ]);
 
     if (nodesResult.status === "fulfilled") {
@@ -782,6 +795,13 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     } else {
       console.error(eventsResult.reason);
       setServiceEvents([]);
+    }
+
+    if (yearExpensesResult.status === "fulfilled") {
+      setYearExpenses(yearExpensesResult.value.expenses ?? []);
+    } else {
+      console.error(yearExpensesResult.reason);
+      setYearExpenses([]);
     }
 
     if (topNodesResult.status === "fulfilled") {
@@ -1449,6 +1469,31 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       },
     ]);
   }, [apiBaseUrl, isMovingToTrash, router, vehicleId]);
+  const expenseSummaryMonthTotals = useMemo(() => {
+    const currentMonthKey = getCurrentExpenseMonthKey();
+    const byCurrency = new Map<string, { total: number; count: number }>();
+    for (const expense of yearExpenses) {
+      if (getExpenseMonthKeyFromIso(expense.expenseDate) !== currentMonthKey) continue;
+      const currency = expense.currency.trim();
+      const prev = byCurrency.get(currency) ?? { total: 0, count: 0 };
+      byCurrency.set(currency, { total: prev.total + expense.amount, count: prev.count + 1 });
+    }
+    return Array.from(byCurrency.entries())
+      .map(([currency, row]) => ({
+        currency,
+        totalAmount: row.total,
+        paidEventCount: row.count,
+      }))
+      .sort((a, b) => a.currency.localeCompare(b.currency, "en"));
+  }, [yearExpenses]);
+  const expenseSummary = useMemo(
+    () => buildExpenseSummaryFromServiceEvents(serviceEvents),
+    [serviceEvents]
+  );
+  const expenseSummaryForCard = useMemo(
+    () => ({ ...expenseSummary, currentMonthTotalsByCurrency: expenseSummaryMonthTotals }),
+    [expenseSummary, expenseSummaryMonthTotals]
+  );
 
   if (isLoading) {
     return (
@@ -1485,13 +1530,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     );
   }
 
-  const resolvedView = forcedView ?? queryView;
-  const isNodeTreePage = resolvedView === "nodes";
-  const isLandscape = width > height;
-  const isWideLayout = width >= 720 || isLandscape;
-  const isTabletLayout = width >= 900;
-  const contentMaxWidth = isTabletLayout ? 1080 : 760;
-
   const detailViewModel = buildVehicleDetailViewModel(vehicle);
   const stateViewModel = buildVehicleStateViewModel({
     odometer: vehicle.odometer,
@@ -1505,7 +1543,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     soonCount: attentionSummary.soonCount,
   });
   const okCount = Math.max(0, 10 - attentionSummary.totalCount);
-  const expenseSummary = buildExpenseSummaryFromServiceEvents(serviceEvents);
   const recentEvents = getRecentDashboardEvents(serviceEvents);
   const silhouetteSource = getVehicleSilhouetteSource(vehicle);
 
@@ -1576,7 +1613,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
               <Text style={styles.sectionSubheader}>
                 Детальная структура узлов, поиск, контекст, действия обслуживания и план ТО.
               </Text>
-              <>
+              <View style={styles.nodeTreeControls}>
                 <Text style={styles.searchLabel}>Поиск по узлам</Text>
                 <TextInput
                   style={styles.searchInput}
@@ -1815,7 +1852,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                     <Text style={styles.emptyNodesText}>Данные о состоянии узлов отсутствуют</Text>
                   </View>
                 ) : null}
-              </>
+              </View>
             </View>
           </>
         ) : (
@@ -1970,7 +2007,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
           </DashboardSection>
 
           <ExpenseDashboardCard
-            summary={expenseSummary}
+            summary={expenseSummaryForCard}
             onPress={() => router.push(`/vehicles/${vehicleId}/expenses`)}
           />
 
@@ -1994,7 +2031,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         }}
         onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
         onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
-        onOpenProfile={() => router.push(`/vehicles/${vehicleId}/profile`)}
+        onOpenProfile={() => router.push("/profile")}
         hasVehicleContext
       />
       <Modal
@@ -3937,6 +3974,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+  nodeTreeControls: {
+    marginTop: 6,
+    gap: 10,
+  },
   maintenanceModeToggle: {
     alignSelf: "flex-start",
     borderRadius: 10,
@@ -3980,7 +4021,7 @@ const styles = StyleSheet.create({
   },
   sectionSubheader: {
     marginTop: 4,
-    marginBottom: 8,
+    marginBottom: 10,
     fontSize: 13,
     lineHeight: 18,
     color: c.textMuted,
@@ -4041,19 +4082,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    marginBottom: 6,
+    marginBottom: 0,
   },
   searchHint: {
-    marginBottom: 8,
+    marginBottom: 0,
     fontSize: 12,
     color: c.textMuted,
   },
   statusFilterRow: {
     gap: 8,
-    paddingBottom: 10,
+    paddingBottom: 2,
   },
   expenseYearRow: {
-    marginTop: 10,
+    marginTop: 0,
     gap: 8,
   },
   expenseYearChips: {

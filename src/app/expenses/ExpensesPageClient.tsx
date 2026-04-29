@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
@@ -159,6 +159,7 @@ export function ExpensesPageClient(props: {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const filtersPanelRef = useRef<HTMLDivElement | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({
     vehicleId: effectiveVehicleId,
@@ -353,7 +354,20 @@ export function ExpensesPageClient(props: {
     .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime());
   const topNode = nodeRows[0] ?? null;
   const latestExpense = [...filteredExpenses].sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime())[0] ?? null;
-  const hasFilters = Object.values(filters).some(Boolean);
+  const hasFilters = useMemo(() => {
+    const hasVehicleFilter = Boolean(filters.vehicleId && filters.vehicleId !== effectiveVehicleId);
+    return Boolean(
+      hasVehicleFilter ||
+      filters.category ||
+      filters.installStatus ||
+      filters.installationStatus ||
+      filters.currency ||
+      filters.nodeId ||
+      filters.monthKey ||
+      filters.source ||
+      filters.search.trim()
+    );
+  }, [effectiveVehicleId, filters]);
 
   async function load(year = selectedYear) {
     try {
@@ -500,6 +514,13 @@ export function ExpensesPageClient(props: {
     void markExpenseInstalled(expense.id);
   }
 
+  function openFiltersFromTable() {
+    setShowFilters(true);
+    requestAnimationFrame(() => {
+      filtersPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   return (
     <main style={pageShellStyle}>
       <div
@@ -591,56 +612,64 @@ export function ExpensesPageClient(props: {
             </Panel>
           ) : null}
 
-          {showFilters ? (
-            <Panel title="Фильтры">
-              <div style={filtersGridStyle}>
-                <Field label="Поиск">
-                  <input value={filters.search} onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))} placeholder="Название, узел, SKU" style={fieldStyle} />
-                </Field>
-                <Field label="Категория">
-                  <select value={filters.category} onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))} style={fieldStyle}>
-                    <option value="">Все</option>
-                    {categoryOptions.map((category) => <option key={category} value={category}>{expenseCategoryLabelsRu[category]}</option>)}
-                  </select>
-                </Field>
-                <Field label="Статус">
-                  <select value={filters.installStatus} onChange={(e) => setFilters((prev) => ({ ...prev, installStatus: e.target.value }))} style={fieldStyle}>
-                    <option value="">Все</option>
-                    {installStatusOptions.map((status) => <option key={status} value={status}>{expenseInstallStatusLabelsRu[status]}</option>)}
-                  </select>
-                </Field>
-                <Field label="Установка">
-                  <select value={filters.installationStatus} onChange={(e) => setFilters((prev) => ({ ...prev, installationStatus: e.target.value }))} style={fieldStyle}>
-                    <option value="">Все</option>
-                    <option value="NOT_INSTALLED">Куплено, не установлено</option>
-                    <option value="INSTALLED">Установлено</option>
-                    <option value="NOT_APPLICABLE">Не требует установки</option>
-                  </select>
-                </Field>
-                <Field label="Узел">
-                  <select value={filters.nodeId} onChange={(e) => setFilters((prev) => ({ ...prev, nodeId: e.target.value }))} style={fieldStyle}>
-                    <option value="">Все</option>
-                    {nodeOptions.map(([nodeId, nodeName]) => <option key={nodeId} value={nodeId}>{nodeName}</option>)}
-                  </select>
-                </Field>
-                <Field label="Валюта">
-                  <select value={filters.currency} onChange={(e) => setFilters((prev) => ({ ...prev, currency: e.target.value }))} style={fieldStyle}>
-                    <option value="">Все</option>
-                    {currencyOptions.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
-                  </select>
-                </Field>
-                <Field label="Источник">
-                  <select value={filters.source} onChange={(e) => setFilters((prev) => ({ ...prev, source: e.target.value }))} style={fieldStyle}>
-                    <option value="">Все</option>
-                    <option value="service">ServiceEvent</option>
-                    <option value="wishlist">Список покупок</option>
-                    <option value="manual">Ручной расход</option>
-                  </select>
-                </Field>
-              </div>
-              <button type="button" onClick={resetFilters} style={ghostButtonStyle}>Сбросить фильтры</button>
+          <div ref={filtersPanelRef}>
+            <Panel
+              title="Фильтры"
+              action={
+                <div style={filtersPanelHeaderRowStyle}>
+                  {!showFilters ? (
+                    <span style={filtersHeaderCompactTextStyle}>
+                      {hasFilters ? "Есть активные фильтры" : "Фильтры свернуты"}
+                    </span>
+                  ) : null}
+                  {hasFilters && !showFilters ? (
+                    <button type="button" onClick={resetFilters} style={filtersHeaderCompactButtonStyle}>
+                      Сбросить
+                    </button>
+                  ) : null}
+                  <button type="button" onClick={() => setShowFilters((prev) => !prev)} style={filtersHeaderCompactButtonStyle}>
+                    {showFilters ? "Свернуть" : "Развернуть"}
+                  </button>
+                </div>
+              }
+            >
+              {showFilters ? (
+                <>
+                  <div style={filtersInlineRowStyle}>
+                    <select aria-label="Категория расходов" value={filters.category} onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))} style={{ ...fieldStyle, ...compactFilterControlStyle }}>
+                      <option value="">Категория: все</option>
+                      {categoryOptions.map((category) => <option key={category} value={category}>{expenseCategoryLabelsRu[category]}</option>)}
+                    </select>
+                    <select aria-label="Статус расходов" value={filters.installStatus} onChange={(e) => setFilters((prev) => ({ ...prev, installStatus: e.target.value }))} style={{ ...fieldStyle, ...compactFilterControlStyle }}>
+                      <option value="">Статус: все</option>
+                      {installStatusOptions.map((status) => <option key={status} value={status}>{expenseInstallStatusLabelsRu[status]}</option>)}
+                    </select>
+                    <select aria-label="Статус установки" value={filters.installationStatus} onChange={(e) => setFilters((prev) => ({ ...prev, installationStatus: e.target.value }))} style={{ ...fieldStyle, ...compactFilterControlStyle }}>
+                      <option value="">Установка: все</option>
+                      <option value="NOT_INSTALLED">Куплено, не установлено</option>
+                      <option value="INSTALLED">Установлено</option>
+                      <option value="NOT_APPLICABLE">Не требует установки</option>
+                    </select>
+                    <select aria-label="Фильтр по узлу" value={filters.nodeId} onChange={(e) => setFilters((prev) => ({ ...prev, nodeId: e.target.value }))} style={{ ...fieldStyle, ...compactFilterControlStyle }}>
+                      <option value="">Узел: все</option>
+                      {nodeOptions.map(([nodeId, nodeName]) => <option key={nodeId} value={nodeId}>{nodeName}</option>)}
+                    </select>
+                    <select aria-label="Фильтр по валюте" value={filters.currency} onChange={(e) => setFilters((prev) => ({ ...prev, currency: e.target.value }))} style={{ ...fieldStyle, ...compactFilterControlStyle }}>
+                      <option value="">Валюта: все</option>
+                      {currencyOptions.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
+                    </select>
+                    <select aria-label="Фильтр по источнику" value={filters.source} onChange={(e) => setFilters((prev) => ({ ...prev, source: e.target.value }))} style={{ ...fieldStyle, ...compactFilterControlStyle }}>
+                      <option value="">Источник: все</option>
+                      <option value="service">ServiceEvent</option>
+                      <option value="wishlist">Список покупок</option>
+                      <option value="manual">Ручной расход</option>
+                    </select>
+                    <button type="button" onClick={resetFilters} style={{ ...ghostButtonStyle, marginTop: 0, whiteSpace: "nowrap" }}>Сбросить</button>
+                  </div>
+                </>
+              ) : null}
             </Panel>
-          ) : null}
+          </div>
 
           {isLoading ? (
             <StateCard>Загружаю расходы...</StateCard>
@@ -713,7 +742,7 @@ export function ExpensesPageClient(props: {
                 action={
                   <div style={tableActionsStyle}>
                     <input value={filters.search} onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))} placeholder="Поиск" style={searchInputStyle} />
-                    <button type="button" onClick={() => setShowFilters((prev) => !prev)} style={tableButtonStyle}>Фильтры</button>
+                    <button type="button" onClick={openFiltersFromTable} style={tableButtonStyle}>Фильтры</button>
                   </div>
                 }
               >
@@ -757,7 +786,7 @@ function Panel(props: { title: string; children: ReactNode; action?: ReactNode }
         <h2 style={panelTitleStyle}>{props.title}</h2>
         {props.action}
       </div>
-      <div style={{ marginTop: 12 }}>{props.children}</div>
+      {props.children != null ? <div style={{ marginTop: 12 }}>{props.children}</div> : null}
     </section>
   );
 }
@@ -1485,6 +1514,63 @@ const filtersGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
   gap: 10,
+};
+
+const filtersInlineRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "nowrap",
+  alignItems: "center",
+  gap: 8,
+  overflowX: "auto",
+  paddingBottom: 2,
+};
+
+const compactFilterControlStyle: CSSProperties = {
+  minWidth: 150,
+  padding: "8px 10px",
+  fontSize: 12,
+};
+
+const filtersCollapsedHintStyle: CSSProperties = {
+  margin: 0,
+  color: c.textSecondary,
+  fontSize: 13,
+  lineHeight: 1.2,
+  whiteSpace: "nowrap",
+};
+
+const filtersCollapsedRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  minHeight: 28,
+};
+
+const filtersPanelHeaderRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const filtersHeaderCompactTextStyle: CSSProperties = {
+  color: c.textSecondary,
+  fontSize: 12,
+  lineHeight: 1.2,
+  whiteSpace: "nowrap",
+};
+
+const filtersHeaderCompactButtonStyle: CSSProperties = {
+  border: `1px solid ${c.borderStrong}`,
+  backgroundColor: c.cardSubtle,
+  color: c.textSecondary,
+  borderRadius: 8,
+  padding: "4px 8px",
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1.1,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const formGridStyle: CSSProperties = {
