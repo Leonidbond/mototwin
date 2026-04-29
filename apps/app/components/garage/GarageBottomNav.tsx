@@ -1,7 +1,9 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
+import { writeLastViewedVehicleId } from "../../src/ui-last-viewed-vehicle";
 
 type BottomNavKey = "garage" | "nodes" | "journal" | "expenses" | "profile";
 
@@ -22,8 +24,12 @@ export function GarageBottomNav(props: {
   onOpenExpenses: () => void;
   onOpenProfile: () => void;
   hasVehicleContext: boolean;
+  currentVehicleId?: string | null;
 }) {
   const insets = useSafeAreaInsets();
+  useEffect(() => {
+    writeLastViewedVehicleId(props.currentVehicleId);
+  }, [props.currentVehicleId]);
   const items: NavItem[] = [
     {
       key: "garage",

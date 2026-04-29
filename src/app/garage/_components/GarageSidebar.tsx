@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui";
 import { productSemanticColors } from "@mototwin/design-tokens";
 
@@ -18,17 +19,22 @@ type NavItem = {
   href: string;
   label: string;
   icon: NavIconKind;
-  active?: boolean;
+  isActive: boolean;
 };
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/garage", label: "Мой гараж", icon: "home", active: true },
-  { href: "/vehicles", label: "Узлы", icon: "nodes" },
-  { href: "/service-log", label: "Журнал", icon: "journal" },
-  { href: "/expenses", label: "Расходы", icon: "expenses" },
-  { href: "/details", label: "Детали", icon: "details" },
-  { href: "/profile", label: "Профиль", icon: "profile" },
-];
+const LAST_VIEWED_VEHICLE_ID_STORAGE_KEY = "mototwin.lastViewedVehicleId";
+
+function getVehicleIdFromPathname(pathname: string): string | null {
+  const matched = /^\/vehicles\/([^/]+)/.exec(pathname);
+  if (!matched?.[1]) {
+    return null;
+  }
+  try {
+    return decodeURIComponent(matched[1]);
+  } catch {
+    return matched[1];
+  }
+}
 
 export function GarageSidebar({
   collapsed,
@@ -37,6 +43,77 @@ export function GarageSidebar({
   collapsed: boolean;
   onToggle: () => void;
 }) {
+  const pathname = usePathname();
+  const pathVehicleId = useMemo(() => getVehicleIdFromPathname(pathname), [pathname]);
+  const [lastViewedVehicleId, setLastViewedVehicleId] = useState<string | null>(pathVehicleId);
+
+  useEffect(() => {
+    if (pathVehicleId) {
+      setLastViewedVehicleId(pathVehicleId);
+      try {
+        localStorage.setItem(LAST_VIEWED_VEHICLE_ID_STORAGE_KEY, pathVehicleId);
+      } catch {
+        // Ignore local storage write failures.
+      }
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(LAST_VIEWED_VEHICLE_ID_STORAGE_KEY);
+      if (stored) {
+        setLastViewedVehicleId(stored);
+      }
+    } catch {
+      // Ignore local storage read failures.
+    }
+  }, [pathVehicleId]);
+
+  const resolvedVehicleId = pathVehicleId ?? lastViewedVehicleId;
+  const vehicleBaseHref = resolvedVehicleId ? `/vehicles/${encodeURIComponent(resolvedVehicleId)}` : null;
+
+  const navItems: NavItem[] = useMemo(
+    () => [
+      {
+        href: "/garage",
+        label: "Мой гараж",
+        icon: "home",
+        isActive: pathname === "/garage",
+      },
+      {
+        href: vehicleBaseHref ? `${vehicleBaseHref}/nodes` : "/vehicles",
+        label: "Узлы",
+        icon: "nodes",
+        isActive: Boolean(vehicleBaseHref) && pathname.startsWith(`${vehicleBaseHref}/nodes`),
+      },
+      {
+        href: vehicleBaseHref ? `${vehicleBaseHref}/service-log` : "/service-log",
+        label: "Журнал",
+        icon: "journal",
+        isActive: Boolean(vehicleBaseHref) && pathname.startsWith(`${vehicleBaseHref}/service-log`),
+      },
+      {
+        href: vehicleBaseHref ? `${vehicleBaseHref}/expenses` : "/expenses",
+        label: "Расходы",
+        icon: "expenses",
+        isActive:
+          pathname === "/expenses" ||
+          (Boolean(vehicleBaseHref) && pathname.startsWith(`${vehicleBaseHref}/expenses`)),
+      },
+      {
+        href: vehicleBaseHref ? `${vehicleBaseHref}/parts` : "/details",
+        label: "Детали",
+        icon: "details",
+        isActive: Boolean(vehicleBaseHref) && pathname.startsWith(`${vehicleBaseHref}/parts`),
+      },
+      {
+        href: "/profile",
+        label: "Профиль",
+        icon: "profile",
+        isActive: pathname === "/profile",
+      },
+    ],
+    [pathname, vehicleBaseHref]
+  );
+
   return (
     <aside style={{ ...asideStyle, padding: collapsed ? "14px 7px" : "18px 14px" }}>
       <div>
@@ -78,7 +155,7 @@ export function GarageSidebar({
           </button>
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink key={item.label} item={item} collapsed={collapsed} />
           ))}
         </nav>
@@ -144,7 +221,7 @@ export function GarageSidebar({
 }
 
 function NavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
-  const isActive = !!item.active;
+  const isActive = item.isActive;
   const color = isActive ? productSemanticColors.textPrimary : productSemanticColors.textMuted;
   const accent = isActive ? productSemanticColors.primaryAction : color;
   return (

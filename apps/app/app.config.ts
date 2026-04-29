@@ -45,7 +45,8 @@ function getLanIPv4ForDevMachine(): string {
     const score = ifaceScore(name);
     if (score == null) continue;
     for (const net of nets[name] ?? []) {
-      const v4 = net.family === "IPv4" || net.family === 4;
+      const family = net.family as string | number;
+      const v4 = family === "IPv4" || family === 4;
       if (!v4 || net.internal) continue;
       const addr = net.address;
       if (addr.startsWith("127.")) continue;
@@ -65,15 +66,16 @@ function shouldEmbedDevApiBaseUrl(): boolean {
 }
 
 export default ({ config }: ConfigContext): ExpoConfig => {
+  const baseConfig = config as ExpoConfig;
   const host = getLanIPv4ForDevMachine();
   const devApiBaseUrl = shouldEmbedDevApiBaseUrl()
     ? `http://${host}:3000`.replace(/\/$/, "")
     : undefined;
 
   return {
-    ...config,
+    ...baseConfig,
     extra: {
-      ...config.extra,
+      ...baseConfig.extra,
       ...(devApiBaseUrl ? { devApiBaseUrl } : {}),
     },
   };

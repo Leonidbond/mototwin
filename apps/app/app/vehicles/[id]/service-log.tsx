@@ -1004,6 +1004,7 @@ export default function ServiceLogScreen() {
         onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
         onOpenProfile={() => router.push("/profile")}
         hasVehicleContext
+        currentVehicleId={vehicleId}
       />
 
     </SafeAreaView>

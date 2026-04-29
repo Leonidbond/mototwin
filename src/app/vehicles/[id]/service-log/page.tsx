@@ -20,6 +20,7 @@ import {
   validateAddServiceEventFormValues,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
+import { BackButton } from "@/components/navigation/BackButton";
 import type {
   AddServiceEventFormValues,
   ExpenseItem,
@@ -541,18 +542,7 @@ export default function VehicleServiceLogPage() {
       style={{ backgroundColor: productSemanticColors.canvas, color: productSemanticColors.textPrimary }}
     >
       <div className="mx-auto max-w-6xl space-y-4">
-        <button
-          type="button"
-          onClick={navigateBackWithFallback}
-          className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-          style={{
-            backgroundColor: productSemanticColors.card,
-            borderColor: productSemanticColors.borderStrong,
-            color: productSemanticColors.textPrimary,
-          }}
-        >
-          Назад к мотоциклу
-        </button>
+        <BackButton onClick={navigateBackWithFallback} />
         <header
           className="rounded-2xl border border-gray-200 bg-white px-5 py-4"
           style={{

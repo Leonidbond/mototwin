@@ -37,6 +37,7 @@ export function ScreenHeader(props: {
           style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
         >
           <MaterialIcons name="chevron-left" size={22} color={c.textPrimary} />
+          <Text style={styles.backButtonLabel}>Назад</Text>
         </Pressable>
         <Text numberOfLines={1} style={styles.title}>
           {title ?? ""}
@@ -61,14 +62,25 @@ const styles = StyleSheet.create({
     backgroundColor: c.canvas,
   },
   backButton: {
-    width: 32,
-    height: 32,
+    minHeight: 36,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: "row",
+    gap: 2,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: c.card,
   },
   backButtonPressed: {
     backgroundColor: c.cardMuted,
+  },
+  backButtonLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: c.textPrimary,
   },
   title: {
     flex: 1,

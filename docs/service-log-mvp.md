@@ -27,7 +27,14 @@ Supported route/query params:
 - `paidOnly=1` — pre-enables paid-only filter
 - `nodeId=<nodeId>` or `nodeIds=<id1,id2,...>` with optional `nodeLabel` — pre-applies node filter context
 - `serviceEventId=<eventId>` (alias: `highlightServiceEventId`) — scrolls the timeline to a concrete service event and highlights its row
+- `expandExpenses=1` — enables expense-focused mode on clients that support this handoff
+- `feedback=created|updated` — lifecycle return notice after add/edit flow
 - optional lifecycle handoff params for add/edit flow may be used by client UI
+
+Platform notes:
+
+- Web reads both `nodeId` and `nodeIds`; Expo currently uses `nodeIds` for subtree context.
+- Web performs add/edit inline in Service Log modal; Expo opens dedicated `service-events/new` screen for create/edit/repeat.
 
 ## Expenses integration
 
@@ -70,6 +77,11 @@ API contract:
 - UI feedback after success: `Сервисное событие обновлено` (+ `Статусы и расходы обновлены`)
 - UI feedback after save error: `Не удалось сохранить сервисное событие`
 
+Implementation note:
+
+- Web edits inside Service Log page.
+- Expo edit is routed to `/vehicles/[id]/service-events/new?source=service-log&eventId=...`.
+
 ## Deleting SERVICE events
 
 `SERVICE` events are deletable on both clients.
@@ -90,6 +102,14 @@ After creating `SERVICE` event, clients show:
 - `Сервисное событие добавлено`
 - optional detail: `Статусы и расходы обновлены`
 - on web, the notice includes **`В журнал`**; clicking it opens `/vehicles/[id]/service-log`
+- on Expo, create/update handoff uses `feedback=created|updated` query state on return to Service Log
+
+## Repeat SERVICE events
+
+Both clients support repeat flow for `SERVICE` rows.
+
+- Web: repeat action opens Service Log add form prefilled from selected event.
+- Expo: repeat action opens `/vehicles/[id]/service-events/new?source=service-log&repeatFrom=<eventId>`.
 
 ## Wishlist origin links
 

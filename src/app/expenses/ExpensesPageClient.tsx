@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { BackButton } from "@/components/navigation/BackButton";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildExpenseAnalyticsFromItems,
@@ -536,9 +537,7 @@ export function ExpensesPageClient(props: {
         <section style={contentStyle}>
           <header style={headerStyle}>
             <div>
-              <button type="button" onClick={navigateBack} style={backButtonStyle}>
-                ← Назад
-              </button>
+              <BackButton onClick={navigateBack} />
               <h1 style={titleStyle}>{props.title}</h1>
               <p style={subtitleStyle}>{props.subtitle}</p>
               {nodeIdFromQuery ? (
@@ -1068,16 +1067,6 @@ const subtitleStyle: CSSProperties = {
   margin: "6px 0 0",
   color: c.textSecondary,
   fontSize: 13,
-};
-
-const backButtonStyle: CSSProperties = {
-  border: 0,
-  background: "transparent",
-  color: c.textMuted,
-  padding: 0,
-  fontSize: 13,
-  fontWeight: 700,
-  cursor: "pointer",
 };
 
 const scopePillStyle: CSSProperties = {

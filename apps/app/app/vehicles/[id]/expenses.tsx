@@ -646,6 +646,7 @@ export default function VehicleExpensesScreen() {
         onOpenExpenses={() => undefined}
         onOpenProfile={() => router.push("/profile")}
         hasVehicleContext
+        currentVehicleId={vehicleId}
       />
     </SafeAreaView>
   );

@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -14,6 +14,7 @@ import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
+import { readLastViewedVehicleId } from "../src/ui-last-viewed-vehicle";
 import { AppScreenHelpBar } from "./components/app-screen-help-bar";
 import { GarageBottomNav } from "../components/garage/GarageBottomNav";
 import { GarageEmptyState } from "../components/garage/GarageEmptyState";
@@ -27,6 +28,7 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [trashCount, setTrashCount] = useState(0);
+  const [lastViewedVehicleId, setLastViewedVehicleId] = useState<string | null>(null);
 
   const apiBaseUrl = getApiBaseUrl();
 
@@ -65,6 +67,10 @@ export default function HomeScreen() {
     }, [loadGarage])
   );
 
+  useEffect(() => {
+    setLastViewedVehicleId(readLastViewedVehicleId());
+  }, [vehicles.length]);
+
   const dashboardSummary = buildGarageDashboardSummary(vehicles);
   const openTrash = useCallback(() => router.push("/trash"), [router]);
   const openProfile = useCallback(() => router.push("/profile"), [router]);
@@ -80,19 +86,20 @@ export default function HomeScreen() {
     [router]
   );
   const primaryVehicleId = vehicles[0]?.id ?? null;
+  const navVehicleId = primaryVehicleId ?? lastViewedVehicleId;
   const openGarage = useCallback(() => router.push("/"), [router]);
   const openNodes = useCallback(() => {
-    if (!primaryVehicleId) return;
-    router.push(`/vehicles/${primaryVehicleId}`);
-  }, [primaryVehicleId, router]);
+    if (!navVehicleId) return;
+    router.push(`/vehicles/${navVehicleId}`);
+  }, [navVehicleId, router]);
   const openJournal = useCallback(() => {
-    if (!primaryVehicleId) return;
-    router.push(`/vehicles/${primaryVehicleId}/service-log`);
-  }, [primaryVehicleId, router]);
+    if (!navVehicleId) return;
+    router.push(`/vehicles/${navVehicleId}/service-log`);
+  }, [navVehicleId, router]);
   const openExpenses = useCallback(() => {
-    if (!primaryVehicleId) return;
-    router.push(`/vehicles/${primaryVehicleId}/expenses`);
-  }, [primaryVehicleId, router]);
+    if (!navVehicleId) return;
+    router.push(`/vehicles/${navVehicleId}/expenses`);
+  }, [navVehicleId, router]);
 
   if (isLoading) {
     return (
@@ -164,7 +171,7 @@ export default function HomeScreen() {
           onOpenJournal={openJournal}
           onOpenExpenses={openExpenses}
           onOpenProfile={openProfile}
-          hasVehicleContext={!!primaryVehicleId}
+          hasVehicleContext={!!navVehicleId}
         />
       </View>
     </SafeAreaView>

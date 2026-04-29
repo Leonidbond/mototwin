@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
@@ -14,11 +14,13 @@ import {
   USER_LOCAL_SETTINGS_STORAGE_KEY,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
+import { BackButton } from "@/components/navigation/BackButton";
 import {
   DEFAULT_DEV_USER_EMAIL,
   DEV_USER_STORAGE_KEY,
   type UserLocalSettings
 } from "@mototwin/types";
+import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 
 type ProfileViewModel = {
   displayName: string;
@@ -28,6 +30,7 @@ type ProfileViewModel = {
 };
 
 const profileApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+const SIDEBAR_COLLAPSED_KEY = "profile.sidebar.collapsed";
 
 function buildProfileViewModel(selectedDevUserEmail: string, fromApi?: ProfileViewModel): ProfileViewModel {
   if (fromApi) {
@@ -44,6 +47,7 @@ function buildProfileViewModel(selectedDevUserEmail: string, fromApi?: ProfileVi
 
 export default function ProfilePage() {
   const router = useRouter();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userSettings, setUserSettings] = useState<UserLocalSettings>(() => ({
     ...DEFAULT_USER_LOCAL_SETTINGS,
   }));
@@ -128,6 +132,28 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
+        setSidebarCollapsed(true);
+      }
+    } catch {
+      // Ignore localStorage read failures.
+    }
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        // Ignore localStorage write failures.
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
     if (!devLoginEnabled) return;
     try {
       const raw = localStorage.getItem(DEV_USER_STORAGE_KEY);
@@ -179,20 +205,24 @@ export default function ProfilePage() {
 
   return (
     <main
-      className="mt-internal-page min-h-screen px-6 py-16 text-gray-950"
+      className="mt-internal-page min-h-screen text-gray-950"
       style={{ backgroundColor: productSemanticColors.canvas }}
     >
+      <div
+        style={{
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: `${sidebarCollapsed ? 64 : 220}px minmax(0, 1fr)`,
+          alignItems: "start",
+          transition: "grid-template-columns 0.18s ease",
+        }}
+      >
+        <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <section className="px-6 py-16">
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-semibold tracking-tight">Профиль</h1>
-          <button
-            type="button"
-            onClick={navigateBackWithFallback}
-            className="rounded-xl border px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-white"
-            style={{ borderColor: productSemanticColors.borderStrong }}
-          >
-            Назад в гараж
-          </button>
+          <BackButton onClick={navigateBackWithFallback} />
         </div>
 
         <section
@@ -354,6 +384,8 @@ export default function ProfilePage() {
             <div className="mt-2 text-xs text-gray-500">Current: {selectedDevUserEmail}</div>
           </section>
         ) : null}
+      </div>
+      </section>
       </div>
     </main>
   );

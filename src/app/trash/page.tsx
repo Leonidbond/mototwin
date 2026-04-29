@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildTrashedVehicleViewModel } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
+import { BackButton } from "@/components/navigation/BackButton";
 
 const trashApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
@@ -87,14 +88,7 @@ export default function TrashPage() {
               Здесь хранятся удаленные мотоциклы перед окончательным удалением
             </p>
           </div>
-          <button
-            type="button"
-            onClick={navigateBackWithFallback}
-            className="rounded-xl border px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-white"
-            style={{ borderColor: productSemanticColors.borderStrong }}
-          >
-            Вернуться в гараж
-          </button>
+          <BackButton onClick={navigateBackWithFallback} />
         </div>
 
         {isLoading ? <p className="text-sm text-gray-600">Загрузка Свалки...</p> : null}

@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   type GestureResponderEvent,
+  findNodeHandle,
   Image,
   type ImageSourcePropType,
   Modal,
@@ -26,7 +27,6 @@ import {
   buildNodeTreeSectionProps,
   buildNodeContextViewModel,
   buildNodeSearchResultActions,
-  buildNodeSubtreeModalViewModel,
   buildTopNodeOverviewCards,
   buildNodeMaintenancePlanViewModel,
   buildRideProfileViewModel,
@@ -59,7 +59,6 @@ import type {
   NodeTreeItem,
   NodeTreeItemProps,
   NodeTreeItemViewModel,
-  NodeSubtreeModalViewModel,
   NodeTreeSearchResultViewModel,
   NodeTreeSearchActionKey,
   PartRecommendationViewModel,
@@ -263,6 +262,7 @@ type NodeRowProps = {
   expenseYear: number;
   onOpenExpensesForNode?: (nodeId: string) => void;
   isMaintenanceModeEnabled: boolean;
+  selectedNodeId?: string | null;
   highlightedNodeId?: string | null;
   statusHighlightedNodeIds?: Set<string>;
   highlightedScrollViewRef?: RefObject<ScrollView | null>;
@@ -284,6 +284,7 @@ function NodeRow({
   expenseYear,
   onOpenExpensesForNode,
   isMaintenanceModeEnabled,
+  selectedNodeId,
   highlightedNodeId,
   statusHighlightedNodeIds,
   highlightedScrollViewRef,
@@ -364,15 +365,17 @@ function NodeRow({
     const timeout = setTimeout(() => {
       const scrollViewHandle = highlightedScrollViewRef.current;
       const rowHandle = rowRef.current;
-      if (!scrollViewHandle || !rowHandle) {
+      const scrollViewNode = scrollViewHandle ? findNodeHandle(scrollViewHandle) : null;
+      if (!scrollViewNode || !rowHandle) {
         return;
       }
+      const targetScrollView = scrollViewHandle;
       rowHandle.measureLayout(
-        scrollViewHandle,
+        scrollViewNode,
         (_x, y, _width, nodeHeight) => {
           const viewportHeight = highlightedScrollViewportHeight ?? 0;
           const centeredY = viewportHeight > 0 ? y - viewportHeight / 2 + nodeHeight / 2 : y;
-          scrollViewHandle.scrollTo({ y: Math.max(0, centeredY), animated: true });
+          targetScrollView?.scrollTo({ y: Math.max(0, centeredY), animated: true });
         },
         () => {}
       );
@@ -384,33 +387,53 @@ function NodeRow({
     <View style={styles.nodeContainer}>
       <Pressable
         ref={rowRef}
-        onPress={() => hasChildren && treeItemContract.onToggleExpand()}
+        onPress={() => {
+          if (onOpenContext) {
+            onOpenContext(rowNode.id);
+            return;
+          }
+          if (hasChildren) {
+            treeItemContract.onToggleExpand();
+          }
+        }}
         style={({ pressed }) => [
           styles.nodeRow,
           { paddingLeft: indent },
           isTopLevel && styles.nodeRowTopLevel,
           depth > 0 && styles.nodeRowNested,
-          highlightedNodeId === rowNode.id && styles.nodeRowHighlighted,
+          (highlightedNodeId === rowNode.id || selectedNodeId === rowNode.id) && styles.nodeRowHighlighted,
           statusHighlightTokens && {
             borderColor: statusHighlightTokens.border,
             borderWidth: 1,
           },
           accentColor !== "transparent" && { borderLeftColor: accentColor, borderLeftWidth: 3 },
-          pressed && hasChildren && styles.nodeRowPressed,
+          pressed && styles.nodeRowPressed,
         ]}
       >
         <View style={styles.nodeRowLeft}>
-          <View style={styles.chevronWrap}>
+          <Pressable
+            style={styles.chevronWrap}
+            onPress={(event) => {
+              event.stopPropagation();
+              if (hasChildren) {
+                treeItemContract.onToggleExpand();
+              }
+            }}
+            hitSlop={6}
+            accessibilityRole={hasChildren ? "button" : undefined}
+            accessibilityLabel={hasChildren ? (isExpanded ? "Свернуть ветку" : "Развернуть ветку") : undefined}
+          >
             {hasChildren ? (
               <Text style={styles.chevron}>{isExpanded ? "▾" : "▸"}</Text>
             ) : (
               <View style={styles.chevronPlaceholder} />
             )}
-          </View>
+          </Pressable>
           <View style={styles.nodeNameBlock}>
             <Text style={[styles.nodeName, depth === 0 && styles.nodeNameTop]}>
               {rowNode.name}
             </Text>
+            <Text style={styles.nodeCodeText}>{rowNode.code}</Text>
             {reasonShort &&
             canOpenMaintenanceExplanation ? (
               <Pressable
@@ -551,29 +574,7 @@ function NodeRow({
         )}
 
         <View style={styles.nodeRowActions}>
-          {onAddToWishlist ? (
-            <ActionIconButton
-              onPress={() => onAddToWishlist(rowNode.id)}
-              accessibilityLabel={`Добавить узел ${rowNode.name} в список покупок`}
-              variant="subtle"
-              icon={<MaterialIcons name="playlist-add" size={17} color={c.textSecondary} />}
-            />
-          ) : null}
-          {onOpenContext ? (
-            <ActionIconButton
-              onPress={() => onOpenContext(rowNode.id)}
-              accessibilityLabel={`Открыть контекст узла ${rowNode.name}`}
-              variant="subtle"
-              icon={<MaterialIcons name="open-in-new" size={15} color={c.textSecondary} />}
-            />
-          ) : null}
-          {rowNode.canAddServiceEvent ? (
-            <ActionIconButton
-              onPress={() => treeItemContract.onRequestAddServiceEvent?.()}
-              accessibilityLabel={`Добавить сервисное событие для узла ${rowNode.name}`}
-              icon={<MaterialIcons name="event-available" size={16} color={c.textSecondary} />}
-            />
-          ) : null}
+          <MaterialIcons name="chevron-right" size={17} color={c.textMuted} />
         </View>
       </Pressable>
 
@@ -637,6 +638,7 @@ function NodeRow({
               onOpenExpensesForNode={onOpenExpensesForNode}
               isMaintenanceModeEnabled={isMaintenanceModeEnabled}
               highlightedNodeId={highlightedNodeId}
+              selectedNodeId={selectedNodeId}
               statusHighlightedNodeIds={statusHighlightedNodeIds}
               highlightedScrollViewRef={highlightedScrollViewRef}
               highlightedScrollViewportHeight={highlightedScrollViewportHeight}
@@ -708,7 +710,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [topServiceNodesError, setTopServiceNodesError] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
-  const [selectedTopLevelNodeId, setSelectedTopLevelNodeId] = useState<string | null>(null);
   const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
   const [nodeSearchQuery, setNodeSearchQuery] = useState("");
   const [debouncedNodeSearchQuery, setDebouncedNodeSearchQuery] = useState("");
@@ -856,27 +857,9 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   }, [nodeSearchQuery]);
 
   useEffect(() => {
-    if (!selectedNodeStatusFilter) {
-      return;
-    }
-    const expandedNodeIds = collectExpandedNodeIdsWithStatusDescendants(
-      topLevelNodeViewModels,
-      selectedNodeStatusFilter
-    );
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      expandedNodeIds.forEach((nodeId) => {
-        next.add(nodeId);
-      });
-      return next;
-    });
-  }, [topLevelNodeViewModels, selectedNodeStatusFilter]);
-
-  useEffect(() => {
     if (!nodeContextIdParam) {
       return;
     }
-    setSelectedTopLevelNodeId(null);
     setHighlightedNodeId(nodeContextIdParam);
     setSelectedNodeContextId(nodeContextIdParam);
   }, [nodeContextIdParam]);
@@ -944,6 +927,22 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     [nodeTreeViewModel]
   );
   const selectedNodeStatusFilter = nodeStatusFilter === "ALL" ? null : nodeStatusFilter;
+  useEffect(() => {
+    if (!selectedNodeStatusFilter) {
+      return;
+    }
+    const expandedNodeIds = collectExpandedNodeIdsWithStatusDescendants(
+      topLevelNodeViewModels,
+      selectedNodeStatusFilter
+    );
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      expandedNodeIds.forEach((nodeId) => {
+        next.add(nodeId);
+      });
+      return next;
+    });
+  }, [topLevelNodeViewModels, selectedNodeStatusFilter]);
   const nodeStatusCounts = useMemo(
     () => countNodeStatuses(topLevelNodeViewModels),
     [topLevelNodeViewModels]
@@ -951,22 +950,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const filteredTopLevelNodeViewModels = useMemo(
     () => filterNodeViewModelsByStatus(topLevelNodeViewModels, selectedNodeStatusFilter),
     [topLevelNodeViewModels, selectedNodeStatusFilter]
-  );
-  const selectedTopLevelNode = useMemo(
-    () =>
-      selectedTopLevelNodeId
-        ? getNodeSubtreeById(filteredTopLevelNodeViewModels, selectedTopLevelNodeId)
-        : null,
-    [filteredTopLevelNodeViewModels, selectedTopLevelNodeId]
-  );
-  const selectedNodeSubtreeModalViewModel = useMemo<NodeSubtreeModalViewModel | null>(
-    () =>
-      selectedTopLevelNode
-        ? buildNodeSubtreeModalViewModel(selectedTopLevelNode, {
-            maintenanceModeEnabled: isNodeMaintenanceModeEnabled,
-          })
-        : null,
-    [selectedTopLevelNode, isNodeMaintenanceModeEnabled]
   );
   const selectedNodeContextNode = useMemo(
     () =>
@@ -1085,7 +1068,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
   const openServiceLogForTreeNode = useCallback(
     (vm: NodeTreeItemViewModel) => {
-      setSelectedTopLevelNodeId(null);
       setHighlightedNodeId(null);
       const raw = findNodeTreeItemById(nodeTree, vm.id);
       if (!raw) {
@@ -1099,7 +1081,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
   const openWishlistForTreeNode = useCallback(
     (nodeId: string) => {
-      setSelectedTopLevelNodeId(null);
       setHighlightedNodeId(null);
       router.push(buildVehicleWishlistNewHref(vehicleId, nodeId));
     },
@@ -1107,7 +1088,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   );
   const openExpensesForTreeNode = useCallback(
     (nodeId: string) => {
-      setSelectedTopLevelNodeId(null);
       setHighlightedNodeId(null);
       router.push(`/vehicles/${vehicleId}/expenses?nodeId=${encodeURIComponent(nodeId)}&year=${nodeExpenseYear}`);
     },
@@ -1115,24 +1095,23 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   );
   const openAddServiceFromTreeNode = useCallback(
     (leafNodeId: string) => {
-      setSelectedTopLevelNodeId(null);
       setHighlightedNodeId(null);
       router.push(`/vehicles/${vehicleId}/service-events/new?source=tree&nodeId=${leafNodeId}`);
     },
     [router, vehicleId]
   );
   const openStatusExplanationFromTreeNode = useCallback((node: NodeTreeItemViewModel) => {
-    setSelectedTopLevelNodeId(null);
     setHighlightedNodeId(null);
     setStatusExplanationNode(null);
     requestAnimationFrame(() => {
       setStatusExplanationNode(node);
     });
   }, []);
-  const openSearchResultInSubtreeModal = useCallback((result: NodeTreeSearchResultViewModel) => {
+  const openSearchResultInNodeContext = useCallback((result: NodeTreeSearchResultViewModel) => {
     setNodeSearchQuery("");
     setDebouncedNodeSearchQuery("");
     setHighlightedNodeId(result.nodeId);
+    setSelectedNodeContextId(result.nodeId);
     setExpandedIds((prev) => {
       const next = new Set(prev);
       for (const ancestorId of result.ancestorIds) {
@@ -1140,7 +1119,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       }
       return next;
     });
-    setSelectedTopLevelNodeId(result.topLevelNodeId);
   }, []);
   const focusNodeInTree = useCallback(
     (nodeId: string) => {
@@ -1152,6 +1130,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       setDebouncedNodeSearchQuery("");
       setNodeStatusFilter("ALL");
       setHighlightedNodeId(nodeId);
+      setSelectedNodeContextId(nodeId);
       setExpandedIds((prev) => {
         const next = new Set(prev);
         for (const ancestorId of path.slice(0, -1)) {
@@ -1159,7 +1138,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         }
         return next;
       });
-      setSelectedTopLevelNodeId(path[0] ?? null);
     },
     [topLevelNodeViewModels]
   );
@@ -1168,7 +1146,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       const idToNode = flattenNodeViewModelsById(topLevelNodeViewModels);
       const nextHighlightedIds = new Set<string>();
       let focusNodeId: string | null = null;
-      let focusTopLevelNodeId: string | null = null;
       setExpandedIds((prev) => {
         const next = new Set(prev);
         for (const nodeId of nodeIds) {
@@ -1184,7 +1161,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
             if (pathNode && isIssueNodeStatus(pathNode.effectiveStatus)) {
               nextHighlightedIds.add(pathNode.id);
               focusNodeId ??= pathNode.id;
-              focusTopLevelNodeId ??= path[0] ?? null;
             }
           }
         }
@@ -1194,8 +1170,8 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       setDebouncedNodeSearchQuery("");
       setStatusHighlightedNodeIds(nextHighlightedIds);
       setHighlightedNodeId(focusNodeId);
+      setSelectedNodeContextId(focusNodeId);
       setNodeStatusFilter("ALL");
-      setSelectedTopLevelNodeId(focusTopLevelNodeId);
     },
     [topLevelNodeViewModels]
   );
@@ -1253,7 +1229,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     setNodeContextAddingKitCode("");
   }, []);
   const openNodeContextModal = useCallback((nodeId: string) => {
-    setSelectedTopLevelNodeId(null);
     setHighlightedNodeId(null);
     setSelectedNodeContextId(nodeId);
   }, []);
@@ -1417,10 +1392,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     },
     [vehicleId]
   );
-  const getNodeModeToggleLabel = () =>
-    isNodeMaintenanceModeEnabled ? "План обслуживания: вкл" : "Показывать план обслуживания";
-  const getNodeModeToggleShortLabel = () =>
-    isNodeMaintenanceModeEnabled ? "План ТО: вкл" : "План ТО";
   const selectedNodeSnoozeUntil = selectedNodeContextId
     ? (nodeSnoozeByNodeId[selectedNodeContextId] ?? null)
     : null;
@@ -1568,7 +1539,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         {isNodeTreePage ? (
           <>
             <ScreenHeader
-              title="Состояние узлов"
+              title="Дерево узлов"
               onBack={() => {
                 if (router.canGoBack()) {
                   router.back();
@@ -1578,52 +1549,15 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
               }}
             />
             <View style={styles.fullTreeSection}>
-              <View style={styles.nodeTreePageActionsRow}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.maintenanceModeToggle,
-                    isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleActive,
-                    pressed && styles.maintenanceModeTogglePressed,
-                  ]}
-                  onPress={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
-                  accessibilityRole="button"
-                  accessibilityLabel={getNodeModeToggleLabel()}
-                >
-                  <Text
-                    style={[
-                      styles.maintenanceModeToggleText,
-                      isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleTextActive,
-                    ]}
-                  >
-                    {getNodeModeToggleShortLabel()}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sectionJournalButton,
-                    pressed && styles.sectionJournalButtonPressed,
-                  ]}
-                  onPress={() => router.push(`/vehicles/${vehicleId}/service-log`)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Журнал обслуживания"
-                >
-                  <Text style={styles.sectionJournalButtonText}>Журнал</Text>
-                </Pressable>
-              </View>
-              <Text style={styles.sectionSubheader}>
-                Детальная структура узлов, поиск, контекст, действия обслуживания и план ТО.
-              </Text>
               <View style={styles.nodeTreeControls}>
-                <Text style={styles.searchLabel}>Поиск по узлам</Text>
                 <TextInput
                   style={styles.searchInput}
                   value={nodeSearchQuery}
                   onChangeText={setNodeSearchQuery}
-                  placeholder="Поиск по узлам"
+                  placeholder="Поиск узла..."
                   placeholderTextColor={c.textSecondary}
                   returnKeyType="search"
                 />
-                <Text style={styles.searchLabel}>Фильтр по статусу</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -1718,12 +1652,11 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                         const resultNode = getNodeSubtreeById(topLevelNodeViewModels, result.nodeId);
                         const canOpenResultExplanation =
                           Boolean(result.shortExplanationLabel) &&
-                          Boolean(resultNode) &&
-                          canOpenNodeStatusExplanationModal(resultNode);
+                          (resultNode ? canOpenNodeStatusExplanationModal(resultNode) : false);
                         return (
                         <View key={result.nodeId} style={styles.searchResultCard}>
                           <Pressable
-                            onPress={() => openSearchResultInSubtreeModal(result)}
+                            onPress={() => openSearchResultInNodeContext(result)}
                             style={({ pressed }) => [
                               styles.searchResultRow,
                               pressed && styles.searchResultRowPressed,
@@ -1840,6 +1773,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                           expenseYear={nodeExpenseYear}
                           onOpenExpensesForNode={openExpensesForTreeNode}
                           isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
+                          selectedNodeId={selectedNodeContextId}
                           highlightedNodeId={highlightedNodeId}
                           statusHighlightedNodeIds={statusHighlightedNodeIds}
                         />
@@ -2033,6 +1967,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
         onOpenProfile={() => router.push("/profile")}
         hasVehicleContext
+        currentVehicleId={vehicleId}
       />
       <Modal
         visible={Boolean(selectedNodeContextViewModel)}
@@ -2040,10 +1975,12 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         transparent
         onRequestClose={closeNodeContextModal}
       >
-        <View style={styles.subtreeModalOverlay}>
-          <View style={styles.subtreeModalCard}>
+        <View style={styles.nodeContextSheetOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeNodeContextModal} />
+          <View style={styles.nodeContextSheetCard}>
             {selectedNodeContextViewModel ? (
               <>
+                <View style={styles.nodeContextSheetHandle} />
                 <View style={styles.subtreeModalHeader}>
                   <View style={styles.subtreeModalHeaderTextCol}>
                     <Text style={styles.subtreeModalTitle}>{selectedNodeContextViewModel.nodeName}</Text>
@@ -2071,15 +2008,37 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                       <Text style={styles.snoozeLabelText}>{selectedNodeSnoozeLabel}</Text>
                     ) : null}
                   </View>
-                  <Pressable
-                    onPress={closeNodeContextModal}
-                    style={({ pressed }) => [
-                      styles.subtreeModalCloseBtn,
-                      pressed && styles.subtreeModalCloseBtnPressed,
-                    ]}
-                  >
-                    <Text style={styles.subtreeModalCloseBtnText}>Закрыть</Text>
-                  </Pressable>
+                  <View style={styles.subtreeModalHeaderActions}>
+                    {selectedNodeContextViewModel.effectiveStatus ? (
+                      <View
+                        style={[
+                          styles.badge,
+                          {
+                            backgroundColor: getStatusColors(selectedNodeContextViewModel.effectiveStatus).bg,
+                            borderColor: getStatusColors(selectedNodeContextViewModel.effectiveStatus).border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.badgeText,
+                            { color: getStatusColors(selectedNodeContextViewModel.effectiveStatus).text },
+                          ]}
+                        >
+                          {selectedNodeContextViewModel.statusLabel}
+                        </Text>
+                      </View>
+                    ) : null}
+                    <Pressable
+                      onPress={closeNodeContextModal}
+                      style={({ pressed }) => [
+                        styles.subtreeModalCloseBtn,
+                        pressed && styles.subtreeModalCloseBtnPressed,
+                      ]}
+                    >
+                      <Text style={styles.subtreeModalCloseBtnText}>Закрыть</Text>
+                    </Pressable>
+                  </View>
                 </View>
                 <ScrollView
                   ref={subtreeScrollViewRef}
@@ -2311,155 +2270,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                       </View>
                     ))}
                   </View>
-                </ScrollView>
-              </>
-            ) : null}
-          </View>
-        </View>
-      </Modal>
-      <Modal
-        visible={Boolean(selectedNodeSubtreeModalViewModel)}
-        animationType="slide"
-        transparent
-        onRequestClose={() => {
-          setSelectedTopLevelNodeId(null);
-          setHighlightedNodeId(null);
-        }}
-      >
-        <View style={styles.subtreeModalOverlay}>
-          <View style={styles.subtreeModalCard}>
-            {selectedNodeSubtreeModalViewModel ? (
-              <>
-                <View style={styles.subtreeModalHeader}>
-                  <View
-                    style={[
-                      styles.subtreeModalHeaderTextCol,
-                      highlightedNodeId === selectedNodeSubtreeModalViewModel.rootNodeId &&
-                        styles.subtreeModalHeaderTextColHighlighted,
-                    ]}
-                  >
-                    <Text style={styles.subtreeModalTitle}>
-                      {selectedNodeSubtreeModalViewModel.rootNodeName}
-                    </Text>
-                    {selectedNodeSubtreeModalViewModel.shortExplanationLabel ? (
-                      selectedTopLevelNode && canOpenNodeStatusExplanationModal(selectedTopLevelNode) ? (
-                        <Pressable
-                          onPress={() => openStatusExplanationFromTreeNode(selectedTopLevelNode)}
-                          hitSlop={6}
-                          accessibilityRole="button"
-                          accessibilityLabel="Пояснение расчёта статуса"
-                        >
-                          <Text style={[styles.subtreeModalSubtitle, styles.searchResultLink]}>
-                            {selectedNodeSubtreeModalViewModel.shortExplanationLabel}
-                          </Text>
-                        </Pressable>
-                      ) : (
-                        <Text style={styles.subtreeModalSubtitle}>
-                          {selectedNodeSubtreeModalViewModel.shortExplanationLabel}
-                        </Text>
-                      )
-                    ) : null}
-                    {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine ? (
-                      selectedTopLevelNode && canOpenNodeStatusExplanationModal(selectedTopLevelNode) ? (
-                        <Pressable
-                          onPress={() => openStatusExplanationFromTreeNode(selectedTopLevelNode)}
-                          hitSlop={6}
-                          accessibilityRole="button"
-                          accessibilityLabel="Пояснение расчёта статуса"
-                        >
-                          <Text style={[styles.planSummaryText, styles.searchResultLink]}>
-                            {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine}
-                          </Text>
-                        </Pressable>
-                      ) : (
-                        <Text style={styles.planSummaryText}>
-                          {selectedNodeSubtreeModalViewModel.maintenanceSummaryLine}
-                        </Text>
-                      )
-                    ) : null}
-                  </View>
-                  <View style={styles.subtreeModalHeaderActions}>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.maintenanceModeToggle,
-                        isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleActive,
-                        pressed && styles.maintenanceModeTogglePressed,
-                      ]}
-                      onPress={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
-                    >
-                      <Text
-                        style={[
-                          styles.maintenanceModeToggleText,
-                          isNodeMaintenanceModeEnabled && styles.maintenanceModeToggleTextActive,
-                        ]}
-                      >
-                        {getNodeModeToggleLabel()}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => {
-                        setSelectedTopLevelNodeId(null);
-                        setHighlightedNodeId(null);
-                      }}
-                      style={({ pressed }) => [
-                        styles.subtreeModalCloseBtn,
-                        pressed && styles.subtreeModalCloseBtnPressed,
-                      ]}
-                    >
-                      <Text style={styles.subtreeModalCloseBtnText}>Закрыть</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                <ScrollView contentContainerStyle={styles.subtreeModalBody} keyboardShouldPersistTaps="handled">
-                  {selectedNodeSubtreeModalViewModel.isLeafRoot ? (
-                    selectedTopLevelNode ? (
-                      <NodeRow
-                        node={selectedTopLevelNode}
-                        depth={0}
-                        expandedIds={expandedIds}
-                        onToggle={toggleNode}
-                        onAddFromLeaf={openAddServiceFromTreeNode}
-                        onAddToWishlist={openWishlistForTreeNode}
-                        onOpenContext={openNodeContextModal}
-                        onOpenStatusExplanation={openStatusExplanationFromTreeNode}
-                        onOpenServiceLogForNode={openServiceLogForTreeNode}
-                        expenseSummary={nodeExpenseSummaryByNodeId[selectedTopLevelNode.id] ?? null}
-                        expenseSummaryByNodeId={nodeExpenseSummaryByNodeId}
-                        expenseYear={nodeExpenseYear}
-                        onOpenExpensesForNode={openExpensesForTreeNode}
-                        isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
-                        highlightedNodeId={highlightedNodeId}
-                        statusHighlightedNodeIds={statusHighlightedNodeIds}
-                        highlightedScrollViewRef={subtreeScrollViewRef}
-                        highlightedScrollViewportHeight={height * 0.72}
-                      />
-                    ) : null
-                  ) : (
-                    selectedNodeSubtreeModalViewModel.childNodes.map((child) => (
-                      <NodeRow
-                        key={child.id}
-                        node={child}
-                        depth={0}
-                        expandedIds={expandedIds}
-                        onToggle={toggleNode}
-                        onAddFromLeaf={openAddServiceFromTreeNode}
-                        onAddToWishlist={openWishlistForTreeNode}
-                        onOpenContext={openNodeContextModal}
-                        onOpenStatusExplanation={openStatusExplanationFromTreeNode}
-                        onOpenServiceLogForNode={openServiceLogForTreeNode}
-                        expenseSummary={nodeExpenseSummaryByNodeId[child.id] ?? null}
-                        expenseSummaryByNodeId={nodeExpenseSummaryByNodeId}
-                        expenseYear={nodeExpenseYear}
-                        onOpenExpensesForNode={openExpensesForTreeNode}
-                        isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
-                        highlightedNodeId={highlightedNodeId}
-                        statusHighlightedNodeIds={statusHighlightedNodeIds}
-                        highlightedScrollViewRef={subtreeScrollViewRef}
-                        highlightedScrollViewportHeight={height * 0.72}
-                      />
-                    ))
-                  )}
                 </ScrollView>
               </>
             ) : null}
@@ -3967,16 +3777,16 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   nodeTreePageActionsRow: {
-    marginTop: 4,
+    marginTop: 2,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
     flexWrap: "wrap",
     gap: 8,
   },
   nodeTreeControls: {
-    marginTop: 6,
-    gap: 10,
+    marginTop: 4,
+    gap: 8,
   },
   maintenanceModeToggle: {
     alignSelf: "flex-start",
@@ -4021,7 +3831,7 @@ const styles = StyleSheet.create({
   },
   sectionSubheader: {
     marginTop: 4,
-    marginBottom: 10,
+    marginBottom: 6,
     fontSize: 13,
     lineHeight: 18,
     color: c.textMuted,
@@ -4080,8 +3890,8 @@ const styles = StyleSheet.create({
     backgroundColor: c.card,
     color: c.textPrimary,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    paddingVertical: 8,
+    fontSize: 13,
     marginBottom: 0,
   },
   searchHint: {
@@ -4107,8 +3917,8 @@ const styles = StyleSheet.create({
     borderColor: c.borderStrong,
     borderRadius: 999,
     backgroundColor: c.cardMuted,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
   },
   statusFilterChipActiveNeutral: {
     backgroundColor: c.textPrimary,
@@ -4254,14 +4064,14 @@ const styles = StyleSheet.create({
     backgroundColor: c.card,
     borderColor: c.border,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
-    marginBottom: 20,
+    marginBottom: 12,
   },
   treeDivider: {
     height: 1,
     backgroundColor: c.divider,
-    marginLeft: 14,
+    marginLeft: 10,
   },
   topLevelNodeRow: {
     flexDirection: "row",
@@ -4295,12 +4105,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 11,
-    paddingRight: 14,
-    minHeight: 52,
+    paddingVertical: 8,
+    paddingRight: 8,
+    minHeight: 44,
   },
   nodeContainer: {
-    marginBottom: 2,
+    marginBottom: 0,
   },
   nodeRowTopLevel: {
     backgroundColor: c.card,
@@ -4308,12 +4118,13 @@ const styles = StyleSheet.create({
     borderBottomColor: c.divider,
   },
   nodeRowNested: {
-    backgroundColor: c.chipBackground,
+    backgroundColor: c.cardMuted,
   },
   nodeRowHighlighted: {
     borderWidth: 1,
     borderColor: c.borderStrong,
-    backgroundColor: c.cardMuted,
+    backgroundColor: c.chipBackground,
+    borderRadius: 12,
   },
   nodeRowPressed: {
     backgroundColor: c.divider,
@@ -4322,11 +4133,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
-    marginRight: 8,
+    marginRight: 6,
   },
   chevronWrap: {
-    width: 26,
-    minHeight: 26,
+    width: 22,
+    minHeight: 22,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 0,
@@ -4344,18 +4155,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   nodeName: {
-    fontSize: 14,
+    fontSize: 13,
     color: c.textMeta,
-    lineHeight: 20,
+    lineHeight: 17,
   },
   nodeNameTop: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
     color: c.textPrimary,
   },
+  nodeCodeText: {
+    marginTop: 1,
+    fontSize: 10,
+    fontWeight: "600",
+    color: c.textMuted,
+    letterSpacing: 0.2,
+  },
   reasonShort: {
-    marginTop: 3,
-    fontSize: 12,
+    marginTop: 2,
+    fontSize: 11,
     color: c.textTertiary,
     lineHeight: 16,
   },
@@ -4457,6 +4275,13 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     justifyContent: "center",
   },
+  nodeContextSheetOverlay: {
+    flex: 1,
+    backgroundColor: c.overlayModal,
+    justifyContent: "flex-end",
+    paddingHorizontal: 10,
+    paddingBottom: 78,
+  },
   subtreeModalCard: {
     maxHeight: "86%",
     backgroundColor: c.card,
@@ -4464,6 +4289,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     overflow: "hidden",
+  },
+  nodeContextSheetCard: {
+    maxHeight: "72%",
+    backgroundColor: c.card,
+    borderColor: c.borderStrong,
+    borderWidth: 1,
+    borderRadius: 22,
+    overflow: "hidden",
+  },
+  nodeContextSheetHandle: {
+    alignSelf: "center",
+    width: 54,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: c.borderStrong,
+    marginTop: 8,
+    marginBottom: 2,
   },
   subtreeModalHeader: {
     flexDirection: "row",
