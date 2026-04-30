@@ -136,9 +136,10 @@ export default function VehicleExpensesScreen() {
   const { width } = useWindowDimensions();
   const isMobileLayout = width < 720;
   const scrollViewRef = useRef<ScrollView>(null);
-  const params = useLocalSearchParams<{ id: string; nodeId?: string; year?: string }>();
+  const params = useLocalSearchParams<{ id: string; nodeId?: string; year?: string; returnNodeId?: string }>();
   const vehicleId = String(params.id ?? "");
   const targetNodeId = typeof params.nodeId === "string" ? params.nodeId : "";
+  const returnNodeId = typeof params.returnNodeId === "string" ? params.returnNodeId : "";
   const requestedYear = typeof params.year === "string" ? Number.parseInt(params.year, 10) : NaN;
   const selectedYear = Number.isFinite(requestedYear) ? requestedYear : new Date().getFullYear();
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
@@ -379,7 +380,16 @@ export default function VehicleExpensesScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScreenHeader title="Расходы" onBack={() => router.push(`/vehicles/${vehicleId}`)} />
+      <ScreenHeader
+        title="Расходы"
+        onBack={() => {
+          if (returnNodeId) {
+            router.replace(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeId)}`);
+            return;
+          }
+          router.push(`/vehicles/${vehicleId}`);
+        }}
+      />
       <ScrollView ref={scrollViewRef} contentContainerStyle={styles.content}>
         <View style={styles.headerCard}>
           <View style={styles.headerTop}>

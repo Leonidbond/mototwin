@@ -107,7 +107,14 @@ export function buildVehicleServiceLogHref(
   vehicleId: string,
   nodeFilter: ServiceLogNodeFilter | null,
   paidOnly: boolean,
-  options?: { expandExpenses?: boolean; month?: string; serviceEventId?: string; returnNodeId?: string }
+  options?: {
+    expandExpenses?: boolean;
+    month?: string;
+    serviceEventId?: string;
+    returnNodeId?: string;
+    returnOrigin?: "node-tree" | "attention";
+    returnAttentionNodeId?: string;
+  }
 ): string {
   const q: string[] = [];
   if (nodeFilter?.nodeIds.length) {
@@ -129,6 +136,12 @@ export function buildVehicleServiceLogHref(
   }
   if (options?.returnNodeId) {
     q.push(`returnNodeId=${encodeURIComponent(options.returnNodeId)}`);
+  }
+  if (options?.returnOrigin) {
+    q.push(`returnOrigin=${encodeURIComponent(options.returnOrigin)}`);
+  }
+  if (options?.returnAttentionNodeId) {
+    q.push(`returnAttentionNodeId=${encodeURIComponent(options.returnAttentionNodeId)}`);
   }
   return `/vehicles/${vehicleId}/service-log${q.length ? `?${q.join("&")}` : ""}`;
 }
@@ -441,6 +454,8 @@ export default function ServiceLogScreen() {
     serviceEventId?: string;
     highlightServiceEventId?: string;
     returnNodeId?: string;
+    returnOrigin?: string;
+    returnAttentionNodeId?: string;
   }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
   const highlightedServiceEventId =
@@ -450,6 +465,9 @@ export default function ServiceLogScreen() {
         ? params.highlightServiceEventId
         : "";
   const returnNodeId = typeof params.returnNodeId === "string" ? params.returnNodeId : "";
+  const returnOrigin = typeof params.returnOrigin === "string" ? params.returnOrigin : "";
+  const returnAttentionNodeId =
+    typeof params.returnAttentionNodeId === "string" ? params.returnAttentionNodeId : "";
 
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -734,6 +752,14 @@ export default function ServiceLogScreen() {
       <ScreenHeader
         title="Журнал обслуживания"
         onBack={() => {
+          if (returnOrigin === "attention") {
+            const q = new URLSearchParams({ returnFocus: "attention" });
+            if (returnAttentionNodeId) {
+              q.set("attentionNodeId", returnAttentionNodeId);
+            }
+            router.replace(`/vehicles/${vehicleId}?${q.toString()}`);
+            return;
+          }
           if (returnNodeId) {
             router.replace(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeId)}`);
             return;

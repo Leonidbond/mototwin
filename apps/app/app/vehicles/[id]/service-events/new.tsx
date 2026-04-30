@@ -517,7 +517,13 @@ export default function NewServiceEventScreen() {
         }
       }
       const feedback = isEditMode ? "updated" : "created";
-      if (source === "tree" || source === "attention" || source === "search" || source === "node-context") {
+      if (source === "attention") {
+        const q = new URLSearchParams({ returnFocus: "attention" });
+        if (initialNodeId) {
+          q.set("attentionNodeId", initialNodeId);
+        }
+        router.replace(`/vehicles/${vehicleId}?${q.toString()}`);
+      } else if (source === "tree" || source === "search" || source === "node-context") {
         router.replace(`/vehicles/${vehicleId}`);
       } else if (source === "wishlist") {
         router.replace(

@@ -119,7 +119,6 @@ type VehicleDashboardProps = {
   onAddExpense: () => void;
   onOpenParts: () => void;
   onOpenPartItem: (itemId: string) => void;
-  onOpenAttention: () => void;
   onOpenAllNodes: () => void;
   onOpenNode: (nodeId: string) => void;
   onOpenNodeIssues: (nodeIds: string[]) => void;
@@ -128,7 +127,7 @@ type VehicleDashboardProps = {
   onOpenExpenseDetails: () => void;
   onOpenAttentionItemService: (item: AttentionItemViewModel) => void;
   onOpenAttentionItemLog: (item: AttentionItemViewModel) => void;
-  onOpenAttentionItemContext: (item: AttentionItemViewModel) => void;
+  onOpenAttentionItemParts: (item: AttentionItemViewModel) => void;
 };
 
 export function VehicleDashboard(props: VehicleDashboardProps) {
@@ -178,6 +177,12 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
   });
   const silhouetteClassLabel = getVehicleSilhouetteClassLabel(silhouetteKey);
   const silhouetteSrc = SILHOUETTE_SRC[silhouetteKey] ?? SILHOUETTE_SRC.naked_roadster;
+  const wishlistItemByNodeId = new Map<string, PartWishlistItemViewModel>();
+  for (const item of wishlistItems) {
+    if (item.nodeId && !wishlistItemByNodeId.has(item.nodeId)) {
+      wishlistItemByNodeId.set(item.nodeId, item);
+    }
+  }
   const heroMetaLine = [
     vehicle.modelVariant?.year ?? vehicle.year,
     vehicleStateViewModel?.odometerValue ?? `${vehicle.odometer} км`,
@@ -297,38 +302,46 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
       <section
         className={styles.midGrid}
       >
-        <Card padding="md">
-          <SectionHeader
-            title="Требует внимания"
-            trailing={
-              <Button variant="ghost" size="sm" onClick={props.onOpenAttention}>
-                Все задачи
-              </Button>
-            }
-          />
-          <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-            {attentionItems.length === 0 ? (
-              <EmptyStateBlock
-                title="Критичных замечаний нет"
-                details="Все основные узлы сейчас в нормальном состоянии."
-              />
-            ) : (
-              attentionItems.slice(0, 3).map((item) => (
-                <AttentionRow
-                  key={item.nodeId}
-                  item={item}
-                  onOpenContext={() => props.onOpenAttentionItemContext(item)}
-                  onOpenLog={() => props.onOpenAttentionItemLog(item)}
-                  onOpenService={
-                    item.canAddServiceEvent ? () => props.onOpenAttentionItemService(item) : undefined
-                  }
+        <Card
+          className={styles.midGridCard}
+          padding="md"
+          style={{
+            display: "flex",
+            minHeight: 0,
+            alignSelf: "stretch",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          <SectionHeader title="Требует внимания" />
+          <div className={styles.attentionScrollShell}>
+            <div className={styles.attentionScrollList}>
+              {attentionItems.length === 0 ? (
+                <EmptyStateBlock
+                  title="Критичных замечаний нет"
+                  details="Все основные узлы сейчас в нормальном состоянии."
                 />
-              ))
-            )}
+              ) : (
+                attentionItems.map((item) => (
+                  <AttentionRow
+                    key={item.nodeId}
+                    item={item}
+                    wishlistItem={wishlistItemByNodeId.get(item.nodeId) ?? null}
+                    onOpenNode={() => props.onOpenNode(item.nodeId)}
+                    onOpenLog={() => props.onOpenAttentionItemLog(item)}
+                    onOpenService={
+                      item.canAddServiceEvent ? () => props.onOpenAttentionItemService(item) : undefined
+                    }
+                    onOpenWishlistItem={(itemId) => props.onOpenPartItem(itemId)}
+                    onOpenParts={() => props.onOpenAttentionItemParts(item)}
+                  />
+                ))
+              )}
+            </div>
           </div>
         </Card>
 
-        <Card padding="md">
+        <Card className={styles.midGridCard} padding="md" style={{ overflow: "hidden" }}>
           <SectionHeader
             title="Состояние узлов"
             trailing={
@@ -706,9 +719,12 @@ function ReadinessCard(props: {
 
 function AttentionRow(props: {
   item: AttentionItemViewModel;
+  wishlistItem: PartWishlistItemViewModel | null;
   onOpenLog: () => void;
   onOpenService?: () => void;
-  onOpenContext: () => void;
+  onOpenNode: () => void;
+  onOpenWishlistItem: (itemId: string) => void;
+  onOpenParts: () => void;
 }) {
   const tokens = statusSemanticTokens[props.item.effectiveStatus];
   const iconAccent = tokens.accent === "transparent" ? tokens.foreground : tokens.accent;
@@ -716,21 +732,31 @@ function AttentionRow(props: {
   const iconSrc = getAttentionIconSrc(props.item.code);
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={props.onOpenNode}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          props.onOpenNode();
+        }
+      }}
       style={{
         boxSizing: "border-box",
-        height: 74,
+        minHeight: 78,
         padding: "8px 10px",
         borderRadius: 14,
         border: `1px solid ${productSemanticColors.border}`,
         backgroundColor: productSemanticColors.cardMuted,
+        cursor: "pointer",
       }}
     >
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "40px minmax(0, 1fr) auto",
-          alignItems: "center",
-          gap: 10,
+          gridTemplateColumns: "36px minmax(0, 1fr) max-content",
+          alignItems: "start",
+          gap: "6px 9px",
           height: "100%",
         }}
       >
@@ -738,8 +764,8 @@ function AttentionRow(props: {
           style={{
             position: "relative",
             display: "inline-flex",
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             alignItems: "center",
             justifyContent: "center",
             borderRadius: 13,
@@ -748,13 +774,14 @@ function AttentionRow(props: {
             boxShadow: `0 0 0 1px rgba(255,255,255,0.025), 0 0 16px ${iconGlow}`,
             flexShrink: 0,
             overflow: "hidden",
+            gridRow: "1 / 3",
           }}
         >
           <Image
             src={iconSrc}
             alt=""
             fill
-            sizes="40px"
+            sizes="36px"
             style={{
               objectFit: "contain",
               padding: 2,
@@ -763,15 +790,25 @@ function AttentionRow(props: {
           />
         </span>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-            <div style={{ color: productSemanticColors.textPrimary, fontSize: 13, fontWeight: 700 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <div
+              style={{
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                color: productSemanticColors.textPrimary,
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
               {props.item.name}
             </div>
             <StatusPill status={props.item.effectiveStatus} />
           </div>
           <MutedText
             style={{
-              marginTop: 5,
+              marginTop: 3,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -780,14 +817,42 @@ function AttentionRow(props: {
             {props.item.shortExplanation || props.item.topLevelParentName || "Требуется внимание по регламенту обслуживания."}
           </MutedText>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div
+          style={{
+            gridColumn: "3 / 4",
+            gridRow: "1 / 3",
+            display: "grid",
+            gridTemplateColumns: "repeat(2, max-content)",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            alignSelf: "start",
+            gap: 6,
+            paddingTop: 0,
+          }}
+        >
           {props.onOpenService ? (
-            <CompactActionButton variant="primary" onClick={props.onOpenService}>
+            <CompactActionButton onClick={props.onOpenService}>
               ТО
             </CompactActionButton>
           ) : null}
           <CompactActionButton onClick={props.onOpenLog}>Журнал</CompactActionButton>
-          <CompactActionButton onClick={props.onOpenContext}>Узел</CompactActionButton>
+          <CompactActionButton
+            variant={props.wishlistItem ? "cart" : "disabled"}
+            title={
+              props.wishlistItem
+                ? `В корзине: ${props.wishlistItem.title}`
+                : "Для этого узла пока нет позиции в корзине"
+            }
+            disabled={!props.wishlistItem}
+            onClick={() => {
+              if (props.wishlistItem) {
+                props.onOpenWishlistItem(props.wishlistItem.id);
+              }
+            }}
+          >
+            В корзине
+          </CompactActionButton>
+          <CompactActionButton variant="primary" onClick={props.onOpenParts}>Подбор</CompactActionButton>
         </div>
       </div>
     </div>
@@ -797,24 +862,57 @@ function AttentionRow(props: {
 function CompactActionButton(props: {
   children: ReactNode;
   onClick: () => void;
-  variant?: "primary" | "neutral";
+  variant?: "primary" | "neutral" | "cart" | "disabled";
+  title?: string;
+  disabled?: boolean;
 }) {
   const isPrimary = props.variant === "primary";
+  const isCart = props.variant === "cart";
+  const isDisabled = props.disabled || props.variant === "disabled";
   return (
     <button
       type="button"
-      onClick={props.onClick}
+      title={props.title}
+      disabled={isDisabled}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (isDisabled) {
+          return;
+        }
+        props.onClick();
+      }}
       style={{
         height: 26,
-        padding: "0 9px",
+        padding: "0 8px",
         borderRadius: 9,
-        border: `1px solid ${isPrimary ? "transparent" : productSemanticColors.border}`,
-        backgroundColor: isPrimary ? productSemanticColors.primaryAction : "rgba(255,255,255,0.03)",
-        color: isPrimary ? productSemanticColors.onPrimaryAction : productSemanticColors.textSecondary,
-        fontSize: 11,
+        border: `1px solid ${
+          isPrimary
+            ? "transparent"
+            : isCart
+              ? statusSemanticTokens.OK.border
+              : isDisabled
+                ? "rgba(255,255,255,0.018)"
+              : productSemanticColors.border
+        }`,
+        backgroundColor: isPrimary
+          ? productSemanticColors.primaryAction
+          : isCart
+            ? statusSemanticTokens.OK.background
+            : isDisabled
+              ? "rgba(2,6,23,0.08)"
+            : "rgba(255,255,255,0.03)",
+        color: isPrimary
+          ? productSemanticColors.onPrimaryAction
+          : isCart
+            ? statusSemanticTokens.OK.foreground
+            : isDisabled
+              ? "rgba(148,163,184,0.28)"
+            : productSemanticColors.textSecondary,
+        fontSize: 10,
         fontWeight: 700,
         lineHeight: 1,
-        cursor: "pointer",
+        cursor: isDisabled ? "default" : "pointer",
+        opacity: isDisabled ? 0.24 : 1,
         whiteSpace: "nowrap",
       }}
     >

@@ -86,6 +86,7 @@ import {
   consumeNodeTreeReturnState,
   writeNodeTreeReturnState,
 } from "../../../src/ui-node-tree-return-state";
+import { getNodeTreeIconAsset } from "../../../../../src/node-tree-icons";
 import { buildVehicleServiceLogHref } from "./service-log";
 import {
   buildServiceEventNewFromWishlistHref,
@@ -124,6 +125,49 @@ function getStatusColors(status: NodeStatus | null) {
 function getNodeAccentColor(status: NodeStatus | null) {
   const tokens = status ? statusSemanticTokens[status] : statusSemanticTokens.UNKNOWN;
   return tokens.accent;
+}
+
+type NodeContextExpenseSummary = {
+  year: number;
+  totalsLabel: string;
+  expenseCount: number;
+  hasExpenses: boolean;
+};
+
+function buildNodeExpenseSummaryFromItems(
+  expenses: ExpenseItem[],
+  nodeIds: Set<string>,
+  year: number
+): NodeContextExpenseSummary {
+  const totalsByCurrency = new Map<string, number>();
+  let expenseCount = 0;
+  for (const expense of expenses) {
+    if (!expense.nodeId || !nodeIds.has(expense.nodeId)) {
+      continue;
+    }
+    const expenseDate = new Date(expense.expenseDate);
+    const expenseYear = Number.isNaN(expenseDate.getTime())
+      ? Number(expense.expenseDate.slice(0, 4))
+      : expenseDate.getFullYear();
+    if (expenseYear !== year) {
+      continue;
+    }
+    expenseCount += 1;
+    const currency = expense.currency.trim();
+    totalsByCurrency.set(currency, (totalsByCurrency.get(currency) ?? 0) + expense.amount);
+  }
+  const rows = Array.from(totalsByCurrency.entries())
+    .filter(([, amount]) => amount > 0)
+    .sort(([left], [right]) => left.localeCompare(right, "en"));
+  return {
+    year,
+    totalsLabel:
+      rows.length > 0
+        ? rows.map(([currency, amount]) => `${formatExpenseAmountRu(amount)} ${currency}`).join(" · ")
+        : "0",
+    expenseCount,
+    hasExpenses: expenseCount > 0,
+  };
 }
 
 const NODE_STATUS_FILTER_OPTIONS: NodeStatus[] = [
@@ -356,6 +400,20 @@ function NodeRow({
       onOpenStatusExplanation(rowNode);
     }
   };
+  const openContext = () => {
+    onOpenContext?.(rowNode.id);
+  };
+  const handleRowPress = () => {
+    if (hasChildren) {
+      treeItemContract.onToggleExpand();
+      return;
+    }
+    openContext();
+  };
+  const handleContextButtonPress = (event?: GestureResponderEvent) => {
+    event?.stopPropagation();
+    openContext();
+  };
 
   useEffect(() => {
     if (
@@ -390,15 +448,20 @@ function NodeRow({
     <View style={styles.nodeContainer}>
       <Pressable
         ref={rowRef}
-        onPress={() => {
-          if (onOpenContext) {
-            onOpenContext(rowNode.id);
-            return;
-          }
-          if (hasChildren) {
-            treeItemContract.onToggleExpand();
-          }
-        }}
+        onPress={handleRowPress}
+        onLongPress={openContext}
+        delayLongPress={260}
+        accessibilityRole="button"
+        accessibilityLabel={
+          hasChildren
+            ? `${isExpanded ? "Свернуть" : "Развернуть"} ветку ${rowNode.name}`
+            : `Открыть узел ${rowNode.name}`
+        }
+        accessibilityHint={
+          hasChildren
+            ? "Долгое нажатие открывает подробности узла."
+            : "Откроется панель подробностей узла."
+        }
         style={({ pressed }) => [
           styles.nodeRow,
           isTopLevel && styles.nodeRowTopLevel,
@@ -481,7 +544,10 @@ function NodeRow({
         {label ? (
           onOpenServiceLogForNode ? (
             <Pressable
-              onPress={() => onOpenServiceLogForNode(rowNode)}
+              onPress={(event) => {
+                event.stopPropagation();
+                onOpenServiceLogForNode(rowNode);
+              }}
               hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel={`Журнал обслуживания по узлу ${rowNode.name}`}
@@ -515,7 +581,18 @@ function NodeRow({
         )}
 
         <View style={styles.nodeRowActions}>
-          <MaterialIcons name="chevron-right" size={17} color={c.textMuted} />
+          <Pressable
+            onPress={handleContextButtonPress}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={`Открыть подробности узла ${rowNode.name}`}
+            style={({ pressed }) => [
+              styles.nodeContextButton,
+              pressed && styles.nodeContextButtonPressed,
+            ]}
+          >
+            <MaterialIcons name="info-outline" size={18} color={c.textMeta} />
+          </Pressable>
         </View>
       </Pressable>
 
@@ -555,6 +632,7 @@ type VehicleDetailScreenProps = {
 export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
+  const dashboardScrollViewRef = useRef<ScrollView | null>(null);
   const subtreeScrollViewRef = useRef<ScrollView | null>(null);
   const appliedNodeTreeReturnStateRef = useRef(false);
   const params = useLocalSearchParams<{
@@ -562,6 +640,8 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     nodeContextId?: string;
     nodeId?: string;
     highlightIssueNodeIds?: string;
+    returnFocus?: string;
+    attentionNodeId?: string;
     view?: string | string[];
   }>();
   const vehicleId =
@@ -579,11 +659,15 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const isWideLayout = width >= 720 || isLandscape;
   const isTabletLayout = width >= 900;
   const contentMaxWidth = isTabletLayout ? 1080 : 760;
+  const currentExpenseYear = new Date().getFullYear();
   const nodeContextIdParam =
     typeof params.nodeContextId === "string" ? params.nodeContextId : "";
   const targetNodeIdParam = typeof params.nodeId === "string" ? params.nodeId : "";
   const highlightIssueNodeIdsParam =
     typeof params.highlightIssueNodeIds === "string" ? params.highlightIssueNodeIds : "";
+  const returnFocusParam = typeof params.returnFocus === "string" ? params.returnFocus : "";
+  const returnAttentionNodeIdParam =
+    typeof params.attentionNodeId === "string" ? params.attentionNodeId : "";
 
   useEffect(() => {
     if (!shouldRedirectLegacyNodesView || !vehicleId) return;
@@ -608,6 +692,10 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [isSubtreeCompositionExpanded, setIsSubtreeCompositionExpanded] = useState(false);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [statusHighlightedNodeIds, setStatusHighlightedNodeIds] = useState<Set<string>>(new Set());
+  const [selectedAttentionItem, setSelectedAttentionItem] =
+    useState<AttentionItemViewModel | null>(null);
+  const [highlightedAttentionNodeId, setHighlightedAttentionNodeId] = useState<string | null>(null);
+  const attentionBlockYRef = useRef(0);
   const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
     PartRecommendationViewModel[]
   >([]);
@@ -676,7 +764,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       endpoints.getNodeTree(vehicleId),
       endpoints.getServiceEvents(vehicleId),
       endpoints.getTopServiceNodes(),
-      endpoints.getExpenses({ vehicleId, year: new Date().getFullYear() }),
+      endpoints.getExpenses({ vehicleId, year: currentExpenseYear }),
       endpoints.getVehicleWishlist(vehicleId),
     ]);
 
@@ -721,7 +809,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
     setIsNodeTreeLoading(false);
     setIsTopServiceNodesLoading(false);
-  }, [apiBaseUrl, vehicleId]);
+  }, [apiBaseUrl, currentExpenseYear, vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -929,6 +1017,10 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         .filter((item) => item.nodeId != null && selectedNodeFilterIds.has(item.nodeId)),
     [selectedNodeFilterIds, wishlistItems]
   );
+  const selectedNodeExpenseSummary = useMemo(
+    () => buildNodeExpenseSummaryFromItems(yearExpenses, selectedNodeFilterIds, currentExpenseYear),
+    [currentExpenseYear, selectedNodeFilterIds, yearExpenses]
+  );
   const nodeSearchResults = useMemo<NodeTreeSearchResultViewModel[]>(
     () =>
       searchNodeTree(filteredTopLevelNodeViewModels, {
@@ -942,6 +1034,60 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     () => buildAttentionSummaryFromNodeTree(nodeTree),
     [nodeTree]
   );
+  const nodeViewModelById = useMemo(
+    () => flattenNodeViewModelsById(topLevelNodeViewModels),
+    [topLevelNodeViewModels]
+  );
+  const selectedAttentionNode = selectedAttentionItem
+    ? nodeViewModelById.get(selectedAttentionItem.nodeId) ?? null
+    : null;
+  const selectedAttentionWishlistItem = useMemo(() => {
+    if (!selectedAttentionItem) {
+      return null;
+    }
+    return (
+      filterActiveWishlistItems(wishlistItems)
+        .map(buildPartWishlistItemViewModel)
+        .find((item) => item.nodeId === selectedAttentionItem.nodeId) ?? null
+    );
+  }, [selectedAttentionItem, wishlistItems]);
+  useEffect(() => {
+    if (isNodeTreePage || returnFocusParam !== "attention") {
+      return;
+    }
+    const focusNodeId = returnAttentionNodeIdParam || attentionSummary.items[0]?.nodeId || null;
+    const timeoutId = setTimeout(() => {
+      dashboardScrollViewRef.current?.scrollTo({
+        y: Math.max(0, attentionBlockYRef.current - 14),
+        animated: true,
+      });
+      if (focusNodeId) {
+        setHighlightedAttentionNodeId(focusNodeId);
+      }
+      router.replace(`/vehicles/${vehicleId}`);
+    }, 120);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [
+    attentionSummary.items,
+    isNodeTreePage,
+    returnAttentionNodeIdParam,
+    returnFocusParam,
+    router,
+    vehicleId,
+  ]);
+  useEffect(() => {
+    if (!highlightedAttentionNodeId) {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      setHighlightedAttentionNodeId(null);
+    }, 1800);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [highlightedAttentionNodeId]);
   useEffect(() => {
     if (!vehicleId) {
       setNodeSnoozeByNodeId({});
@@ -1142,6 +1288,73 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     },
     [focusNodeInTree, isNodeTreePage, router, vehicleId]
   );
+  const closeAttentionActions = useCallback(() => {
+    setSelectedAttentionItem(null);
+  }, []);
+  const openAttentionActions = useCallback((item: AttentionItemViewModel) => {
+    setSelectedAttentionItem(item);
+  }, []);
+  const openFirstAttentionActions = useCallback(() => {
+    const firstItem = attentionSummary.items[0];
+    if (!firstItem) {
+      Alert.alert("Требует внимания", "Критичных замечаний нет.");
+      return;
+    }
+    setSelectedAttentionItem(firstItem);
+  }, [attentionSummary.items]);
+  const openSelectedAttentionNodeInTree = useCallback(() => {
+    if (!selectedAttentionItem) {
+      return;
+    }
+    closeAttentionActions();
+    openTopOverviewNode(selectedAttentionItem.nodeId);
+  }, [closeAttentionActions, openTopOverviewNode, selectedAttentionItem]);
+  const openSelectedAttentionServiceLog = useCallback(() => {
+    if (!selectedAttentionNode) {
+      return;
+    }
+    closeAttentionActions();
+    const raw = findNodeTreeItemById(nodeTree, selectedAttentionNode.id);
+    if (!raw) {
+      return;
+    }
+    const filter = createServiceLogNodeFilter(raw);
+    router.push(
+      buildVehicleServiceLogHref(vehicleId, filter, false, {
+        returnOrigin: "attention",
+        returnAttentionNodeId: selectedAttentionNode.id,
+      })
+    );
+  }, [closeAttentionActions, nodeTree, router, selectedAttentionNode, vehicleId]);
+  const openSelectedAttentionServiceEventForm = useCallback(() => {
+    if (!selectedAttentionNode?.canAddServiceEvent) {
+      return;
+    }
+    closeAttentionActions();
+    router.push(
+      `/vehicles/${vehicleId}/service-events/new?source=attention&nodeId=${encodeURIComponent(
+        selectedAttentionNode.id
+      )}`
+    );
+  }, [closeAttentionActions, router, selectedAttentionNode, vehicleId]);
+  const openSelectedAttentionWishlistForm = useCallback(() => {
+    if (!selectedAttentionItem) {
+      return;
+    }
+    closeAttentionActions();
+    router.push(buildVehicleWishlistNewHref(vehicleId, selectedAttentionItem.nodeId));
+  }, [closeAttentionActions, router, selectedAttentionItem, vehicleId]);
+  const openSelectedAttentionWishlistItem = useCallback(() => {
+    if (!selectedAttentionWishlistItem) {
+      return;
+    }
+    closeAttentionActions();
+    router.push(
+      buildVehicleWishlistItemHighlightHref(vehicleId, selectedAttentionWishlistItem.id, {
+        partsStatus: selectedAttentionWishlistItem.status,
+      })
+    );
+  }, [closeAttentionActions, router, selectedAttentionWishlistItem, vehicleId]);
   const openTopOverviewIssueNodes = useCallback(
     (nodeIds: string[]) => {
       if (nodeIds.length === 0) {
@@ -1212,6 +1425,15 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     setNodeContextAddingRecommendedSkuId("");
     setNodeContextAddingKitCode("");
   }, []);
+  const openSelectedNodeExpenses = useCallback(() => {
+    if (!selectedNodeContextId) {
+      return;
+    }
+    closeNodeContextModal();
+    router.push(
+      `/vehicles/${vehicleId}/expenses?nodeId=${encodeURIComponent(selectedNodeContextId)}&year=${currentExpenseYear}&returnNodeId=${encodeURIComponent(selectedNodeContextId)}`
+    );
+  }, [closeNodeContextModal, currentExpenseYear, router, selectedNodeContextId, vehicleId]);
   const openNodeContextModal = useCallback((nodeId: string) => {
     setHighlightedNodeId(null);
     setSelectedNodeContextId(nodeId);
@@ -1589,6 +1811,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         onClose={() => setStatusExplanationNode(null)}
       />
       <ScrollView
+        ref={dashboardScrollViewRef}
         contentContainerStyle={[
           styles.scrollContent,
           isLandscape && styles.scrollContentLandscape,
@@ -1915,42 +2138,19 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
               okCount={okCount}
               soonCount={attentionSummary.soonCount}
               overdueCount={attentionSummary.overdueCount}
-              onOpenAttention={() => router.push(`/vehicles/${vehicleId}/attention`)}
+              onOpenAttention={openFirstAttentionActions}
             />
           </View>
 
           <View style={[styles.mobileSideStack, isWideLayout && styles.mobileSideStackWide]}>
             <ReferenceAttentionBlock
-              items={attentionSummary.items.slice(0, 3)}
-              onOpenAll={() => router.push(`/vehicles/${vehicleId}/attention`)}
-              onOpenItem={(nodeId) => openNodeContextModal(nodeId)}
+              items={attentionSummary.items}
+              onOpenItem={openAttentionActions}
+              highlightedNodeId={highlightedAttentionNodeId}
+              onLayoutY={(y) => {
+                attentionBlockYRef.current = y;
+              }}
             />
-
-            <View style={styles.quickActionsBlock}>
-              <Text style={styles.referenceSectionTitle}>Быстрые действия</Text>
-              <View style={styles.heroQuickActionsRow}>
-                <DashboardActionButton
-                  label="Добавить ТО"
-                  iconName="build-circle"
-                  onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
-                />
-                <DashboardActionButton
-                  label="Добавить расход"
-                  iconName="account-balance-wallet"
-                  onPress={() => router.push(`/vehicles/${vehicleId}/expenses`)}
-                />
-                <DashboardActionButton
-                  label="Подобрать деталь"
-                  iconName="youtube-searched-for"
-                  onPress={() => router.push(`/vehicles/${vehicleId}/wishlist/new`)}
-                />
-                <DashboardActionButton
-                  label="Календарь ТО"
-                  iconName="event"
-                  onPress={() => router.push(`/vehicles/${vehicleId}/attention`)}
-                />
-              </View>
-            </View>
           </View>
         </View>
 
@@ -2035,6 +2235,110 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         currentVehicleId={vehicleId}
       />
       <Modal
+        visible={Boolean(selectedAttentionItem)}
+        animationType="slide"
+        transparent
+        onRequestClose={closeAttentionActions}
+      >
+        <View style={styles.nodeContextSheetOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeAttentionActions} />
+          <View style={styles.attentionActionSheetCard}>
+            {selectedAttentionItem ? (
+              <>
+                <View style={styles.nodeContextSheetHandle} />
+                <View style={styles.attentionActionHeader}>
+                  <View
+                    style={[
+                      styles.referenceAttentionIcon,
+                      {
+                        borderColor: statusSemanticTokens[selectedAttentionItem.effectiveStatus].border,
+                        backgroundColor: statusSemanticTokens[selectedAttentionItem.effectiveStatus].background,
+                      },
+                    ]}
+                  >
+                    <TopNodePngIcon source={getAttentionIconSource(selectedAttentionItem.code)} size={31} />
+                  </View>
+                  <View style={styles.attentionActionHeaderText}>
+                    <Text style={styles.subtreeModalTitle}>{selectedAttentionItem.name}</Text>
+                    <Text style={styles.subtreeModalSubtitle}>
+                      {selectedAttentionItem.shortExplanation ||
+                        selectedAttentionItem.topLevelParentName ||
+                        "Выберите быстрое действие"}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={closeAttentionActions}
+                    style={({ pressed }) => [
+                      styles.subtreeModalCloseBtn,
+                      pressed && styles.subtreeModalCloseBtnPressed,
+                    ]}
+                  >
+                    <Text style={styles.subtreeModalCloseBtnText}>Закрыть</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.attentionActionStatusRow}>
+                  <View
+                    style={[
+                      styles.referenceStatusBadge,
+                      { backgroundColor: statusSemanticTokens[selectedAttentionItem.effectiveStatus].background },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.referenceStatusBadgeText,
+                        { color: statusSemanticTokens[selectedAttentionItem.effectiveStatus].foreground },
+                      ]}
+                    >
+                      {selectedAttentionItem.statusLabelRu}
+                    </Text>
+                  </View>
+                  {selectedAttentionWishlistItem ? (
+                    <Text style={styles.attentionActionWishlistStatus}>
+                      В корзине: {partWishlistStatusLabelsRu[selectedAttentionWishlistItem.status]}
+                    </Text>
+                  ) : null}
+                </View>
+
+                <View style={styles.attentionActionGrid}>
+                  <AttentionQuickActionButton
+                    label="В дерево"
+                    iconName="account-tree"
+                    onPress={openSelectedAttentionNodeInTree}
+                  />
+                  <AttentionQuickActionButton
+                    label="ТО"
+                    iconName="build-circle"
+                    onPress={openSelectedAttentionServiceEventForm}
+                    disabled={!selectedAttentionNode?.canAddServiceEvent}
+                  />
+                  <AttentionQuickActionButton
+                    label="Журнал"
+                    iconName="history"
+                    onPress={openSelectedAttentionServiceLog}
+                    disabled={!selectedAttentionNode}
+                  />
+                  <AttentionQuickActionButton
+                    label={selectedAttentionWishlistItem ? "В корзине" : "Нет в корзине"}
+                    iconName="shopping-cart"
+                    onPress={openSelectedAttentionWishlistItem}
+                    disabled={!selectedAttentionWishlistItem}
+                    variant="cart"
+                  />
+                  <AttentionQuickActionButton
+                    label="Подбор запчасти"
+                    iconName="youtube-searched-for"
+                    onPress={openSelectedAttentionWishlistForm}
+                    variant="primary"
+                    wide
+                  />
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+      <Modal
         visible={Boolean(selectedNodeContextViewModel)}
         animationType="slide"
         transparent
@@ -2115,6 +2419,66 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                       <Text style={styles.subtreeModalCloseBtnText}>Закрыть</Text>
                     </Pressable>
                   </View>
+                </View>
+                <View style={styles.nodeContextSummaryRow}>
+                  <Pressable
+                    onPress={canOpenSelectedNodeContextExplanation ? openSelectedNodeContextExplanation : undefined}
+                    disabled={!canOpenSelectedNodeContextExplanation}
+                    accessibilityRole="button"
+                    accessibilityLabel="Пояснение состояния обслуживания"
+                    style={({ pressed }) => [
+                      styles.nodeContextServiceStateCard,
+                      selectedNodeContextViewModel.effectiveStatus
+                        ? {
+                            borderColor: getStatusColors(selectedNodeContextViewModel.effectiveStatus).border,
+                            backgroundColor: getStatusColors(selectedNodeContextViewModel.effectiveStatus).bg,
+                          }
+                        : null,
+                      pressed && canOpenSelectedNodeContextExplanation && styles.nodeContextSummaryCardPressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.nodeContextSummaryLabel,
+                        selectedNodeContextViewModel.effectiveStatus
+                          ? { color: getStatusColors(selectedNodeContextViewModel.effectiveStatus).text }
+                          : null,
+                      ]}
+                    >
+                      Состояние обслуживания
+                    </Text>
+                    <Text
+                      style={[
+                        styles.nodeContextSummaryValue,
+                        selectedNodeContextViewModel.effectiveStatus
+                          ? { color: getStatusColors(selectedNodeContextViewModel.effectiveStatus).text }
+                          : null,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {selectedNodeContextViewModel.shortExplanationLabel ||
+                        selectedNodeContextViewModel.statusLabel ||
+                        "Нет данных"}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={openSelectedNodeExpenses}
+                    accessibilityRole="button"
+                    accessibilityLabel="Открыть расходы по узлу"
+                    style={({ pressed }) => [
+                      styles.nodeContextExpenseSummaryCard,
+                      selectedNodeExpenseSummary.hasExpenses && styles.nodeContextExpenseSummaryCardActive,
+                      pressed && styles.nodeContextSummaryCardPressed,
+                    ]}
+                  >
+                    <Text style={styles.nodeContextSummaryLabel}>Расходы по узлу</Text>
+                    <Text style={styles.nodeContextExpenseSummaryValue} numberOfLines={2}>
+                      {selectedNodeExpenseSummary.totalsLabel}
+                    </Text>
+                    <Text style={styles.nodeContextExpenseSummaryMeta}>
+                      Сезон {selectedNodeExpenseSummary.year} · {selectedNodeExpenseSummary.expenseCount}
+                    </Text>
+                  </Pressable>
                 </View>
                 <ScrollView
                   ref={subtreeScrollViewRef}
@@ -2595,26 +2959,6 @@ function DashboardSection({
   );
 }
 
-function DashboardActionButton({
-  label,
-  iconName,
-  onPress,
-}: {
-  label: string;
-  iconName: keyof typeof MaterialIcons.glyphMap;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.heroQuickActionBtn, pressed && styles.heroQuickActionBtnPressed]}
-    >
-      <MaterialIcons name={iconName} size={15} color={c.textPrimary} />
-      <Text style={styles.heroQuickActionText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function MobileScorePanel({
   score,
   okCount,
@@ -2659,35 +3003,57 @@ function MobileScoreStat({ value, label, color }: { value: number; label: string
 
 function ReferenceAttentionBlock({
   items,
-  onOpenAll,
   onOpenItem,
+  highlightedNodeId,
+  onLayoutY,
 }: {
   items: AttentionItemViewModel[];
-  onOpenAll: () => void;
-  onOpenItem: (nodeId: string) => void;
+  onOpenItem: (item: AttentionItemViewModel) => void;
+  highlightedNodeId?: string | null;
+  onLayoutY?: (y: number) => void;
 }) {
   return (
-    <View style={styles.referenceBlock}>
+    <View
+      style={styles.referenceBlock}
+      onLayout={(event) => {
+        onLayoutY?.(event.nativeEvent.layout.y);
+      }}
+    >
       <View style={styles.referenceSectionHeader}>
         <Text style={styles.referenceSectionTitle}>Требует внимания</Text>
-        <Pressable onPress={onOpenAll} style={({ pressed }) => pressed && styles.referenceLinkPressed}>
-          <Text style={styles.referenceSectionLink}>Смотреть все</Text>
-        </Pressable>
+        <Text style={styles.referenceSectionHint}>Нажмите на узел для действий</Text>
       </View>
-      <View style={styles.referenceAttentionList}>
+      <ScrollView
+        nestedScrollEnabled
+        style={styles.referenceAttentionScroll}
+        contentContainerStyle={styles.referenceAttentionList}
+      >
         {items.length === 0 ? (
           <Text style={styles.dashboardEmptyText}>Критичных замечаний нет.</Text>
         ) : (
           items.map((item) => (
-            <ReferenceAttentionRow key={item.nodeId} item={item} onPress={() => onOpenItem(item.nodeId)} />
+            <ReferenceAttentionRow
+              key={item.nodeId}
+              item={item}
+              onPress={() => onOpenItem(item)}
+              isHighlighted={highlightedNodeId === item.nodeId}
+            />
           ))
         )}
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
-function ReferenceAttentionRow({ item, onPress }: { item: AttentionItemViewModel; onPress: () => void }) {
+function ReferenceAttentionRow({
+  item,
+  onPress,
+  isHighlighted = false,
+}: {
+  item: AttentionItemViewModel;
+  onPress: () => void;
+  isHighlighted?: boolean;
+}) {
   const tokens = statusSemanticTokens[item.effectiveStatus];
   return (
     <Pressable
@@ -2695,6 +3061,7 @@ function ReferenceAttentionRow({ item, onPress }: { item: AttentionItemViewModel
       style={({ pressed }) => [
         styles.referenceAttentionRow,
         { borderLeftColor: tokens.accent },
+        isHighlighted && styles.referenceAttentionRowHighlighted,
         pressed && styles.referenceAttentionRowPressed,
       ]}
     >
@@ -2717,6 +3084,58 @@ function ReferenceAttentionRow({ item, onPress }: { item: AttentionItemViewModel
         </Text>
       </View>
       <MaterialIcons name="chevron-right" size={22} color={c.textTertiary} />
+    </Pressable>
+  );
+}
+
+function AttentionQuickActionButton({
+  label,
+  iconName,
+  onPress,
+  disabled = false,
+  variant = "default",
+  wide = false,
+}: {
+  label: string;
+  iconName: keyof typeof MaterialIcons.glyphMap;
+  onPress: () => void;
+  disabled?: boolean;
+  variant?: "default" | "primary" | "cart";
+  wide?: boolean;
+}) {
+  const iconColor = disabled
+    ? c.textTertiary
+    : variant === "primary"
+      ? c.onPrimaryAction
+      : variant === "cart"
+        ? c.successText
+        : c.textPrimary;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        styles.attentionActionButton,
+        variant === "primary" && styles.attentionActionButtonPrimary,
+        variant === "cart" && styles.attentionActionButtonCart,
+        wide && styles.attentionActionButtonWide,
+        pressed && !disabled && styles.attentionActionButtonPressed,
+        disabled && styles.attentionActionButtonDisabled,
+      ]}
+    >
+      <MaterialIcons name={iconName} size={19} color={iconColor} />
+      <Text
+        style={[
+          styles.attentionActionButtonText,
+          variant === "primary" && styles.attentionActionButtonTextPrimary,
+          variant === "cart" && styles.attentionActionButtonTextCart,
+          disabled && styles.attentionActionButtonTextDisabled,
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -2950,39 +3369,7 @@ function getAttentionIconSource(code: string): ImageSourcePropType {
 }
 
 function getNodeTreeIconSource(node: Pick<NodeTreeItemViewModel, "code" | "name">): ImageSourcePropType {
-  const code = node.code.toUpperCase();
-  const segments = code.replace(/[._]/g, "-").split("-").filter(Boolean);
-  const lastSegment = segments[segments.length - 1] ?? "";
-  const name = node.name.toLowerCase();
-
-  if (lastSegment === "OIL" || (name.includes("мотор") && name.includes("масл"))) {
-    return oilIcon;
-  }
-  if (lastSegment === "FILTER" || lastSegment === "FLTR" || name.includes("фильтр")) {
-    return lubricationIcon;
-  }
-  if (lastSegment === "PADS" || name.includes("колодк")) {
-    return code.includes("FRONT") ? brakesFrontPadsIcon : brakesIcon;
-  }
-  if (code.startsWith("BRAKES") || name.includes("торм")) {
-    return brakesIcon;
-  }
-  if (code.startsWith("TIRES") || name.includes("шин")) {
-    return code.includes("REAR") ? tiresRearIcon : tiresIcon;
-  }
-  if (code.startsWith("DRIVETRAIN") || name.includes("цеп")) {
-    return chainSprocketsIcon;
-  }
-  if (code.startsWith("SUSPENSION") || name.includes("подвес")) {
-    return suspensionIcon;
-  }
-  if (code.startsWith("COOLING") || name.includes("охлаж")) {
-    return engineCoolingIcon;
-  }
-  if (code.startsWith("ENGINE") || name.includes("двиг")) {
-    return engineCoolingIcon;
-  }
-  return getAttentionIconSource(code);
+  return getNodeTreeIconAsset(node.code, node.name) as ImageSourcePropType;
 }
 
 function getVehicleSilhouetteSource(vehicle: VehicleDetail): ImageSourcePropType {
@@ -3339,9 +3726,6 @@ const styles = StyleSheet.create({
   referenceBlock: {
     gap: 8,
   },
-  quickActionsBlock: {
-    gap: 8,
-  },
   referenceSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -3353,13 +3737,13 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: c.textPrimary,
   },
-  referenceSectionLink: {
+  referenceSectionHint: {
     fontSize: 12,
     fontWeight: "800",
-    color: c.primaryAction,
+    color: c.textMuted,
   },
-  referenceLinkPressed: {
-    opacity: 0.72,
+  referenceAttentionScroll: {
+    maxHeight: 252,
   },
   referenceAttentionList: {
     gap: 8,
@@ -3379,6 +3763,10 @@ const styles = StyleSheet.create({
   },
   referenceAttentionRowPressed: {
     opacity: 0.9,
+    backgroundColor: c.cardMuted,
+  },
+  referenceAttentionRowHighlighted: {
+    borderColor: c.primaryAction,
     backgroundColor: c.cardMuted,
   },
   referenceAttentionIcon: {
@@ -3418,6 +3806,91 @@ const styles = StyleSheet.create({
   referenceStatusBadgeText: {
     fontSize: 9,
     fontWeight: "900",
+  },
+  attentionActionSheetCard: {
+    width: "100%",
+    maxHeight: "72%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 22,
+    gap: 14,
+  },
+  attentionActionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  attentionActionHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  attentionActionStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  attentionActionWishlistStatus: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: c.successText,
+  },
+  attentionActionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  attentionActionButton: {
+    width: "48%",
+    minHeight: 54,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  attentionActionButtonWide: {
+    width: "100%",
+  },
+  attentionActionButtonPrimary: {
+    borderColor: c.primaryAction,
+    backgroundColor: c.primaryAction,
+  },
+  attentionActionButtonCart: {
+    borderColor: c.successBorder,
+    backgroundColor: c.successSurface,
+  },
+  attentionActionButtonPressed: {
+    opacity: 0.88,
+  },
+  attentionActionButtonDisabled: {
+    opacity: 0.36,
+    borderColor: c.border,
+    backgroundColor: c.chipBackground,
+  },
+  attentionActionButtonText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: c.textPrimary,
+    textAlign: "center",
+  },
+  attentionActionButtonTextPrimary: {
+    color: c.onPrimaryAction,
+  },
+  attentionActionButtonTextCart: {
+    color: c.successText,
+  },
+  attentionActionButtonTextDisabled: {
+    color: c.textTertiary,
   },
   dashboardEmptyText: {
     fontSize: 13,
@@ -3794,34 +4267,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 11,
     color: c.textMuted,
-  },
-  heroQuickActionsRow: {
-    marginTop: 8,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  heroQuickActionBtn: {
-    width: "48%",
-    minHeight: 60,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: 11,
-    backgroundColor: c.card,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingHorizontal: 8,
-  },
-  heroQuickActionBtnPressed: {
-    backgroundColor: c.divider,
-  },
-  heroQuickActionText: {
-    fontSize: 10,
-    lineHeight: 12,
-    fontWeight: "800",
-    color: c.textSecondary,
-    textAlign: "center",
   },
   divider: {
     height: 1,
@@ -4772,6 +5217,68 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: c.textMeta,
   },
+  nodeContextSummaryRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  nodeContextServiceStateCard: {
+    flex: 65,
+    minHeight: 74,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.cardSubtle,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    justifyContent: "center",
+  },
+  nodeContextExpenseSummaryCard: {
+    flex: 35,
+    minHeight: 74,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.cardSubtle,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    justifyContent: "center",
+  },
+  nodeContextExpenseSummaryCardActive: {
+    borderColor: c.primaryAction,
+    backgroundColor: "rgba(249, 115, 22, 0.12)",
+  },
+  nodeContextSummaryCardPressed: {
+    opacity: 0.88,
+  },
+  nodeContextSummaryLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: c.textMuted,
+    textTransform: "uppercase",
+  },
+  nodeContextSummaryValue: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "800",
+    color: c.textPrimary,
+  },
+  nodeContextExpenseSummaryValue: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: "900",
+    color: c.textPrimary,
+  },
+  nodeContextExpenseSummaryMeta: {
+    marginTop: 4,
+    fontSize: 10,
+    lineHeight: 12,
+    color: c.textSecondary,
+  },
   subtreeModalBody: {
     paddingHorizontal: 8,
     paddingTop: 6,
@@ -4859,6 +5366,20 @@ const styles = StyleSheet.create({
     gap: 6,
     flexShrink: 0,
     marginLeft: 6,
+  },
+  nodeContextButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nodeContextButtonPressed: {
+    backgroundColor: c.divider,
+    opacity: 0.9,
   },
   wishlistTreeButton: {
     paddingVertical: 6,

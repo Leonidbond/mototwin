@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
@@ -45,16 +46,11 @@ import {
   buildExpenseSummaryFromServiceEvents,
   formatExpenseAmountRu,
   expenseCategoryLabelsRu,
-  buildAttentionActionViewModel,
   buildAttentionSummaryFromNodeTree,
   calculateSnoozeUntilDate,
-  filterAttentionItemsBySnooze,
-  buildNodeTreeItemViewModel,
   buildNodeMaintenancePlanViewModel,
   formatSnoozeUntilLabel,
-  getAttentionSnoozeFilterLabel,
   getDefaultCurrencyFromSettings,
-  groupAttentionItemsByStatus,
   buildPartWishlistItemViewModel,
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
@@ -90,10 +86,10 @@ import { ACTION_SVG_BODIES, type ActionIconKey } from "@mototwin/icons";
 import { TopNodeIcon } from "@/components/icons/top-nodes";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { BackButton } from "@/components/navigation/BackButton";
+import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
 import type {
   AttentionItemViewModel,
-  AttentionSnoozeFilter,
   NodeSnoozeOption,
   EditVehicleProfileFormValues,
   NodeStatus,
@@ -156,6 +152,8 @@ function NodeContextReferencePanel({
   onOpenWishlistPart,
   onAdvanceWishlistPartStatus,
   onOpenAllUninstalledParts,
+  nodeExpenseSummary,
+  onOpenNodeExpenses,
 }: {
   viewModel: NodeContextViewModel;
   showSubtreeCompositionSection: boolean;
@@ -189,6 +187,8 @@ function NodeContextReferencePanel({
   onOpenWishlistPart: (item: PartWishlistItemViewModel) => void;
   onAdvanceWishlistPartStatus: (item: PartWishlistItemViewModel) => void;
   onOpenAllUninstalledParts: () => void;
+  nodeExpenseSummary: NodeContextExpenseSummary;
+  onOpenNodeExpenses: () => void;
 }) {
   const subtreeCompositionPreviewLimit = 12;
   const [isSubtreeCompositionExpanded, setIsSubtreeCompositionExpanded] = useState(false);
@@ -357,35 +357,66 @@ function NodeContextReferencePanel({
         ) : null}
       </div>
 
-      <button
-        type="button"
-        onClick={canOpenStatusExplanation ? onOpenStatusExplanation : undefined}
-        disabled={!canOpenStatusExplanation}
-        title={canOpenStatusExplanation ? "Открыть пояснение статуса" : undefined}
-        style={{
-          width: "100%",
-          appearance: "none",
-          textAlign: "left",
-          border: `1px solid ${border}`,
-          borderRadius: 9,
-          backgroundColor: card,
-          color: productSemanticColors.textPrimary,
-          padding: "10px 12px 9px",
-          cursor: canOpenStatusExplanation ? "pointer" : "default",
-          minWidth: 0,
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
-          <span style={{ marginTop: 5, width: 8, height: 8, flexShrink: 0, borderRadius: 999, backgroundColor: statusTokens.foreground }} />
-          <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 12, lineHeight: "16px", fontWeight: 700 }}>{alertTitle}</p>
-            <p style={{ margin: "3px 0 0", maxWidth: 520, color: productSemanticColors.textSecondary, fontSize: 11, lineHeight: "14px", fontWeight: 500 }}>
-              {alertDescription}
-            </p>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 65fr) minmax(0, 35fr)", gap: 8 }}>
+        <button
+          type="button"
+          onClick={canOpenStatusExplanation ? onOpenStatusExplanation : undefined}
+          disabled={!canOpenStatusExplanation}
+          title={canOpenStatusExplanation ? "Открыть пояснение статуса" : undefined}
+          style={{
+            width: "100%",
+            minHeight: 86,
+            appearance: "none",
+            textAlign: "left",
+            border: `1px solid ${border}`,
+            borderRadius: 9,
+            backgroundColor: card,
+            color: productSemanticColors.textPrimary,
+            padding: "10px 12px 9px",
+            cursor: canOpenStatusExplanation ? "pointer" : "default",
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 11 }}>
+            <span style={{ marginTop: 5, width: 8, height: 8, flexShrink: 0, borderRadius: 999, backgroundColor: statusTokens.foreground }} />
+            <div style={{ minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 12, lineHeight: "16px", fontWeight: 700 }}>{alertTitle}</p>
+              <p style={{ margin: "3px 0 0", maxWidth: 520, color: productSemanticColors.textSecondary, fontSize: 11, lineHeight: "14px", fontWeight: 500 }}>
+                {alertDescription}
+              </p>
+            </div>
           </div>
-        </div>
-      </button>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenNodeExpenses}
+          title="Открыть расходы по этому узлу"
+          style={{
+            minHeight: 86,
+            appearance: "none",
+            textAlign: "left",
+            border: `1px solid ${nodeExpenseSummary.hasExpenses ? productSemanticColors.primaryAction : border}`,
+            borderRadius: 9,
+            backgroundColor: nodeExpenseSummary.hasExpenses ? "rgba(249, 115, 22, 0.12)" : card,
+            color: productSemanticColors.textPrimary,
+            padding: "10px 12px 9px",
+            cursor: "pointer",
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <p style={{ margin: 0, color: productSemanticColors.textMuted, fontSize: 11, fontWeight: 800 }}>
+            Расходы по узлу
+          </p>
+          <p style={{ margin: "7px 0 0", overflowWrap: "anywhere", color: productSemanticColors.textPrimary, fontSize: 17, lineHeight: "20px", fontWeight: 800 }}>
+            {nodeExpenseSummary.totalsLabel}
+          </p>
+          <p style={{ margin: "4px 0 0", color: productSemanticColors.textSecondary, fontSize: 10, lineHeight: "13px" }}>
+            Сезон {nodeExpenseSummary.year} · {nodeExpenseSummary.expenseCount} записей
+          </p>
+        </button>
+      </div>
 
       <section style={sectionStyle}>
         <div style={sectionHeaderStyle}>
@@ -1009,13 +1040,19 @@ type VehiclePageProps = {
 };
 
 type OverlayReturnTarget =
-  | { type: "attention" }
   | { type: "nodeContext"; nodeId: string };
 
 type ServiceLogActionNotice = {
   tone: "success" | "error";
   title: string;
   details?: string;
+};
+
+type NodeContextExpenseSummary = {
+  year: number;
+  totalsLabel: string;
+  expenseCount: number;
+  hasExpenses: boolean;
 };
 
 type PartsStatusFilter = PartWishlistItemStatus | "ALL";
@@ -1214,6 +1251,39 @@ function collectSubtreeDescendantItems(
   return out;
 }
 
+function formatCurrencyTotalsFromMap(totalsByCurrency: Map<string, number>): string {
+  const rows = Array.from(totalsByCurrency.entries())
+    .filter(([, amount]) => amount > 0)
+    .sort(([left], [right]) => left.localeCompare(right, "en"));
+  if (rows.length === 0) {
+    return "0";
+  }
+  return rows.map(([currency, amount]) => `${formatExpenseAmountRu(amount)} ${currency}`).join(" · ");
+}
+
+function buildNodeContextExpenseSummary(
+  nodeId: string,
+  summaryByNodeId: Record<string, ExpenseNodeSummaryItem>,
+  year: number
+): NodeContextExpenseSummary {
+  const summary = summaryByNodeId[nodeId];
+  if (!summary) {
+    return {
+      year,
+      totalsLabel: "0",
+      expenseCount: 0,
+      hasExpenses: false,
+    };
+  }
+  const totalsByCurrency = new Map(summary.totalByCurrency.map((row) => [row.currency, row.amount]));
+  return {
+    year,
+    totalsLabel: formatCurrencyTotalsFromMap(totalsByCurrency),
+    expenseCount: summary.expenseCount,
+    hasExpenses: summary.expenseCount > 0,
+  };
+}
+
 function isIssueNodeStatus(status: NodeStatus | null): status is "OVERDUE" | "SOON" {
   return status === "OVERDUE" || status === "SOON";
 }
@@ -1296,8 +1366,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [nodeContextAddingKitCode, setNodeContextAddingKitCode] = useState("");
   const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
   const [hasLoadedDetailCollapsePrefs, setHasLoadedDetailCollapsePrefs] = useState(false);
-  const [isAttentionModalOpen, setIsAttentionModalOpen] = useState(false);
-  const [attentionSnoozeFilter, setAttentionSnoozeFilter] = useState<AttentionSnoozeFilter>("all");
   const [wishlistItems, setWishlistItems] = useState<PartWishlistItem[]>([]);
   const [isWishlistLoading, setIsWishlistLoading] = useState(false);
   const [wishlistError, setWishlistError] = useState("");
@@ -1727,35 +1795,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     setNodeSnoozeByNodeId(next);
   }, [vehicleId, attentionSummary.items, selectedNodeContextId]);
-
-  const attentionAction = useMemo(
-    () => buildAttentionActionViewModel(attentionSummary),
-    [attentionSummary]
-  );
-  const filteredAttentionItems = useMemo(
-    () =>
-      filterAttentionItemsBySnooze(
-        attentionSummary.items,
-        attentionSnoozeFilter,
-        (nodeId) => nodeSnoozeByNodeId[nodeId] ?? null
-      ),
-    [attentionSummary.items, attentionSnoozeFilter, nodeSnoozeByNodeId]
-  );
-  const filteredAttentionGroups = useMemo(
-    () => groupAttentionItemsByStatus(filteredAttentionItems),
-    [filteredAttentionItems]
-  );
-  const attentionEmptyStateLabel =
-    attentionSnoozeFilter === "unsnoozed"
-      ? "Нет активных узлов без отложенного напоминания"
-      : attentionSnoozeFilter === "snoozed"
-        ? "Нет отложенных узлов"
-        : "Нет узлов, требующих внимания";
-  const attentionTok = statusSemanticTokens[attentionAction.semanticKey];
-  const attentionBadgeBg =
-    attentionAction.totalCount > 0 && attentionTok.accent !== "transparent"
-      ? attentionTok.accent
-      : productSemanticColors.divider;
 
   const wishlistViewModels = useMemo(
     () => wishlistItems.map(buildPartWishlistItemViewModel),
@@ -2665,7 +2704,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (!raw) {
       return;
     }
-    setIsAttentionModalOpen(false);
     const filter = createServiceLogNodeFilter(raw);
     const q = new URLSearchParams();
     q.set("nodeIds", filter.nodeIds.join(","));
@@ -2677,26 +2715,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (!item.canAddServiceEvent) {
       return;
     }
-    pushOverlayReturnTarget({ type: "attention" });
-    setIsAttentionModalOpen(false);
     openAddServiceEventFromLeafNode(item.nodeId);
-  };
-
-  const openStatusExplanationForAttentionItem = (item: AttentionItemViewModel) => {
-    if (!item.canOpenStatusExplanation) {
-      return;
-    }
-    const raw = findNodeTreeItemById(nodeTree, item.nodeId);
-    if (!raw) {
-      return;
-    }
-    const vm = buildNodeTreeItemViewModel(raw);
-    if (!canOpenNodeStatusExplanationModal(vm)) {
-      return;
-    }
-    pushOverlayReturnTarget({ type: "attention" });
-    setIsAttentionModalOpen(false);
-    openStatusExplanationModal(vm);
   };
 
   const openWishlistModalForCreate = (presetNodeId?: string) => {
@@ -3088,10 +3107,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     overlayReturnStackRef.current = [...overlayReturnStackRef.current, target];
   };
   const restoreOverlayReturnTarget = (target: OverlayReturnTarget) => {
-    if (target.type === "attention") {
-      setIsAttentionModalOpen(true);
-      return;
-    }
     if (target.type === "nodeContext") {
       setSelectedNodeContextId(target.nodeId);
       return;
@@ -3108,9 +3123,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const getCurrentOverlayReturnTarget = (): OverlayReturnTarget | null => {
     if (selectedNodeContextId) {
       return { type: "nodeContext", nodeId: selectedNodeContextId };
-    }
-    if (isAttentionModalOpen) {
-      return { type: "attention" };
     }
     return null;
   };
@@ -3132,12 +3144,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
   };
   const openWishlistFromAttentionItem = (item: AttentionItemViewModel) => {
-    pushOverlayReturnTarget({ type: "attention" });
-    setIsAttentionModalOpen(false);
     openWishlistModalForCreate(item.nodeId);
-  };
-  const openNodeContextFromAttentionItem = (item: AttentionItemViewModel) => {
-    openNodeContextModal(item.nodeId, { type: "attention" });
   };
   const openTopOverviewNode = (nodeId: string) => {
     if (pageView === "nodeTree") {
@@ -3187,7 +3194,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (target) {
       pushOverlayReturnTarget(target);
     }
-    setIsAttentionModalOpen(false);
     setSelectedNodeContextId(nodeId);
     replaceNodeTreeSelectedNodeInUrl(nodeId);
   };
@@ -3447,6 +3453,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           : node.effectiveStatus === "RECENTLY_REPLACED"
           ? "Недавно"
           : "ОК";
+      const handlePrimaryRowAction = () => {
+        if (hasChildren) {
+          toggleNodeExpansion(node);
+          return;
+        }
+        openNodeContextModal(node.id);
+      };
+      const handleOpenNodeDetails = () => {
+        openNodeContextModal(node.id);
+      };
       const renderIndentGuides = () => (
         <>
           {ancestorLasts.slice(0, -1).map((ancestorIsLast, index) => (
@@ -3521,6 +3537,19 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         </>
       );
       const renderTreeIcon = () => {
+        const iconSrc = getNodeTreeIconWebSrc(node.code, node.name);
+        if (iconSrc) {
+          return (
+            <Image
+              src={iconSrc}
+              alt=""
+              width={22}
+              height={22}
+              className="object-contain"
+              aria-hidden
+            />
+          );
+        }
         const codeUpper = node.code.toUpperCase();
         const segments = codeUpper.replace(/[._]/g, "-").split("-").filter(Boolean);
         const lastSeg = segments[segments.length - 1] ?? "";
@@ -3618,13 +3647,19 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
             data-node-tree-id={node.id}
             role="button"
             tabIndex={0}
-            onClick={() => openNodeContextModal(node.id)}
+            onClick={handlePrimaryRowAction}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                openNodeContextModal(node.id);
+                handlePrimaryRowAction();
               }
             }}
+            title={hasChildren ? "Развернуть или свернуть ветку" : "Открыть контекст узла"}
+            aria-label={
+              hasChildren
+                ? `${isExpanded ? "Свернуть" : "Развернуть"} ветку ${node.name}`
+                : `Открыть контекст узла ${node.name}`
+            }
             className="flex min-h-[52px] items-stretch text-left transition hover:bg-slate-800/40"
             style={{
               backgroundColor: productSemanticColors.card,
@@ -3715,11 +3750,23 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   <span>{rowStatusLabel}</span>
                 </button>
               ) : null}
-              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center" style={{ color: productSemanticColors.textMuted }}>
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                  <path d="M6 4.5 9.5 8 6 11.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleOpenNodeDetails();
+                }}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition hover:bg-slate-800 focus-visible:outline focus-visible:ring-2 focus-visible:ring-slate-400"
+                style={{
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                  color: productSemanticColors.textPrimary,
+                }}
+                title="Открыть контекст узла"
+                aria-label={`Открыть контекст узла ${node.name}`}
+              >
+                <OpenContextIcon />
+              </button>
             </div>
           </div>
           {hasChildren && isExpanded ? (
@@ -3742,13 +3789,29 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           data-node-tree-id={node.id}
           role="button"
           tabIndex={0}
-          onClick={() => openNodeContextModal(node.id)}
+          onClick={() => {
+            if (hasChildren) {
+              toggleNodeExpansion(node);
+              return;
+            }
+            openNodeContextModal(node.id);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
+              if (hasChildren) {
+                toggleNodeExpansion(node);
+                return;
+              }
               openNodeContextModal(node.id);
             }
           }}
+          title={hasChildren ? "Развернуть или свернуть ветку" : "Открыть контекст узла"}
+          aria-label={
+            hasChildren
+              ? `${isExpanded ? "Свернуть" : "Развернуть"} ветку ${node.name}`
+              : `Открыть контекст узла ${node.name}`
+          }
           className={`rounded-xl border bg-slate-900 px-3 py-2 text-left transition hover:border-slate-500 ${
             statusHighlightTokens
               ? "ring-2"
@@ -4868,6 +4931,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     const selectedUninstalledParts = wishlistActiveViewModels.filter(
       (item) => item.nodeId && selectedNodeFilterIds.has(item.nodeId)
     );
+    const selectedNodeExpenseSummary = buildNodeContextExpenseSummary(
+      selectedNodeContext.nodeId,
+      nodeExpenseSummaryByNodeId,
+      nodeExpenseYear
+    );
 
     return (
       <NodeContextReferencePanel
@@ -4942,6 +5010,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           const selectedNodeHref = `/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(selectedNodeContext.nodeId)}`;
           window.history.replaceState(window.history.state, "", selectedNodeHref);
           router.push(`/vehicles/${vehicleId}/parts?nodeId=${encodeURIComponent(selectedNodeContext.nodeId)}`);
+        }}
+        nodeExpenseSummary={selectedNodeExpenseSummary}
+        onOpenNodeExpenses={() => {
+          router.push(
+            `/vehicles/${vehicleId}/expenses?nodeId=${encodeURIComponent(selectedNodeContext.nodeId)}&year=${nodeExpenseYear}&returnNodeId=${encodeURIComponent(selectedNodeContext.nodeId)}`
+          );
         }}
       />
     );
@@ -5811,7 +5885,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   onOpenPartItem={(itemId) =>
                     router.push(`/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(itemId)}`)
                   }
-                  onOpenAttention={() => setIsAttentionModalOpen(true)}
                   onOpenAllNodes={() => {
                     router.push(`/vehicles/${vehicleId}/nodes`);
                   }}
@@ -5832,7 +5905,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   onOpenExpenseDetails={() => router.push(`/vehicles/${vehicleId}/expenses`)}
                   onOpenAttentionItemService={openAddServiceFromAttentionItem}
                   onOpenAttentionItemLog={openServiceLogForAttentionItem}
-                  onOpenAttentionItemContext={openNodeContextFromAttentionItem}
+                  onOpenAttentionItemParts={openWishlistFromAttentionItem}
                 />
 
                 {false ? (
@@ -5936,30 +6009,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       На свалку
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsAttentionModalOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition hover:opacity-95"
-                    style={{
-                      borderColor: attentionTok.border,
-                      backgroundColor: attentionTok.background,
-                      color: attentionTok.foreground,
-                    }}
-                  >
-                    Требует внимания
-                    <span
-                      className="rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
-                      style={{
-                        backgroundColor: attentionBadgeBg,
-                        color:
-                          attentionAction.totalCount > 0
-                            ? attentionTok.foreground
-                            : productSemanticColors.textMuted,
-                      }}
-                    >
-                      {attentionSummary.totalCount}
-                    </span>
-                  </button>
                 </div>
               </div>
               {moveToTrashError ? (
@@ -7234,262 +7283,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   {isWishlistSaving ? "Сохранение…" : "Сохранить"}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {isAttentionModalOpen ? (
-        <div
-          className="fixed inset-0 z-[65] flex items-start justify-center px-4 py-6 sm:items-center"
-          style={{ backgroundColor: productSemanticColors.overlayModal }}
-        >
-          <div
-            className="garage-dark-surface-text w-full max-w-3xl rounded-3xl border shadow-xl sm:max-w-4xl"
-            style={{
-              backgroundColor: productSemanticColors.card,
-              borderColor: productSemanticColors.borderStrong,
-              color: productSemanticColors.textPrimary,
-            }}
-          >
-            <div
-              className="flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4"
-              style={{ borderColor: productSemanticColors.borderStrong }}
-            >
-              <div>
-                <h2
-                  className="text-xl font-semibold tracking-tight"
-                  style={{ color: productSemanticColors.textPrimary }}
-                >
-                  Требует внимания
-                </h2>
-                <p className="mt-1 text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                  Узлы «Просрочено» и «Скоро» по текущему дереву узлов.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAttentionModalOpen(false)}
-                className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border px-3.5 text-sm font-medium transition"
-                style={{
-                  backgroundColor: productSemanticColors.cardSubtle,
-                  borderColor: productSemanticColors.borderStrong,
-                  color: productSemanticColors.textPrimary,
-                }}
-              >
-                Закрыть
-              </button>
-            </div>
-            <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
-              <p className="text-sm" style={{ color: productSemanticColors.textSecondary }}>
-                Всего:{" "}
-                <span className="font-semibold" style={{ color: productSemanticColors.textPrimary }}>
-                  {attentionSummary.totalCount}
-                </span>
-                {attentionSummary.overdueCount > 0 ? (
-                  <>
-                    {" "}
-                    · Просрочено:{" "}
-                    <span className="font-medium" style={{ color: productSemanticColors.textPrimary }}>
-                      {attentionSummary.overdueCount}
-                    </span>
-                  </>
-                ) : null}
-                {attentionSummary.soonCount > 0 ? (
-                  <>
-                    {" "}
-                    · Скоро:{" "}
-                    <span className="font-medium" style={{ color: productSemanticColors.textPrimary }}>
-                      {attentionSummary.soonCount}
-                    </span>
-                  </>
-                ) : null}
-              </p>
-              {!isNodeTreeLoading && !nodeTreeError && attentionSummary.totalCount > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {(["all", "unsnoozed", "snoozed"] as AttentionSnoozeFilter[]).map((filter) => (
-                    <button
-                      key={filter}
-                      type="button"
-                      onClick={() => setAttentionSnoozeFilter(filter)}
-                      className="inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition"
-                      style={{
-                        backgroundColor:
-                          attentionSnoozeFilter === filter
-                            ? productSemanticColors.primaryAction
-                            : productSemanticColors.cardSubtle,
-                        borderColor:
-                          attentionSnoozeFilter === filter
-                            ? productSemanticColors.primaryAction
-                            : productSemanticColors.borderStrong,
-                        color:
-                          attentionSnoozeFilter === filter
-                            ? productSemanticColors.onPrimaryAction
-                            : productSemanticColors.textPrimary,
-                      }}
-                    >
-                      {getAttentionSnoozeFilterLabel(filter)}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              {isNodeTreeLoading ? (
-                <p className="mt-6 text-sm" style={{ color: productSemanticColors.textSecondary }}>
-                  Загрузка дерева узлов…
-                </p>
-              ) : nodeTreeError ? (
-                <p className="mt-6 text-sm" style={{ color: productSemanticColors.error }}>
-                  {nodeTreeError}
-                </p>
-              ) : filteredAttentionItems.length === 0 ? (
-                <div
-                  className="mt-6 rounded-xl border border-dashed px-4 py-8 text-center text-sm"
-                  style={{
-                    backgroundColor: productSemanticColors.cardMuted,
-                    borderColor: productSemanticColors.border,
-                    color: productSemanticColors.textSecondary,
-                  }}
-                >
-                  {attentionEmptyStateLabel}
-                </div>
-              ) : (
-                <div className="mt-5 space-y-6">
-                  {filteredAttentionGroups.map((group) => (
-                    <section key={group.status}>
-                      <h3
-                        className="text-xs font-semibold uppercase tracking-wide"
-                        style={{ color: productSemanticColors.textMuted }}
-                      >
-                        {group.sectionTitleRu}
-                      </h3>
-                      <ul className="mt-3 space-y-3">
-                        {group.items.map((item) => {
-                          const st =
-                            item.effectiveStatus === "OVERDUE"
-                              ? statusSemanticTokens.OVERDUE
-                              : statusSemanticTokens.SOON;
-                          const snoozeLabel = formatSnoozeUntilLabel(
-                            nodeSnoozeByNodeId[item.nodeId] ?? null
-                          );
-                          return (
-                            <li
-                              key={item.nodeId}
-                              className="rounded-2xl border p-4 shadow-sm"
-                              style={{
-                                backgroundColor: productSemanticColors.cardMuted,
-                                borderColor: productSemanticColors.borderStrong,
-                                color: productSemanticColors.textPrimary,
-                              }}
-                            >
-                              {item.topLevelParentName ? (
-                                <p className="text-xs" style={{ color: productSemanticColors.textMuted }}>
-                                  Раздел: {item.topLevelParentName}
-                                </p>
-                              ) : null}
-                              <div className="mt-1 flex flex-wrap items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => openNodeContextFromAttentionItem(item)}
-                                  className="text-base font-semibold transition hover:underline"
-                                  style={{ color: productSemanticColors.textPrimary }}
-                                >
-                                  {item.name}
-                                </button>
-                                <span
-                                  className="inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
-                                  style={{
-                                    borderColor: st.border,
-                                    backgroundColor: st.background,
-                                    color: st.foreground,
-                                  }}
-                                >
-                                  {item.statusLabelRu}
-                                </span>
-                              </div>
-                              {item.shortExplanation && item.canOpenStatusExplanation ? (
-                                <button
-                                  type="button"
-                                  onClick={() => openStatusExplanationForAttentionItem(item)}
-                                  className="mt-2 text-left text-sm underline decoration-dotted underline-offset-2 transition"
-                                  style={{ color: productSemanticColors.textSecondary }}
-                                >
-                                  {item.shortExplanation}
-                                </button>
-                              ) : item.shortExplanation ? (
-                                <p className="mt-2 text-sm" style={{ color: productSemanticColors.textSecondary }}>
-                                  {item.shortExplanation}
-                                </p>
-                              ) : null}
-                              {snoozeLabel ? (
-                                <p
-                                  className="mt-2 text-xs font-medium"
-                                  style={{ color: productSemanticColors.textSecondary }}
-                                >
-                                  {snoozeLabel}
-                                </p>
-                              ) : null}
-
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => openServiceLogForAttentionItem(item)}
-                                  className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition"
-                                  style={{
-                                    backgroundColor: productSemanticColors.cardSubtle,
-                                    borderColor: productSemanticColors.borderStrong,
-                                    color: productSemanticColors.textPrimary,
-                                  }}
-                                >
-                                  Журнал по узлу
-                                </button>
-                                {item.canAddServiceEvent ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => openAddServiceFromAttentionItem(item)}
-                                    className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition"
-                                    style={{
-                                      backgroundColor: productSemanticColors.cardSubtle,
-                                      borderColor: productSemanticColors.borderStrong,
-                                      color: productSemanticColors.textPrimary,
-                                    }}
-                                  >
-                                    Добавить сервис
-                                  </button>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  onClick={() => openWishlistFromAttentionItem(item)}
-                                  className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition"
-                                  style={{
-                                    backgroundColor: productSemanticColors.cardSubtle,
-                                    borderColor: productSemanticColors.borderStrong,
-                                    color: productSemanticColors.textPrimary,
-                                  }}
-                                >
-                                  В список покупок
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openNodeContextFromAttentionItem(item)}
-                                  className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition"
-                                  style={{
-                                    backgroundColor: productSemanticColors.cardSubtle,
-                                    borderColor: productSemanticColors.borderStrong,
-                                    color: productSemanticColors.textPrimary,
-                                  }}
-                                >
-                                  Контекст узла
-                                </button>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </section>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>

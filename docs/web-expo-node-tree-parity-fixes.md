@@ -40,7 +40,7 @@
 ## «Требует внимания»
 
 - **Web:** кнопка у заголовка ТС открывает модалку со списком узлов `OVERDUE` / `SOON`, собранным через `buildAttentionSummaryFromNodeTree` (`packages/domain/src/attention.ts`). Окраска кнопки — **`buildAttentionActionViewModel`** + **`statusSemanticTokens`** (худший статус среди пунктов). **Полное пояснение** — та же модалка, что у дерева (`setSelectedStatusExplanationNode` + `buildNodeTreeItemViewModel` по `nodeId`), без отдельного inline-разворота в модалке внимания. Действие **«Журнал по узлу»** использует тот же `createServiceLogNodeFilter`, что и клик по бейджу статуса в дереве.
-- **Expo:** экран `vehicles/[id]/attention.tsx` — тот же shared summary и та же логика окраски пилюли на `index.tsx`; полное пояснение через общий **`StatusExplanationModal`** (как на экране ТС). Переход в журнал с `nodeIds` / `nodeLabel` через `buildVehicleServiceLogHref`.
+- **Expo:** постоянный dashboard-блок **«Требует внимания»** на `vehicles/[id]/index.tsx` использует тот же shared summary. Тап по узлу открывает bottom sheet быстрых действий (**В дерево**, **ТО**, **Журнал**, **В корзине**, **Подбор запчасти**) вместо отдельного экрана `vehicles/[id]/attention.tsx`.
 - Подробнее: [attention-flow-mvp.md](./attention-flow-mvp.md).
 
 ## QA (ручная проверка)

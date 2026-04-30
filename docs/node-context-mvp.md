@@ -19,6 +19,7 @@ For selected node, Node Context shows:
 - node name, code, full path;
 - effective status + short explanation;
 - action to open detailed status explanation;
+- `Расходы по узлу` summary for the selected season, displayed next to the service-state block (`~65% / ~35%` layout);
 - maintenance-plan block (when meaningful data exists);
 - latest service events (up to 3);
 - compact SKU recommendations + add-to-wishlist action;
@@ -34,6 +35,19 @@ Node Context action set is built in shared domain and follows safety rules:
 - `Пояснение статуса` when `statusExplanation` exists.
 
 `Журнал` opens the dedicated Service Log page/screen for current vehicle with node filter context (`nodeId` / `nodeIds` + label when available).
+
+`Расходы по узлу` opens Expenses with `nodeId`, `year`, and `returnNodeId`. The Expenses page treats `nodeId` as selected node + full subtree and returns to the node tree focused on `returnNodeId`.
+
+### Node expenses
+
+Node Context expense totals must match the `За сезон` metric on the Expenses page with the same `nodeId` and `year`:
+
+- season = calendar year;
+- parent node = own expenses + all descendants;
+- leaf node = own expenses only;
+- currencies stay separate;
+- web uses `GET /api/expenses/node-summary?vehicleId=...&year=...`, whose parent rows are already rolled up;
+- Expo uses `GET /api/expenses?vehicleId=...&year=...` and applies the same node + subtree and selected-year filters client-side.
 
 ### Snooze reminder (local only)
 

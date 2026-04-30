@@ -149,6 +149,7 @@ export function ExpensesPageClient(props: {
   const selectedYearDefault = Number(searchParams.get("year")) || new Date().getFullYear();
   const vehicleIdFromQuery = searchParams.get("vehicleId")?.trim() || "";
   const nodeIdFromQuery = searchParams.get("nodeId")?.trim() || "";
+  const returnNodeIdFromQuery = searchParams.get("returnNodeId")?.trim() || "";
   const effectiveVehicleId = props.vehicleId ?? vehicleIdFromQuery;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedYear, setSelectedYear] = useState(selectedYearDefault);
@@ -459,6 +460,10 @@ export function ExpensesPageClient(props: {
   }
 
   function navigateBack() {
+    if (returnNodeIdFromQuery && effectiveVehicleId) {
+      router.push(`/vehicles/${effectiveVehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeIdFromQuery)}`);
+      return;
+    }
     if (props.backHref) {
       router.push(props.backHref);
       return;
