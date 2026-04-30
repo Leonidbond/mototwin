@@ -364,13 +364,13 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
         </Card>
 
         <Card
-          className={styles.midGridCard}
           padding="md"
           style={{
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
             minHeight: 0,
+            minWidth: 0,
           }}
         >
           <SectionHeader
@@ -998,22 +998,21 @@ function SystemStatusCard(props: {
         alignItems: "flex-start",
         minWidth: 0,
         boxSizing: "border-box",
-        minHeight: 112,
         overflow: "hidden",
-        padding: "8px 82px 14px 12px",
+        padding: "6px 76px 8px 10px",
         textAlign: "left",
-        borderRadius: 14,
+        borderRadius: 12,
         border: `1px solid ${productSemanticColors.border}`,
         backgroundColor: productSemanticColors.cardMuted,
       }}
     >
       <div style={{ minWidth: 0, flex: 1 }}>
         <div>
-          <div style={{ color: productSemanticColors.textPrimary, fontSize: 13, fontWeight: 700 }}>
+          <div style={{ color: productSemanticColors.textPrimary, fontSize: 12, fontWeight: 700, lineHeight: "16px" }}>
             {normalizeTopNodeLabel(props.card)}
           </div>
         </div>
-        <div style={{ display: "grid", gap: 5, marginTop: 8 }}>
+        <div style={{ display: "grid", gap: 8, marginTop: 6 }}>
           {props.card.nodes.map((node) => {
             const nodeTokens = getStatusTokens(node.status);
             return (
@@ -1030,12 +1029,12 @@ function SystemStatusCard(props: {
                   justifyContent: "center",
                   width: "fit-content",
                   maxWidth: "100%",
-                  minHeight: 21,
+                  minHeight: 20,
                   borderRadius: 999,
                   border: `1px solid ${nodeTokens.border}`,
                   backgroundColor: nodeTokens.background,
                   color: nodeTokens.foreground,
-                  padding: "0 8px",
+                  padding: "0 7px",
                   fontSize: 10,
                   fontWeight: 800,
                   lineHeight: 1,
@@ -1063,13 +1062,13 @@ function SystemStatusCard(props: {
         title="Показать узлы со статусом Скоро или Просрочено"
         style={{
           position: "absolute",
-          right: 4,
+          right: 2,
           top: "50%",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 78,
-          height: 78,
+          width: 68,
+          height: 68,
           opacity: 0.98,
           transform: "translateY(-50%)",
           border: 0,
@@ -1082,8 +1081,8 @@ function SystemStatusCard(props: {
           aria-hidden
           style={{
             display: "inline-flex",
-            width: 74,
-            height: 74,
+            width: 64,
+            height: 64,
             backgroundColor: tokens.foreground,
             maskImage: `url(${TOP_NODE_CARD_ICON_SRC[props.card.key].src})`,
             maskPosition: "center",

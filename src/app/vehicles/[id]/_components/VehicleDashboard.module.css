@@ -22,10 +22,10 @@
   align-items: start;
 }
 
-/* Tall enough for SectionHeader + 3×2 SystemStatusCards (tags + icon) without clipping. */
+/* Mid row: left uses fixed height for scroll; right column height follows compact node cards. */
 .midGridCard {
   box-sizing: border-box;
-  height: 520px;
+  height: 440px;
 }
 
 .lowerGrid {
@@ -35,7 +35,7 @@
 }
 
 .systemsGridBody {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -43,11 +43,9 @@
 }
 
 .systemsGrid {
-  flex: 1;
-  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   margin-top: 12px;
   align-content: start;
   justify-items: stretch;
