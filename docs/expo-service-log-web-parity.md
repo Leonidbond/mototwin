@@ -28,9 +28,8 @@
 ### Preserved behavior
 
 - Loading / error / empty states
-- Add-service-event action
-- Navigation and focus-based refresh behavior
-- Shared grouping/summary helpers from `@mototwin/domain`
+- Navigation and focus-based refresh (`useFocusEffect`)
+- Shared timeline pipeline from `@mototwin/domain` (`buildServiceLogTimelineProps`, filters, sort, month groups)
 
 ## What now matches web conceptually
 
@@ -41,12 +40,15 @@
 
 ## What remains intentionally mobile-specific
 
-- No desktop-like dense table/filter layout
+- No desktop-like dense table layout or wide filter panel
 - No heavy timeline decorations
 - More compact cards and spacing tuned for one-hand use
+- Add/edit/repeat flows open the dedicated `service-events/new` screen instead of web’s inline modal on the journal page
 
-## Not yet at full parity
+## Parity since this doc was first written
 
-- Web-level filtering/sorting controls are not mirrored in mobile
-- Advanced comments expansion behavior from web is not replicated
-- Desktop modal composition is intentionally not cloned
+- Filtering, sorting, `paidOnly`, subtree filter via `nodeIds`/`nodeLabel`, comment preview/expand, and wishlist-origin affordances are aligned with web at the **data + rules** level (see [expo-service-log-filter-sort-parity.md](./expo-service-log-filter-sort-parity.md) and [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md)).
+
+## Still not a pixel clone of web
+
+- Layout density and control chrome differ by design (mobile-first toolbar vs desktop page)

@@ -2,7 +2,7 @@
 
 ## What was built
 
-The Vehicle Detail screen (`apps/app/app/vehicles/[id].tsx`) now shows the full hierarchical node tree with expand/collapse interaction.
+The Expo vehicle node route (`apps/app/app/vehicles/[id]/nodes.tsx`) renders `VehicleDetailScreen` from `apps/app/app/vehicles/[id]/index.tsx` with `forcedView="nodes"`, showing the full hierarchical node tree with expand/collapse interaction.
 
 ## How it works
 
@@ -15,7 +15,13 @@ The Vehicle Detail screen (`apps/app/app/vehicles/[id].tsx`) now shows the full 
 - Status filter chips support `Все`, `Просрочено`, `Скоро`, `Недавно заменено`, `ОК`
 - Status filtering keeps matching nodes plus their parent chain, and automatically expands branches that contain matches
 - Search results are scoped by the active status filter
+- `ТОП-узлы` limits the tree to up to 15 dashboard overview nodes plus their parent chains
+- `Свернуть` clears expanded branches; expanding a single-child branch opens the chain down to the first branch/leaf
 - Node context, subtree modal and status explanation modal share the same dark theme tokens and return to the previous overlay/screen when closed
+- Node context matches the web action matrix: subtree composition for parent nodes, clickable recent events, compatible parts row vs quick-add, service kit row vs quick-add, and active uninstalled wishlist rows
+- Node context **layout** mirrors the web `NodeContextReferencePanel` idea: separate bordered **sections** (header strip + body) instead of one undivided scroll — Actions, maintenance plan, composition, recent events (with **Журнал** in the section header), SKU recommendations, service kits, uninstalled parts (leaf)
+- Leaving the node tree for service log or wishlist stores selected node, status filter, TOP mode and expanded branches so return navigation restores the same leaf focus
+- Unlike web, Expo currently does not render node expense summary blocks inside the tree
 
 ## Visual structure
 
@@ -49,10 +55,12 @@ With status filter enabled:
 Uses `GET /api/vehicles/:id/node-tree` via `getNodeTree` from `@mototwin/api-client`.
 
 The response is `{ nodeTree: NodeTreeItem[] }` — each item contains:
-- `name`, `effectiveStatus`, `statusExplanation.reasonShort`
+- `id`, `code`, `name`, `level`, `displayOrder`
+- `status`, `directStatus`, `computedStatus`, `effectiveStatus`
+- `statusExplanation.reasonShort` when the API can explain the current status
 - `children: NodeTreeItem[]` (recursive)
 
-Loaded in parallel with vehicle detail on screen mount.
+Loaded as part of the vehicle detail screen data refresh. The tree has its own loading/error state so a tree failure does not hide the vehicle card.
 
 ## Shared packages used
 

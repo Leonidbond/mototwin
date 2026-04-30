@@ -2,7 +2,7 @@
 
 ## What was built
 
-A Vehicle Detail screen (`apps/app/app/vehicles/[id].tsx`) that:
+A Vehicle Detail screen (`apps/app/app/vehicles/[id]/index.tsx`) that:
 
 - Loads full motorcycle data and top-level node statuses in parallel
 - Shows an info card with key motorcycle details
@@ -18,7 +18,7 @@ From the Garage screen (`apps/app/app/index.tsx`), tapping a motorcycle title ca
 router.push(`/vehicles/${item.id}`)
 ```
 
-Expo Router maps this to `apps/app/app/vehicles/[id].tsx`.  
+Expo Router maps this to `apps/app/app/vehicles/[id]/index.tsx`.  
 The screen is registered in `_layout.tsx` as `vehicles/[id]` with the title "Мотоцикл".
 
 ## Data and routes

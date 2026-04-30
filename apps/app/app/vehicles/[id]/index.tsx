@@ -1,4 +1,4 @@
-import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import {
@@ -29,6 +29,7 @@ import {
   buildNodeSearchResultActions,
   buildTopNodeOverviewCards,
   buildNodeMaintenancePlanViewModel,
+  buildPartWishlistItemViewModel,
   buildRideProfileViewModel,
   buildVehicleDetailViewModel,
   buildVehicleStateViewModel,
@@ -41,17 +42,17 @@ import {
   getNodeSubtreeById,
   getTopLevelNodeTreeItems,
   isNodeSnoozed,
+  partWishlistStatusLabelsRu,
   searchNodeTree,
   formatIsoCalendarDateRu,
   formatExpenseAmountRu,
-  expenseCategoryLabelsRu,
+  filterActiveWishlistItems,
   getRecentServiceEventsForNode,
   resolveGarageVehicleSilhouette,
 } from "@mototwin/domain";
 import type {
   AttentionItemViewModel,
   ExpenseItem,
-  ExpenseNodeSummaryItem,
   ExpenseSummaryViewModel,
   NodeSnoozeOption,
   NodeContextViewModel,
@@ -61,6 +62,9 @@ import type {
   NodeTreeItemViewModel,
   NodeTreeSearchResultViewModel,
   NodeTreeSearchActionKey,
+  PartWishlistItem,
+  PartWishlistItemStatus,
+  PartWishlistItemViewModel,
   PartRecommendationViewModel,
   ServiceEventItem,
   ServiceKitViewModel,
@@ -75,15 +79,19 @@ import {
 } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import {
-  readCollapsiblePreference,
-  writeCollapsiblePreference,
-} from "../../../src/ui-collapsible-preferences";
-import {
   readNodeSnoozePreferences,
   writeNodeSnoozePreference,
 } from "../../../src/ui-node-snooze-preferences";
+import {
+  consumeNodeTreeReturnState,
+  writeNodeTreeReturnState,
+} from "../../../src/ui-node-tree-return-state";
 import { buildVehicleServiceLogHref } from "./service-log";
-import { buildVehicleWishlistNewHref } from "./wishlist/hrefs";
+import {
+  buildServiceEventNewFromWishlistHref,
+  buildVehicleWishlistItemHighlightHref,
+  buildVehicleWishlistNewHref,
+} from "./wishlist/hrefs";
 import { StatusExplanationModal } from "./status-explanation-modal";
 import { ActionIconButton } from "../../components/action-icon-button";
 import { AppScreenHelpBar } from "../../components/app-screen-help-bar";
@@ -127,6 +135,10 @@ const NODE_STATUS_FILTER_OPTIONS: NodeStatus[] = [
 
 type NodeStatusFilter = NodeStatus | "ALL";
 
+function isNodeStatusFilter(value: unknown): value is NodeStatusFilter {
+  return value === "ALL" || NODE_STATUS_FILTER_OPTIONS.includes(value as NodeStatus);
+}
+
 function findNodeViewModelPathById(
   nodes: NodeTreeItemViewModel[],
   targetNodeId: string,
@@ -143,6 +155,65 @@ function findNodeViewModelPathById(
     }
   }
   return null;
+}
+
+const NODE_TREE_TOP_NODES_LIMIT = 15;
+
+function collectNodeIdsOnPathsToTargets(
+  roots: NodeTreeItemViewModel[],
+  targetIds: Set<string>
+): Set<string> {
+  const included = new Set<string>();
+  const walk = (node: NodeTreeItemViewModel, ancestors: string[]) => {
+    const path = [...ancestors, node.id];
+    if (targetIds.has(node.id)) {
+      path.forEach((id) => included.add(id));
+    }
+    node.children.forEach((child) => walk(child, path));
+  };
+  roots.forEach((root) => walk(root, []));
+  return included;
+}
+
+function filterNodeTreeToNodeIdSet(
+  nodes: NodeTreeItemViewModel[],
+  keepIds: Set<string>
+): NodeTreeItemViewModel[] {
+  return nodes.flatMap((node) => {
+    if (!keepIds.has(node.id)) {
+      return [];
+    }
+    const children = filterNodeTreeToNodeIdSet(node.children, keepIds);
+    return [{ ...node, children, hasChildren: children.length > 0 }];
+  });
+}
+
+function collectSingleChildExpansionChain(node: NodeTreeItemViewModel): string[] {
+  const expandedIds: string[] = [];
+  let current: NodeTreeItemViewModel | null = node;
+  while (current && current.children.length === 1) {
+    expandedIds.push(current.id);
+    const onlyChild: NodeTreeItemViewModel | null = current.children[0] ?? null;
+    current = onlyChild && onlyChild.children.length > 0 ? onlyChild : null;
+  }
+  if (expandedIds.length === 0 && node.children.length > 0) {
+    expandedIds.push(node.id);
+  }
+  return expandedIds;
+}
+
+function collectSubtreeDescendantItems(
+  root: NodeTreeItemViewModel
+): { id: string; name: string; depthFromSelected: number }[] {
+  const out: { id: string; name: string; depthFromSelected: number }[] = [];
+  const walk = (node: NodeTreeItemViewModel, depthFromSelected: number) => {
+    for (const child of node.children) {
+      out.push({ id: child.id, name: child.name, depthFromSelected });
+      walk(child, depthFromSelected + 1);
+    }
+  };
+  walk(root, 1);
+  return out;
 }
 
 function filterNodeViewModelsByStatus(
@@ -189,25 +260,6 @@ function collectExpandedNodeIdsWithStatusDescendants(
   return expandedIds;
 }
 
-function countNodeStatuses(nodes: NodeTreeItemViewModel[]): Record<NodeStatus, number> {
-  const counts: Record<NodeStatus, number> = {
-    OVERDUE: 0,
-    SOON: 0,
-    RECENTLY_REPLACED: 0,
-    OK: 0,
-  };
-
-  const walk = (node: NodeTreeItemViewModel) => {
-    if (node.effectiveStatus) {
-      counts[node.effectiveStatus] += 1;
-    }
-    node.children.forEach(walk);
-  };
-
-  nodes.forEach(walk);
-  return counts;
-}
-
 function flattenNodeViewModelsById(nodes: NodeTreeItemViewModel[]): Map<string, NodeTreeItemViewModel> {
   const byId = new Map<string, NodeTreeItemViewModel>();
   const stack = [...nodes];
@@ -226,42 +278,18 @@ function isIssueNodeStatus(status: NodeStatus | null): status is "OVERDUE" | "SO
   return status === "OVERDUE" || status === "SOON";
 }
 
-function formatNodeExpenseTotals(totals: ExpenseNodeSummaryItem["totalByCurrency"]): string {
-  if (totals.length === 0) {
-    return "—";
-  }
-  return totals
-    .map((row) => `${formatExpenseAmountRu(row.amount)} ${row.currency === "RUB" ? "₽" : row.currency}`)
-    .join(" · ");
-}
-
-function formatNodeExpenseDate(date: string): string {
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) {
-    return date.slice(0, 10);
-  }
-  return parsed.toLocaleDateString("ru-RU");
-}
-
-
-
 // ─── Expandable node row ──────────────────────────────────────────────────────
 
 type NodeRowProps = {
   node: NodeTreeItemViewModel;
   depth: number;
   expandedIds: Set<string>;
-  onToggle: (id: string) => void;
+  onToggle: (node: NodeTreeItemViewModel) => void;
   onAddFromLeaf: (leafNodeId: string) => void;
   onAddToWishlist?: (nodeId: string) => void;
   onOpenContext?: (nodeId: string) => void;
   onOpenStatusExplanation?: (node: NodeTreeItemViewModel) => void;
   onOpenServiceLogForNode?: (node: NodeTreeItemViewModel) => void;
-  expenseSummary?: ExpenseNodeSummaryItem | null;
-  expenseSummaryByNodeId: Record<string, ExpenseNodeSummaryItem>;
-  expenseYear: number;
-  onOpenExpensesForNode?: (nodeId: string) => void;
-  isMaintenanceModeEnabled: boolean;
   selectedNodeId?: string | null;
   highlightedNodeId?: string | null;
   statusHighlightedNodeIds?: Set<string>;
@@ -279,11 +307,6 @@ function NodeRow({
   onOpenContext,
   onOpenStatusExplanation,
   onOpenServiceLogForNode,
-  expenseSummary,
-  expenseSummaryByNodeId,
-  expenseYear,
-  onOpenExpensesForNode,
-  isMaintenanceModeEnabled,
   selectedNodeId,
   highlightedNodeId,
   statusHighlightedNodeIds,
@@ -295,7 +318,7 @@ function NodeRow({
     item: node,
     depth,
     isExpanded: expandedIds.has(node.id),
-    onToggleExpand: () => onToggle(node.id),
+    onToggleExpand: () => onToggle(node),
     onRequestAddServiceEvent: node.canAddServiceEvent
       ? () => onAddFromLeaf(node.id)
       : undefined,
@@ -305,46 +328,26 @@ function NodeRow({
   const isExpanded = treeItemContract.isExpanded;
   const status = rowNode.effectiveStatus as NodeStatus | null;
   const colors = getStatusColors(status);
-  const label = rowNode.statusLabel;
-  const indent = 12 + depth * 14;
+  const label =
+    rowNode.effectiveStatus === "OVERDUE"
+      ? "Просрочено"
+      : rowNode.effectiveStatus === "SOON"
+        ? "Скоро"
+        : rowNode.effectiveStatus === "RECENTLY_REPLACED"
+          ? "Недавно"
+          : rowNode.effectiveStatus
+            ? "ОК"
+            : rowNode.statusLabel;
   const accentColor = getNodeAccentColor(status);
   const isTopLevel = depth === 0;
   const badgeStyle = !isTopLevel ? styles.badgeNested : undefined;
   const badgeTextStyle = !isTopLevel ? styles.badgeTextNested : undefined;
+  const childCount = rowNode.children.length;
   const statusHighlightTokens =
     statusHighlightedNodeIds?.has(rowNode.id) && isIssueNodeStatus(rowNode.effectiveStatus)
       ? statusSemanticTokens[rowNode.effectiveStatus]
       : null;
-  const maintenancePlan = isMaintenanceModeEnabled ? buildNodeMaintenancePlanViewModel(rowNode) : null;
-  const shouldUseMaintenanceShortExplanation =
-    isMaintenanceModeEnabled &&
-    rowNode.effectiveStatus === "OVERDUE" &&
-    !rowNode.shortExplanationLabel &&
-    Boolean(maintenancePlan?.shortText);
-  const overdueDueLineFallback =
-    isMaintenanceModeEnabled && rowNode.effectiveStatus === "OVERDUE"
-      ? (maintenancePlan?.dueLines[0] ?? null)
-      : null;
-  const overdueDetailedFallback =
-    isMaintenanceModeEnabled && rowNode.effectiveStatus === "OVERDUE"
-      ? (rowNode.statusExplanation?.reasonDetailed?.trim() || null)
-      : null;
-  const reasonShort =
-    rowNode.shortExplanationLabel ??
-    (shouldUseMaintenanceShortExplanation ? maintenancePlan?.shortText ?? null : null) ??
-    overdueDetailedFallback ??
-    overdueDueLineFallback;
-  const summary = maintenancePlan?.parentSummary;
-  const summaryLine =
-    summary && (summary.overdueCount > 0 || summary.soonCount > 0 || summary.plannedLaterCount > 0)
-      ? [
-          summary.overdueCount > 0 ? `Просрочено: ${summary.overdueCount}` : null,
-          summary.soonCount > 0 ? `Скоро: ${summary.soonCount}` : null,
-          summary.plannedLaterCount > 0 ? `Запланировано: ${summary.plannedLaterCount}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")
-      : null;
+  const reasonShort = rowNode.shortExplanationLabel;
   const canOpenMaintenanceExplanation =
     canOpenNodeStatusExplanationModal(rowNode) && Boolean(onOpenStatusExplanation);
   const openMaintenanceExplanation = (event?: GestureResponderEvent) => {
@@ -398,7 +401,6 @@ function NodeRow({
         }}
         style={({ pressed }) => [
           styles.nodeRow,
-          { paddingLeft: indent },
           isTopLevel && styles.nodeRowTopLevel,
           depth > 0 && styles.nodeRowNested,
           (highlightedNodeId === rowNode.id || selectedNodeId === rowNode.id) && styles.nodeRowHighlighted,
@@ -411,6 +413,16 @@ function NodeRow({
         ]}
       >
         <View style={styles.nodeRowLeft}>
+          {depth > 0 ? (
+            <View style={styles.nodeGuides} pointerEvents="none">
+              {Array.from({ length: depth }).map((_, guideIndex) => (
+                <View key={`${rowNode.id}.guide.${guideIndex}`} style={styles.nodeGuideColumn}>
+                  <View style={styles.nodeGuideVertical} />
+                  {guideIndex === depth - 1 ? <View style={styles.nodeGuideElbow} /> : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
           <Pressable
             style={styles.chevronWrap}
             onPress={(event) => {
@@ -429,11 +441,27 @@ function NodeRow({
               <View style={styles.chevronPlaceholder} />
             )}
           </Pressable>
+          <View style={styles.nodeTreeIconWrap}>
+            <Image
+              source={getNodeTreeIconSource(rowNode)}
+              style={styles.nodeTreeIconImage}
+              resizeMode="contain"
+              alt=""
+            />
+          </View>
           <View style={styles.nodeNameBlock}>
             <Text style={[styles.nodeName, depth === 0 && styles.nodeNameTop]}>
               {rowNode.name}
             </Text>
-            <Text style={styles.nodeCodeText}>{rowNode.code}</Text>
+            <View style={styles.nodeMetaRow}>
+              <Text style={styles.nodeCodeText}>{rowNode.code}</Text>
+              {childCount > 0 ? (
+                <View style={styles.nodeChildCount}>
+                  <MaterialIcons name="content-copy" size={10} color={c.textMuted} />
+                  <Text style={styles.nodeChildCountText}>{childCount}</Text>
+                </View>
+              ) : null}
+            </View>
             {reasonShort &&
             canOpenMaintenanceExplanation ? (
               <Pressable
@@ -446,93 +474,6 @@ function NodeRow({
               </Pressable>
             ) : reasonShort ? (
               <Text style={styles.reasonShort}>{reasonShort}</Text>
-            ) : null}
-            {isMaintenanceModeEnabled && maintenancePlan && !reasonShort && maintenancePlan.shortText ? (
-              canOpenMaintenanceExplanation ? (
-                <Pressable
-                  onPress={openMaintenanceExplanation}
-                  hitSlop={6}
-                  accessibilityRole="button"
-                  accessibilityLabel="Пояснение расчёта статуса"
-                >
-                  <Text style={[styles.reasonShort, styles.reasonShortLink]}>
-                    {maintenancePlan.shortText}
-                  </Text>
-                </Pressable>
-              ) : (
-                <Text style={styles.reasonShort}>{maintenancePlan.shortText}</Text>
-              )
-            ) : null}
-            {isMaintenanceModeEnabled && summaryLine ? (
-              <Text style={styles.planSummaryText}>{summaryLine}</Text>
-            ) : null}
-            {expenseSummary ? (
-              <View style={styles.nodeExpenseCompact}>
-                <Text style={styles.nodeExpenseLine}>
-                  Расходы за сезон: {formatNodeExpenseTotals(expenseSummary.totalByCurrency)}
-                </Text>
-                {expenseSummary.purchasedNotInstalledCount > 0 ? (
-                  <Text style={styles.nodeExpenseLine}>
-                    Куплено, не установлено: {expenseSummary.purchasedNotInstalledCount}
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
-            {isMaintenanceModeEnabled &&
-            maintenancePlan &&
-            !hasChildren &&
-            maintenancePlan.hasMeaningfulData ? (
-              <View style={styles.planLeafBlock}>
-                {maintenancePlan.dueLines.map((line) => (
-                  canOpenMaintenanceExplanation ? (
-                    <Pressable
-                      key={line}
-                      onPress={openMaintenanceExplanation}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityLabel="Пояснение расчёта статуса"
-                    >
-                      <Text style={[styles.planLeafLine, styles.planLeafLink]}>{line}</Text>
-                    </Pressable>
-                  ) : (
-                    <Text key={line} style={styles.planLeafLine}>
-                      {line}
-                    </Text>
-                  )
-                ))}
-                {maintenancePlan.lastServiceLine ? (
-                  canOpenMaintenanceExplanation ? (
-                    <Pressable
-                      onPress={openMaintenanceExplanation}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityLabel="Пояснение расчёта статуса"
-                    >
-                      <Text style={[styles.planLeafMuted, styles.planLeafLink]}>
-                        {maintenancePlan.lastServiceLine}
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Text style={styles.planLeafMuted}>{maintenancePlan.lastServiceLine}</Text>
-                  )
-                ) : null}
-                {maintenancePlan.ruleIntervalLine ? (
-                  canOpenMaintenanceExplanation ? (
-                    <Pressable
-                      onPress={openMaintenanceExplanation}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityLabel="Пояснение расчёта статуса"
-                    >
-                      <Text style={[styles.planLeafMuted, styles.planLeafLink]}>
-                        {maintenancePlan.ruleIntervalLine}
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Text style={styles.planLeafMuted}>{maintenancePlan.ruleIntervalLine}</Text>
-                  )
-                ) : null}
-              </View>
             ) : null}
           </View>
         </View>
@@ -580,46 +521,6 @@ function NodeRow({
 
       {hasChildren && isExpanded ? (
         <>
-          {expenseSummary ? (
-            <View style={[styles.nodeExpenseDetails, { marginLeft: indent + 12 }]}>
-              <View style={styles.nodeExpenseDetailsHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.nodeExpenseDetailsTitle}>Расходы по узлу</Text>
-                  <Text style={styles.nodeExpenseDetailsText}>
-                    {formatNodeExpenseTotals(expenseSummary.totalByCurrency)} за сезон {expenseYear}
-                  </Text>
-                  <Text style={styles.nodeExpenseDetailsText}>
-                    {expenseSummary.expenseCount} расход{expenseSummary.expenseCount === 1 ? "" : "а"}
-                  </Text>
-                  {expenseSummary.purchasedNotInstalledCount > 0 ? (
-                    <Text style={styles.nodeExpenseDetailsText}>
-                      Куплено, не установлено: {expenseSummary.purchasedNotInstalledCount}
-                    </Text>
-                  ) : null}
-                </View>
-                {onOpenExpensesForNode ? (
-                  <Pressable onPress={() => onOpenExpensesForNode(rowNode.id)} hitSlop={8}>
-                    <Text style={styles.nodeExpenseLink}>Все расходы →</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-              {expenseSummary.latestExpenses.length > 0 ? (
-                <View style={styles.nodeExpenseLatestList}>
-                  <Text style={styles.nodeExpenseLatestTitle}>Последние расходы</Text>
-                  {expenseSummary.latestExpenses.map((expense) => (
-                    <View key={expense.id} style={styles.nodeExpenseLatestRow}>
-                      <Text style={styles.nodeExpenseLatestText}>
-                        {formatNodeExpenseDate(expense.date)} {expense.title} · {expenseCategoryLabelsRu[expense.category]}
-                      </Text>
-                      <Text style={styles.nodeExpenseLatestAmount}>
-                        {formatExpenseAmountRu(expense.amount)} {expense.currency === "RUB" ? "₽" : expense.currency}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          ) : null}
           {rowNode.children.map((child) => (
             <NodeRow
               key={child.id}
@@ -632,11 +533,6 @@ function NodeRow({
               onOpenContext={onOpenContext}
               onOpenStatusExplanation={onOpenStatusExplanation}
               onOpenServiceLogForNode={onOpenServiceLogForNode}
-              expenseSummary={expenseSummaryByNodeId[child.id] ?? null}
-              expenseSummaryByNodeId={expenseSummaryByNodeId}
-              expenseYear={expenseYear}
-              onOpenExpensesForNode={onOpenExpensesForNode}
-              isMaintenanceModeEnabled={isMaintenanceModeEnabled}
               highlightedNodeId={highlightedNodeId}
               selectedNodeId={selectedNodeId}
               statusHighlightedNodeIds={statusHighlightedNodeIds}
@@ -660,6 +556,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const subtreeScrollViewRef = useRef<ScrollView | null>(null);
+  const appliedNodeTreeReturnStateRef = useRef(false);
   const params = useLocalSearchParams<{
     id?: string | string[];
     nodeContextId?: string;
@@ -695,12 +592,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
-  const [nodeExpenseYear, setNodeExpenseYear] = useState(() => new Date().getFullYear());
-  const [nodeExpenseSummaryByNodeId, setNodeExpenseSummaryByNodeId] = useState<
-    Record<string, ExpenseNodeSummaryItem>
-  >({});
-  const [isNodeExpenseSummaryLoading, setIsNodeExpenseSummaryLoading] = useState(false);
-  const [nodeExpenseSummaryError, setNodeExpenseSummaryError] = useState("");
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -709,11 +600,12 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [isTopServiceNodesLoading, setIsTopServiceNodesLoading] = useState(false);
   const [topServiceNodesError, setTopServiceNodesError] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
   const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
   const [nodeSearchQuery, setNodeSearchQuery] = useState("");
   const [debouncedNodeSearchQuery, setDebouncedNodeSearchQuery] = useState("");
   const [nodeStatusFilter, setNodeStatusFilter] = useState<NodeStatusFilter>("ALL");
+  const [nodeTreeTopOnly, setNodeTreeTopOnly] = useState(false);
+  const [isSubtreeCompositionExpanded, setIsSubtreeCompositionExpanded] = useState(false);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [statusHighlightedNodeIds, setStatusHighlightedNodeIds] = useState<Set<string>>(new Set());
   const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
@@ -726,10 +618,10 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [nodeContextServiceKitsError, setNodeContextServiceKitsError] = useState("");
   const [nodeContextAddingRecommendedSkuId, setNodeContextAddingRecommendedSkuId] = useState("");
   const [nodeContextAddingKitCode, setNodeContextAddingKitCode] = useState("");
-  const [hasLoadedCollapsePrefs, setHasLoadedCollapsePrefs] = useState(false);
   const [statusExplanationNode, setStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
   const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<PartWishlistItem[]>([]);
   const [yearExpenses, setYearExpenses] = useState<ExpenseItem[]>([]);
   const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
   const [isMovingToTrash, setIsMovingToTrash] = useState(false);
@@ -751,6 +643,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     setNodeTreeError("");
     setTopServiceNodesError("");
     setServiceEvents([]);
+    setWishlistItems([]);
     setYearExpenses([]);
 
     try {
@@ -763,6 +656,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       setNodeTree([]);
       setTopServiceNodes([]);
       setServiceEvents([]);
+      setWishlistItems([]);
       setYearExpenses([]);
       setIsLoading(false);
       return;
@@ -772,14 +666,18 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
     setIsNodeTreeLoading(true);
     setIsTopServiceNodesLoading(true);
-    setIsNodeExpenseSummaryLoading(true);
-    setNodeExpenseSummaryError("");
-    const [nodesResult, eventsResult, topNodesResult, expenseNodeSummaryResult, yearExpensesResult] = await Promise.allSettled([
+    const [
+      nodesResult,
+      eventsResult,
+      topNodesResult,
+      yearExpensesResult,
+      wishlistResult,
+    ] = await Promise.allSettled([
       endpoints.getNodeTree(vehicleId),
       endpoints.getServiceEvents(vehicleId),
       endpoints.getTopServiceNodes(),
-      endpoints.getExpenseNodeSummary({ vehicleId, year: nodeExpenseYear }),
       endpoints.getExpenses({ vehicleId, year: new Date().getFullYear() }),
+      endpoints.getVehicleWishlist(vehicleId),
     ]);
 
     if (nodesResult.status === "fulfilled") {
@@ -805,6 +703,13 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       setYearExpenses([]);
     }
 
+    if (wishlistResult.status === "fulfilled") {
+      setWishlistItems(wishlistResult.value.items ?? []);
+    } else {
+      console.error(wishlistResult.reason);
+      setWishlistItems([]);
+    }
+
     if (topNodesResult.status === "fulfilled") {
       setTopServiceNodes(topNodesResult.value.nodes ?? []);
       setTopServiceNodesError("");
@@ -814,38 +719,15 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       setTopServiceNodesError("Не удалось загрузить основные узлы.");
     }
 
-    if (expenseNodeSummaryResult.status === "fulfilled") {
-      setNodeExpenseSummaryByNodeId(
-        Object.fromEntries((expenseNodeSummaryResult.value.nodes ?? []).map((summary) => [summary.nodeId, summary]))
-      );
-      setNodeExpenseSummaryError("");
-    } else {
-      console.error(expenseNodeSummaryResult.reason);
-      setNodeExpenseSummaryByNodeId({});
-      setNodeExpenseSummaryError("Не удалось загрузить расходы по узлам.");
-    }
-
     setIsNodeTreeLoading(false);
     setIsTopServiceNodesLoading(false);
-    setIsNodeExpenseSummaryLoading(false);
-  }, [apiBaseUrl, nodeExpenseYear, vehicleId]);
+  }, [apiBaseUrl, vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
       load();
     }, [load])
   );
-
-  useEffect(() => {
-    if (!vehicleId) return;
-    void (async () => {
-      const maintenanceMode = await readCollapsiblePreference(
-        `vehicleDetail.${vehicleId}.nodeMaintenanceMode.enabled`
-      );
-      setIsNodeMaintenanceModeEnabled(maintenanceMode ?? false);
-      setHasLoadedCollapsePrefs(true);
-    })();
-  }, [vehicleId]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -910,14 +792,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       });
   }, [apiBaseUrl, vehicleId, selectedNodeContextId]);
 
-  useEffect(() => {
-    if (!vehicleId || !hasLoadedCollapsePrefs) return;
-    void writeCollapsiblePreference(
-      `vehicleDetail.${vehicleId}.nodeMaintenanceMode.enabled`,
-      isNodeMaintenanceModeEnabled
-    );
-  }, [vehicleId, hasLoadedCollapsePrefs, isNodeMaintenanceModeEnabled]);
-
   const { roots: nodeTreeViewModel } = useMemo(
     () => buildNodeTreeSectionProps(nodeTree),
     [nodeTree]
@@ -943,13 +817,51 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       return next;
     });
   }, [topLevelNodeViewModels, selectedNodeStatusFilter]);
-  const nodeStatusCounts = useMemo(
-    () => countNodeStatuses(topLevelNodeViewModels),
-    [topLevelNodeViewModels]
+  const topNodeStatusByCode = useMemo(() => {
+    const statusByCode = new Map<string, NodeStatus | null>();
+    const stack = [...nodeTree];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) {
+        continue;
+      }
+      statusByCode.set(current.code, current.effectiveStatus ?? null);
+      if (current.children.length > 0) {
+        stack.push(...current.children);
+      }
+    }
+    return statusByCode;
+  }, [nodeTree]);
+  const topNodeOverviewCards = useMemo<TopNodeOverviewCard[]>(
+    () => buildTopNodeOverviewCards(topServiceNodes, topNodeStatusByCode),
+    [topServiceNodes, topNodeStatusByCode]
   );
+  const overviewTopNodeIdsOrderedForTree = useMemo(
+    () =>
+      topNodeOverviewCards
+        .flatMap((card) => card.nodes.map((node) => node.id))
+        .filter((id) => findNodeViewModelPathById(topLevelNodeViewModels, id) != null),
+    [topNodeOverviewCards, topLevelNodeViewModels]
+  );
+  const hasExpandedNodeTreeItems = useMemo(() => expandedIds.size > 0, [expandedIds]);
   const filteredTopLevelNodeViewModels = useMemo(
-    () => filterNodeViewModelsByStatus(topLevelNodeViewModels, selectedNodeStatusFilter),
-    [topLevelNodeViewModels, selectedNodeStatusFilter]
+    () => {
+      let visibleRoots = topLevelNodeViewModels;
+      if (nodeTreeTopOnly) {
+        const targetIds = new Set(
+          overviewTopNodeIdsOrderedForTree.slice(0, NODE_TREE_TOP_NODES_LIMIT)
+        );
+        const keepIds = collectNodeIdsOnPathsToTargets(topLevelNodeViewModels, targetIds);
+        visibleRoots = filterNodeTreeToNodeIdSet(topLevelNodeViewModels, keepIds);
+      }
+      return filterNodeViewModelsByStatus(visibleRoots, selectedNodeStatusFilter);
+    },
+    [
+      topLevelNodeViewModels,
+      selectedNodeStatusFilter,
+      nodeTreeTopOnly,
+      overviewTopNodeIdsOrderedForTree,
+    ]
   );
   const selectedNodeContextNode = useMemo(
     () =>
@@ -982,6 +894,41 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     nodeContextRecommendations,
     nodeContextServiceKits,
   ]);
+  useEffect(() => {
+    setIsSubtreeCompositionExpanded(false);
+  }, [selectedNodeContextId]);
+  const isSelectedNodeContextTopLevel = useMemo(
+    () =>
+      selectedNodeContextId != null &&
+      topLevelNodeViewModels.some((node) => node.id === selectedNodeContextId),
+    [selectedNodeContextId, topLevelNodeViewModels]
+  );
+  const subtreeCompositionItems = useMemo(
+    () => (selectedNodeContextNode ? collectSubtreeDescendantItems(selectedNodeContextNode) : []),
+    [selectedNodeContextNode]
+  );
+  const visibleSubtreeCompositionItems = isSubtreeCompositionExpanded
+    ? subtreeCompositionItems
+    : subtreeCompositionItems.slice(0, 12);
+  const showSubtreeCompositionSection =
+    Boolean(selectedNodeContextNode) &&
+    Boolean(selectedNodeContextViewModel) &&
+    !selectedNodeContextViewModel?.isLeaf &&
+    isSelectedNodeContextTopLevel &&
+    subtreeCompositionItems.length > 0;
+  const selectedNodeFilterIds = useMemo(() => {
+    if (selectedNodeContextRawNode) {
+      return new Set(createServiceLogNodeFilter(selectedNodeContextRawNode).nodeIds);
+    }
+    return selectedNodeContextId ? new Set([selectedNodeContextId]) : new Set<string>();
+  }, [selectedNodeContextRawNode, selectedNodeContextId]);
+  const selectedUninstalledParts = useMemo(
+    () =>
+      filterActiveWishlistItems(wishlistItems)
+        .map(buildPartWishlistItemViewModel)
+        .filter((item) => item.nodeId != null && selectedNodeFilterIds.has(item.nodeId)),
+    [selectedNodeFilterIds, wishlistItems]
+  );
   const nodeSearchResults = useMemo<NodeTreeSearchResultViewModel[]>(
     () =>
       searchNodeTree(filteredTopLevelNodeViewModels, {
@@ -991,26 +938,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       }),
     [filteredTopLevelNodeViewModels, debouncedNodeSearchQuery]
   );
-  const topNodeStatusByCode = useMemo(() => {
-    const statusByCode = new Map<string, NodeStatus | null>();
-    const stack = [...nodeTree];
-    while (stack.length > 0) {
-      const current = stack.pop();
-      if (!current) {
-        continue;
-      }
-      statusByCode.set(current.code, current.effectiveStatus ?? null);
-      if (current.children.length > 0) {
-        stack.push(...current.children);
-      }
-    }
-    return statusByCode;
-  }, [nodeTree]);
-  const topNodeOverviewCards = useMemo<TopNodeOverviewCard[]>(
-    () => buildTopNodeOverviewCards(topServiceNodes, topNodeStatusByCode),
-    [topServiceNodes, topNodeStatusByCode]
-  );
-
   const attentionSummary = useMemo(
     () => buildAttentionSummaryFromNodeTree(nodeTree),
     [nodeTree]
@@ -1054,44 +981,71 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     };
   }, [vehicleId, attentionSummary.items, selectedNodeContextId]);
 
-  function toggleNode(id: string) {
+  function toggleNode(node: NodeTreeItemViewModel) {
+    const chainIds = collectSingleChildExpansionChain(node);
     setExpandedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
+      const shouldExpand = !next.has(node.id);
+      for (const id of chainIds) {
+        if (shouldExpand) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+      }
+      if (chainIds.length === 0) {
+        if (shouldExpand) {
+          next.add(node.id);
+        } else {
+          next.delete(node.id);
+        }
       }
       return next;
     });
   }
 
+  const persistNodeTreeReturnState = useCallback(
+    (selectedNodeId: string) => {
+      if (!vehicleId || !isNodeTreePage) {
+        return;
+      }
+      appliedNodeTreeReturnStateRef.current = false;
+      void writeNodeTreeReturnState(vehicleId, {
+        selectedNodeId,
+        nodeStatusFilter,
+        nodeTreeTopOnly,
+        expandedIds: Array.from(expandedIds),
+      });
+    },
+    [expandedIds, isNodeTreePage, nodeStatusFilter, nodeTreeTopOnly, vehicleId]
+  );
+
   const openServiceLogForTreeNode = useCallback(
-    (vm: NodeTreeItemViewModel) => {
+    (vm: NodeTreeItemViewModel, options?: { serviceEventId?: string; returnNodeId?: string }) => {
       setHighlightedNodeId(null);
+      persistNodeTreeReturnState(options?.returnNodeId ?? vm.id);
       const raw = findNodeTreeItemById(nodeTree, vm.id);
       if (!raw) {
         return;
       }
       const filter = createServiceLogNodeFilter(raw);
-      router.push(buildVehicleServiceLogHref(vehicleId, filter, false));
+      router.push(
+        buildVehicleServiceLogHref(vehicleId, filter, false, {
+          serviceEventId: options?.serviceEventId,
+          returnNodeId: options?.returnNodeId ?? vm.id,
+        })
+      );
     },
-    [nodeTree, router, vehicleId]
+    [nodeTree, persistNodeTreeReturnState, router, vehicleId]
   );
 
   const openWishlistForTreeNode = useCallback(
     (nodeId: string) => {
       setHighlightedNodeId(null);
+      persistNodeTreeReturnState(nodeId);
       router.push(buildVehicleWishlistNewHref(vehicleId, nodeId));
     },
-    [router, vehicleId]
-  );
-  const openExpensesForTreeNode = useCallback(
-    (nodeId: string) => {
-      setHighlightedNodeId(null);
-      router.push(`/vehicles/${vehicleId}/expenses?nodeId=${encodeURIComponent(nodeId)}&year=${nodeExpenseYear}`);
-    },
-    [nodeExpenseYear, router, vehicleId]
+    [persistNodeTreeReturnState, router, vehicleId]
   );
   const openAddServiceFromTreeNode = useCallback(
     (leafNodeId: string) => {
@@ -1121,14 +1075,16 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     });
   }, []);
   const focusNodeInTree = useCallback(
-    (nodeId: string) => {
+    (nodeId: string, options: { resetFilters?: boolean } = {}) => {
       const path = findNodeViewModelPathById(topLevelNodeViewModels, nodeId);
       if (!path || path.length === 0) {
         return;
       }
       setNodeSearchQuery("");
       setDebouncedNodeSearchQuery("");
-      setNodeStatusFilter("ALL");
+      if (options.resetFilters ?? true) {
+        setNodeStatusFilter("ALL");
+      }
       setHighlightedNodeId(nodeId);
       setSelectedNodeContextId(nodeId);
       setExpandedIds((prev) => {
@@ -1209,6 +1165,34 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     focusNodeInTree(targetNodeIdParam);
   }, [focusNodeInTree, isNodeTreePage, targetNodeIdParam, topLevelNodeViewModels.length]);
   useEffect(() => {
+    if (
+      !isNodeTreePage ||
+      !vehicleId ||
+      topLevelNodeViewModels.length === 0 ||
+      appliedNodeTreeReturnStateRef.current
+    ) {
+      return;
+    }
+    appliedNodeTreeReturnStateRef.current = true;
+    let isCancelled = false;
+    void consumeNodeTreeReturnState(vehicleId).then((state) => {
+      if (isCancelled || !state?.selectedNodeId) {
+        return;
+      }
+      if (isNodeStatusFilter(state.nodeStatusFilter)) {
+        setNodeStatusFilter(state.nodeStatusFilter);
+      }
+      setNodeTreeTopOnly(Boolean(state.nodeTreeTopOnly));
+      setExpandedIds(new Set(Array.isArray(state.expandedIds) ? state.expandedIds : []));
+      requestAnimationFrame(() => {
+        focusNodeInTree(state.selectedNodeId, { resetFilters: false });
+      });
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [focusNodeInTree, isNodeTreePage, topLevelNodeViewModels.length, vehicleId]);
+  useEffect(() => {
     if (!isNodeTreePage || !highlightIssueNodeIdsParam || topLevelNodeViewModels.length === 0) {
       return;
     }
@@ -1232,6 +1216,16 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     setHighlightedNodeId(null);
     setSelectedNodeContextId(nodeId);
   }, []);
+  const selectCompositionNode = useCallback(
+    (nodeId: string) => {
+      focusNodeInTree(nodeId);
+      setSelectedNodeContextId(nodeId);
+      requestAnimationFrame(() => {
+        subtreeScrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      });
+    },
+    [focusNodeInTree]
+  );
   const openServiceLogFromSearchResult = useCallback(
     (result: NodeTreeSearchResultViewModel) => {
       setNodeSearchQuery("");
@@ -1341,6 +1335,72 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       }
     },
     [apiBaseUrl, vehicleId, selectedNodeContextId]
+  );
+  const openWishlistFormForRecommendedSku = useCallback(
+    (rec: PartRecommendationViewModel) => {
+      if (!vehicleId || !selectedNodeContextId) {
+        return;
+      }
+      persistNodeTreeReturnState(selectedNodeContextId);
+      closeNodeContextModal();
+      router.push(buildVehicleWishlistNewHref(vehicleId, selectedNodeContextId, { skuId: rec.skuId }));
+    },
+    [closeNodeContextModal, persistNodeTreeReturnState, router, selectedNodeContextId, vehicleId]
+  );
+  const openWishlistFormForServiceKit = useCallback(
+    (kit: ServiceKitViewModel) => {
+      if (!vehicleId || !selectedNodeContextId) {
+        return;
+      }
+      persistNodeTreeReturnState(selectedNodeContextId);
+      closeNodeContextModal();
+      router.push(buildVehicleWishlistNewHref(vehicleId, selectedNodeContextId, { kitCode: kit.code }));
+    },
+    [closeNodeContextModal, persistNodeTreeReturnState, router, selectedNodeContextId, vehicleId]
+  );
+  const openWishlistItemFromNodeContext = useCallback(
+    (item: PartWishlistItemViewModel) => {
+      if (!vehicleId) {
+        return;
+      }
+      persistNodeTreeReturnState(item.nodeId ?? selectedNodeContextId ?? item.id);
+      closeNodeContextModal();
+      router.push(buildVehicleWishlistItemHighlightHref(vehicleId, item.id, { partsStatus: item.status }));
+    },
+    [closeNodeContextModal, persistNodeTreeReturnState, router, selectedNodeContextId, vehicleId]
+  );
+  const advanceWishlistItemStatusFromNodeContext = useCallback(
+    async (item: PartWishlistItemViewModel) => {
+      if (!vehicleId || !item.nodeId) {
+        return;
+      }
+      const nextStatus: PartWishlistItemStatus =
+        item.status === "NEEDED"
+          ? "ORDERED"
+          : item.status === "ORDERED"
+            ? "BOUGHT"
+            : "INSTALLED";
+      if (nextStatus === "INSTALLED") {
+        persistNodeTreeReturnState(item.nodeId);
+        closeNodeContextModal();
+        router.push(buildServiceEventNewFromWishlistHref(vehicleId, item));
+        return;
+      }
+      try {
+        const res = await createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).updateWishlistItem(
+          vehicleId,
+          item.id,
+          { status: nextStatus, nodeId: item.nodeId }
+        );
+        setWishlistItems((prev) =>
+          prev.map((candidate) => (candidate.id === item.id ? res.item : candidate))
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Не удалось обновить статус позиции.";
+        Alert.alert("Список покупок", message);
+      }
+    },
+    [apiBaseUrl, closeNodeContextModal, persistNodeTreeReturnState, router, vehicleId]
   );
   const handleNodeContextAction = useCallback(
     (actionKey: string) => {
@@ -1550,14 +1610,59 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
             />
             <View style={styles.fullTreeSection}>
               <View style={styles.nodeTreeControls}>
-                <TextInput
-                  style={styles.searchInput}
-                  value={nodeSearchQuery}
-                  onChangeText={setNodeSearchQuery}
-                  placeholder="Поиск узла..."
-                  placeholderTextColor={c.textSecondary}
-                  returnKeyType="search"
-                />
+                <View style={styles.nodeTreeTopControlsRow}>
+                  <View style={styles.nodeTreeSearchBox}>
+                    <MaterialIcons name="search" size={13} color={c.textMuted} />
+                    <TextInput
+                      style={styles.nodeTreeSearchInputCompact}
+                      value={nodeSearchQuery}
+                      onChangeText={setNodeSearchQuery}
+                      placeholder=""
+                      placeholderTextColor={c.textSecondary}
+                      returnKeyType="search"
+                      accessibilityLabel="Поиск по узлам"
+                    />
+                    <MaterialIcons name="tune" size={13} color={c.textMuted} />
+                  </View>
+                  <Pressable
+                    onPress={() => setExpandedIds(new Set())}
+                    disabled={!hasExpandedNodeTreeItems}
+                    style={({ pressed }) => [
+                      styles.statusFilterChip,
+                      styles.nodeTreeUtilityChip,
+                      !hasExpandedNodeTreeItems && styles.nodeTreeUtilityChipDisabled,
+                      pressed && hasExpandedNodeTreeItems && styles.statusFilterChipPressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Свернуть раскрытые ветки дерева"
+                  >
+                    <Text style={styles.statusFilterChipText}>Свернуть дерево</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setNodeTreeTopOnly((prev) => !prev)}
+                    disabled={isTopServiceNodesLoading || overviewTopNodeIdsOrderedForTree.length === 0}
+                    style={({ pressed }) => [
+                      styles.statusFilterChip,
+                      styles.nodeTreeUtilityChip,
+                      nodeTreeTopOnly && styles.statusFilterChipActiveNeutral,
+                      (isTopServiceNodesLoading || overviewTopNodeIdsOrderedForTree.length === 0) &&
+                        styles.nodeTreeUtilityChipDisabled,
+                      pressed && styles.statusFilterChipPressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: nodeTreeTopOnly }}
+                    accessibilityLabel="Показать только ТОП-узлы дерева"
+                  >
+                    <Text
+                      style={[
+                        styles.statusFilterChipText,
+                        nodeTreeTopOnly && styles.statusFilterChipTextActiveNeutral,
+                      ]}
+                    >
+                      ТОП-узлы
+                    </Text>
+                  </Pressable>
+                </View>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -1600,48 +1705,13 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                         accessibilityRole="button"
                         accessibilityLabel={`Показать узлы со статусом ${statusTextLabelsRu[status]}`}
                       >
-                        <Text
-                          style={[
-                            styles.statusFilterChipText,
-                            isActive && { color: tokens.foreground },
-                          ]}
-                        >
-                          {statusTextLabelsRu[status]} · {nodeStatusCounts[status]}
+                        <Text style={[styles.statusFilterChipText, isActive && { color: tokens.foreground }]}>
+                          {status === "RECENTLY_REPLACED" ? "Недавно" : statusTextLabelsRu[status]}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </ScrollView>
-                <View style={styles.expenseYearRow}>
-                  <Text style={styles.searchLabel}>Сезон расходов</Text>
-                  <View style={styles.expenseYearChips}>
-                    {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((year) => (
-                      <Pressable
-                        key={year}
-                        onPress={() => setNodeExpenseYear(year)}
-                        style={[
-                          styles.statusFilterChip,
-                          nodeExpenseYear === year && styles.statusFilterChipActiveNeutral,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.statusFilterChipText,
-                            nodeExpenseYear === year && styles.statusFilterChipTextActiveNeutral,
-                          ]}
-                        >
-                          {year}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  {isNodeExpenseSummaryLoading ? (
-                    <Text style={styles.searchHint}>Загружаю расходы по узлам...</Text>
-                  ) : null}
-                  {nodeExpenseSummaryError ? (
-                    <Text style={styles.treeErrorText}>{nodeExpenseSummaryError}</Text>
-                  ) : null}
-                </View>
                 {nodeSearchQuery.trim().length > 0 && nodeSearchQuery.trim().length < 2 ? (
                   <Text style={styles.searchHint}>Введите минимум 2 символа.</Text>
                 ) : null}
@@ -1768,11 +1838,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                           onOpenContext={openNodeContextModal}
                           onOpenStatusExplanation={openStatusExplanationFromTreeNode}
                           onOpenServiceLogForNode={openServiceLogForTreeNode}
-                          expenseSummary={nodeExpenseSummaryByNodeId[node.id] ?? null}
-                          expenseSummaryByNodeId={nodeExpenseSummaryByNodeId}
-                          expenseYear={nodeExpenseYear}
-                          onOpenExpensesForNode={openExpensesForTreeNode}
-                          isMaintenanceModeEnabled={isNodeMaintenanceModeEnabled}
                           selectedNodeId={selectedNodeContextId}
                           highlightedNodeId={highlightedNodeId}
                           statusHighlightedNodeIds={statusHighlightedNodeIds}
@@ -2010,14 +2075,25 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                   </View>
                   <View style={styles.subtreeModalHeaderActions}>
                     {selectedNodeContextViewModel.effectiveStatus ? (
-                      <View
-                        style={[
+                      <Pressable
+                        onPress={() => {
+                          if (selectedNodeContextNode) {
+                            closeNodeContextModal();
+                            openServiceLogForTreeNode(selectedNodeContextNode, {
+                              returnNodeId: selectedNodeContextViewModel.nodeId,
+                            });
+                          }
+                        }}
+                        style={({ pressed }) => [
                           styles.badge,
                           {
                             backgroundColor: getStatusColors(selectedNodeContextViewModel.effectiveStatus).bg,
                             borderColor: getStatusColors(selectedNodeContextViewModel.effectiveStatus).border,
                           },
+                          pressed && styles.badgePressed,
                         ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Открыть журнал по узлу ${selectedNodeContextViewModel.nodeName}`}
                       >
                         <Text
                           style={[
@@ -2027,7 +2103,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                         >
                           {selectedNodeContextViewModel.statusLabel}
                         </Text>
-                      </View>
+                      </Pressable>
                     ) : null}
                     <Pressable
                       onPress={closeNodeContextModal}
@@ -2045,71 +2121,82 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                   contentContainerStyle={styles.subtreeModalBody}
                   keyboardShouldPersistTaps="handled"
                 >
-                  <View style={styles.searchActionsRow}>
-                    {selectedNodeContextViewModel.actions.map((action) => (
-                      <ActionIconButton
-                        key={action.key}
-                        onPress={() => handleNodeContextAction(action.key)}
-                        disabled={action.key === "add_kit" && Boolean(nodeContextAddingKitCode)}
-                        accessibilityLabel={action.label}
-                        variant="subtle"
-                        icon={
-                          action.key === "journal" ? (
-                            <MaterialIcons name="menu-book" size={15} color={c.textMeta} />
-                          ) : action.key === "add_service_event" ? (
-                            <MaterialIcons name="event-available" size={15} color={c.textMeta} />
-                          ) : action.key === "add_wishlist" ? (
-                            <MaterialIcons name="playlist-add" size={16} color={c.textMeta} />
-                          ) : action.key === "add_kit" ? (
-                            <MaterialIcons name="inventory-2" size={15} color={c.textMeta} />
-                          ) : (
-                            <MaterialIcons name="help-outline" size={15} color={c.textMeta} />
-                          )
-                        }
-                      />
-                    ))}
-                    {canSnoozeSelectedNode ? (
-                      <>
-                        <ActionIconButton
-                          onPress={() =>
-                            void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "7d")
-                          }
-                          accessibilityLabel="Отложить напоминание на 7 дней"
-                          variant="subtle"
-                          icon={<MaterialIcons name="snooze" size={15} color={c.textMeta} />}
-                        />
-                        <Pressable
-                          onPress={() =>
-                            void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "30d")
-                          }
-                          style={({ pressed }) => [
-                            styles.searchActionBtn,
-                            pressed && styles.searchActionBtnPressed,
-                          ]}
-                        >
-                          <Text style={styles.searchActionBtnText}>Отложить на 30 дней</Text>
-                        </Pressable>
-                        {selectedNodeSnoozeLabel ? (
-                          <Pressable
-                            onPress={() =>
-                              void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "clear")
-                            }
-                            style={({ pressed }) => [
-                              styles.searchActionBtn,
-                              pressed && styles.searchActionBtnPressed,
-                            ]}
-                          >
-                            <Text style={styles.searchActionBtnText}>Снять отложенное</Text>
-                          </Pressable>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </View>
+                  <View style={styles.nodeContextScrollInner}>
+                    <View style={styles.nodeContextSection}>
+                      <View style={styles.nodeContextSectionHeader}>
+                        <Text style={styles.nodeContextSectionTitle}>Действия</Text>
+                      </View>
+                      <View style={styles.nodeContextSectionBody}>
+                        <View style={styles.nodeContextActionsRow}>
+                          {selectedNodeContextViewModel.actions.map((action) => (
+                            <ActionIconButton
+                              key={action.key}
+                              onPress={() => handleNodeContextAction(action.key)}
+                              disabled={action.key === "add_kit" && Boolean(nodeContextAddingKitCode)}
+                              accessibilityLabel={action.label}
+                              variant="subtle"
+                              icon={
+                                action.key === "journal" ? (
+                                  <MaterialIcons name="menu-book" size={15} color={c.textMeta} />
+                                ) : action.key === "add_service_event" ? (
+                                  <MaterialIcons name="event-available" size={15} color={c.textMeta} />
+                                ) : action.key === "add_wishlist" ? (
+                                  <MaterialIcons name="playlist-add" size={16} color={c.textMeta} />
+                                ) : action.key === "add_kit" ? (
+                                  <MaterialIcons name="inventory-2" size={15} color={c.textMeta} />
+                                ) : (
+                                  <MaterialIcons name="help-outline" size={15} color={c.textMeta} />
+                                )
+                              }
+                            />
+                          ))}
+                          {canSnoozeSelectedNode ? (
+                            <>
+                              <ActionIconButton
+                                onPress={() =>
+                                  void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "7d")
+                                }
+                                accessibilityLabel="Отложить напоминание на 7 дней"
+                                variant="subtle"
+                                icon={<MaterialIcons name="snooze" size={15} color={c.textMeta} />}
+                              />
+                              <Pressable
+                                onPress={() =>
+                                  void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "30d")
+                                }
+                                style={({ pressed }) => [
+                                  styles.searchActionBtn,
+                                  pressed && styles.searchActionBtnPressed,
+                                ]}
+                              >
+                                <Text style={styles.searchActionBtnText}>Отложить на 30 дней</Text>
+                              </Pressable>
+                              {selectedNodeSnoozeLabel ? (
+                                <Pressable
+                                  onPress={() =>
+                                    void setNodeSnoozeOption(selectedNodeContextViewModel.nodeId, "clear")
+                                  }
+                                  style={({ pressed }) => [
+                                    styles.searchActionBtn,
+                                    pressed && styles.searchActionBtnPressed,
+                                  ]}
+                                >
+                                  <Text style={styles.searchActionBtnText}>Снять отложенное</Text>
+                                </Pressable>
+                              ) : null}
+                            </>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
 
                   {selectedNodeContextViewModel.maintenancePlan &&
                   selectedNodeContextViewModel.maintenancePlan.hasMeaningfulData ? (
-                    <View style={styles.searchResultCard}>
-                      <Text style={styles.searchResultTitle}>План обслуживания</Text>
+                    <View style={styles.nodeContextSection}>
+                      <View style={styles.nodeContextSectionHeader}>
+                        <Text style={styles.nodeContextSectionTitle}>План обслуживания</Text>
+                      </View>
+                      <View style={styles.nodeContextSectionBody}>
                       {selectedNodeContextViewModel.maintenancePlan.shortText ? (
                         canOpenSelectedNodeContextExplanation ? (
                           <Pressable
@@ -2183,16 +2270,100 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                           </Text>
                         )
                       ) : null}
+                      </View>
                     </View>
                   ) : null}
 
-                  <View style={styles.searchResultCard}>
-                    <Text style={styles.searchResultTitle}>Последние сервисные события</Text>
+                  {showSubtreeCompositionSection ? (
+                    <View style={styles.nodeContextSection}>
+                      <View style={styles.nodeContextSectionHeader}>
+                        <Text style={styles.nodeContextSectionTitle}>Что входит в узел</Text>
+                        {subtreeCompositionItems.length > 12 ? (
+                          <Pressable
+                            onPress={() => setIsSubtreeCompositionExpanded((prev) => !prev)}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                              isSubtreeCompositionExpanded
+                                ? "Свернуть состав узла"
+                                : "Развернуть полный состав узла"
+                            }
+                          >
+                            <Text style={styles.contextSectionActionText}>
+                              {isSubtreeCompositionExpanded
+                                ? "Свернуть"
+                                : `Развернуть (${subtreeCompositionItems.length})`}
+                            </Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                      <View style={[styles.nodeContextSectionBody, styles.compositionInlineList]}>
+                        {visibleSubtreeCompositionItems.map((item, index) => (
+                          <Fragment key={item.id}>
+                            {index > 0 ? <Text style={styles.compositionSeparator}>·</Text> : null}
+                            <Pressable
+                              onPress={() => selectCompositionNode(item.id)}
+                              hitSlop={4}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Открыть узел ${item.name}`}
+                            >
+                              <Text
+                                style={[
+                                  styles.compositionNodeText,
+                                  item.depthFromSelected === 1 && styles.compositionNodeTextDirect,
+                                ]}
+                              >
+                                {item.name}
+                              </Text>
+                            </Pressable>
+                          </Fragment>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.nodeContextSection}>
+                    <View style={styles.nodeContextSectionHeader}>
+                      <Text style={styles.nodeContextSectionTitle}>Последние сервисные события</Text>
+                      {selectedNodeContextNode ? (
+                        <Pressable
+                          onPress={() => {
+                            closeNodeContextModal();
+                            openServiceLogForTreeNode(selectedNodeContextNode, {
+                              returnNodeId: selectedNodeContextViewModel.nodeId,
+                            });
+                          }}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel="Открыть журнал обслуживания по этому узлу"
+                        >
+                          <Text style={styles.nodeContextSectionHeaderActionText}>Журнал</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                    <View style={styles.nodeContextSectionBody}>
                     {selectedNodeContextViewModel.recentServiceEvents.length === 0 ? (
                       <Text style={styles.searchResultPath}>По этому узлу записей пока нет.</Text>
                     ) : (
                       selectedNodeContextViewModel.recentServiceEvents.map((event) => (
-                        <View key={event.id} style={styles.searchResultRow}>
+                        <Pressable
+                          key={event.id}
+                          onPress={() => {
+                            if (selectedNodeContextNode) {
+                              closeNodeContextModal();
+                              openServiceLogForTreeNode(selectedNodeContextNode, {
+                                serviceEventId: event.id,
+                                returnNodeId: event.nodeId,
+                              });
+                            }
+                          }}
+                          style={({ pressed }) => [
+                            styles.searchResultRow,
+                            pressed && styles.searchResultRowPressed,
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Открыть событие ${event.serviceType} в журнале`}
+                        >
                           <View style={styles.searchResultTextCol}>
                             <Text style={styles.searchResultTitle}>
                               {formatIsoCalendarDateRu(event.eventDate)} · {event.serviceType}
@@ -2202,13 +2373,18 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                               <Text style={styles.searchResultPath}>Стоимость: {event.costLabelRu}</Text>
                             ) : null}
                           </View>
-                        </View>
+                          <MaterialIcons name="chevron-right" size={16} color={c.textMuted} />
+                        </Pressable>
                       ))
                     )}
+                    </View>
                   </View>
 
-                  <View style={styles.searchResultCard}>
-                    <Text style={styles.searchResultTitle}>Рекомендации SKU</Text>
+                  <View style={styles.nodeContextSection}>
+                    <View style={styles.nodeContextSectionHeader}>
+                      <Text style={styles.nodeContextSectionTitle}>Рекомендации SKU</Text>
+                    </View>
+                    <View style={styles.nodeContextSectionBody}>
                     {nodeContextRecommendationsError ? (
                       <Text style={[styles.searchResultPath, { color: c.error }]}>
                         {nodeContextRecommendationsError}
@@ -2223,12 +2399,28 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                       </Text>
                     ) : null}
                     {nodeContextRecommendations.slice(0, 5).map((rec) => (
-                      <View key={rec.skuId} style={styles.searchResultRow}>
+                      <Pressable
+                        key={rec.skuId}
+                        onPress={() => openWishlistFormForRecommendedSku(rec)}
+                        style={({ pressed }) => [
+                          styles.searchResultRow,
+                          pressed && styles.searchResultRowPressed,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Открыть добавление ${rec.canonicalName}`}
+                      >
                         <View style={styles.searchResultTextCol}>
                           <Text style={styles.searchResultTitle}>
                             {rec.brandName} · {rec.canonicalName}
                           </Text>
                           <Text style={styles.searchResultPath}>{rec.recommendationLabel}</Text>
+                          {rec.priceAmount != null ? (
+                            <Text style={styles.searchResultPath}>
+                              {`${formatExpenseAmountRu(rec.priceAmount)} ${
+                                rec.currency?.trim() || ""
+                              }`.trim()}
+                            </Text>
+                          ) : null}
                         </View>
                         <ActionIconButton
                           onPress={() => void addRecommendedSkuToWishlistFromNodeContext(rec)}
@@ -2237,12 +2429,16 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                           variant="subtle"
                           icon={<MaterialIcons name="shopping-cart" size={15} color={c.textMeta} />}
                         />
-                      </View>
+                      </Pressable>
                     ))}
+                    </View>
                   </View>
 
-                  <View style={styles.searchResultCard}>
-                    <Text style={styles.searchResultTitle}>Комплекты обслуживания</Text>
+                  <View style={styles.nodeContextSection}>
+                    <View style={styles.nodeContextSectionHeader}>
+                      <Text style={styles.nodeContextSectionTitle}>Комплекты обслуживания</Text>
+                    </View>
+                    <View style={styles.nodeContextSectionBody}>
                     {nodeContextServiceKitsError ? (
                       <Text style={[styles.searchResultPath, { color: c.error }]}>
                         {nodeContextServiceKitsError}
@@ -2255,7 +2451,16 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                       <Text style={styles.searchResultPath}>Для этого узла комплекты не найдены.</Text>
                     ) : null}
                     {nodeContextServiceKits.slice(0, 3).map((kit) => (
-                      <View key={kit.code} style={styles.searchResultRow}>
+                      <Pressable
+                        key={kit.code}
+                        onPress={() => openWishlistFormForServiceKit(kit)}
+                        style={({ pressed }) => [
+                          styles.searchResultRow,
+                          pressed && styles.searchResultRowPressed,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Открыть подбор комплекта ${kit.title}`}
+                      >
                         <View style={styles.searchResultTextCol}>
                           <Text style={styles.searchResultTitle}>{kit.title}</Text>
                           <Text style={styles.searchResultPath}>{kit.description}</Text>
@@ -2267,8 +2472,85 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                           variant="subtle"
                           icon={<MaterialIcons name="inventory-2" size={15} color={c.textMeta} />}
                         />
-                      </View>
+                      </Pressable>
                     ))}
+                    </View>
+                  </View>
+
+                  {selectedNodeContextViewModel.isLeaf ? (
+                    <View style={styles.nodeContextSection}>
+                      <View style={styles.nodeContextSectionHeader}>
+                        <Text style={styles.nodeContextSectionTitle}>Неустановленные запчасти</Text>
+                        <Pressable
+                          onPress={() => {
+                            closeNodeContextModal();
+                            router.push(`/vehicles/${vehicleId}/wishlist`);
+                          }}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel="Открыть список покупок"
+                        >
+                          <Text style={styles.nodeContextSectionHeaderActionText}>
+                            {selectedUninstalledParts.length > 3
+                              ? `Все (${selectedUninstalledParts.length})`
+                              : "Корзина"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                      <View style={styles.nodeContextSectionBody}>
+                      {selectedUninstalledParts.length === 0 ? (
+                        <Text style={styles.searchResultPath}>
+                          Активных позиций по этому узлу пока нет.
+                        </Text>
+                      ) : (
+                        selectedUninstalledParts.slice(0, 3).map((item) => {
+                          const nextStatus: PartWishlistItemStatus =
+                            item.status === "NEEDED"
+                              ? "ORDERED"
+                              : item.status === "ORDERED"
+                                ? "BOUGHT"
+                                : "INSTALLED";
+                          return (
+                            <Pressable
+                              key={item.id}
+                              onPress={() => openWishlistItemFromNodeContext(item)}
+                              style={({ pressed }) => [
+                                styles.searchResultRow,
+                                pressed && styles.searchResultRowPressed,
+                              ]}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Открыть позицию ${item.title} в корзине`}
+                            >
+                              <View style={styles.searchResultTextCol}>
+                                <Text style={styles.searchResultTitle}>{item.title}</Text>
+                                <Text style={styles.searchResultPath}>
+                                  {item.costLabelRu ?? "Стоимость не указана"}
+                                  {item.kitOriginLabelRu ? ` · ${item.kitOriginLabelRu}` : ""}
+                                </Text>
+                              </View>
+                              <Pressable
+                                onPress={(event) => {
+                                  event.stopPropagation();
+                                  void advanceWishlistItemStatusFromNodeContext(item);
+                                }}
+                                style={({ pressed }) => [
+                                  styles.wishlistStatusAdvanceBadge,
+                                  pressed && styles.badgePressed,
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Перевести в статус ${partWishlistStatusLabelsRu[nextStatus]}`}
+                              >
+                                <Text style={styles.wishlistStatusAdvanceText}>
+                                  {partWishlistStatusLabelsRu[nextStatus]}
+                                </Text>
+                              </Pressable>
+                            </Pressable>
+                          );
+                        })
+                      )}
+                      </View>
+                    </View>
+                  ) : null}
                   </View>
                 </ScrollView>
               </>
@@ -2665,6 +2947,42 @@ function getAttentionIconSource(code: string): ImageSourcePropType {
   }
   const groupKey = TOP_NODE_ICON_BY_PREFIX.find(([prefix]) => code.startsWith(prefix))?.[1] ?? "lubrication";
   return TOP_NODE_GROUP_ICON_SRC[groupKey];
+}
+
+function getNodeTreeIconSource(node: Pick<NodeTreeItemViewModel, "code" | "name">): ImageSourcePropType {
+  const code = node.code.toUpperCase();
+  const segments = code.replace(/[._]/g, "-").split("-").filter(Boolean);
+  const lastSegment = segments[segments.length - 1] ?? "";
+  const name = node.name.toLowerCase();
+
+  if (lastSegment === "OIL" || (name.includes("мотор") && name.includes("масл"))) {
+    return oilIcon;
+  }
+  if (lastSegment === "FILTER" || lastSegment === "FLTR" || name.includes("фильтр")) {
+    return lubricationIcon;
+  }
+  if (lastSegment === "PADS" || name.includes("колодк")) {
+    return code.includes("FRONT") ? brakesFrontPadsIcon : brakesIcon;
+  }
+  if (code.startsWith("BRAKES") || name.includes("торм")) {
+    return brakesIcon;
+  }
+  if (code.startsWith("TIRES") || name.includes("шин")) {
+    return code.includes("REAR") ? tiresRearIcon : tiresIcon;
+  }
+  if (code.startsWith("DRIVETRAIN") || name.includes("цеп")) {
+    return chainSprocketsIcon;
+  }
+  if (code.startsWith("SUSPENSION") || name.includes("подвес")) {
+    return suspensionIcon;
+  }
+  if (code.startsWith("COOLING") || name.includes("охлаж")) {
+    return engineCoolingIcon;
+  }
+  if (code.startsWith("ENGINE") || name.includes("двиг")) {
+    return engineCoolingIcon;
+  }
+  return getAttentionIconSource(code);
 }
 
 function getVehicleSilhouetteSource(vehicle: VehicleDetail): ImageSourcePropType {
@@ -3786,31 +4104,13 @@ const styles = StyleSheet.create({
   },
   nodeTreeControls: {
     marginTop: 4,
-    gap: 8,
+    gap: 6,
   },
-  maintenanceModeToggle: {
-    alignSelf: "flex-start",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: c.card,
-  },
-  maintenanceModeToggleActive: {
-    backgroundColor: c.textPrimary,
-    borderColor: c.textPrimary,
-  },
-  maintenanceModeTogglePressed: {
-    opacity: 0.9,
-  },
-  maintenanceModeToggleText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: c.textMeta,
-  },
-  maintenanceModeToggleTextActive: {
-    color: c.textInverse,
+  nodeTreeTopControlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
   },
   sectionJournalButton: {
     alignSelf: "flex-start",
@@ -3894,13 +4194,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 0,
   },
+  nodeTreeSearchBox: {
+    minWidth: 104,
+    maxWidth: 150,
+    flexGrow: 1,
+    flexBasis: 124,
+    height: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 999,
+    backgroundColor: c.card,
+    paddingHorizontal: 9,
+  },
+  nodeTreeSearchInputCompact: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    fontSize: 12,
+    color: c.textPrimary,
+  },
+  nodeTreeUtilityChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  nodeTreeUtilityChipDisabled: {
+    opacity: 0.45,
+  },
   searchHint: {
     marginBottom: 0,
     fontSize: 12,
     color: c.textMuted,
   },
   statusFilterRow: {
-    gap: 8,
+    gap: 6,
     paddingBottom: 2,
   },
   expenseYearRow: {
@@ -3917,8 +4247,8 @@ const styles = StyleSheet.create({
     borderColor: c.borderStrong,
     borderRadius: 999,
     backgroundColor: c.cardMuted,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
   },
   statusFilterChipActiveNeutral: {
     backgroundColor: c.textPrimary,
@@ -3928,7 +4258,7 @@ const styles = StyleSheet.create({
     opacity: 0.86,
   },
   statusFilterChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     color: c.textSecondary,
   },
@@ -3959,6 +4289,7 @@ const styles = StyleSheet.create({
   searchResultCard: {
     borderRadius: 10,
     backgroundColor: c.card,
+    padding: 10,
   },
   searchResultRowPressed: {
     borderColor: c.borderStrong,
@@ -3993,6 +4324,52 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
+  },
+  contextSectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  contextSectionActionText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: c.textSecondary,
+  },
+  compositionInlineList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 5,
+  },
+  compositionNodeText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: c.textSecondary,
+    textDecorationLine: "underline",
+  },
+  compositionNodeTextDirect: {
+    fontWeight: "900",
+    color: c.textPrimary,
+  },
+  compositionSeparator: {
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  wishlistStatusAdvanceBadge: {
+    alignSelf: "center",
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 999,
+    backgroundColor: c.cardMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    maxWidth: 116,
+  },
+  wishlistStatusAdvanceText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: c.textSecondary,
   },
   searchActionBtn: {
     borderWidth: 1,
@@ -4061,12 +4438,13 @@ const styles = StyleSheet.create({
 
   // Tree card
   treeCard: {
-    backgroundColor: c.card,
+    backgroundColor: c.cardMuted,
     borderColor: c.border,
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 12,
     overflow: "hidden",
     marginBottom: 12,
+    padding: 2,
   },
   treeDivider: {
     height: 1,
@@ -4107,7 +4485,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 8,
     paddingRight: 8,
-    minHeight: 44,
+    minHeight: 52,
+    backgroundColor: c.card,
   },
   nodeContainer: {
     marginBottom: 0,
@@ -4118,7 +4497,7 @@ const styles = StyleSheet.create({
     borderBottomColor: c.divider,
   },
   nodeRowNested: {
-    backgroundColor: c.cardMuted,
+    backgroundColor: c.card,
   },
   nodeRowHighlighted: {
     borderWidth: 1,
@@ -4135,9 +4514,34 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 6,
   },
+  nodeGuides: {
+    flexDirection: "row",
+    alignSelf: "stretch",
+  },
+  nodeGuideColumn: {
+    width: 14,
+    alignSelf: "stretch",
+    position: "relative",
+  },
+  nodeGuideVertical: {
+    position: "absolute",
+    left: 7,
+    top: -8,
+    bottom: -8,
+    width: 1,
+    backgroundColor: c.border,
+  },
+  nodeGuideElbow: {
+    position: "absolute",
+    left: 7,
+    top: "50%",
+    width: 10,
+    height: 1,
+    backgroundColor: c.border,
+  },
   chevronWrap: {
-    width: 22,
-    minHeight: 22,
+    width: 20,
+    minHeight: 20,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 0,
@@ -4151,25 +4555,53 @@ const styles = StyleSheet.create({
   chevronPlaceholder: {
     width: 16,
   },
+  nodeTreeIconWrap: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  nodeTreeIconImage: {
+    width: 22,
+    height: 22,
+    opacity: 0.82,
+  },
   nodeNameBlock: {
     flex: 1,
   },
   nodeName: {
     fontSize: 13,
-    color: c.textMeta,
-    lineHeight: 17,
+    fontWeight: "700",
+    color: c.textPrimary,
+    lineHeight: 16,
   },
   nodeNameTop: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "800",
     color: c.textPrimary,
   },
+  nodeMetaRow: {
+    marginTop: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   nodeCodeText: {
-    marginTop: 1,
     fontSize: 10,
-    fontWeight: "600",
+    fontWeight: "700",
     color: c.textMuted,
     letterSpacing: 0.2,
+  },
+  nodeChildCount: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  nodeChildCountText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: c.textMuted,
   },
   reasonShort: {
     marginTop: 2,
@@ -4180,13 +4612,6 @@ const styles = StyleSheet.create({
   reasonShortLink: {
     color: c.textSecondary,
     textDecorationLine: "underline",
-  },
-  planSummaryText: {
-    marginTop: 3,
-    fontSize: 11,
-    fontWeight: "600",
-    color: c.textSecondary,
-    lineHeight: 16,
   },
   nodeExpenseCompact: {
     marginTop: 5,
@@ -4249,24 +4674,6 @@ const styles = StyleSheet.create({
     color: c.textPrimary,
     fontSize: 11,
     fontWeight: "800",
-  },
-  planLeafBlock: {
-    marginTop: 4,
-    gap: 2,
-  },
-  planLeafLine: {
-    fontSize: 11,
-    color: c.textMeta,
-    lineHeight: 15,
-  },
-  planLeafMuted: {
-    fontSize: 11,
-    color: c.textMuted,
-    lineHeight: 15,
-  },
-  planLeafLink: {
-    color: c.textSecondary,
-    textDecorationLine: "underline",
   },
   subtreeModalOverlay: {
     flex: 1,
@@ -4367,8 +4774,53 @@ const styles = StyleSheet.create({
   },
   subtreeModalBody: {
     paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingTop: 6,
     paddingBottom: 20,
+  },
+  nodeContextScrollInner: {
+    gap: 8,
+    paddingBottom: 4,
+  },
+  nodeContextSection: {
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 9,
+    backgroundColor: c.cardSubtle,
+    overflow: "hidden",
+  },
+  nodeContextSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: c.divider,
+    backgroundColor: c.cardMuted,
+  },
+  nodeContextSectionTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  nodeContextSectionHeaderActionText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: c.primaryAction,
+  },
+  nodeContextSectionBody: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  nodeContextActionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
   },
 
   // Badge

@@ -1,15 +1,35 @@
 import type { PartWishlistItem } from "@mototwin/types";
 
 /** Deep link / router href for creating a wishlist item, optionally with a node preset. */
-export function buildVehicleWishlistNewHref(vehicleId: string, nodeId?: string): string {
-  const q = nodeId?.trim()
-    ? `?nodeId=${encodeURIComponent(nodeId.trim())}`
-    : "";
-  return `/vehicles/${vehicleId}/wishlist/new${q}`;
+export function buildVehicleWishlistNewHref(
+  vehicleId: string,
+  nodeId?: string,
+  options?: { skuId?: string; kitCode?: string }
+): string {
+  const q = new URLSearchParams();
+  if (nodeId?.trim()) {
+    q.set("nodeId", nodeId.trim());
+  }
+  if (options?.skuId?.trim()) {
+    q.set("skuId", options.skuId.trim());
+  }
+  if (options?.kitCode?.trim()) {
+    q.set("kitCode", options.kitCode.trim());
+  }
+  const qs = q.toString();
+  return `/vehicles/${vehicleId}/wishlist/new${qs ? `?${qs}` : ""}`;
 }
 
-export function buildVehicleWishlistItemHighlightHref(vehicleId: string, itemId: string): string {
-  return `/vehicles/${vehicleId}/wishlist?wishlistItemId=${encodeURIComponent(itemId)}`;
+export function buildVehicleWishlistItemHighlightHref(
+  vehicleId: string,
+  itemId: string,
+  options?: { partsStatus?: PartWishlistItem["status"] }
+): string {
+  const q = new URLSearchParams({ wishlistItemId: itemId });
+  if (options?.partsStatus) {
+    q.set("partsStatus", options.partsStatus);
+  }
+  return `/vehicles/${vehicleId}/wishlist?${q.toString()}`;
 }
 
 export function buildVehicleServiceLogEventHref(vehicleId: string, eventId: string): string {

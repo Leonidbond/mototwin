@@ -99,7 +99,6 @@ import type {
   NodeStatus,
   NodeTreeItem,
   NodeTreeItemViewModel,
-  NodeMaintenancePlanSummaryViewModel,
   NodeTreeSearchResultViewModel,
   NodeTreeSearchActionKey,
   NodeContextViewModel,
@@ -193,9 +192,6 @@ function NodeContextReferencePanel({
 }) {
   const subtreeCompositionPreviewLimit = 12;
   const [isSubtreeCompositionExpanded, setIsSubtreeCompositionExpanded] = useState(false);
-  useEffect(() => {
-    setIsSubtreeCompositionExpanded(false);
-  }, [viewModel.nodeId]);
   const statusTokens = viewModel.effectiveStatus
     ? statusSemanticTokens[viewModel.effectiveStatus]
     : statusSemanticTokens.UNKNOWN;
@@ -249,7 +245,6 @@ function NodeContextReferencePanel({
       : productSemanticColors.textPrimary;
   const lastServiceLine = maintenance?.lastServiceLine ?? "Нет записей";
   const intervalLine = maintenance?.ruleIntervalLine ?? "Интервал не задан";
-
   const visibleRecommendations = recommendations.slice(0, 5);
   const visibleServiceKits = serviceKits.slice(0, 3);
   const visibleUninstalledParts = uninstalledParts.slice(0, 3);
@@ -1282,7 +1277,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     useState<NodeTreeItemViewModel | null>(null);
   const [isUsageProfileSectionExpanded, setIsUsageProfileSectionExpanded] = useState(true);
   const [isTechnicalSummarySectionExpanded, setIsTechnicalSummarySectionExpanded] = useState(true);
-  const [isNodeMaintenanceModeEnabled, setIsNodeMaintenanceModeEnabled] = useState(false);
   const [nodeSearchQuery, setNodeSearchQuery] = useState("");
   const [debouncedNodeSearchQuery, setDebouncedNodeSearchQuery] = useState("");
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
@@ -1990,9 +1984,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     try {
       const usageRaw = localStorage.getItem(`vehicleDetail.${vehicleId}.usageProfile.expanded`);
       const techRaw = localStorage.getItem(`vehicleDetail.${vehicleId}.technicalSummary.expanded`);
-      const maintenanceModeRaw = localStorage.getItem(
-        `vehicleDetail.${vehicleId}.nodeMaintenanceMode.enabled`
-      );
       if (usageRaw === "true" || usageRaw === "false") {
         setIsUsageProfileSectionExpanded(usageRaw === "true");
       } else {
@@ -2003,15 +1994,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       } else {
         setIsTechnicalSummarySectionExpanded(true);
       }
-      if (maintenanceModeRaw === "true" || maintenanceModeRaw === "false") {
-        setIsNodeMaintenanceModeEnabled(maintenanceModeRaw === "true");
-      } else {
-        setIsNodeMaintenanceModeEnabled(false);
-      }
     } catch {
       setIsUsageProfileSectionExpanded(true);
       setIsTechnicalSummarySectionExpanded(true);
-      setIsNodeMaintenanceModeEnabled(false);
     } finally {
       setHasLoadedDetailCollapsePrefs(true);
     }
@@ -2044,20 +2029,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       // Ignore localStorage failures for local UI prefs.
     }
   }, [vehicleId, hasLoadedDetailCollapsePrefs, isTechnicalSummarySectionExpanded]);
-
-  useEffect(() => {
-    if (!vehicleId || !hasLoadedDetailCollapsePrefs) {
-      return;
-    }
-    try {
-      localStorage.setItem(
-        `vehicleDetail.${vehicleId}.nodeMaintenanceMode.enabled`,
-        String(isNodeMaintenanceModeEnabled)
-      );
-    } catch {
-      // Ignore localStorage failures for local UI prefs.
-    }
-  }, [vehicleId, hasLoadedDetailCollapsePrefs, isNodeMaintenanceModeEnabled]);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -3415,25 +3386,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     selectedNodeContextViewModel?.effectiveStatus === "OVERDUE" ||
     selectedNodeContextViewModel?.effectiveStatus === "SOON";
 
-  const formatNodeMaintenanceSummaryLine = (
-    summary: NodeMaintenancePlanSummaryViewModel | null
-  ): string | null => {
-    if (!summary) {
-      return null;
-    }
-    const parts: string[] = [];
-    if (summary.overdueCount > 0) {
-      parts.push(`Просрочено: ${summary.overdueCount}`);
-    }
-    if (summary.soonCount > 0) {
-      parts.push(`Скоро: ${summary.soonCount}`);
-    }
-    if (summary.plannedLaterCount > 0) {
-      parts.push(`Запланировано: ${summary.plannedLaterCount}`);
-    }
-    return parts.length > 0 ? parts.join(" · ") : null;
-  };
-
   const formatNodeExpenseTotals = (
     totals: ExpenseNodeSummaryItem["totalByCurrency"]
   ): string => {
@@ -3467,67 +3419,13 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   ): ReactNode => {
     const hasChildren = node.hasChildren;
     const isExpanded = Boolean(expandedNodes[node.id]);
-    const maintenancePlan = isNodeMaintenanceModeEnabled
-      ? buildNodeMaintenancePlanViewModel(node)
-      : null;
-    const parentMaintenanceSummary = formatNodeMaintenanceSummaryLine(maintenancePlan?.parentSummary ?? null);
     const nodeExpenseSummary = nodeExpenseSummaryByNodeId[node.id] ?? null;
-    const shouldUseMaintenanceShortExplanation =
-      isNodeMaintenanceModeEnabled &&
-      node.effectiveStatus === "OVERDUE" &&
-      !node.shortExplanationLabel &&
-      Boolean(maintenancePlan?.shortText);
-    const overdueDueLineFallback =
-      isNodeMaintenanceModeEnabled && node.effectiveStatus === "OVERDUE"
-        ? (maintenancePlan?.dueLines[0] ?? null)
-        : null;
-    const overdueDetailedFallback =
-      isNodeMaintenanceModeEnabled && node.effectiveStatus === "OVERDUE"
-        ? (node.statusExplanation?.reasonDetailed?.trim() || null)
-        : null;
-    const shortExplanationLabel =
-      node.shortExplanationLabel ??
-      (shouldUseMaintenanceShortExplanation ? maintenancePlan?.shortText ?? null : null) ??
-      overdueDetailedFallback ??
-      overdueDueLineFallback;
+    const shortExplanationLabel = node.shortExplanationLabel;
     const canOpenStatusExplanation = canOpenNodeStatusExplanationModal(node);
     const statusHighlightTokens =
       statusHighlightedNodeIds.has(node.id) && isIssueNodeStatus(node.effectiveStatus)
         ? statusSemanticTokens[node.effectiveStatus]
         : null;
-    const renderMaintenanceTableCell = (
-      line: string,
-      options: { key?: string; muted?: boolean } = {}
-    ) => {
-      const contentStyle = {
-        color: options.muted
-          ? productSemanticColors.textSecondary
-          : productSemanticColors.textPrimary,
-      };
-      return (
-        <td
-          key={options.key ?? line}
-          className="whitespace-nowrap px-2 py-0.5 align-top first:pl-0"
-        >
-          {canOpenStatusExplanation ? (
-            <button
-              type="button"
-              onClick={() => openStatusExplanationFromTreeContext(node)}
-              className="block text-left text-xs underline decoration-dotted underline-offset-2 transition hover:text-slate-100"
-              style={contentStyle}
-              title={line}
-            >
-              {line}
-            </button>
-          ) : (
-            <span className="block text-xs" style={contentStyle} title={line}>
-              {line}
-            </span>
-          )}
-        </td>
-      );
-    };
-
     if (pageView === "nodeTree") {
       const isSelected = selectedNodeContextId === node.id;
       const metaCount = node.children.length;
@@ -3938,36 +3836,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   {shortExplanationLabel}
                 </p>
               ) : null}
-              {isNodeMaintenanceModeEnabled &&
-              maintenancePlan &&
-              !shortExplanationLabel &&
-              maintenancePlan.shortText ? (
-                canOpenStatusExplanation ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openStatusExplanationFromTreeContext(node);
-                    }}
-                    className="mt-1 pl-8 text-left text-xs text-slate-300 underline decoration-dotted underline-offset-2 transition hover:text-slate-100"
-                    style={{ color: productSemanticColors.textSecondary }}
-                  >
-                    {maintenancePlan.shortText}
-                  </button>
-                ) : (
-                  <p className="mt-1 pl-8 text-xs text-slate-300" style={{ color: productSemanticColors.textSecondary }}>
-                    {maintenancePlan.shortText}
-                  </p>
-                )
-              ) : null}
-              {isNodeMaintenanceModeEnabled && parentMaintenanceSummary ? (
-                <p
-                  className="mt-1.5 pl-8 text-xs font-medium text-slate-200"
-                  style={{ color: productSemanticColors.textPrimary }}
-                >
-                  {parentMaintenanceSummary}
-                </p>
-              ) : null}
               {nodeExpenseSummary ? (
                 <div className="mt-1.5 space-y-1 pl-8 text-xs" style={{ color: productSemanticColors.textSecondary }}>
                   <p>
@@ -3984,34 +3852,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       </span>
                     </p>
                   ) : null}
-                </div>
-              ) : null}
-              {isNodeMaintenanceModeEnabled &&
-              maintenancePlan &&
-              !hasChildren &&
-              maintenancePlan.hasMeaningfulData ? (
-                <div className="mt-1.5 overflow-x-auto pl-8">
-                  <table className="w-auto border-collapse">
-                    <tbody>
-                      <tr>
-                        {maintenancePlan.dueLines.map((line) =>
-                          renderMaintenanceTableCell(line)
-                        )}
-                        {maintenancePlan.lastServiceLine
-                          ? renderMaintenanceTableCell(maintenancePlan.lastServiceLine, {
-                              key: "last-service",
-                              muted: true,
-                            })
-                          : null}
-                        {maintenancePlan.ruleIntervalLine
-                          ? renderMaintenanceTableCell(maintenancePlan.ruleIntervalLine, {
-                              key: "rule-interval",
-                              muted: true,
-                            })
-                          : null}
-                      </tr>
-                    </tbody>
-                  </table>
                 </div>
               ) : null}
             </div>
@@ -4517,24 +4357,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   >
                     Дерево узлов
                   </h2>
-                  <button
-                    type="button"
-                    onClick={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-extrabold transition"
-                    style={{
-                        backgroundColor: isNodeMaintenanceModeEnabled ? productSemanticColors.primaryAction : productSemanticColors.cardMuted,
-                      borderColor: isNodeMaintenanceModeEnabled ? productSemanticColors.primaryAction : productSemanticColors.border,
-                        color: isNodeMaintenanceModeEnabled ? productSemanticColors.onPrimaryAction : productSemanticColors.textSecondary,
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
-                      <rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                      <path d="M1 5h12" stroke="currentColor" strokeWidth="1.2"/>
-                      <path d="M4 1v2M10 1v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                      <path d="M4 8l1.5 1.5L10 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    План обслуживания
-                  </button>
                 </div>
               )}
               <p className="mt-1 text-xs leading-5" style={{ color: productSemanticColors.textSecondary }}>
@@ -5049,6 +4871,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
     return (
       <NodeContextReferencePanel
+        key={selectedNodeContext.nodeId}
         viewModel={selectedNodeContext}
         showSubtreeCompositionSection={showSubtreeCompositionSection}
         subtreeCompositionItems={subtreeCompositionItems}

@@ -60,6 +60,7 @@
 - Охлаждение (`COOLING`)
   - Воздушное (если есть элементы) (`COOLING.AIR`)
   - Жидкостное (`COOLING.LIQUID`)
+    - Охлаждающая жидкость (`COOLING.LIQUID.COOLANT`)
     - Радиаторы/крышка (`COOLING.LIQUID.RADIATOR`)
     - Помпа/крыльчатка/сальники (`COOLING.LIQUID.PUMP`)
     - Патрубки/хомуты (`COOLING.LIQUID.HOSES`)
@@ -82,6 +83,7 @@
     - Катушка (`ELECTRICS.IGNITION.COIL`)
     - Свеча/колпачок (`ELECTRICS.IGNITION.SPARK`)
   - Проводка/жгуты/разъёмы (`ELECTRICS.WIRING`)
+  - Датчики двигателя / общие датчики (`ELECTRICS.SENSORS`)
   - Свет (`ELECTRICS.LIGHTS`)
     - Фара (`ELECTRICS.LIGHTS.HEAD`)
     - Задний фонарь (`ELECTRICS.LIGHTS.TAIL`)
@@ -140,6 +142,7 @@
   - Задняя шина/камера (`TIRES.REAR`)
   - Буксаторы/ободная лента (`TIRES.RIMLOCK`)
 - Тормоза (`BRAKES`)
+  - ABS / датчики ABS (`BRAKES.ABS`)
   - Передний тормоз (`BRAKES.FRONT`)
     - Главный цилиндр/рычаг (`BRAKES.FRONT.MASTER`)
     - Суппорт (перед) (`BRAKES.FRONT.CALIPER`)
@@ -302,7 +305,7 @@ UI-правила:
 
 ## Full Tree UI Behavior
 
-Полное дерево — отдельный flow на web (`/vehicles/[id]/nodes`) и Expo (`vehicles/[id]` в режиме узлов). Overview мотоцикла показывает только top-node агрегаты и явный переход `Все узлы`.
+Полное дерево — отдельный flow на web (`/vehicles/[id]/nodes`) и Expo (`/vehicles/[id]/nodes`, wrapper над `apps/app/app/vehicles/[id]/index.tsx` с режимом `nodes`). Overview мотоцикла показывает top-node агрегаты и явный переход `Все узлы`.
 
 Текущий контракт UI:
 
@@ -313,14 +316,18 @@ UI-правила:
 - при активном статус-фильтре ветки с совпадениями раскрываются автоматически;
 - поиск применяется поверх выбранного статус-фильтра;
 - пустой результат статус-фильтра отображается как empty state, без изменения backend-контракта;
+- `ТОП-узлы` ограничивает дерево первыми 15 узлами из overview-порядка и сохраняет цепочки родителей;
+- `Свернуть дерево` закрывает раскрытые ветки;
+- раскрытие узла с единственным дочерним узлом автоматически раскрывает цепочку до ветвления или листа;
 - action icons в строках дерева: `Контекст`, `Журнал`, `Купить`, `Добавить сервисное событие`.
 
 Навигация/закрытие:
 
 - закрытие modal/subtree/status/context возвращает к предыдущему overlay-состоянию, если оно было открыто из него;
 - переходы на отдельные страницы используют history back (`router.back()` / `router.canGoBack()`) с fallback на логический экран.
+- переходы из дерева в журнал/корзину сохраняют выбранный узел, статус-фильтр, TOP-режим и раскрытые ветки; возврат восстанавливает фокус.
 
-Advanced (сохранены в техдереве, но скрыты из MVP):
+Advanced-узлы сохранены в техдереве. Текущий API дерева фильтрует только `isActive = true`, поэтому advanced-узлы могут попадать в полный каталог, если активны:
 
 - `ENGINE.TOPEND.CYLINDER`
 - `ENGINE.TOPEND.PISTON`
@@ -340,16 +347,18 @@ Advanced (сохранены в техдереве, но скрыты из MVP):
 - `CHASSIS.SUBFRAME`
 - `ELECTRICS.SENSORS`
 
-## TOP-12 -> Overview-6 mapping
+## TOP-15 -> Overview-6 mapping
 
 На overview-странице мотоцикла используется компактный слой из 6 агрегированных карточек.
-Источник данных для него — строго `TOP-12` узлы (`isTopNode=true`, endpoint `/api/nodes/top`).
+Источник данных для него — 15 top-service узлов из `src/lib/top-service-nodes.ts`; UI-группы собираются в `packages/domain/src/top-node-overview.ts`.
 
-- `engine` / Двигатель:
+- `lubrication` / Смазка:
   - `ENGINE.LUBE.OIL`
   - `ENGINE.LUBE.FILTER`
+- `engine` / Двигатель / охлаждение:
   - `INTAKE.FILTER`
   - `ELECTRICS.IGNITION.SPARK`
+  - `COOLING.LIQUID.COOLANT`
 - `brakes` / Тормоза:
   - `BRAKES.FRONT.PADS`
   - `BRAKES.REAR.PADS`
@@ -361,7 +370,15 @@ Advanced (сохранены в техдереве, но скрыты из MVP):
   - `DRIVETRAIN.CHAIN`
   - `DRIVETRAIN.FRONT_SPROCKET`
   - `DRIVETRAIN.REAR_SPROCKET`
-- `electrics` / Электрика:
-  - резервная карточка overview; в текущем TOP-12 отдельных кодов нет
 - `suspension` / Подвеска:
-  - резервная карточка overview; в текущем TOP-12 отдельных кодов нет
+  - `SUSPENSION.FRONT.SEALS`
+  - `SUSPENSION.FRONT.OIL`
+
+## Runtime hierarchy adjustments
+
+Перед сборкой дерева для UI `loadCatalogNodeContext` применяет runtime-ремап шин:
+
+- `TIRES.FRONT` отображается как дочерний узел `WHEELS.FRONT`;
+- `TIRES.REAR` и `TIRES.RIMLOCK` отображаются как дочерние узлы `WHEELS.REAR`.
+
+Это не меняет seed taxonomy, но влияет на дерево, возвращаемое `GET /api/vehicles/[id]/node-tree`.

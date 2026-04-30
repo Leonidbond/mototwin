@@ -62,6 +62,8 @@ type WishlistItemEditorProps = {
   vehicleId: string;
   itemId?: string;
   presetNodeId?: string;
+  presetSkuId?: string;
+  presetKitCode?: string;
 };
 
 function findOptionById(
@@ -76,6 +78,8 @@ export function WishlistItemEditor({
   vehicleId,
   itemId,
   presetNodeId,
+  presetSkuId,
+  presetKitCode,
 }: WishlistItemEditorProps) {
   const router = useRouter();
   const apiBaseUrl = getApiBaseUrl();
@@ -108,6 +112,7 @@ export function WishlistItemEditor({
   const [serviceKitsLoading, setServiceKitsLoading] = useState(false);
   const [serviceKitsError, setServiceKitsError] = useState("");
   const [addingKitCode, setAddingKitCode] = useState("");
+  const [selectedKitCode, setSelectedKitCode] = useState(presetKitCode?.trim() ?? "");
   const wishlistSkuSearchGen = useRef(0);
   const [loadedWishlistItem, setLoadedWishlistItem] = useState<PartWishlistItem | null>(null);
 
@@ -221,6 +226,44 @@ export function WishlistItemEditor({
   }, [load]);
 
   useEffect(() => {
+    const nextKitCode = presetKitCode?.trim() ?? "";
+    setSelectedKitCode(nextKitCode);
+  }, [presetKitCode]);
+
+  useEffect(() => {
+    const skuId = presetSkuId?.trim();
+    if (isLoading || mode !== "create" || !vehicleId || !skuId) {
+      return;
+    }
+    const nodeId = form.nodeId.trim();
+    let isCancelled = false;
+    const client = createApiClient({ baseUrl: apiBaseUrl });
+    const endpoints = createMotoTwinEndpoints(client);
+    void endpoints
+      .getPartSkus({ nodeId: nodeId || undefined })
+      .then((res) => {
+        if (isCancelled) {
+          return;
+        }
+        const sku = (res.skus ?? []).find((candidate) => candidate.id === skuId);
+        if (!sku) {
+          setForm((current) => ({ ...current, skuId }));
+          return;
+        }
+        setWishlistSkuPickedPreview(sku);
+        setForm((current) => applyPartSkuViewModelToPartWishlistFormValues(current, sku));
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setForm((current) => ({ ...current, skuId }));
+        }
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [apiBaseUrl, form.nodeId, isLoading, mode, presetSkuId, vehicleId]);
+
+  useEffect(() => {
     const id = setTimeout(() => {
       setWishlistSkuDebouncedQuery(wishlistSkuQuery.trim());
     }, 350);
@@ -319,7 +362,16 @@ export function WishlistItemEditor({
     void endpoints
       .getServiceKits({ nodeId, vehicleId })
       .then((res) => {
-        setServiceKits(res.kits ?? []);
+        const kits = res.kits ?? [];
+        setServiceKits(
+          selectedKitCode
+            ? [...kits].sort((a, b) => {
+                if (a.code === selectedKitCode) return -1;
+                if (b.code === selectedKitCode) return 1;
+                return 0;
+              })
+            : kits
+        );
       })
       .catch(() => {
         setServiceKits([]);
@@ -328,7 +380,7 @@ export function WishlistItemEditor({
       .finally(() => {
         setServiceKitsLoading(false);
       });
-  }, [apiBaseUrl, form.nodeId, isLoading, mode, vehicleId]);
+  }, [apiBaseUrl, form.nodeId, isLoading, mode, selectedKitCode, vehicleId]);
 
   const applyRecommendedSkuToForm = (rec: PartRecommendationViewModel) => {
     const skuFromRecommendation: PartSkuViewModel = {
@@ -649,9 +701,16 @@ export function WishlistItemEditor({
                     {!serviceKitsLoading
                       ? serviceKits.map((kit) => {
                           const preview = serviceKitPreviewByCode.get(kit.code);
+                          const isSelectedKit = kit.code === selectedKitCode;
                           return (
-                          <View key={kit.code} style={styles.kitCard}>
-                            <Text style={styles.recName}>{kit.title}</Text>
+                          <View
+                            key={kit.code}
+                            style={[styles.kitCard, isSelectedKit && styles.kitCardSelected]}
+                          >
+                            <Text style={styles.recName}>
+                              {kit.title}
+                              {isSelectedKit ? " · выбран" : ""}
+                            </Text>
                             <Text style={styles.skuResultMeta}>{kit.description}</Text>
                             {(preview?.items ?? []).map((item) => {
                               const muted = item.status !== "WILL_ADD";
@@ -999,6 +1058,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 8,
     backgroundColor: c.card,
+  },
+  kitCardSelected: {
+    borderColor: c.indigoSoftBorder,
+    backgroundColor: c.indigoSoftBg,
   },
   kitPreviewRow: {
     marginTop: 6,

@@ -107,7 +107,7 @@ export function buildVehicleServiceLogHref(
   vehicleId: string,
   nodeFilter: ServiceLogNodeFilter | null,
   paidOnly: boolean,
-  options?: { expandExpenses?: boolean; month?: string; serviceEventId?: string }
+  options?: { expandExpenses?: boolean; month?: string; serviceEventId?: string; returnNodeId?: string }
 ): string {
   const q: string[] = [];
   if (nodeFilter?.nodeIds.length) {
@@ -126,6 +126,9 @@ export function buildVehicleServiceLogHref(
   }
   if (options?.serviceEventId) {
     q.push(`serviceEventId=${encodeURIComponent(options.serviceEventId)}`);
+  }
+  if (options?.returnNodeId) {
+    q.push(`returnNodeId=${encodeURIComponent(options.returnNodeId)}`);
   }
   return `/vehicles/${vehicleId}/service-log${q.length ? `?${q.join("&")}` : ""}`;
 }
@@ -437,6 +440,7 @@ export default function ServiceLogScreen() {
     month?: string;
     serviceEventId?: string;
     highlightServiceEventId?: string;
+    returnNodeId?: string;
   }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
   const highlightedServiceEventId =
@@ -445,6 +449,7 @@ export default function ServiceLogScreen() {
       : typeof params.highlightServiceEventId === "string"
         ? params.highlightServiceEventId
         : "";
+  const returnNodeId = typeof params.returnNodeId === "string" ? params.returnNodeId : "";
 
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -726,7 +731,20 @@ export default function ServiceLogScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScreenHeader title="Журнал обслуживания" />
+      <ScreenHeader
+        title="Журнал обслуживания"
+        onBack={() => {
+          if (returnNodeId) {
+            router.replace(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeId)}`);
+            return;
+          }
+          if (router.canGoBack()) {
+            router.back();
+            return;
+          }
+          router.replace(`/vehicles/${vehicleId}`);
+        }}
+      />
       <KeyboardAwareScrollScreen
         contentContainerStyle={styles.scrollContent}
         scrollViewRef={scrollRef}
