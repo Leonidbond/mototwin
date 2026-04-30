@@ -97,6 +97,7 @@ export default function VehicleServiceLogPage() {
   const nodeIdsFromQuery = searchParams.get("nodeIds");
   const nodeLabelFromQuery = searchParams.get("nodeLabel");
   const expandExpensesFromQuery = searchParams.get("expandExpenses");
+  const returnNodeIdFromQuery = searchParams.get("returnNodeId");
   const highlightedServiceEventId =
     searchParams.get("serviceEventId") ?? searchParams.get("highlightServiceEventId");
 
@@ -515,6 +516,10 @@ export default function VehicleServiceLogPage() {
   const navigateBackWithFallback = () => {
     if (window.history.length > 1) {
       router.back();
+      return;
+    }
+    if (returnNodeIdFromQuery) {
+      router.push(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeIdFromQuery)}`);
       return;
     }
     router.push(`/vehicles/${vehicleId}`);

@@ -52,6 +52,7 @@ export function getRecentServiceEventsForNode(
     .slice(0, limit)
     .map((event) => ({
       id: event.id,
+      nodeId: event.nodeId,
       eventDate: event.eventDate,
       serviceType: event.serviceType,
       odometer: event.odometer,

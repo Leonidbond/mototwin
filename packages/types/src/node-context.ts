@@ -15,6 +15,7 @@ export type NodeContextActionViewModel = {
 
 export type NodeContextServiceEventSummary = {
   id: string;
+  nodeId: string;
   eventDate: string;
   serviceType: string;
   odometer: number;

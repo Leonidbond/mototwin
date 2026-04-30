@@ -152,7 +152,7 @@ export async function syncExpenseItemForServiceEvent(
       await db.expenseItem.update({
         where: { id: expense.id },
         data: {
-          nodeId: event.nodeId,
+          node: { connect: { id: event.nodeId } },
           serviceEvent: { connect: { id: event.id } },
           category: classifyServiceExpense(event),
           installStatus: "INSTALLED",

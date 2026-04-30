@@ -145,13 +145,17 @@ function NodeContextReferencePanel({
   onAddService,
   onPickParts,
   onOpenAllEvents,
+  onOpenEvent,
   onOpenStatusExplanation,
+  onOpenCompatiblePart,
   onAddCompatiblePart,
+  onOpenServiceKit,
   onAddServiceKit,
   onSnooze7Days,
   onSnooze30Days,
   onClearSnooze,
-  onInstallWishlistPart,
+  onOpenWishlistPart,
+  onAdvanceWishlistPartStatus,
   onOpenAllUninstalledParts,
 }: {
   viewModel: NodeContextViewModel;
@@ -174,13 +178,17 @@ function NodeContextReferencePanel({
   onAddService: () => void;
   onPickParts: () => void;
   onOpenAllEvents: () => void;
+  onOpenEvent: (eventId: string, eventNodeId: string) => void;
   onOpenStatusExplanation: () => void;
+  onOpenCompatiblePart: (rec: PartRecommendationViewModel) => void;
   onAddCompatiblePart: (rec: PartRecommendationViewModel) => void;
+  onOpenServiceKit: (kit: ServiceKitViewModel) => void;
   onAddServiceKit: (kit: ServiceKitViewModel) => void;
   onSnooze7Days: () => void;
   onSnooze30Days: () => void;
   onClearSnooze: () => void;
-  onInstallWishlistPart: (item: PartWishlistItemViewModel) => void;
+  onOpenWishlistPart: (item: PartWishlistItemViewModel) => void;
+  onAdvanceWishlistPartStatus: (item: PartWishlistItemViewModel) => void;
   onOpenAllUninstalledParts: () => void;
 }) {
   const subtreeCompositionPreviewLimit = 12;
@@ -319,7 +327,7 @@ function NodeContextReferencePanel({
             </svg>
           </span>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 20, lineHeight: "24px", fontWeight: 700 }}>
+            <h2 style={{ margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 18, lineHeight: "22px", fontWeight: 700 }}>
               {viewModel.nodeName}
             </h2>
             <p style={{ margin: "4px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: productSemanticColors.textSecondary, fontSize: 11, lineHeight: "14px", fontWeight: 700 }}>
@@ -445,7 +453,27 @@ function NodeContextReferencePanel({
               ? productSemanticColors.errorSurface
               : productSemanticColors.indigoSoftBg;
             return (
-            <div key={event.id} style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 10, padding: "7px 12px 6px", borderTop: index > 0 ? `1px solid ${border}` : undefined }}>
+            <button
+              key={event.id}
+              type="button"
+              onClick={() => onOpenEvent(event.id, event.nodeId)}
+              title="Открыть событие в журнале"
+              style={{
+                display: "flex",
+                width: "100%",
+                appearance: "none",
+                minWidth: 0,
+                alignItems: "center",
+                gap: 10,
+                padding: "7px 12px 6px",
+                border: 0,
+                borderTop: index > 0 ? `1px solid ${border}` : undefined,
+                backgroundColor: "transparent",
+                color: "inherit",
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
               <span style={{ width: 24, height: 24, borderRadius: 7, display: "inline-flex", alignItems: "center", justifyContent: "center", backgroundColor: eventBg, color: eventColor }}>
                 {isReplacement ? (
                   <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
@@ -473,7 +501,7 @@ function NodeContextReferencePanel({
                 </p>
               </div>
               <span style={{ color: productSemanticColors.textMuted, fontSize: 19, lineHeight: 1 }}>›</span>
-            </div>
+            </button>
           );
           })
         )}
@@ -625,12 +653,48 @@ function NodeContextReferencePanel({
               <div style={{ display: "grid", gap: 8 }}>
                 {visibleRecommendations.map((rec) => {
                   const warning = getPartRecommendationWarningLabel(rec);
+                  const priceLabel =
+                    rec.priceAmount != null
+                      ? `${formatExpenseAmountRu(rec.priceAmount)} ${rec.currency?.trim() || ""}`.trim()
+                      : null;
                   return (
-                    <div key={rec.skuId} style={{ display: "flex", minWidth: 0, alignItems: "center", justifyContent: "space-between", gap: 12, borderTop: rec === visibleRecommendations[0] ? undefined : `1px solid ${border}`, paddingTop: rec === visibleRecommendations[0] ? 0 : 8 }}>
+                    <div
+                      key={rec.skuId}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onOpenCompatiblePart(rec)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onOpenCompatiblePart(rec);
+                        }
+                      }}
+                      title={`Открыть карточку добавления ${rec.brandName} ${rec.canonicalName}`}
+                      style={{
+                        display: "flex",
+                        width: "100%",
+                        minWidth: 0,
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        borderTop: rec === visibleRecommendations[0] ? undefined : `1px solid ${border}`,
+                        backgroundColor: "transparent",
+                        color: "inherit",
+                        cursor: "pointer",
+                        padding: rec === visibleRecommendations[0] ? 0 : "8px 0 0",
+                        textAlign: "left",
+                      }}
+                    >
                       <div style={{ minWidth: 0, flex: "1 1 auto" }}>
                         <p style={{ margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 700 }}>{rec.brandName} {rec.canonicalName}</p>
                         <p style={{ margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: productSemanticColors.textSecondary, fontSize: 11 }}>
-                          {rec.partNumbers[0] ?? rec.partType} · {rec.recommendationLabel}
+                          {[
+                            rec.partNumbers[0] ?? rec.partType,
+                            rec.recommendationLabel,
+                            priceLabel ? `Цена: ${priceLabel}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </p>
                         {warning ? (
                           <p style={{ margin: "3px 0 0", color: statusSemanticTokens.SOON.foreground, fontSize: 10, lineHeight: "13px" }}>
@@ -638,14 +702,29 @@ function NodeContextReferencePanel({
                           </p>
                         ) : null}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => onAddCompatiblePart(rec)}
-                        disabled={isAddingCompatiblePart}
-                        style={{ flex: "0 0 auto", border: `1px solid ${productSemanticColors.borderStrong}`, borderRadius: 999, backgroundColor: productSemanticColors.cardMuted, color: productSemanticColors.textPrimary, padding: "7px 10px", fontSize: 11, lineHeight: "13px", fontWeight: 700, whiteSpace: "nowrap" }}
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (!isAddingCompatiblePart) {
+                            onAddCompatiblePart(rec);
+                          }
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (!isAddingCompatiblePart) {
+                              onAddCompatiblePart(rec);
+                            }
+                          }
+                        }}
+                        aria-disabled={isAddingCompatiblePart}
+                        style={{ flex: "0 0 auto", border: `1px solid ${productSemanticColors.borderStrong}`, borderRadius: 999, backgroundColor: productSemanticColors.cardMuted, color: productSemanticColors.textPrimary, padding: "7px 10px", fontSize: 11, lineHeight: "13px", fontWeight: 700, whiteSpace: "nowrap", cursor: isAddingCompatiblePart ? "not-allowed" : "pointer", opacity: isAddingCompatiblePart ? 0.6 : 1 }}
                       >
-                        В список
-                      </button>
+                        {isAddingCompatiblePart ? "Добавляем..." : "В корзину"}
+                      </span>
                     </div>
                   );
                 })}
@@ -692,26 +771,69 @@ function NodeContextReferencePanel({
               <p style={{ margin: 0, color: productSemanticColors.textSecondary, fontSize: 12, lineHeight: "16px" }}>Загрузка комплектов...</p>
             ) : visibleServiceKits.length > 0 ? (
               <div style={{ display: "grid", gap: 8 }}>
-                {visibleServiceKits.map((kit) => (
-                  <div key={kit.code} style={{ minWidth: 0, borderTop: kit === visibleServiceKits[0] ? undefined : `1px solid ${border}`, paddingTop: kit === visibleServiceKits[0] ? 0 : 8 }}>
-                    <div style={{ display: "flex", minWidth: 0, alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                {visibleServiceKits.map((kit) => {
+                  const isAddingThisKit = addingServiceKitCode === kit.code;
+                  const canAddThisKit = availableActionKeys.has("add_kit") && !addingServiceKitCode;
+                  return (
+                  <div
+                    key={kit.code}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onOpenServiceKit(kit)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onOpenServiceKit(kit);
+                      }
+                    }}
+                    title={`Открыть подбор комплекта «${kit.title}»`}
+                    style={{
+                      display: "flex",
+                      width: "100%",
+                      minWidth: 0,
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      borderTop: kit === visibleServiceKits[0] ? undefined : `1px solid ${border}`,
+                      backgroundColor: "transparent",
+                      color: "inherit",
+                      cursor: "pointer",
+                      padding: kit === visibleServiceKits[0] ? 0 : "8px 0 0",
+                      textAlign: "left",
+                    }}
+                  >
                       <div style={{ minWidth: 0 }}>
                         <p style={{ margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 700 }}>{kit.title}</p>
                         <p style={{ margin: "3px 0 0", overflowWrap: "anywhere", color: productSemanticColors.textSecondary, fontSize: 11, lineHeight: "14px" }}>
                           {kit.items.length} поз. · {kit.description}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => onAddServiceKit(kit)}
-                        disabled={addingServiceKitCode === kit.code}
-                        style={{ flex: "0 0 auto", border: `1px solid ${productSemanticColors.borderStrong}`, borderRadius: 999, backgroundColor: productSemanticColors.cardMuted, color: productSemanticColors.textPrimary, padding: "7px 10px", fontSize: 11, lineHeight: "13px", fontWeight: 700 }}
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (canAddThisKit) {
+                            onAddServiceKit(kit);
+                          }
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (canAddThisKit) {
+                              onAddServiceKit(kit);
+                            }
+                          }
+                        }}
+                        aria-disabled={!canAddThisKit}
+                        style={{ flex: "0 0 auto", border: `1px solid ${productSemanticColors.borderStrong}`, borderRadius: 999, backgroundColor: productSemanticColors.cardMuted, color: productSemanticColors.textPrimary, cursor: canAddThisKit ? "pointer" : "not-allowed", opacity: canAddThisKit || isAddingThisKit ? 1 : 0.6, padding: "7px 10px", fontSize: 11, lineHeight: "13px", fontWeight: 700 }}
                       >
-                        {addingServiceKitCode === kit.code ? "Добавляем..." : "Добавить"}
-                      </button>
-                    </div>
+                        {isAddingThisKit ? "Добавляем..." : "В корзину"}
+                      </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p style={{ margin: 0, color: productSemanticColors.textSecondary, fontSize: 12 }}>Для этого узла пока нет готовых комплектов.</p>
@@ -734,25 +856,74 @@ function NodeContextReferencePanel({
             {visibleUninstalledParts.length > 0 ? (
               <div style={{ display: "grid", gap: 8 }}>
                 {visibleUninstalledParts.map((item) => {
-                  const isInstalling = updatingWishlistItemId === item.id;
+                  const isUpdating = updatingWishlistItemId === item.id;
+                  const nextStatus =
+                    item.status === "NEEDED"
+                      ? "ORDERED"
+                      : item.status === "ORDERED"
+                      ? "BOUGHT"
+                      : "INSTALLED";
+                  const nextStatusLabel =
+                    item.status === "NEEDED"
+                      ? "Заказать"
+                      : item.status === "ORDERED"
+                      ? "Куплено"
+                      : "Установить";
                   return (
-                    <div key={item.id} style={{ display: "flex", minWidth: 0, alignItems: "center", justifyContent: "space-between", gap: 10, borderTop: item === visibleUninstalledParts[0] ? undefined : `1px solid ${border}`, paddingTop: item === visibleUninstalledParts[0] ? 0 : 8 }}>
+                    <div
+                      key={item.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onOpenWishlistPart(item)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onOpenWishlistPart(item);
+                        }
+                      }}
+                      title={`Открыть позицию «${item.title}» в корзине`}
+                      style={{
+                        display: "flex",
+                        minWidth: 0,
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        borderTop: item === visibleUninstalledParts[0] ? undefined : `1px solid ${border}`,
+                        cursor: "pointer",
+                        paddingTop: item === visibleUninstalledParts[0] ? 0 : 8,
+                      }}
+                    >
                       <div style={{ minWidth: 0 }}>
                         <p style={{ margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 700 }}>{item.title}</p>
                         <p style={{ margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: productSemanticColors.textSecondary, fontSize: 11 }}>
                           {item.statusLabelRu} · Кол-во: {item.quantity}{item.costLabelRu ? ` · ${item.costLabelRu}` : ""}
                         </p>
                       </div>
-                      {item.status === "BOUGHT" ? (
-                        <button
-                          type="button"
-                          onClick={() => onInstallWishlistPart(item)}
-                          disabled={isInstalling}
-                          style={{ flex: "0 0 auto", border: `1px solid ${productSemanticColors.borderStrong}`, borderRadius: 999, backgroundColor: productSemanticColors.primaryAction, color: productSemanticColors.onPrimaryAction, padding: "7px 10px", fontSize: 11, lineHeight: "13px", fontWeight: 700 }}
-                        >
-                          {isInstalling ? "Открываем..." : "Установить"}
-                        </button>
-                      ) : null}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onAdvanceWishlistPartStatus(item);
+                        }}
+                        disabled={isUpdating}
+                        title={`Сделать статус: ${nextStatus}`}
+                        style={{
+                          flex: "0 0 auto",
+                          border: `1px solid ${productSemanticColors.borderStrong}`,
+                          borderRadius: 999,
+                          backgroundColor: item.status === "BOUGHT" ? productSemanticColors.primaryAction : productSemanticColors.cardMuted,
+                          color: item.status === "BOUGHT" ? productSemanticColors.onPrimaryAction : productSemanticColors.textPrimary,
+                          cursor: isUpdating ? "not-allowed" : "pointer",
+                          opacity: isUpdating ? 0.6 : 1,
+                          padding: "7px 10px",
+                          fontSize: 11,
+                          lineHeight: "13px",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {isUpdating ? "Обновляем..." : nextStatusLabel}
+                      </button>
                     </div>
                   );
                 })}
@@ -796,6 +967,43 @@ function NodeContextReferencePanel({
 function normalizePartNumberForLookup(value: string): string {
   return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 }
+
+function buildPartSkuViewModelFromRecommendation(
+  rec: PartRecommendationViewModel
+): PartSkuViewModel {
+  const now = new Date().toISOString();
+  return {
+    id: rec.skuId,
+    seedKey: null,
+    primaryNodeId: rec.primaryNode?.id ?? null,
+    brandName: rec.brandName,
+    canonicalName: rec.canonicalName,
+    partType: rec.partType,
+    description: null,
+    category: null,
+    priceAmount: rec.priceAmount,
+    currency: rec.currency,
+    sourceUrl: null,
+    isOem: false,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    primaryNode: rec.primaryNode,
+    nodeLinks: [],
+    fitments: [],
+    offers: [],
+    partNumbers: rec.partNumbers.map((number, idx) => ({
+      id: `${rec.skuId}-${idx}`,
+      skuId: rec.skuId,
+      number,
+      normalizedNumber: normalizePartNumberForLookup(number),
+      numberType: "MANUFACTURER",
+      brandName: rec.brandName,
+      createdAt: now,
+    })),
+  };
+}
+
 const SIDEBAR_COLLAPSED_KEY = "vehicle.detail.sidebar.collapsed";
 
 type VehiclePageProps = {
@@ -830,6 +1038,14 @@ type NodeStatusFilter = NodeStatus | "ALL";
 
 function buildNodeSnoozeStorageKey(vehicleId: string, nodeId: string): string {
   return `mototwin.nodeSnooze.${vehicleId}.${nodeId}`;
+}
+
+function buildNodeTreeReturnStateStorageKey(vehicleId: string): string {
+  return `mototwin.nodeTree.returnState.${vehicleId}`;
+}
+
+function isNodeStatusFilter(value: unknown): value is NodeStatusFilter {
+  return value === "ALL" || NODE_STATUS_FILTER_OPTIONS.includes(value as NodeStatus);
 }
 
 function findNodeViewModelPathById(
@@ -1061,6 +1277,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [nodeStatusFilter, setNodeStatusFilter] = useState<NodeStatusFilter>("ALL");
   const [nodeTreeTopOnly, setNodeTreeTopOnly] = useState(false);
+  const appliedNodeTreeEntryKeyRef = useRef<string | null>(null);
   const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
   const [isUsageProfileSectionExpanded, setIsUsageProfileSectionExpanded] = useState(true);
@@ -1072,8 +1289,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [statusHighlightedNodeIds, setStatusHighlightedNodeIds] = useState<Set<string>>(new Set());
   const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
   const overlayReturnStackRef = useRef<OverlayReturnTarget[]>([]);
-  /** When we sync selection to the URL ourselves, skip URL→focus effect to avoid double updates (flicker). */
-  const lastNodeIdWrittenToUrlRef = useRef<string | null>(null);
   const serviceEventCommentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
     PartRecommendationViewModel[]
@@ -1141,6 +1356,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [wishlistServiceKitsLoading, setWishlistServiceKitsLoading] = useState(false);
   const [wishlistServiceKitsError, setWishlistServiceKitsError] = useState("");
   const [wishlistAddingKitCode, setWishlistAddingKitCode] = useState("");
+  const [wishlistSelectedKitCode, setWishlistSelectedKitCode] = useState("");
   const wishlistSkuSearchGen = useRef(0);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -1328,6 +1544,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const highlightedWishlistItemIdFromSearchParams = searchParams.get("wishlistItemId");
   const partsStatusFromSearchParams = searchParams.get("partsStatus");
   const installWishlistItemIdFromSearchParams = searchParams.get("installWishlistItemId");
+
   const focusNodeInTree = useCallback(
     (nodeId: string) => {
       const path = findNodeViewModelPathById(topLevelNodeViewModels, nodeId);
@@ -1349,6 +1566,95 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     },
     [topLevelNodeViewModels]
   );
+
+  useEffect(() => {
+    if (pageView !== "nodeTree" || !vehicleId || topLevelNodeViewModels.length === 0) {
+      return;
+    }
+
+    let entryKey = targetNodeIdFromSearchParams ? `url:${targetNodeIdFromSearchParams}` : "empty";
+    let restoredNodeId: string | null = targetNodeIdFromSearchParams;
+    let restoredExpandedNodes: Record<string, boolean> = {};
+    let restoredStatusFilter: NodeStatusFilter | null = null;
+    let restoredTopOnly: boolean | null = null;
+    let shouldReplaceUrl = false;
+
+    try {
+      const raw = sessionStorage.getItem(buildNodeTreeReturnStateStorageKey(vehicleId));
+      if (raw) {
+        sessionStorage.removeItem(buildNodeTreeReturnStateStorageKey(vehicleId));
+        const parsed = JSON.parse(raw) as {
+          selectedNodeId?: unknown;
+          nodeStatusFilter?: unknown;
+          nodeTreeTopOnly?: unknown;
+          expandedNodes?: unknown;
+        };
+        entryKey = `return:${typeof parsed.selectedNodeId === "string" ? parsed.selectedNodeId : ""}`;
+        restoredNodeId =
+          typeof parsed.selectedNodeId === "string" ? parsed.selectedNodeId : targetNodeIdFromSearchParams;
+        restoredExpandedNodes =
+          parsed.expandedNodes &&
+          typeof parsed.expandedNodes === "object" &&
+          !Array.isArray(parsed.expandedNodes)
+            ? Object.fromEntries(
+                Object.entries(parsed.expandedNodes as Record<string, unknown>).filter(
+                  ([, value]) => typeof value === "boolean"
+                )
+              ) as Record<string, boolean>
+            : {};
+        restoredStatusFilter = isNodeStatusFilter(parsed.nodeStatusFilter)
+          ? parsed.nodeStatusFilter
+          : null;
+        restoredTopOnly = typeof parsed.nodeTreeTopOnly === "boolean" ? parsed.nodeTreeTopOnly : null;
+        shouldReplaceUrl = Boolean(restoredNodeId);
+      }
+    } catch {
+      // Ignore stale return state.
+    }
+
+    if (appliedNodeTreeEntryKeyRef.current === entryKey) {
+      return;
+    }
+    appliedNodeTreeEntryKeyRef.current = entryKey;
+
+    if (restoredStatusFilter) {
+      setNodeStatusFilter(restoredStatusFilter);
+    }
+    if (restoredTopOnly !== null) {
+      setNodeTreeTopOnly(restoredTopOnly);
+    }
+
+    if (!restoredNodeId) {
+      return;
+    }
+
+    const path = findNodeViewModelPathById(topLevelNodeViewModels, restoredNodeId);
+    if (!path || path.length === 0) {
+      return;
+    }
+
+    setSelectedNodeContextId(restoredNodeId);
+    setHighlightedNodeId(restoredNodeId);
+    setStatusHighlightedNodeIds(new Set());
+    setExpandedNodes(() => {
+      const next = { ...restoredExpandedNodes };
+      for (const ancestorId of path.slice(0, -1)) {
+        next[ancestorId] = true;
+      }
+      return next;
+    });
+
+    if (shouldReplaceUrl) {
+      const q = new URLSearchParams(window.location.search);
+      q.set("nodeId", restoredNodeId);
+      q.delete("highlightIssueNodeIds");
+      const nextHref = `/vehicles/${vehicleId}/nodes?${q.toString()}`;
+      if (window.location.pathname + window.location.search !== nextHref) {
+        window.history.replaceState(window.history.state, "", nextHref);
+      }
+    }
+  }, [pageView, targetNodeIdFromSearchParams, topLevelNodeViewModels, vehicleId]);
+
   const focusIssueNodesInTree = useCallback(
     (nodeIds: string[]) => {
       const idToNode = flattenNodeViewModelsById(topLevelNodeViewModels);
@@ -1571,6 +1877,20 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     return out;
   }, [serviceKitNodesByCode, wishlistItems, wishlistServiceKits]);
+  const visibleWishlistServiceKits = useMemo(() => {
+    if (!wishlistSelectedKitCode) {
+      return wishlistServiceKits;
+    }
+    return [...wishlistServiceKits].sort((a, b) => {
+      if (a.code === wishlistSelectedKitCode) {
+        return -1;
+      }
+      if (b.code === wishlistSelectedKitCode) {
+        return 1;
+      }
+      return 0;
+    });
+  }, [wishlistSelectedKitCode, wishlistServiceKits]);
   const wishlistNodeOptions = useMemo(
     () => flattenNodeTreeToSelectOptions(nodeTree),
     [nodeTree]
@@ -1832,16 +2152,26 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     void vehicleDetailApi
       .getServiceKits({ nodeId, vehicleId })
       .then((res) => {
-        setWishlistServiceKits(res.kits ?? []);
+        const nextKits = res.kits ?? [];
+        setWishlistServiceKits((currentKits) => {
+          if (!wishlistSelectedKitCode) {
+            return nextKits;
+          }
+          const selectedKit = currentKits.find((kit) => kit.code === wishlistSelectedKitCode);
+          if (selectedKit && !nextKits.some((kit) => kit.code === wishlistSelectedKitCode)) {
+            return [selectedKit, ...nextKits];
+          }
+          return nextKits;
+        });
       })
       .catch(() => {
-        setWishlistServiceKits([]);
+        setWishlistServiceKits((currentKits) => (wishlistSelectedKitCode ? currentKits : []));
         setWishlistServiceKitsError("Не удалось загрузить комплекты обслуживания.");
       })
       .finally(() => {
         setWishlistServiceKitsLoading(false);
       });
-  }, [isWishlistModalOpen, vehicleId, wishlistForm.nodeId]);
+  }, [isWishlistModalOpen, vehicleId, wishlistForm.nodeId, wishlistSelectedKitCode]);
 
 
   useEffect(() => {
@@ -1860,15 +2190,43 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     router.push(`/vehicles/${vehicleId}/service-log`);
   };
 
-  const openServiceLogFilteredByNode = (node: NodeTreeItemViewModel) => {
+  const persistNodeTreeReturnState = (selectedNodeId: string) => {
+    if (pageView !== "nodeTree" || !vehicleId) {
+      return;
+    }
+    try {
+      sessionStorage.setItem(
+        buildNodeTreeReturnStateStorageKey(vehicleId),
+        JSON.stringify({
+          selectedNodeId,
+          nodeStatusFilter,
+          nodeTreeTopOnly,
+          expandedNodes,
+        })
+      );
+    } catch {
+      // Ignore sessionStorage failures; the browser back stack still works.
+    }
+  };
+
+  const openServiceLogFilteredByNode = (
+    node: NodeTreeItemViewModel,
+    serviceEventId?: string,
+    returnNodeId = node.id
+  ) => {
     const raw = findNodeTreeItemById(nodeTree, node.id);
     if (!raw) {
       return;
     }
+    persistNodeTreeReturnState(returnNodeId);
     const filter = createServiceLogNodeFilter(raw);
     const q = new URLSearchParams();
     q.set("nodeIds", filter.nodeIds.join(","));
     q.set("nodeLabel", filter.displayLabel);
+    q.set("returnNodeId", returnNodeId);
+    if (serviceEventId) {
+      q.set("serviceEventId", serviceEventId);
+    }
     router.push(`/vehicles/${vehicleId}/service-log?${q.toString()}`);
   };
 
@@ -1931,28 +2289,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setServiceEventFormError("");
     setIsAddServiceEventModalOpen(true);
   }, [searchParams, serviceEvents, nodeTree]);
-
-  useEffect(() => {
-    if (pageView !== "nodeTree" || !targetNodeIdFromSearchParams || topLevelNodeViewModels.length === 0) {
-      return;
-    }
-    if (lastNodeIdWrittenToUrlRef.current === targetNodeIdFromSearchParams) {
-      lastNodeIdWrittenToUrlRef.current = null;
-      return;
-    }
-    setStatusHighlightedNodeIds(new Set());
-    focusNodeInTree(targetNodeIdFromSearchParams);
-  }, [focusNodeInTree, pageView, targetNodeIdFromSearchParams, topLevelNodeViewModels.length]);
-
-  useEffect(() => {
-    if (pageView !== "nodeTree" || selectedNodeContextId || topLevelNodeViewModels.length === 0) {
-      return;
-    }
-    const frame = window.requestAnimationFrame(() => {
-      setSelectedNodeContextId(topLevelNodeViewModels[0]?.id ?? null);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [pageView, selectedNodeContextId, topLevelNodeViewModels]);
 
   useEffect(() => {
     if (
@@ -2058,7 +2394,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     const textarea = serviceEventCommentTextareaRef.current;
     textarea.style.height = "auto";
-    textarea.style.height = `${Math.max(textarea.scrollHeight, 80)}px`;
+    textarea.style.height = `${Math.max(textarea.scrollHeight, 64)}px`;
   }, [comment, isAddServiceEventModalOpen]);
 
   useEffect(() => {
@@ -2407,11 +2743,71 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setWishlistServiceKits([]);
     setWishlistServiceKitsError("");
     setWishlistAddingKitCode("");
+    setWishlistSelectedKitCode("");
     const initialWishlistForm = createInitialPartWishlistFormValues({
       nodeId: presetNodeId ?? "",
       status: "NEEDED",
     });
     setWishlistForm({ ...initialWishlistForm, currency: readDefaultCurrencySetting() });
+    setWishlistFormError("");
+    setIsWishlistModalOpen(true);
+  };
+
+  const openWishlistModalForServiceKit = (kit: ServiceKitViewModel, presetNodeId?: string) => {
+    setWishlistNotice("");
+    setWishlistEditingId(null);
+    wishlistSkuSearchGen.current += 1;
+    setWishlistSkuQuery("");
+    setWishlistSkuDebouncedQuery("");
+    setWishlistSkuResults([]);
+    setWishlistSkuFetchError("");
+    setWishlistSkuPickedPreview(null);
+    setWishlistRecommendations([]);
+    setWishlistRecommendationsError("");
+    setWishlistAddingRecommendedSkuId("");
+    setWishlistServiceKits([kit]);
+    setWishlistServiceKitsError("");
+    setWishlistAddingKitCode("");
+    setWishlistSelectedKitCode(kit.code);
+    const initialWishlistForm = createInitialPartWishlistFormValues({
+      nodeId: presetNodeId ?? "",
+      status: "NEEDED",
+    });
+    setWishlistForm({ ...initialWishlistForm, currency: readDefaultCurrencySetting() });
+    setWishlistFormError("");
+    setIsWishlistModalOpen(true);
+  };
+
+  const openWishlistModalForRecommendedSku = (
+    rec: PartRecommendationViewModel,
+    presetNodeId?: string
+  ) => {
+    const skuFromRecommendation = buildPartSkuViewModelFromRecommendation(rec);
+    setWishlistNotice("");
+    setWishlistEditingId(null);
+    wishlistSkuSearchGen.current += 1;
+    setWishlistSkuQuery("");
+    setWishlistSkuDebouncedQuery("");
+    setWishlistSkuResults([]);
+    setWishlistSkuFetchError("");
+    setWishlistSkuPickedPreview(skuFromRecommendation);
+    setWishlistRecommendations([]);
+    setWishlistRecommendationsError("");
+    setWishlistAddingRecommendedSkuId("");
+    setWishlistServiceKits([]);
+    setWishlistServiceKitsError("");
+    setWishlistAddingKitCode("");
+    setWishlistSelectedKitCode("");
+    const initialWishlistForm = createInitialPartWishlistFormValues({
+      nodeId: presetNodeId ?? rec.primaryNode?.id ?? "",
+      status: "NEEDED",
+    });
+    setWishlistForm(
+      applyPartSkuViewModelToPartWishlistFormValues(
+        { ...initialWishlistForm, currency: readDefaultCurrencySetting() },
+        skuFromRecommendation
+      )
+    );
     setWishlistFormError("");
     setIsWishlistModalOpen(true);
   };
@@ -2431,6 +2827,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setWishlistServiceKits([]);
     setWishlistServiceKitsError("");
     setWishlistAddingKitCode("");
+    setWishlistSelectedKitCode("");
     setWishlistForm(partWishlistFormValuesFromItem(item));
     setWishlistFormError("");
     setIsWishlistModalOpen(true);
@@ -2452,6 +2849,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setWishlistServiceKits([]);
     setWishlistServiceKitsError("");
     setWishlistAddingKitCode("");
+    setWishlistSelectedKitCode("");
     if (options.restorePrevious ?? true) {
       restorePreviousOverlay();
     }
@@ -2514,37 +2912,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
   const addRecommendedSkuToWishlist = async (rec: PartRecommendationViewModel) => {
     if (!vehicleId || wishlistEditingId) {
-      const skuFromRecommendation: PartSkuViewModel = {
-        id: rec.skuId,
-        seedKey: null,
-        primaryNodeId: rec.primaryNode?.id ?? null,
-        brandName: rec.brandName,
-        canonicalName: rec.canonicalName,
-        partType: rec.partType,
-        description: null,
-        category: null,
-        priceAmount: rec.priceAmount,
-        currency: rec.currency,
-        sourceUrl: null,
-        isOem: false,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        primaryNode: rec.primaryNode,
-        nodeLinks: [],
-        fitments: [],
-        offers: [],
-        partNumbers: rec.partNumbers.map((number, idx) => ({
-          id: `${rec.skuId}-${idx}`,
-          skuId: rec.skuId,
-          number,
-          normalizedNumber: number,
-          numberType: "MANUFACTURER",
-          brandName: rec.brandName,
-          createdAt: new Date().toISOString(),
-        })),
-      };
-      setWishlistSkuPickedPreview(null);
+      const skuFromRecommendation = buildPartSkuViewModelFromRecommendation(rec);
+      setWishlistSkuPickedPreview(skuFromRecommendation);
       setWishlistForm((f) => applyPartSkuViewModelToPartWishlistFormValues(f, skuFromRecommendation));
       return;
     }
@@ -2806,7 +3175,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       const q = new URLSearchParams(window.location.search);
       q.set("nodeId", nodeId);
       q.delete("highlightIssueNodeIds");
-      lastNodeIdWrittenToUrlRef.current = nodeId;
       const nextHref = `/vehicles/${vehicleId}/nodes?${q.toString()}`;
       if (window.location.pathname + window.location.search !== nextHref) {
         window.history.replaceState(window.history.state, "", nextHref);
@@ -2834,7 +3202,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     const q = new URLSearchParams(window.location.search);
     q.set("nodeId", nodeId);
     q.delete("highlightIssueNodeIds");
-    lastNodeIdWrittenToUrlRef.current = nodeId;
     const nextHref = `/vehicles/${vehicleId}/nodes?${q.toString()}`;
     if (window.location.pathname + window.location.search !== nextHref) {
       window.history.replaceState(window.history.state, "", nextHref);
@@ -3165,7 +3532,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       const isSelected = selectedNodeContextId === node.id;
       const metaCount = node.children.length;
       const connectorColor = productSemanticColors.border;
-      const guideColumnPx = 28;
+      const guideColumnPx = 24;
       const selectionTokens = node.effectiveStatus
         ? statusSemanticTokens[node.effectiveStatus]
         : statusSemanticTokens.UNKNOWN;
@@ -3360,7 +3727,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 openNodeContextModal(node.id);
               }
             }}
-            className="flex min-h-[60px] items-stretch text-left transition hover:bg-slate-800/40"
+            className="flex min-h-[52px] items-stretch text-left transition hover:bg-slate-800/40"
             style={{
               backgroundColor: productSemanticColors.card,
               color: productSemanticColors.textPrimary,
@@ -3368,7 +3735,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           >
             {renderIndentGuides()}
             <div
-              className="flex flex-1 items-center gap-3 border-b px-3 py-2.5"
+              className="flex flex-1 items-center gap-2 border-b px-2.5 py-2"
               style={{
                 borderBottomColor: productSemanticColors.border,
                 outline: isSelected ? `1.5px solid ${selectionBorderColor}` : undefined,
@@ -3384,14 +3751,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     toggleNodeExpansion(node);
                   }
                 }}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded"
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded"
                 style={{ color: productSemanticColors.textSecondary }}
                 aria-label={hasChildren ? (isExpanded ? "Свернуть ветку" : "Развернуть ветку") : undefined}
               >
                 {hasChildren ? (
                   <svg
-                    width="14"
-                    height="14"
+                    width="13"
+                    height="13"
                     viewBox="0 0 16 16"
                     fill="none"
                     style={{
@@ -3406,25 +3773,25 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 )}
               </button>
               <div
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 style={{ color: iconColor }}
               >
                 {renderTreeIcon()}
               </div>
               <div className="min-w-0 flex-1">
                 <p
-                  className="truncate text-[15px] font-semibold leading-tight"
+                  className="truncate text-sm font-semibold leading-tight"
                   style={{ color: productSemanticColors.textPrimary }}
                 >
                   {node.name}
                 </p>
-                <div className="mt-1 flex items-center gap-3">
-                  <p className="truncate text-xs font-medium uppercase tracking-wide" style={{ color: productSemanticColors.textMuted }}>
+                <div className="mt-0.5 flex items-center gap-2">
+                  <p className="truncate text-[11px] font-medium uppercase tracking-wide" style={{ color: productSemanticColors.textMuted }}>
                     {node.code}
                   </p>
                   {metaCount > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
-                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                    <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: productSemanticColors.textMuted }}>
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
                         <rect x="3" y="3" width="8" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
                         <path d="M5 1.8h4v2H5z" stroke="currentColor" strokeWidth="1.2" />
                       </svg>
@@ -3440,7 +3807,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     event.stopPropagation();
                     openServiceLogFromTreeContext(node);
                   }}
-                  className="inline-flex h-7 shrink-0 items-center rounded-full border px-3 text-xs font-semibold leading-none"
+                  className="inline-flex h-6 shrink-0 items-center rounded-full border px-2 text-[11px] font-semibold leading-none"
                   style={{
                     borderColor: rowStatusTokens.foreground,
                     backgroundColor: productSemanticColors.cardSubtle,
@@ -3450,8 +3817,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   <span>{rowStatusLabel}</span>
                 </button>
               ) : null}
-              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center" style={{ color: productSemanticColors.textMuted }}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center" style={{ color: productSemanticColors.textMuted }}>
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                   <path d="M6 4.5 9.5 8 6 11.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
@@ -4114,7 +4481,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     return (
             <section
-              className="node-tree-readable garage-dark-surface-text rounded-xl border p-4"
+              className="node-tree-readable garage-dark-surface-text rounded-xl border p-3"
               style={{
                 backgroundColor: productSemanticColors.card,
                 borderColor: productSemanticColors.border,
@@ -4145,7 +4512,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               ) : (
                 <div className="flex items-center justify-between gap-3">
                   <h2
-                    className="text-2xl font-bold tracking-tight"
+                    className="text-xl font-bold tracking-tight"
                     style={{ color: productSemanticColors.textPrimary }}
                   >
                     Дерево узлов
@@ -4153,7 +4520,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   <button
                     type="button"
                     onClick={() => setIsNodeMaintenanceModeEnabled((prev) => !prev)}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-extrabold transition"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-extrabold transition"
                     style={{
                         backgroundColor: isNodeMaintenanceModeEnabled ? productSemanticColors.primaryAction : productSemanticColors.cardMuted,
                       borderColor: isNodeMaintenanceModeEnabled ? productSemanticColors.primaryAction : productSemanticColors.border,
@@ -4170,7 +4537,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   </button>
                 </div>
               )}
-              <p className="mt-1 text-sm" style={{ color: productSemanticColors.textSecondary }}>
+              <p className="mt-1 text-xs leading-5" style={{ color: productSemanticColors.textSecondary }}>
                 {pageView === "nodeTree"
                   ? "Полная структура узлов мотоцикла, статус обслуживания и быстрые действия по каждому узлу."
                   : "Краткая сводка по основным узлам. Детальная структура доступна в полном дереве."}
@@ -4260,13 +4627,13 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               ) : null}
 
               {showFullNodeTree && !isNodeTreeLoading && !nodeTreeError && nodeTree.length > 0 ? (
-                <div className="mt-4 space-y-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1">
                     <label htmlFor="node-tree-search" className="sr-only">
                       Поиск
                     </label>
                     <div
-                      className="flex h-8 min-w-[112px] max-w-[150px] flex-[1_1_132px] items-center gap-1.5 rounded-full border px-2.5"
+                      className="flex h-7 min-w-[104px] max-w-[140px] flex-[1_1_124px] items-center gap-1.5 rounded-full border px-2"
                       style={{
                         backgroundColor: productSemanticColors.cardSubtle,
                         borderColor: productSemanticColors.borderStrong,
@@ -4287,7 +4654,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       />
                       <button
                         type="button"
-                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border"
+                        className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border"
                         style={{
                           borderColor: productSemanticColors.border,
                           color: productSemanticColors.textMuted,
@@ -4309,7 +4676,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       onClick={() => setExpandedNodes({})}
                       disabled={!hasExpandedNodeTreeItems}
                       title="Свернуть раскрытые ветки дерева"
-                      className="h-8 shrink-0 rounded-full border px-2.5 text-xs font-extrabold transition disabled:cursor-not-allowed"
+                      className="h-7 shrink-0 rounded-full border px-2 text-[11px] font-extrabold transition disabled:cursor-not-allowed"
                       style={{
                         backgroundColor: productSemanticColors.cardSubtle,
                         borderColor: productSemanticColors.borderStrong,
@@ -4333,7 +4700,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                             ? "Показать полное дерево"
                             : `До ${NODE_TREE_TOP_NODES_LIMIT} узлов из «Состояния узлов» и родители до корня`
                       }
-                      className="h-8 shrink-0 rounded-full border px-2.5 text-xs font-extrabold transition disabled:cursor-not-allowed"
+                      className="h-7 shrink-0 rounded-full border px-2 text-[11px] font-extrabold transition disabled:cursor-not-allowed"
                       style={{
                         backgroundColor: nodeTreeTopOnly
                           ? productSemanticColors.primaryAction
@@ -4358,11 +4725,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       Введите минимум 2 символа.
                     </p>
                   ) : null}
-                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1">
                     <button
                       type="button"
                       onClick={() => setNodeStatusFilter("ALL")}
-                      className="h-8 shrink-0 rounded-full border px-2.5 text-xs font-extrabold transition"
+                      className="h-7 shrink-0 rounded-full border px-2 text-[11px] font-extrabold transition"
                       style={{
                         backgroundColor: nodeStatusFilter === "ALL" ? productSemanticColors.primaryAction : productSemanticColors.cardSubtle,
                         borderColor: nodeStatusFilter === "ALL" ? productSemanticColors.primaryAction : productSemanticColors.borderStrong,
@@ -4405,7 +4772,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                           key={status}
                           type="button"
                           onClick={() => setNodeStatusFilter(status)}
-                          className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-extrabold transition"
+                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-2 text-[11px] font-extrabold transition"
                           style={{
                             backgroundColor: isActive ? tokens.background : productSemanticColors.cardSubtle,
                             borderColor: isActive ? productSemanticColors.primaryAction : productSemanticColors.borderStrong,
@@ -4500,7 +4867,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   {nodeSearchQuery.trim().length >= 2 ? (
                     nodeSearchResults.length > 0 ? (
                       <div
-                        className="space-y-2 rounded-xl border p-2.5"
+                        className="space-y-1.5 rounded-xl border p-2"
                         style={{
                           backgroundColor: productSemanticColors.cardMuted,
                           borderColor: productSemanticColors.border,
@@ -4514,7 +4881,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                           return (
                             <div
                               key={result.nodeId}
-                              className="rounded-[10px] border px-3 py-2.5 transition hover:opacity-90"
+                              className="rounded-[10px] border px-2.5 py-2 transition hover:opacity-90"
                               style={{
                                 backgroundColor: productSemanticColors.cardSubtle,
                                 borderColor: productSemanticColors.border,
@@ -4534,14 +4901,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                               >
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
-                                  <p className="truncate text-sm font-medium text-slate-100" style={{ color: productSemanticColors.textPrimary }}>{result.nodeName}</p>
-                                  <p className="truncate text-xs text-slate-400" style={{ color: productSemanticColors.textSecondary }}>{result.pathLabel}</p>
+                                  <p className="truncate text-xs font-semibold text-slate-100" style={{ color: productSemanticColors.textPrimary }}>{result.nodeName}</p>
+                                  <p className="truncate text-[11px] text-slate-400" style={{ color: productSemanticColors.textSecondary }}>{result.pathLabel}</p>
                                   <p className="truncate text-[11px] text-slate-500" style={{ color: productSemanticColors.textMuted }}>{result.nodeCode}</p>
                                   {result.shortExplanationLabel ? (
                                     canOpenResultExplanation ? (
                                       <button
                                         type="button"
-                                        className="block truncate pt-1 text-left text-xs text-slate-400 underline decoration-dotted underline-offset-2"
+                                        className="block truncate pt-1 text-left text-[11px] text-slate-400 underline decoration-dotted underline-offset-2"
                                         style={{ color: productSemanticColors.textSecondary }}
                                         onClick={(event) => {
                                           event.stopPropagation();
@@ -4551,7 +4918,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                         {result.shortExplanationLabel}
                                       </button>
                                     ) : (
-                                      <p className="truncate pt-1 text-xs text-slate-400" style={{ color: productSemanticColors.textSecondary }}>
+                                      <p className="truncate pt-1 text-[11px] text-slate-400" style={{ color: productSemanticColors.textSecondary }}>
                                         {result.shortExplanationLabel}
                                       </p>
                                     )
@@ -4559,7 +4926,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                 </div>
                                 {result.effectiveStatus ? (
                                   <span
-                                    className="inline-flex h-[22px] shrink-0 items-center rounded-full border px-2 text-[11px] font-semibold leading-none"
+                                    className="inline-flex h-5 shrink-0 items-center rounded-full border px-2 text-[10px] font-semibold leading-none"
                                     style={getStatusBadgeStyle(result.effectiveStatus)}
                                   >
                                     {result.statusLabel}
@@ -4567,7 +4934,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                 ) : null}
                               </div>
                             </div>
-                            <div className="mt-2 flex flex-wrap gap-1.5">
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
                               {buildNodeSearchResultActions(result).map((action) => (
                                 <div key={`${result.nodeId}.${action.key}`} className="group relative">
                                   <button
@@ -4575,7 +4942,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                     onClick={() => handleSearchResultAction(action.key, result)}
                                     aria-label={`${action.label}: ${result.nodeName}`}
                                     title={action.label}
-                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-600 text-slate-200 transition hover:bg-slate-800"
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-600 text-slate-200 transition hover:bg-slate-800"
                                   >
                                     {action.key === "open" ? (
                                       <OpenContextIcon />
@@ -4597,7 +4964,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       </div>
                     ) : (
                       <p
-                        className="rounded-[10px] border border-dashed px-3 py-2 text-sm"
+                      className="rounded-[10px] border border-dashed px-3 py-2 text-xs"
                         style={{
                           borderColor: productSemanticColors.borderStrong,
                           color: productSemanticColors.textSecondary,
@@ -4609,7 +4976,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   ) : null}
                   {filteredTopLevelNodeViewModels.length === 0 ? (
                     <p
-                      className="rounded-[10px] border border-dashed px-3 py-3 text-sm"
+                      className="rounded-[10px] border border-dashed px-3 py-2 text-xs"
                       style={{
                         borderColor: productSemanticColors.borderStrong,
                         color: productSemanticColors.textSecondary,
@@ -4619,7 +4986,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     </p>
                   ) : null}
                   <div
-                    className="overflow-hidden rounded-xl border p-1"
+                    className="overflow-hidden rounded-xl border p-0.5"
                     style={{
                       backgroundColor: productSemanticColors.cardSubtle,
                       borderColor: productSemanticColors.border,
@@ -4654,7 +5021,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: productSemanticColors.textMuted }}>
             Контекст узла
           </p>
-          <h2 className="mt-2 text-xl font-semibold">Выберите узел</h2>
+          <h2 className="mt-2 text-lg font-semibold">Выберите узел</h2>
           <p className="mt-2 text-sm" style={{ color: productSemanticColors.textSecondary }}>
             Нажмите на строку дерева, чтобы открыть подробности, обслуживание, события и подбор деталей.
           </p>
@@ -4706,16 +5073,49 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
             openServiceLogFilteredByNode(selectedNodeContextNode);
           }
         }}
+        onOpenEvent={(eventId, eventNodeId) => {
+          if (selectedNodeContextNode) {
+            openServiceLogFilteredByNode(selectedNodeContextNode, eventId, eventNodeId);
+          }
+        }}
         onOpenStatusExplanation={() => handleNodeContextAction("open_status_explanation")}
+        onOpenCompatiblePart={(rec) => {
+          if (selectedNodeContextNode) {
+            pushOverlayReturnTarget({ type: "nodeContext", nodeId: selectedNodeContextNode.id });
+            openWishlistModalForRecommendedSku(rec, selectedNodeContextNode.id);
+          }
+        }}
         onAddCompatiblePart={(rec) => void addRecommendedSkuToWishlistFromNodeContext(rec)}
+        onOpenServiceKit={(kit) => {
+          if (selectedNodeContextNode) {
+            pushOverlayReturnTarget({ type: "nodeContext", nodeId: selectedNodeContextNode.id });
+            openWishlistModalForServiceKit(kit, selectedNodeContextNode.id);
+          }
+        }}
         onAddServiceKit={(kit) => void addServiceKitToWishlistFromNodeContext(kit)}
         onSnooze7Days={() => setNodeSnoozeOption(selectedNodeContext.nodeId, "7d")}
         onSnooze30Days={() => setNodeSnoozeOption(selectedNodeContext.nodeId, "30d")}
         onClearSnooze={() => setNodeSnoozeOption(selectedNodeContext.nodeId, "clear")}
-        onInstallWishlistPart={(item) => {
-          void patchWishlistItemStatus(item.id, "INSTALLED", item.status);
+        onOpenWishlistPart={(item) => {
+          if (item.nodeId) {
+            persistNodeTreeReturnState(item.nodeId);
+          }
+          const returnNodeId = item.nodeId || selectedNodeContext.nodeId;
+          router.push(
+            `/vehicles/${vehicleId}/parts?nodeId=${encodeURIComponent(returnNodeId)}&wishlistItemId=${encodeURIComponent(item.id)}`
+          );
+        }}
+        onAdvanceWishlistPartStatus={(item) => {
+          const nextStatus: PartWishlistItem["status"] =
+            item.status === "NEEDED"
+              ? "ORDERED"
+              : item.status === "ORDERED"
+              ? "BOUGHT"
+              : "INSTALLED";
+          void patchWishlistItemStatus(item.id, nextStatus, item.status);
         }}
         onOpenAllUninstalledParts={() => {
+          persistNodeTreeReturnState(selectedNodeContext.nodeId);
           const selectedNodeHref = `/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(selectedNodeContext.nodeId)}`;
           window.history.replaceState(window.history.state, "", selectedNodeHref);
           router.push(`/vehicles/${vehicleId}/parts?nodeId=${encodeURIComponent(selectedNodeContext.nodeId)}`);
@@ -6265,19 +6665,21 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
       {isAddServiceEventModalOpen ? (
         <div
-          className="fixed inset-0 z-[60] flex items-start justify-center px-4 py-6 sm:items-center"
+          className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto px-2 py-2"
           style={{ backgroundColor: productSemanticColors.overlayModal }}
         >
           <div
-            className="garage-dark-surface-text w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl"
+            className="garage-dark-surface-text flex w-full max-w-3xl flex-col rounded-2xl border border-gray-200 bg-white shadow-xl"
             style={{
               backgroundColor: productSemanticColors.card,
               borderColor: productSemanticColors.borderStrong,
               color: productSemanticColors.textPrimary,
+              maxHeight: "calc(100dvh - 16px)",
+              minHeight: 0,
             }}
           >
             <div
-              className="flex items-center justify-between border-b border-gray-200 px-5 py-3"
+              className="flex items-center justify-between border-b border-gray-200 px-4 py-2"
               style={{
                 backgroundColor: productSemanticColors.card,
                 borderBottomColor: productSemanticColors.borderStrong,
@@ -6285,7 +6687,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               }}
             >
               <h2
-                className="text-xl font-semibold tracking-tight"
+                className="text-lg font-semibold tracking-tight"
                 style={{ color: productSemanticColors.textPrimary }}
               >
                 {editingServiceEventId
@@ -6295,7 +6697,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               <button
                 type="button"
                 onClick={() => closeAddServiceEventModal()}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-900 transition hover:bg-gray-50"
                 style={darkModalButtonStyle}
               >
                 Закрыть
@@ -6303,28 +6705,28 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
             </div>
 
             <div
-              className="max-h-[78vh] overflow-y-auto px-5 py-4"
+              className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
               style={{
                 backgroundColor: productSemanticColors.card,
                 color: productSemanticColors.textPrimary,
               }}
             >
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <div
-                  className="rounded-2xl border border-gray-200 bg-gray-50/70 px-3 py-2.5"
+                  className="rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-2"
                   style={darkModalSectionStyle}
                 >
                   <h3
-                    className="text-sm font-semibold"
+                    className="text-xs font-semibold uppercase tracking-wide"
                     style={{ color: productSemanticColors.textPrimary }}
                   >
                     Выбор узла
                   </h3>
-                  <div className="mt-1.5 flex flex-wrap items-end gap-2">
+                  <div className="mt-1 flex flex-wrap items-end gap-1.5">
                     {nodeSelectLevels.map((nodesAtLevel, levelIndex) => (
                       <div
                         key={`level-${levelIndex}`}
-                        className="min-w-[150px] flex-1"
+                        className="min-w-[140px] flex-1"
                       >
                         <label
                           className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide"
@@ -6344,7 +6746,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                               return next;
                             });
                           }}
-                          className="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-xs outline-none transition focus:border-gray-950"
+                          className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                           style={darkModalFormControlStyle}
                         >
                           <option value="">{`Уровень ${levelIndex + 1}`}</option>
@@ -6360,21 +6762,21 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 </div>
 
                 <div
-                  className="rounded-2xl border border-gray-200 bg-white px-3 py-2.5"
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-2"
                   style={darkModalSectionStyle}
                 >
                   <h3
-                    className="text-sm font-semibold"
+                    className="text-xs font-semibold uppercase tracking-wide"
                     style={{ color: productSemanticColors.textPrimary }}
                   >
                     Данные события
                   </h3>
-                  <div className="mt-1.5 grid gap-x-3 gap-y-2 sm:grid-cols-2">
+                  <div className="mt-1 grid gap-x-2.5 gap-y-1.5 sm:grid-cols-2">
                     <InputField label="Тип сервиса" labelStyle={darkModalInputLabelStyle}>
                       <input
                         value={serviceType}
                         onChange={(event) => setServiceType(event.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                         style={darkModalFormControlStyle}
                         placeholder="Например: Oil change"
                       />
@@ -6386,7 +6788,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                         value={eventDate}
                         onChange={(event) => setEventDate(event.target.value)}
                         max={todayDate}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                         style={darkModalFormControlStyle}
                       />
                     </InputField>
@@ -6397,7 +6799,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                         onChange={(event) => setOdometer(event.target.value)}
                         inputMode="numeric"
                         max={vehicle?.odometer ?? undefined}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                         style={darkModalFormControlStyle}
                         placeholder="Например: 15000"
                       />
@@ -6408,7 +6810,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                         value={engineHours}
                         onChange={(event) => setEngineHours(event.target.value)}
                         inputMode="numeric"
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                         style={darkModalFormControlStyle}
                         placeholder="Если применимо"
                       />
@@ -6419,7 +6821,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                         value={costAmount}
                         onChange={(event) => setCostAmount(event.target.value)}
                         inputMode="decimal"
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                         style={darkModalFormControlStyle}
                         placeholder="Например: 120.5"
                       />
@@ -6429,7 +6831,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       <select
                         value={currency}
                         onChange={(event) => setCurrency(event.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                         style={darkModalFormControlStyle}
                       >
                         <option value="">Не выбрана</option>
@@ -6440,12 +6842,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     </InputField>
                   </div>
 
-                  <div className="mt-3 grid gap-x-3 gap-y-2 sm:grid-cols-2">
+                  <div className="mt-2 grid gap-x-2.5 gap-y-1.5 sm:grid-cols-2">
                     <InputField label="Артикул (SKU)" labelStyle={darkModalInputLabelStyle}>
                       <input
                         value={partSku}
                         onChange={(event) => setPartSku(event.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                         style={darkModalFormControlStyle}
                         placeholder="Опционально"
                         maxLength={200}
@@ -6456,7 +6858,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       <input
                         value={partName}
                         onChange={(event) => setPartName(event.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                         style={darkModalFormControlStyle}
                         placeholder="Опционально"
                         maxLength={500}
@@ -6466,7 +6868,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
                   {partSku.trim().length >= 2 ? (
                     <div
-                      className="mt-2 rounded-xl border px-3 py-2"
+                      className="mt-1.5 rounded-xl border px-3 py-2"
                       style={{
                         borderColor: productSemanticColors.borderStrong,
                         backgroundColor: productSemanticColors.cardSubtle,
@@ -6523,13 +6925,13 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     </div>
                   ) : null}
 
-                  <div className="mt-3">
+                  <div className="mt-2">
                     <InputField label="Комментарий" labelStyle={darkModalInputLabelStyle}>
                       <textarea
                         ref={serviceEventCommentTextareaRef}
                         value={comment}
                         onChange={(event) => setComment(event.target.value)}
-                        className="min-h-20 w-full resize-none overflow-hidden rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-950"
+                        className="min-h-16 w-full resize-none overflow-hidden rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
                         style={darkModalFormControlStyle}
                         placeholder="Опционально"
                       />
@@ -6538,8 +6940,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 </div>
 
                 <div
-                  className="border-t border-gray-100 pt-3"
-                  style={{ borderTopColor: productSemanticColors.borderStrong }}
+                  className="sticky bottom-0 border-t border-gray-100 py-2"
+                  style={{
+                    backgroundColor: productSemanticColors.card,
+                    borderTopColor: productSemanticColors.borderStrong,
+                  }}
                 >
                 <button
                   type="button"
@@ -6549,7 +6954,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     !isLeafNodeSelected ||
                     !eventDate
                   }
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-gray-950 px-5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-9 items-center justify-center rounded-xl bg-gray-950 px-4 text-xs font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
                     backgroundColor: productSemanticColors.primaryAction,
                     color: productSemanticColors.onPrimaryAction,
@@ -6744,18 +7149,33 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     {wishlistServiceKitsLoading ? (
                       <p className="mt-1 text-[11px] text-gray-500">Загружаем комплекты…</p>
                     ) : null}
-                    {!wishlistServiceKitsLoading && wishlistServiceKits.length === 0 ? (
+                    {!wishlistServiceKitsLoading && visibleWishlistServiceKits.length === 0 ? (
                       <p className="mt-1 text-[11px] text-gray-500">
                         Для этого узла пока нет подходящих комплектов.
                       </p>
                     ) : null}
-                    {!wishlistServiceKitsLoading && wishlistServiceKits.length > 0 ? (
+                    {visibleWishlistServiceKits.length > 0 ? (
                       <ul className="mt-2 space-y-2">
-                        {wishlistServiceKits.map((kit) => {
+                        {visibleWishlistServiceKits.map((kit) => {
                           const preview = serviceKitPreviewByCode.get(kit.code);
+                          const isSelectedKit = kit.code === wishlistSelectedKitCode;
                           return (
-                          <li key={kit.code} className="rounded-md border border-gray-200 bg-gray-50 p-2">
-                            <p className="text-xs font-semibold text-gray-900">{kit.title}</p>
+                          <li
+                            key={kit.code}
+                            className={`rounded-md border p-2 ${
+                              isSelectedKit
+                                ? "border-amber-300 bg-amber-50/80"
+                                : "border-gray-200 bg-gray-50"
+                            }`}
+                          >
+                            <p className="text-xs font-semibold text-gray-900">
+                              {kit.title}
+                              {isSelectedKit ? (
+                                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                                  выбран
+                                </span>
+                              ) : null}
+                            </p>
                             <p className="mt-0.5 text-[11px] text-gray-600">{kit.description}</p>
                             <ul className="mt-1 space-y-1">
                               {(preview?.items ?? []).map((item) => (
@@ -7727,7 +8147,7 @@ function InputField({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-gray-900" style={labelStyle}>
+      <label className="mb-0.5 block text-xs font-medium text-gray-900" style={labelStyle}>
         {label}
       </label>
       {children}
