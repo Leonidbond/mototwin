@@ -3,9 +3,13 @@
 import Image, { type StaticImageData } from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 import {
+  buildExpenseAnalyticsFromItems,
   calculateGarageScore,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
+  getCurrentExpenseMonthKey,
+  getExpenseCategoryLabelRu,
+  getExpenseMonthKeyFromIso,
   getWishlistItemSkuDisplayLines,
   getVehicleSilhouetteClassLabel,
   resolveGarageVehicleSilhouette,
@@ -18,7 +22,8 @@ import {
 import type {
   AttentionItemViewModel,
   AttentionSummaryViewModel,
-  ExpenseSummaryViewModel,
+  ExpenseAnalyticsSummary,
+  ExpenseItem,
   NodeStatus,
   PartWishlistItemViewModel,
   ServiceEventItem,
@@ -102,13 +107,15 @@ type VehicleDashboardProps = {
   topNodeOverviewCards: TopNodeOverviewCard[];
   attentionSummary: AttentionSummaryViewModel;
   attentionItems: AttentionItemViewModel[];
-  expenseSummary: ExpenseSummaryViewModel;
+  expenseItems: ExpenseItem[];
   serviceEvents: ServiceEventItem[];
   wishlistItems: PartWishlistItemViewModel[];
   isTopServiceNodesLoading: boolean;
   topServiceNodesError: string;
   isServiceEventsLoading: boolean;
   serviceEventsError: string;
+  isExpensesLoading: boolean;
+  expensesError: string;
   isWishlistLoading: boolean;
   wishlistError: string;
   moveToTrashError: string;
@@ -138,13 +145,15 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
     topNodeOverviewCards,
     attentionSummary,
     attentionItems,
-    expenseSummary,
+    expenseItems,
     serviceEvents,
     wishlistItems,
     isTopServiceNodesLoading,
     topServiceNodesError,
     isServiceEventsLoading,
     serviceEventsError,
+    isExpensesLoading,
+    expensesError,
     isWishlistLoading,
     wishlistError,
     moveToTrashError,
@@ -155,13 +164,26 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
     soonCount: attentionSummary.soonCount,
   });
   const recentEvents = getRecentEvents(serviceEvents);
-  const monthlyChart = buildCurrentMonthChart(serviceEvents, expenseSummary.currentMonthKey);
+  const currentExpenseYear = new Date().getFullYear();
+  const expenseAnalytics = buildExpenseAnalyticsFromItems(expenseItems, currentExpenseYear);
+  const currentExpenseMonthKey = getCurrentExpenseMonthKey();
+  const currentExpenseMonthLabel =
+    expenseAnalytics.byMonth.find((month) => month.key === currentExpenseMonthKey)?.label ??
+    new Date().toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  const currentMonthExpenses = expenseItems.filter(
+    (expense) => getExpenseMonthKeyFromIso(expense.expenseDate) === currentExpenseMonthKey
+  );
+  const monthlyChart = buildCurrentMonthExpenseChart(currentMonthExpenses);
+  const currentMonthTotalsLabel = formatExpenseTotalsFromRows(
+    expenseAnalytics.byMonth.find((month) => month.key === currentExpenseMonthKey)?.totalsByCurrency ?? []
+  );
+  const seasonTotalsLabel = formatExpenseTotalsFromRows(expenseAnalytics.selectedYearTotalsByCurrency);
   const readiness = buildRideReadiness(attentionSummary);
   const seasonProgress = score ?? 0;
   const statsStripItems = buildStatsStripItems({
     vehicleStateViewModel,
     attentionSummary,
-    expenseSummary,
+    expenseAnalytics,
     serviceEvents,
   });
   const silhouetteKey = resolveGarageVehicleSilhouette({
@@ -341,7 +363,16 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
           </div>
         </Card>
 
-        <Card className={styles.midGridCard} padding="md" style={{ overflow: "hidden" }}>
+        <Card
+          className={styles.midGridCard}
+          padding="md"
+          style={{
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
           <SectionHeader
             title="Состояние узлов"
             trailing={
@@ -351,34 +382,44 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
             }
           />
 
-          {isTopServiceNodesLoading ? (
-            <MutedText style={{ marginTop: 14 }}>Загрузка основных узлов...</MutedText>
-          ) : null}
-          {!isTopServiceNodesLoading && topServiceNodesError ? (
-            <MutedText style={{ marginTop: 14, color: productSemanticColors.error }}>
-              {topServiceNodesError}
-            </MutedText>
-          ) : null}
+          <div className={styles.systemsGridBody}>
+            {isTopServiceNodesLoading ? (
+              <MutedText style={{ marginTop: 12 }}>Загрузка основных узлов...</MutedText>
+            ) : null}
+            {!isTopServiceNodesLoading && topServiceNodesError ? (
+              <MutedText style={{ marginTop: 12, color: productSemanticColors.error }}>
+                {topServiceNodesError}
+              </MutedText>
+            ) : null}
 
-          {!isTopServiceNodesLoading && !topServiceNodesError ? (
-            <div className={styles.systemsGrid}>
-              {topNodeOverviewCards.map((card) => (
-                <SystemStatusCard
-                  key={card.key}
-                  card={card}
-                  onOpenNode={props.onOpenNode}
-                  onOpenNodeIssues={props.onOpenNodeIssues}
-                />
-              ))}
-            </div>
-          ) : null}
+            {!isTopServiceNodesLoading && !topServiceNodesError ? (
+              <div className={styles.systemsGrid}>
+                {topNodeOverviewCards.map((card) => (
+                  <SystemStatusCard
+                    key={card.key}
+                    card={card}
+                    onOpenNode={props.onOpenNode}
+                    onOpenNodeIssues={props.onOpenNodeIssues}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
         </Card>
       </section>
 
       <section
         className={styles.lowerGrid}
       >
-        <Card padding="md">
+        <Card
+          padding="md"
+          style={{
+            minWidth: 0,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           <SectionHeader
             title="Последние события"
             trailing={
@@ -395,7 +436,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
             </MutedText>
           ) : null}
           {!isServiceEventsLoading && !serviceEventsError ? (
-            <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+            <div className={styles.recentEventsList}>
               {recentEvents.length === 0 ? (
                 <EmptyStateBlock
                   title="Пока нет сервисных записей"
@@ -412,7 +453,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
 
         <Card padding="md">
           <SectionHeader
-            title={`Расходы за ${capitalizeFirst(expenseSummary.currentMonthLabel)}`}
+            title={`Расходы за ${capitalizeFirst(currentExpenseMonthLabel)}`}
             trailing={
               <Button variant="ghost" size="sm" onClick={props.onOpenExpenseDetails}>
                 Все расходы
@@ -420,32 +461,42 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
             }
           />
 
-          {isServiceEventsLoading ? <MutedText style={{ marginTop: 14 }}>Считаем расходы...</MutedText> : null}
-          {!isServiceEventsLoading && serviceEventsError ? (
+          {isExpensesLoading ? <MutedText style={{ marginTop: 14 }}>Считаем расходы...</MutedText> : null}
+          {!isExpensesLoading && expensesError ? (
             <MutedText style={{ marginTop: 14, color: productSemanticColors.error }}>
-              {serviceEventsError}
+              {expensesError}
             </MutedText>
           ) : null}
 
-          {!isServiceEventsLoading && !serviceEventsError ? (
+          {!isExpensesLoading && !expensesError ? (
             <>
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 18 }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ color: productSemanticColors.textPrimary, fontSize: 36, fontWeight: 700 }}>
-                    {expenseSummary.currentMonthTotalsByCurrency.length > 0
-                      ? expenseSummary.currentMonthTotalsByCurrency
-                          .map(
-                            (row) =>
-                              `${formatExpenseAmountRu(row.totalAmount)} ${row.currency}`
-                          )
-                          .join(" · ")
-                      : "0"}
+                  <div style={{ color: productSemanticColors.textPrimary, fontSize: 18, fontWeight: 700 }}>
+                    {currentMonthTotalsLabel}
                   </div>
                   <MutedText style={{ marginTop: 4 }}>
                     {monthlyChart.totalCount > 0
-                      ? `${monthlyChart.totalCount} ${pluralizeRu(monthlyChart.totalCount, ["событие", "события", "событий"])} с затратами`
-                      : "Платных сервисных событий за месяц пока нет"}
+                      ? `${monthlyChart.totalCount} ${pluralizeRu(monthlyChart.totalCount, ["расход", "расхода", "расходов"])} за месяц`
+                      : "Расходов за месяц пока нет"}
                   </MutedText>
+                  <div
+                    style={{
+                      marginTop: 12,
+                      borderTop: `1px solid ${productSemanticColors.border}`,
+                      paddingTop: 10,
+                    }}
+                  >
+                    <MutedText>За сезон {currentExpenseYear}</MutedText>
+                    <div style={{ marginTop: 3, color: productSemanticColors.textPrimary, fontSize: 18, fontWeight: 700 }}>
+                      {seasonTotalsLabel}
+                    </div>
+                    <MutedText style={{ marginTop: 2 }}>
+                      {expenseAnalytics.selectedYearExpenseCount > 0
+                        ? `${expenseAnalytics.selectedYearExpenseCount} ${pluralizeRu(expenseAnalytics.selectedYearExpenseCount, ["расход", "расхода", "расходов"])}`
+                        : "Сезонных расходов пока нет"}
+                    </MutedText>
+                  </div>
                 </div>
                 <DonutChart segments={monthlyChart.segments} />
               </div>
@@ -463,7 +514,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
                 ) : (
                   <EmptyStateBlock
                     title="Нет данных для диаграммы"
-                    details="Добавьте сумму в сервисную запись, и здесь появится распределение расходов."
+                    details="Добавьте расход, и здесь появится распределение по категориям."
                   />
                 )}
               </div>
@@ -581,9 +632,21 @@ function VehicleDashboardTopBar(props: {
   );
 }
 
+/** Matches `Button` `size="sm"` height so mid-grid cards align with/without header actions. */
+const SECTION_HEADER_ROW_MIN_HEIGHT_PX = 34;
+
 function SectionHeader(props: { title: string; trailing?: ReactNode }) {
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        minHeight: SECTION_HEADER_ROW_MIN_HEIGHT_PX,
+      }}
+    >
       <h2
         style={{
           margin: 0,
@@ -937,7 +1000,7 @@ function SystemStatusCard(props: {
         boxSizing: "border-box",
         minHeight: 112,
         overflow: "hidden",
-        padding: "10px 82px 10px 12px",
+        padding: "8px 82px 14px 12px",
         textAlign: "left",
         borderRadius: 14,
         border: `1px solid ${productSemanticColors.border}`,
@@ -1038,56 +1101,120 @@ function SystemStatusCard(props: {
 }
 
 function RecentEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: () => void }) {
+  const costLabel =
+    event.costAmount != null && event.costAmount > 0 && event.currency?.trim()
+      ? `${formatExpenseAmountRu(event.costAmount)} ${event.currency.trim()}`
+      : "—";
+  const nodeLabel = event.node?.name?.trim() || "Без привязки к узлу";
+  const metaLine = `${formatIsoCalendarDateRu(event.eventDate)} · ${nodeLabel}`;
+
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-label={`${formatIsoCalendarDateRu(event.eventDate)} · ${event.serviceType}. Открыть в журнале`}
       style={{
-        display: "grid",
-        gap: 3,
-        padding: "7px 0",
-        borderBottom: `1px solid ${productSemanticColors.divider}`,
-        borderTop: "none",
-        borderLeft: "none",
-        borderRight: "none",
-        background: "transparent",
-        margin: 0,
+        display: "flex",
         width: "100%",
-        cursor: "pointer",
+        minWidth: 0,
+        boxSizing: "border-box",
+        alignItems: "center",
+        gap: 10,
+        padding: "9px 10px",
+        borderRadius: 14,
+        border: `1px solid ${productSemanticColors.border}`,
+        backgroundColor: productSemanticColors.cardMuted,
         textAlign: "left",
+        cursor: "pointer",
+        overflow: "hidden",
         font: "inherit",
         color: "inherit",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: productSemanticColors.textMeta, fontSize: 11, whiteSpace: "nowrap" }}>
-            {formatIsoCalendarDateRu(event.eventDate)}
-          </span>
-          <span
+      <span
+        aria-hidden
+        style={{
+          display: "inline-flex",
+          width: 40,
+          height: 40,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 14,
+          backgroundColor: productSemanticColors.cardSubtle,
+          color: productSemanticColors.primaryAction,
+          flexShrink: 0,
+        }}
+      >
+        <WrenchIcon />
+      </span>
+      <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) auto",
+            gap: "6px 10px",
+            alignItems: "baseline",
+          }}
+        >
+          <div
+            title={event.serviceType}
             style={{
               minWidth: 0,
               color: productSemanticColors.textPrimary,
               fontSize: 13,
               fontWeight: 700,
-              whiteSpace: "nowrap",
+              lineHeight: "18px",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             {event.serviceType}
-          </span>
+          </div>
+          <div
+            title={costLabel === "—" ? undefined : costLabel}
+            style={{
+              minWidth: 0,
+              maxWidth: "10.5rem",
+              justifySelf: "end",
+              textAlign: "right",
+              color: productSemanticColors.textPrimary,
+              fontSize: 13,
+              fontWeight: 700,
+              lineHeight: "18px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {costLabel}
+          </div>
         </div>
-        <div style={{ color: productSemanticColors.textPrimary, fontSize: 13, fontWeight: 700 }}>
-          {event.costAmount && event.currency
-            ? `${formatExpenseAmountRu(event.costAmount)} ${event.currency}`
-            : "—"}
-        </div>
+        <MutedText
+          title={metaLine}
+          style={{
+            marginTop: 3,
+            fontSize: 12,
+            lineHeight: "16px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {metaLine}
+        </MutedText>
       </div>
-      <MutedText style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {event.node?.name || "Без привязки к узлу"}
-      </MutedText>
+      <span
+        aria-hidden
+        style={{
+          color: productSemanticColors.textTertiary,
+          fontSize: 18,
+          flexShrink: 0,
+          alignSelf: "center",
+        }}
+      >
+        ›
+      </span>
     </button>
   );
 }
@@ -1416,9 +1543,10 @@ function EmptyStateBlock(props: { title: string; details: string }) {
   );
 }
 
-function MutedText(props: { children: ReactNode; style?: CSSProperties }) {
+function MutedText(props: { children: ReactNode; style?: CSSProperties; title?: string }) {
   return (
     <div
+      title={props.title}
       style={{
         color: productSemanticColors.textMuted,
         fontSize: 13,
@@ -1435,7 +1563,7 @@ function getRecentEvents(events: ServiceEventItem[]): ServiceEventItem[] {
   return [...events]
     .filter((event) => (event.eventKind ?? "SERVICE") !== "STATE_UPDATE")
     .sort((left, right) => new Date(right.eventDate).getTime() - new Date(left.eventDate).getTime())
-    .slice(0, 3);
+    .slice(0, 4);
 }
 
 function buildRideReadiness(summary: AttentionSummaryViewModel): {
@@ -1464,32 +1592,18 @@ function buildRideReadiness(summary: AttentionSummaryViewModel): {
   };
 }
 
-function buildCurrentMonthChart(events: ServiceEventItem[], monthKey: string) {
-  const paidEvents = events.filter((event) => {
-    const key = new Date(event.eventDate);
-    if (Number.isNaN(key.getTime())) {
-      return event.eventDate.slice(0, 7) === monthKey;
-    }
-    const currentKey = `${key.getFullYear()}-${String(key.getMonth() + 1).padStart(2, "0")}`;
-    return (
-      currentKey === monthKey &&
-      (event.eventKind ?? "SERVICE") !== "STATE_UPDATE" &&
-      (event.costAmount ?? 0) > 0 &&
-      Boolean(event.currency)
-    );
-  });
-
-  const byNode = new Map<string, { amount: number; currency: string }>();
-  for (const event of paidEvents) {
-    const label = event.node?.name || event.serviceType || "Прочее";
-    const currency = event.currency?.trim() || "RUB";
-    const bucket = byNode.get(label) ?? { amount: 0, currency };
-    bucket.amount += event.costAmount ?? 0;
-    byNode.set(label, bucket);
+function buildCurrentMonthExpenseChart(expenses: ExpenseItem[]) {
+  const byCategory = new Map<string, { amount: number; currency: string }>();
+  for (const expense of expenses) {
+    const label = getExpenseCategoryLabelRu(expense.category);
+    const currency = expense.currency.trim() || "RUB";
+    const bucket = byCategory.get(label) ?? { amount: 0, currency };
+    bucket.amount += expense.amount;
+    byCategory.set(label, bucket);
   }
 
   const colors = ["#F97316", "#60A5FA", "#38BDF8", "#FBBF24"];
-  const segments = Array.from(byNode.entries())
+  const segments = Array.from(byCategory.entries())
     .map(([label, value], index) => ({
       label,
       amount: value.amount,
@@ -1500,38 +1614,26 @@ function buildCurrentMonthChart(events: ServiceEventItem[], monthKey: string) {
     .slice(0, 4);
 
   return {
-    totalCount: paidEvents.length,
+    totalCount: expenses.length,
     segments,
   };
 }
 
-function buildSeasonExpenses(summary: ExpenseSummaryViewModel): string {
-  if (summary.byMonth.length === 0) {
-    return "Нет данных";
+function formatExpenseTotalsFromRows(
+  rows: Array<{ currency: string; totalAmount: number }>
+): string {
+  if (rows.length === 0) {
+    return "0";
   }
-  const currentYear = new Date().getFullYear();
-  const totals = new Map<string, number>();
-  for (const month of summary.byMonth) {
-    const year = Number(month.monthKey.slice(0, 4));
-    if (year !== currentYear) {
-      continue;
-    }
-    for (const row of month.totalsByCurrency) {
-      totals.set(row.currency, (totals.get(row.currency) ?? 0) + row.totalAmount);
-    }
-  }
-  if (totals.size === 0) {
-    return "Нет данных";
-  }
-  return Array.from(totals.entries())
-    .map(([currency, amount]) => `${formatExpenseAmountRu(amount)} ${currency}`)
+  return rows
+    .map((row) => `${formatExpenseAmountRu(row.totalAmount)} ${row.currency}`)
     .join(" · ");
 }
 
 function buildStatsStripItems(args: {
   vehicleStateViewModel: VehicleStateViewModel | null;
   attentionSummary: AttentionSummaryViewModel;
-  expenseSummary: ExpenseSummaryViewModel;
+  expenseAnalytics: ExpenseAnalyticsSummary;
   serviceEvents: ServiceEventItem[];
 }): Array<{ title: string; value: string; details: string; icon: ReactNode }> {
   const latestEvent = [...args.serviceEvents]
@@ -1568,10 +1670,10 @@ function buildStatsStripItems(args: {
     },
     {
       title: "Сезонные расходы",
-      value: buildSeasonExpenses(args.expenseSummary),
+      value: formatExpenseTotalsFromRows(args.expenseAnalytics.selectedYearTotalsByCurrency),
       details:
-        args.expenseSummary.paidEventCount > 0
-          ? `${args.expenseSummary.paidEventCount} ${pluralizeRu(args.expenseSummary.paidEventCount, ["запись", "записи", "записей"])} с затратами`
+        args.expenseAnalytics.selectedYearExpenseCount > 0
+          ? `${args.expenseAnalytics.selectedYearExpenseCount} ${pluralizeRu(args.expenseAnalytics.selectedYearExpenseCount, ["расход", "расхода", "расходов"])}`
           : "Расходы еще не указаны",
       icon: <TrendIcon />,
     },

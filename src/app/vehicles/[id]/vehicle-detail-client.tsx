@@ -100,6 +100,7 @@ import type {
   NodeContextViewModel,
   SelectedNodePath,
   ExpenseNodeSummaryItem,
+  ExpenseItem,
   ServiceEventItem,
   VehicleDetail,
   VehicleDetailApiRecord,
@@ -1318,6 +1319,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
   const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false);
   const [serviceEventsError, setServiceEventsError] = useState("");
+  const [dashboardExpenses, setDashboardExpenses] = useState<ExpenseItem[]>([]);
+  const [isDashboardExpensesLoading, setIsDashboardExpensesLoading] = useState(false);
+  const [dashboardExpensesError, setDashboardExpensesError] = useState("");
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [nodeExpenseYear, setNodeExpenseYear] = useState(() => new Date().getFullYear());
   const [nodeExpenseSummaryByNodeId, setNodeExpenseSummaryByNodeId] = useState<
@@ -2502,6 +2506,38 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     void loadServiceEvents();
   }, [vehicleId, loadServiceEvents]);
 
+  const loadDashboardExpenses = useCallback(async () => {
+    if (!vehicleId) {
+      return;
+    }
+
+    try {
+      setIsDashboardExpensesLoading(true);
+      setDashboardExpensesError("");
+      const data = await vehicleDetailApi.getExpenses({
+        vehicleId,
+        year: new Date().getFullYear(),
+      });
+      setDashboardExpenses(data.expenses ?? []);
+    } catch (expenseLoadError) {
+      console.error(expenseLoadError);
+      setDashboardExpensesError(
+        expenseLoadError instanceof Error
+          ? expenseLoadError.message
+          : "Произошла ошибка при загрузке расходов."
+      );
+    } finally {
+      setIsDashboardExpensesLoading(false);
+    }
+  }, [vehicleId]);
+
+  useEffect(() => {
+    if (!vehicleId) {
+      return;
+    }
+    void loadDashboardExpenses();
+  }, [vehicleId, loadDashboardExpenses]);
+
   const loadNodeTree = useCallback(async () => {
     if (!vehicleId) {
       return;
@@ -2877,7 +2913,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         savedItem = res.item;
       }
 
-      await Promise.all([loadWishlist(), loadServiceEvents(), loadNodeTree(), loadTopServiceNodes()]);
+      await Promise.all([loadWishlist(), loadServiceEvents(), loadDashboardExpenses(), loadNodeTree(), loadTopServiceNodes()]);
       closeWishlistModal({ restorePrevious: false });
 
       if (
@@ -3024,7 +3060,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         vendor: wishlistPurchaseExpenseForm.vendor.trim() || null,
         comment: wishlistPurchaseExpenseForm.comment.trim() || null,
       });
-      await loadWishlist();
+      await Promise.all([loadWishlist(), loadDashboardExpenses(), loadNodeExpenseSummary()]);
       closeWishlistPurchaseExpenseForm();
       setWishlistNotice("Расход создан, позиция отмечена как купленная.");
     } catch (e) {
@@ -3083,7 +3119,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         status,
         nodeId: sourceNodeId,
       });
-      await Promise.all([loadWishlist(), loadServiceEvents(), loadNodeTree(), loadTopServiceNodes()]);
+      await Promise.all([loadWishlist(), loadServiceEvents(), loadDashboardExpenses(), loadNodeTree(), loadTopServiceNodes()]);
       const becameInstalled =
         res.item.status === "INSTALLED" &&
         isWishlistTransitionToInstalled(previousStatus, res.item.status);
@@ -4241,7 +4277,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           : currentVehicle
       );
       setIsEditingVehicleState(false);
-      await Promise.all([loadNodeTree(), loadServiceEvents(), loadWishlist(), loadTopServiceNodes()]);
+      await Promise.all([loadNodeTree(), loadServiceEvents(), loadDashboardExpenses(), loadWishlist(), loadTopServiceNodes()]);
     } catch (saveError) {
       console.error(saveError);
       setVehicleStateError(
@@ -4343,7 +4379,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       });
       setPendingWishlistInstallItemId(null);
       resetServiceEventForm();
-      await Promise.all([loadServiceEvents(), loadNodeTree(), loadWishlist(), loadTopServiceNodes()]);
+      await Promise.all([loadServiceEvents(), loadDashboardExpenses(), loadNodeTree(), loadWishlist(), loadTopServiceNodes()]);
       closeAddServiceEventModal({ restorePrevious: false });
     } catch (createError) {
       console.error(createError);
@@ -5864,13 +5900,15 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   topNodeOverviewCards={topNodeOverviewCards}
                   attentionSummary={attentionSummary}
                   attentionItems={attentionSummary.items}
-                  expenseSummary={expenseSummary}
+                  expenseItems={dashboardExpenses}
                   serviceEvents={serviceEvents}
                   wishlistItems={wishlistActiveViewModels}
                   isTopServiceNodesLoading={isTopServiceNodesLoading}
                   topServiceNodesError={topServiceNodesError}
                   isServiceEventsLoading={isServiceEventsLoading}
                   serviceEventsError={serviceEventsError}
+                  isExpensesLoading={isDashboardExpensesLoading}
+                  expensesError={dashboardExpensesError}
                   isWishlistLoading={isWishlistLoading}
                   wishlistError={wishlistError}
                   moveToTrashError={moveToTrashError}
