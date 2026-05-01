@@ -3,13 +3,12 @@ import type { PartWishlistItemStatus, PartWishlistItemViewModel } from "@mototwi
 export type CartSummaryMetric = { count: number; amount: number };
 
 export type PartsCartSummary = {
+  all: CartSummaryMetric;
   needed: CartSummaryMetric;
   ordered: CartSummaryMetric;
   /** Только BOUGHT, как на референсе корзины. */
   bought: CartSummaryMetric;
   installed: CartSummaryMetric;
-  /** Только BOUGHT — «куплено, не установлено» в терминах домена. */
-  boughtNotInstalled: CartSummaryMetric;
 };
 
 function sumCostAmount(items: PartWishlistItemViewModel[]): number {
@@ -20,17 +19,17 @@ function byStatus(items: PartWishlistItemViewModel[], status: PartWishlistItemSt
   return items.filter((i) => i.status === status);
 }
 
-/** Сводка для пяти карточек корзины (см. спеку §4.3; пятая карта = только BOUGHT). */
+/** Сводка для карточек корзины: «Все» + по статусам. */
 export function buildPartsCartSummary(items: PartWishlistItemViewModel[]): PartsCartSummary {
   const needed = byStatus(items, "NEEDED");
   const ordered = byStatus(items, "ORDERED");
   const bought = byStatus(items, "BOUGHT");
   const installed = byStatus(items, "INSTALLED");
   return {
+    all: { count: items.length, amount: sumCostAmount(items) },
     needed: { count: needed.length, amount: sumCostAmount(needed) },
     ordered: { count: ordered.length, amount: sumCostAmount(ordered) },
     bought: { count: bought.length, amount: sumCostAmount(bought) },
     installed: { count: installed.length, amount: sumCostAmount(installed) },
-    boughtNotInstalled: { count: bought.length, amount: sumCostAmount(bought) },
   };
 }

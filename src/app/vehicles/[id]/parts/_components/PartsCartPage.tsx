@@ -20,11 +20,22 @@ import type {
   PartWishlistItemViewModel,
   PartWishlistStatusGroupViewModel,
 } from "@mototwin/types";
-import { buildPartsCartSummary } from "./parts-cart-summary";
+import { buildPartsCartSummary, type CartSummaryMetric } from "./parts-cart-summary";
 import { PARTS_CART_REF } from "./parts-cart-reference-theme";
 import styles from "./PartsCartPage.module.css";
 
 export type PartsStatusFilter = PartWishlistItemStatus | "ALL";
+
+export type PartsAdvancedFilterState = {
+  nodeId: string;
+  skuMode: "ALL" | "WITH_SKU" | "WITHOUT_SKU";
+  kitMode: "ALL" | "KIT" | "SINGLE";
+  priceMode: "ALL" | "WITH_PRICE" | "WITHOUT_PRICE";
+  minPrice: string;
+  maxPrice: string;
+};
+
+export type PartsNodeFilterOption = { id: string; name: string; level: number };
 
 const PARTS_SELECTION_INITIAL_VISIBLE_COUNT = 4;
 const PARTS_SELECTION_COLLAPSED_VISIBLE_COUNT = 5;
@@ -43,11 +54,15 @@ type PartsCartPageProps = {
   wishlistViewModels: PartWishlistItemViewModel[];
   filteredGroups: PartWishlistStatusGroupViewModel[];
   filteredViewModels: PartWishlistItemViewModel[];
-  partsStatusCounts: Map<PartWishlistItemStatus, number>;
   partsStatusFilter: PartsStatusFilter;
   onPartsStatusFilterChange: (value: PartsStatusFilter) => void;
   partsSearchQuery: string;
   onPartsSearchQueryChange: (value: string) => void;
+  advancedFilters: PartsAdvancedFilterState;
+  onAdvancedFiltersChange: (value: PartsAdvancedFilterState) => void;
+  onResetAdvancedFilters: () => void;
+  advancedFilterCount: number;
+  nodeFilterOptions: PartsNodeFilterOption[];
   collapsedPartsStatusGroups: Partial<Record<PartWishlistItemStatus, boolean>>;
   onToggleCollapsedGroup: (status: PartWishlistItemStatus) => void;
   onExpandCollapsedGroup: (status: PartWishlistItemStatus) => void;
@@ -134,10 +149,17 @@ function tint(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function SummaryIcon({ kind }: { kind: "needed" | "ordered" | "bought" | "installed" | "cart" }) {
+function SummaryIcon({ kind }: { kind: "all" | "needed" | "ordered" | "bought" | "installed" | "cart" }) {
+  if (kind === "all") {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M5 7h14M5 12h14M5 17h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    );
+  }
   if (kind === "installed") {
     return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
         <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" opacity="0.65" />
         <path d="M7 12.3l3.2 3.2L17.5 8" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -145,7 +167,7 @@ function SummaryIcon({ kind }: { kind: "needed" | "ordered" | "bought" | "instal
   }
   if (kind === "ordered") {
     return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path d="M5 8l7-4 7 4v8l-7 4-7-4V8z" stroke="currentColor" strokeWidth="1.6" />
         <path d="M5 8l7 4 7-4M12 12v8" stroke="currentColor" strokeWidth="1.4" />
       </svg>
@@ -153,14 +175,14 @@ function SummaryIcon({ kind }: { kind: "needed" | "ordered" | "bought" | "instal
   }
   if (kind === "needed") {
     return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
         <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.6" />
         <path d="M9 5.5c-2.7 4.3-2.7 8.7 0 13M15 5.5c2.7 4.3 2.7 8.7 0 13" stroke="currentColor" strokeWidth="1.2" />
       </svg>
     );
   }
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M6 6h15l-1.5 10H8L6 3H3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="10" cy="20" r="1.2" fill="currentColor" />
       <circle cx="17" cy="20" r="1.2" fill="currentColor" />
@@ -259,11 +281,15 @@ export function PartsCartPage(props: PartsCartPageProps) {
     wishlistViewModels,
     filteredGroups,
     filteredViewModels,
-    partsStatusCounts,
     partsStatusFilter,
     onPartsStatusFilterChange,
     partsSearchQuery,
     onPartsSearchQueryChange,
+    advancedFilters,
+    onAdvancedFiltersChange,
+    onResetAdvancedFilters,
+    advancedFilterCount,
+    nodeFilterOptions,
     collapsedPartsStatusGroups,
     onToggleCollapsedGroup,
     onExpandCollapsedGroup,
@@ -290,6 +316,9 @@ export function PartsCartPage(props: PartsCartPageProps) {
 
   const [deleteConfirmItemId, setDeleteConfirmItemId] = useState<string | null>(null);
   const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
+  const [openStatusMenuId, setOpenStatusMenuId] = useState<string | null>(null);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [isDetailPanelClosed, setIsDetailPanelClosed] = useState(false);
   const [isDetailHistoryExpanded, setIsDetailHistoryExpanded] = useState(false);
   const summary = useMemo(() => buildPartsCartSummary(wishlistViewModels), [wishlistViewModels]);
 
@@ -311,16 +340,54 @@ export function PartsCartPage(props: PartsCartPageProps) {
   );
   const selectedId = selectedVm?.id ?? null;
 
-  const summaryCards = [
-    { key: "needed", label: "Нужно купить", value: summary.needed, color: PARTS_CART_REF.statusNeeded, icon: "needed" as const },
-    { key: "ordered", label: "Заказано", value: summary.ordered, color: PARTS_CART_REF.statusOrdered, icon: "ordered" as const },
-    { key: "bought", label: "Куплено", value: summary.bought, color: PARTS_CART_REF.statusBought, icon: "bought" as const },
-    { key: "installed", label: "Установлено", value: summary.installed, color: PARTS_CART_REF.statusInstalled, icon: "installed" as const },
-    { key: "bni", label: "Куплено, но не установлено", value: summary.boughtNotInstalled, color: PARTS_CART_REF.statusMuted, icon: "cart" as const },
+  const summaryCards: Array<{
+    key: string;
+    label: string;
+    value: CartSummaryMetric;
+    color: string;
+    icon: "all" | "needed" | "ordered" | "bought" | "installed";
+    filter: PartsStatusFilter;
+  }> = [
+    { key: "all", label: "Все", value: summary.all, color: "#ff6b00", icon: "all", filter: "ALL" },
+    { key: "needed", label: "Нужно купить", value: summary.needed, color: PARTS_CART_REF.statusNeeded, icon: "needed", filter: "NEEDED" },
+    { key: "ordered", label: "Заказано", value: summary.ordered, color: PARTS_CART_REF.statusOrdered, icon: "ordered", filter: "ORDERED" },
+    { key: "bought", label: "Куплено", value: summary.bought, color: PARTS_CART_REF.statusBought, icon: "bought", filter: "BOUGHT" },
+    { key: "installed", label: "Установлено", value: summary.installed, color: PARTS_CART_REF.statusInstalled, icon: "installed", filter: "INSTALLED" },
   ];
 
+  const updateAdvancedFilters = (patch: Partial<PartsAdvancedFilterState>) => {
+    onAdvancedFiltersChange({ ...advancedFilters, ...patch });
+  };
+
+  const selectWishlistItem = (id: string | null) => {
+    setIsDetailPanelClosed(false);
+    onSelectWishlistItem(id);
+  };
+
+  const openWishlistItemJournal = (item: PartWishlistItemViewModel) => {
+    const installedServiceEventId = item.status === "INSTALLED" ? installedWishlistServiceEventIdByItemId.get(item.id) : null;
+    if (installedServiceEventId) {
+      router.push(`/vehicles/${vehicleId}/service-log?serviceEventId=${encodeURIComponent(installedServiceEventId)}`);
+      return;
+    }
+    router.push(`/vehicles/${vehicleId}/service-log${item.nodeId ? `?nodeId=${encodeURIComponent(item.nodeId)}` : ""}`);
+  };
+
+  const runStatusAction = (item: PartWishlistItemViewModel, raw: PartWishlistItem, nextStatus: PartWishlistItemStatus) => {
+    setOpenStatusMenuId(null);
+    setOpenRowMenuId(null);
+    if (nextStatus === item.status) {
+      return;
+    }
+    if (nextStatus === "BOUGHT") {
+      onOpenWishlistPurchaseExpense(raw);
+      return;
+    }
+    void onPatchWishlistItemStatus(item.id, nextStatus, item.status);
+  };
+
   const renderDetail = () => {
-    if (!selectedVm || !selectedRaw) {
+    if (isDetailPanelClosed || !selectedVm || !selectedRaw) {
       return (
         <aside className={styles.detail}>
           <div className={styles.emptyDetail}>Выберите позицию в списке слева — здесь появятся детали и действия.</div>
@@ -380,7 +447,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
               <h2 className={styles.detailTitle}>{item.title}</h2>
               <p className={styles.detailStatus} style={{ color: st }}>{item.statusLabelRu}</p>
             </div>
-            <button type="button" className={styles.closeButton} onClick={() => onSelectWishlistItem(null)} aria-label="Закрыть панель">
+            <button type="button" className={styles.closeButton} onClick={() => setIsDetailPanelClosed(true)} aria-label="Закрыть панель">
               ×
             </button>
           </div>
@@ -421,7 +488,6 @@ export function PartsCartPage(props: PartsCartPageProps) {
               <p className={styles.sectionLabel}>Из комплекта</p>
               <div className={styles.kitLine}>
                 <span>{item.kitOriginLabelRu.replace(/^Из комплекта:\s*/i, "")}</span>
-                <span aria-hidden>↗</span>
               </div>
             </div>
           ) : null}
@@ -483,10 +549,10 @@ export function PartsCartPage(props: PartsCartPageProps) {
             className={styles.journalButton}
             onClick={() => {
               if (installedServiceEventId) {
-                router.push(`/vehicles/${vehicleId}/service-log?serviceEventId=${encodeURIComponent(installedServiceEventId)}`);
+                openWishlistItemJournal(item);
                 return;
               }
-              router.push(`/vehicles/${vehicleId}/service-log${item.nodeId ? `?nodeId=${encodeURIComponent(item.nodeId)}` : ""}`);
+              openWishlistItemJournal(item);
             }}
           >
             <span>Перейти в журнал обслуживания</span><span aria-hidden>›</span>
@@ -519,14 +585,24 @@ export function PartsCartPage(props: PartsCartPageProps) {
         {wishlistViewModels.length > 0 ? (
           <section className={styles.summaryGrid} aria-label="Сводка корзины">
             {summaryCards.map((card) => (
-              <article key={card.key} className={styles.summaryCard}>
+              <button
+                key={card.key}
+                type="button"
+                className={`${styles.summaryCard} ${partsStatusFilter === card.filter ? styles.summaryCardActive : ""}`}
+                onClick={() => {
+                  onPartsStatusFilterChange(card.filter);
+                  setIsDetailPanelClosed(false);
+                }}
+              >
                 <span className={styles.summaryIcon} style={{ color: card.color }}><SummaryIcon kind={card.icon} /></span>
-                <div>
+                <div className={styles.summaryCardBody}>
                   <p className={styles.summaryLabel} style={{ color: card.color }}>{card.label}</p>
-                  <p className={styles.summaryCount}>{card.value.count}</p>
-                  <p className={styles.summaryAmount}>{formatSummaryAmount(card.value.amount)}</p>
+                  <p className={styles.summaryStatsRow}>
+                    <span className={styles.summaryCount}>{card.value.count}</span>
+                    <span className={styles.summaryAmount}>{formatSummaryAmount(card.value.amount)}</span>
+                  </p>
                 </div>
-              </article>
+              </button>
             ))}
           </section>
         ) : null}
@@ -562,46 +638,85 @@ export function PartsCartPage(props: PartsCartPageProps) {
 
         {wishlistViewModels.length > 0 ? (
           <section className={styles.listPanel} aria-label="Список позиций корзины">
-            <nav className={styles.tabs} aria-label="Статусы корзины">
-              {(["ALL", ...PART_WISHLIST_STATUS_ORDER] as const).map((key) => {
-                const active = partsStatusFilter === key;
-                const isAll = key === "ALL";
-                const count = isAll ? wishlistViewModels.length : partsStatusCounts.get(key) ?? 0;
-                const label = isAll ? "Все" : partWishlistStatusLabelsRu[key];
-                const tabAccent = isAll ? "#ff6b00" : statusColor(key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => onPartsStatusFilterChange(key)}
-                    className={`${styles.tab} ${active ? styles.tabActive : ""}`}
-                    style={{ "--tab-accent": tabAccent } as CSSProperties}
-                  >
-                    <span>{label}</span>
-                    {!isAll ? (
-                      <span
-                        className={styles.tabBadge}
-                        style={{ color: tabAccent, borderColor: tint(tabAccent, 0.38), backgroundColor: tint(tabAccent, 0.12) }}
-                      >
-                        {count}
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </nav>
-
             <div className={styles.listSearch}>
               <div className={styles.searchRow}>
                 <div className={styles.searchBox}>
                   <span className={styles.searchIcon} aria-hidden><SearchIcon /></span>
                   <input className={styles.searchInput} value={partsSearchQuery} onChange={(e) => onPartsSearchQueryChange(e.target.value)} placeholder="Поиск по названию, SKU, узлу, комментарию" />
                 </div>
-                <button type="button" className={styles.filterButton} onClick={() => { if (hasNodeFilter) onClearNodeFilter(); }}>
+                <button type="button" className={styles.filterButton} onClick={() => setIsFilterPanelOpen((value) => !value)} aria-expanded={isFilterPanelOpen}>
                   <FilterIcon />
                   <span>Фильтры</span>
+                  {advancedFilterCount > 0 ? <span className={styles.filterCount}>{advancedFilterCount}</span> : null}
                 </button>
               </div>
+              {isFilterPanelOpen ? (
+                <div className={styles.filterPanel}>
+                  <div className={styles.filterPanelHeader}>
+                    <p>Фильтры списка</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onResetAdvancedFilters();
+                        if (hasNodeFilter) onClearNodeFilter();
+                      }}
+                    >
+                      Сбросить
+                    </button>
+                  </div>
+                  <div className={styles.filterGrid}>
+                    <label className={styles.filterField}>
+                      <span>Узел</span>
+                      <select value={advancedFilters.nodeId} onChange={(e) => updateAdvancedFilters({ nodeId: e.target.value })}>
+                        <option value="">Все узлы</option>
+                        {nodeFilterOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {"\u00A0".repeat(Math.max(0, option.level - 1) * 2)}
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={styles.filterField}>
+                      <span>SKU</span>
+                      <select value={advancedFilters.skuMode} onChange={(e) => updateAdvancedFilters({ skuMode: e.target.value as PartsAdvancedFilterState["skuMode"] })}>
+                        <option value="ALL">Все</option>
+                        <option value="WITH_SKU">С SKU</option>
+                        <option value="WITHOUT_SKU">Без SKU</option>
+                      </select>
+                    </label>
+                    <label className={styles.filterField}>
+                      <span>Комплект</span>
+                      <select value={advancedFilters.kitMode} onChange={(e) => updateAdvancedFilters({ kitMode: e.target.value as PartsAdvancedFilterState["kitMode"] })}>
+                        <option value="ALL">Все</option>
+                        <option value="KIT">Из комплекта</option>
+                        <option value="SINGLE">Одиночные</option>
+                      </select>
+                    </label>
+                    <label className={styles.filterField}>
+                      <span>Стоимость</span>
+                      <select value={advancedFilters.priceMode} onChange={(e) => updateAdvancedFilters({ priceMode: e.target.value as PartsAdvancedFilterState["priceMode"] })}>
+                        <option value="ALL">Все</option>
+                        <option value="WITH_PRICE">С ценой</option>
+                        <option value="WITHOUT_PRICE">Без цены</option>
+                      </select>
+                    </label>
+                    <label className={styles.filterField}>
+                      <span>Цена от</span>
+                      <input inputMode="decimal" value={advancedFilters.minPrice} onChange={(e) => updateAdvancedFilters({ minPrice: e.target.value })} placeholder="0" />
+                    </label>
+                    <label className={styles.filterField}>
+                      <span>Цена до</span>
+                      <input inputMode="decimal" value={advancedFilters.maxPrice} onChange={(e) => updateAdvancedFilters({ maxPrice: e.target.value })} placeholder="5000" />
+                    </label>
+                  </div>
+                  {hasNodeFilter ? (
+                    <button type="button" className={styles.clearNodeFilter} onClick={onClearNodeFilter}>
+                      Сбросить фильтр узла из ссылки
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             {!isWishlistLoading && !wishlistError && filteredGroups.length > 0 ? (
@@ -643,11 +758,11 @@ export function PartsCartPage(props: PartsCartPageProps) {
                                 data-wishlist-item-id={item.id}
                                 className={`${styles.row} ${isSelected ? styles.rowSelected : ""}`}
                                 style={{ "--row-accent": st } as CSSProperties}
-                                onClick={() => onSelectWishlistItem(item.id)}
+                                onClick={() => selectWishlistItem(item.id)}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
-                                    onSelectWishlistItem(item.id);
+                                    selectWishlistItem(item.id);
                                   }
                                 }}
                               >
@@ -659,7 +774,22 @@ export function PartsCartPage(props: PartsCartPageProps) {
                                 <span className={styles.skuLine}>{skuLines?.primaryLine ?? "—"}</span>
                                 <span className={styles.qty}>{item.quantity} шт.</span>
                                 <span className={styles.price}>{formatRubAmount(item.costAmount)}</span>
-                                <span className={styles.statusPill} style={{ color: st, backgroundColor: tint(st, 0.15), border: `1px solid ${tint(st, 0.28)}` }}>{item.statusLabelRu}</span>
+                                <button
+                                  type="button"
+                                  className={styles.statusPill}
+                                  style={{ color: st, backgroundColor: tint(st, 0.15), border: `1px solid ${tint(st, 0.28)}` }}
+                                  disabled={isBusy || !raw}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setOpenRowMenuId(null);
+                                    setOpenStatusMenuId((id) => (id === item.id ? null : item.id));
+                                  }}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                  aria-label={`Сменить статус: ${item.statusLabelRu}`}
+                                >
+                                  {item.statusLabelRu}
+                                </button>
                                 <button
                                   type="button"
                                   className={styles.menuButton}
@@ -668,15 +798,39 @@ export function PartsCartPage(props: PartsCartPageProps) {
                                     e.stopPropagation();
                                     setOpenRowMenuId((id) => (id === item.id ? null : item.id));
                                   }}
+                                  onKeyDown={(e) => e.stopPropagation()}
                                   aria-label="Меню строки"
                                 >
                                   ⋮
                                 </button>
                               </div>
+                              {openStatusMenuId === item.id && raw ? (
+                                <div className={styles.statusMenu}>
+                                  {PART_WISHLIST_STATUS_ORDER.map((nextStatus) => {
+                                    const nextColor = statusColor(nextStatus);
+                                    const isCurrent = nextStatus === item.status;
+                                    return (
+                                      <button
+                                        key={nextStatus}
+                                        type="button"
+                                        disabled={isBusy || isCurrent}
+                                        onClick={() => runStatusAction(item, raw, nextStatus)}
+                                      >
+                                        <span style={{ color: nextColor }}>●</span>
+                                        <span>{partWishlistStatusLabelsRu[nextStatus]}</span>
+                                        {isCurrent ? <span className={styles.currentStatusMark}>текущий</span> : null}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              ) : null}
                               {openRowMenuId === item.id && raw ? (
                                 <div className={styles.rowMenu}>
                                   <button type="button" onClick={() => { setOpenRowMenuId(null); onOpenWishlistEdit(raw); }}>Изменить</button>
-                                  {item.status === "NEEDED" ? <button type="button" onClick={() => { setOpenRowMenuId(null); void onPatchWishlistItemStatus(item.id, "ORDERED", item.status); }} disabled={isBusy}>Заказано</button> : null}
+                                  {item.status !== "ORDERED" ? <button type="button" onClick={() => runStatusAction(item, raw, "ORDERED")} disabled={isBusy}>Заказано</button> : null}
+                                  {item.status !== "BOUGHT" ? <button type="button" onClick={() => runStatusAction(item, raw, "BOUGHT")} disabled={isBusy}>Куплено</button> : null}
+                                  {item.status !== "INSTALLED" ? <button type="button" onClick={() => runStatusAction(item, raw, "INSTALLED")} disabled={isBusy}>Установлено</button> : null}
+                                  {item.status === "INSTALLED" ? <button type="button" onClick={() => { setOpenRowMenuId(null); openWishlistItemJournal(item); }}>В журнал</button> : null}
                                   <button type="button" onClick={() => { setOpenRowMenuId(null); setDeleteConfirmItemId(item.id); }} style={{ color: PARTS_CART_REF.statusNeeded }}>Удалить</button>
                                 </div>
                               ) : null}

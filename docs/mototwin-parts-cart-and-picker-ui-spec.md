@@ -144,10 +144,10 @@ Bottom bar фиксированная.
 
 ```txt
 ┌ Sidebar ┐ ┌ Header + actions                                      ┐ ┌ Detail panel ┐
-│         │ │ Summary cards                                          │ │ Selected item │
-│         │ │ Tabs                                                   │ │ Status        │
-│         │ │ Search + filters                                       │ │ Actions       │
-│         │ │ Grouped list: Needed / Ordered / Bought / Installed    │ │ History       │
+│         │ │ Summary cards (status filter: Все + по статусам)       │ │ Selected item │
+│         │ │ Search + filters                                       │ │ Status        │
+│         │ │ Grouped list: Needed / Ordered / Bought / Installed    │ │ Actions       │
+│         │ │                                                        │ │ History       │
 └─────────┘ └────────────────────────────────────────────────────────┘ └──────────────┘
 ```
 
@@ -158,7 +158,6 @@ Bottom bar фиксированная.
   <div className="space-y-5">
     <CartHeader />
     <CartSummaryCards />
-    <CartTabs />
     <CartSearchAndFilters />
     <CartGroupedList />
   </div>
@@ -224,66 +223,46 @@ Mobile обязателен.
 
 #### `CartSummaryCards`
 
-Пять карточек:
+Пять карточек в одном ряду (кликабельный фильтр списка; дублирующей строки вкладок под панелью поиска нет):
 
-1. `Нужно купить`
-2. `Заказано`
-3. `Куплено`
-4. `Установлено`
-5. `Куплено, но не установлено`
+1. `Все` — количество всех позиций и сумма по стоимости позиций (`costAmount`, в продукте — преимущественно ₽).
+2. `Нужно купить`
+3. `Заказано`
+4. `Куплено`
+5. `Установлено`
 
-Data shape:
+На карточке: подпись статуса, одна строка **число** и **сумма** рядом (компактно). Отдельной карточки «Куплено, но не установлено» в UI корзины нет (это метрика расходов на `/expenses`).
+
+Data shape (реализация: `buildPartsCartSummary` в web):
 
 ```ts
 type CartSummary = {
+  all: { count: number; amount: number };
   needed: { count: number; amount: number };
   ordered: { count: number; amount: number };
   bought: { count: number; amount: number };
   installed: { count: number; amount: number };
-  boughtNotInstalled: { count: number; amount: number };
 };
 ```
 
 Visual:
 
+- `Все`: оранжевый акцент, иконка «список».
 - Needed: red accent.
 - Ordered: yellow accent.
 - Bought: blue accent.
-- Installed: green accent and amount, same as other summary cards.
-- Bought not installed: gray / cart icon.
+- Installed: green accent.
 
-Desktop: horizontal row.  
-Mobile: horizontal scroll row of 5 compact cards.
+Desktop: horizontal row, карточки без лишней минимальной высоты.  
+Mobile: horizontal scroll row of compact cards.
+
+Фильтр статуса: `ALL` | `NEEDED` | `ORDERED` | `BOUGHT` | `INSTALLED`; активная карточка — оранжевая обводка.
 
 ---
 
-#### `CartStatusTabs`
+#### `CartStatusTabs` (устарело для web)
 
-Tabs:
-
-- `Все`
-- `Нужно купить` + badge count
-- `Заказано` + badge count
-- `Куплено` + badge count
-- `Установлено` + badge count
-
-State:
-
-```ts
-type CartStatusFilter = "all" | "needed" | "ordered" | "bought" | "installed";
-```
-
-Active tab:
-
-- underline uses the tab status color (`Все` stays orange; status tabs use red/yellow/blue/green);
-- text white;
-- inactive text muted.
-- status counts are shown as compact rectangular badges next to the text; the number and badge border use the status color.
-
-Mobile:
-
-- горизонтальный скролл;
-- не переносить в 2 строки.
+На web **не используется**: фильтр по статусу только через **`CartSummaryCards`**. На Expo экран wishlist по-прежнему может использовать chips / отдельный контроль статуса (см. `parts-wishlist-mvp.md`).
 
 ---
 
@@ -324,12 +303,12 @@ Search fields:
 
 Desktop:
 
-- tabs, search and groups live inside one bordered `listPanel`;
+- search, фильтры и группы живут внутри одного bordered `listPanel` (вкладок статусов внутри панели нет);
 - rows are compact table-like item cards with preview placeholder, status accent line on the left, SKU, quantity, price, status badge and kebab menu;
 - group headers are neutral, separated by thin dividers;
-- сворачивание и `Показать ещё` работают только на вкладке `Все` без поиска;
+- сворачивание и `Показать ещё` работают только при фильтре **«Все»** (`ALL`) без поиска;
 - в свернутой группе показывается до 5 строк и CTA `Показать все ...`;
-- на статусных вкладках и при поиске список сразу показывает все элементы группы.
+- при выборе статусной карточки сводки или при поиске список сразу показывает все элементы группы.
 
 Mobile:
 
@@ -1413,12 +1392,17 @@ src/components/mototwin/ui/mt-status-badge.tsx
 
 src/features/parts-cart/components/cart-header.tsx
 src/features/parts-cart/components/cart-summary-cards.tsx
-src/features/parts-cart/components/cart-status-tabs.tsx
 src/features/parts-cart/components/cart-search-and-filters.tsx
 src/features/parts-cart/components/cart-grouped-list.tsx
 src/features/parts-cart/components/cart-item-row.tsx
 src/features/parts-cart/components/cart-item-detail-panel.tsx
 src/features/parts-cart/components/cart-mobile-bottom-actions.tsx
+
+Web (Next.js) — текущая реализация корзины в монорепо:
+
+src/app/vehicles/[id]/parts/_components/PartsCartPage.tsx
+src/app/vehicles/[id]/parts/_components/PartsCartPage.module.css
+src/app/vehicles/[id]/parts/_components/parts-cart-summary.ts
 
 src/features/part-picker/components/part-picker-header.tsx
 src/features/part-picker/components/part-picker-tabs.tsx
@@ -1448,7 +1432,7 @@ Done when:
 - desktop layout matches reference structure;
 - mobile layout matches reference structure;
 - summary cards display correct counts and amounts;
-- status tabs filter the list;
+- summary cards (including «Все») filter the list; duplicate status tabs are not required on web;
 - search filters by title, SKU, node path, comment;
 - rows are grouped by status;
 - selected desktop row opens detail panel;

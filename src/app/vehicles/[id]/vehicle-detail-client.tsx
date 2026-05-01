@@ -82,7 +82,7 @@ import { TopNodeIcon } from "@/components/icons/top-nodes";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
-import { PartsCartPage } from "./parts/_components/PartsCartPage";
+import { PartsCartPage, type PartsAdvancedFilterState } from "./parts/_components/PartsCartPage";
 import { PartPickerShell, type PartPickerTab } from "./parts/_components/PartPickerShell";
 import {
   buildPartSkuViewModelFromRecommendation,
@@ -1018,6 +1018,15 @@ type NodeContextExpenseSummary = {
 
 type PartsStatusFilter = PartWishlistItemStatus | "ALL";
 
+const DEFAULT_PARTS_ADVANCED_FILTERS: PartsAdvancedFilterState = {
+  nodeId: "",
+  skuMode: "ALL",
+  kitMode: "ALL",
+  priceMode: "ALL",
+  minPrice: "",
+  maxPrice: "",
+};
+
 const NODE_STATUS_FILTER_OPTIONS: NodeStatus[] = [
   "OVERDUE",
   "SOON",
@@ -1360,6 +1369,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [wishlistPickerInitialTab, setWishlistPickerInitialTab] = useState<PartPickerTab>("search");
   const [wishlistModalNonce, setWishlistModalNonce] = useState(0);
   const [partsSearchQuery, setPartsSearchQuery] = useState("");
+  const [partsAdvancedFilters, setPartsAdvancedFilters] = useState<PartsAdvancedFilterState>(
+    DEFAULT_PARTS_ADVANCED_FILTERS
+  );
   const [collapsedPartsStatusGroups, setCollapsedPartsStatusGroups] = useState<
     Partial<Record<PartWishlistItemStatus, boolean>>
   >({ INSTALLED: true });
@@ -1786,16 +1798,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     () => groupPartWishlistItemsByStatus(wishlistActiveViewModels),
     [wishlistActiveViewModels]
   );
-  const partsStatusCounts = useMemo(() => {
-    const counts = new Map<PartWishlistItemStatus, number>();
-    for (const status of PART_WISHLIST_STATUS_ORDER) {
-      counts.set(status, 0);
-    }
-    for (const item of wishlistViewModels) {
-      counts.set(item.status, (counts.get(item.status) ?? 0) + 1);
-    }
-    return counts;
-  }, [wishlistViewModels]);
   const normalizedPartsSearchQuery = partsSearchQuery.trim().toLowerCase();
   const partsNodeFilterIds = useMemo(() => {
     if (pageView !== "partsSelection" || !targetNodeIdFromSearchParams) {
@@ -1807,9 +1809,61 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     return new Set(createServiceLogNodeFilter(node).nodeIds);
   }, [nodeTree, pageView, targetNodeIdFromSearchParams]);
+  const advancedPartsNodeFilterIds = useMemo(() => {
+    const nodeId = partsAdvancedFilters.nodeId.trim();
+    if (!nodeId) {
+      return null;
+    }
+    const node = findNodeTreeItemById(nodeTree, nodeId);
+    if (!node) {
+      return new Set([nodeId]);
+    }
+    return new Set(createServiceLogNodeFilter(node).nodeIds);
+  }, [nodeTree, partsAdvancedFilters.nodeId]);
+  const partsMinPriceFilter = Number(partsAdvancedFilters.minPrice.replace(",", "."));
+  const partsMaxPriceFilter = Number(partsAdvancedFilters.maxPrice.replace(",", "."));
+  const hasPartsMinPriceFilter =
+    partsAdvancedFilters.minPrice.trim() !== "" && Number.isFinite(partsMinPriceFilter);
+  const hasPartsMaxPriceFilter =
+    partsAdvancedFilters.maxPrice.trim() !== "" && Number.isFinite(partsMaxPriceFilter);
+  const partsAdvancedFilterCount =
+    (partsNodeFilterIds ? 1 : 0) +
+    (partsAdvancedFilters.nodeId.trim() ? 1 : 0) +
+    (partsAdvancedFilters.skuMode !== "ALL" ? 1 : 0) +
+    (partsAdvancedFilters.kitMode !== "ALL" ? 1 : 0) +
+    (partsAdvancedFilters.priceMode !== "ALL" ? 1 : 0) +
+    (hasPartsMinPriceFilter ? 1 : 0) +
+    (hasPartsMaxPriceFilter ? 1 : 0);
   const filteredPartsWishlistViewModels = useMemo(() => {
     return wishlistViewModels.filter((item) => {
       if (partsNodeFilterIds && (!item.nodeId || !partsNodeFilterIds.has(item.nodeId))) {
+        return false;
+      }
+      if (advancedPartsNodeFilterIds && (!item.nodeId || !advancedPartsNodeFilterIds.has(item.nodeId))) {
+        return false;
+      }
+      if (partsAdvancedFilters.skuMode === "WITH_SKU" && !item.skuId) {
+        return false;
+      }
+      if (partsAdvancedFilters.skuMode === "WITHOUT_SKU" && item.skuId) {
+        return false;
+      }
+      if (partsAdvancedFilters.kitMode === "KIT" && !item.kitOriginLabelRu) {
+        return false;
+      }
+      if (partsAdvancedFilters.kitMode === "SINGLE" && item.kitOriginLabelRu) {
+        return false;
+      }
+      if (partsAdvancedFilters.priceMode === "WITH_PRICE" && item.costAmount == null) {
+        return false;
+      }
+      if (partsAdvancedFilters.priceMode === "WITHOUT_PRICE" && item.costAmount != null) {
+        return false;
+      }
+      if (hasPartsMinPriceFilter && (item.costAmount == null || item.costAmount < partsMinPriceFilter)) {
+        return false;
+      }
+      if (hasPartsMaxPriceFilter && (item.costAmount == null || item.costAmount > partsMaxPriceFilter)) {
         return false;
       }
       if (partsStatusFilter !== "ALL" && item.status !== partsStatusFilter) {
@@ -1833,7 +1887,20 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         .toLowerCase();
       return haystack.includes(normalizedPartsSearchQuery);
     });
-  }, [normalizedPartsSearchQuery, partsNodeFilterIds, partsStatusFilter, wishlistViewModels]);
+  }, [
+    advancedPartsNodeFilterIds,
+    hasPartsMaxPriceFilter,
+    hasPartsMinPriceFilter,
+    normalizedPartsSearchQuery,
+    partsAdvancedFilters.kitMode,
+    partsAdvancedFilters.priceMode,
+    partsAdvancedFilters.skuMode,
+    partsMaxPriceFilter,
+    partsMinPriceFilter,
+    partsNodeFilterIds,
+    partsStatusFilter,
+    wishlistViewModels,
+  ]);
   const filteredPartsWishlistGroups = useMemo(
     () => groupPartWishlistItemsByStatus(filteredPartsWishlistViewModels),
     [filteredPartsWishlistViewModels]
@@ -4379,10 +4446,21 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       }
 
       if (!editingServiceEventId && pendingWishlistInstallItemId) {
+        const sourceWishlistItem = wishlistItems.find((item) => item.id === pendingWishlistInstallItemId);
         await vehicleDetailApi.updateWishlistItem(vehicleId, pendingWishlistInstallItemId, {
           status: "INSTALLED",
           nodeId: serviceFormValues.nodeId,
         });
+        if (sourceWishlistItem && sourceWishlistItem.status !== "INSTALLED") {
+          setWishlistStatusTransitionHistoryByItemId((prev) => ({
+            ...prev,
+            [pendingWishlistInstallItemId]: {
+              changedAt: new Date().toISOString(),
+              previousStatus: sourceWishlistItem.status,
+              nextStatus: "INSTALLED",
+            },
+          }));
+        }
         setWishlistNotice("Позиция отмечена как установленная после добавления события.");
       }
 
@@ -5098,11 +5176,15 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         wishlistViewModels={wishlistViewModels}
         filteredGroups={filteredPartsWishlistGroups}
         filteredViewModels={filteredPartsWishlistViewModels}
-        partsStatusCounts={partsStatusCounts}
         partsStatusFilter={partsStatusFilter}
         onPartsStatusFilterChange={setPartsStatusFilter}
         partsSearchQuery={partsSearchQuery}
         onPartsSearchQueryChange={setPartsSearchQuery}
+        advancedFilters={partsAdvancedFilters}
+        onAdvancedFiltersChange={setPartsAdvancedFilters}
+        onResetAdvancedFilters={() => setPartsAdvancedFilters(DEFAULT_PARTS_ADVANCED_FILTERS)}
+        advancedFilterCount={partsAdvancedFilterCount}
+        nodeFilterOptions={wishlistNodeOptions}
         collapsedPartsStatusGroups={collapsedPartsStatusGroups}
         onToggleCollapsedGroup={(status) =>
           setCollapsedPartsStatusGroups((prev) => ({
