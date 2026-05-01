@@ -6,7 +6,6 @@ export type PartsCartSummary = {
   all: CartSummaryMetric;
   needed: CartSummaryMetric;
   ordered: CartSummaryMetric;
-  /** Только BOUGHT, как на референсе корзины. */
   bought: CartSummaryMetric;
   installed: CartSummaryMetric;
 };
@@ -19,7 +18,7 @@ function byStatus(items: PartWishlistItemViewModel[], status: PartWishlistItemSt
   return items.filter((i) => i.status === status);
 }
 
-/** Сводка для карточек корзины: «Все» + по статусам. */
+/** Сводка для карточек корзины (web + Expo): «Все» + по статусам. */
 export function buildPartsCartSummary(items: PartWishlistItemViewModel[]): PartsCartSummary {
   const needed = byStatus(items, "NEEDED");
   const ordered = byStatus(items, "ORDERED");

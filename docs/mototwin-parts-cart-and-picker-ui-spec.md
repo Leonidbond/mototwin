@@ -221,6 +221,14 @@ Mobile обязателен.
 
 ---
 
+#### Превью «Подбор деталей» на обзоре мотоцикла (garage / dashboard)
+
+Web (`VehicleDashboard`) и Expo (`VehicleDetailScreen`): одна секция с заголовком **«Подбор деталей»**, действие **«Список»** → полная корзина (`/parts` на web, `/wishlist` в Expo). Три **вертикальные** компактные карточки в один ряд (равные колонки): статусы **Нужно купить**, **Заказано**, **Куплено** — число активных позиций, цветная полоска сверху и иконка в цвет статуса (как на мобильном); клик открывает полный список с **фильтром по статусу** (`partsStatus` в query). Под рядом — primary CTA **«Добавить деталь»** (web: модалка создания; Expo: `/wishlist/new`). Пустые и «только установленные» состояния — короткие тексты-подсказки в стиле MVP.
+
+Реализация сводки: **`buildPartsCartSummary`** (`@mototwin/domain`, модуль `parts-cart-summary.ts`) по активным позициям; число **`INSTALLED`** для подписи передаётся отдельно с родителя.
+
+---
+
 #### `CartSummaryCards`
 
 Пять карточек в одном ряду (кликабельный фильтр списка; дублирующей строки вкладок под панелью поиска нет):
@@ -233,7 +241,7 @@ Mobile обязателен.
 
 На карточке: подпись статуса, одна строка **число** и **сумма** рядом (компактно). Отдельной карточки «Куплено, но не установлено» в UI корзины нет (это метрика расходов на `/expenses`).
 
-Data shape (реализация: `buildPartsCartSummary` в web):
+Data shape (реализация: `buildPartsCartSummary` в `@mototwin/domain`):
 
 ```ts
 type CartSummary = {
@@ -262,7 +270,7 @@ Mobile: horizontal scroll row of compact cards.
 
 #### `CartStatusTabs` (устарело для web)
 
-На web **не используется**: фильтр по статусу только через **`CartSummaryCards`**. На Expo экран wishlist по-прежнему может использовать chips / отдельный контроль статуса (см. `parts-wishlist-mvp.md`).
+На web **не используется**: фильтр по статусу только через **`CartSummaryCards`**. На Expo экран wishlist использует **сводные карточки** и выбор фильтра по статусу в том же духе, что web-корзина (см. `parts-wishlist-mvp.md`).
 
 ---
 
@@ -1402,7 +1410,14 @@ Web (Next.js) — текущая реализация корзины в моно
 
 src/app/vehicles/[id]/parts/_components/PartsCartPage.tsx
 src/app/vehicles/[id]/parts/_components/PartsCartPage.module.css
-src/app/vehicles/[id]/parts/_components/parts-cart-summary.ts
+src/app/vehicles/[id]/_components/VehicleDashboard.tsx
+packages/domain/src/parts-cart-summary.ts
+
+Expo — список покупок и превью на экране мотоцикла:
+
+apps/app/app/vehicles/[id]/wishlist/index.tsx
+apps/app/app/vehicles/[id]/index.tsx
+apps/app/app/components/vehicles/CompactVehicleContextRow.tsx
 
 src/features/part-picker/components/part-picker-header.tsx
 src/features/part-picker/components/part-picker-tabs.tsx

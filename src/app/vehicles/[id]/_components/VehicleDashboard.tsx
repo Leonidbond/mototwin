@@ -2,18 +2,19 @@
 
 import Image, { type StaticImageData } from "next/image";
 import type { CSSProperties, ReactNode } from "react";
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   buildExpenseAnalyticsFromItems,
+  buildPartsCartSummary,
   calculateGarageScore,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
   getCurrentExpenseMonthKey,
   getExpenseCategoryLabelRu,
   getExpenseMonthKeyFromIso,
-  getWishlistItemSkuDisplayLines,
   getVehicleSilhouetteClassLabel,
   getNodeTightUiDisplayName,
+  partWishlistStatusLabelsRu,
   resolveGarageVehicleSilhouette,
 } from "@mototwin/domain";
 import {
@@ -27,6 +28,7 @@ import type {
   ExpenseAnalyticsSummary,
   ExpenseItem,
   NodeStatus,
+  PartWishlistItemStatus,
   PartWishlistItemViewModel,
   ServiceEventItem,
   TopNodeOverviewCard,
@@ -167,6 +169,7 @@ type VehicleDashboardProps = {
   expensesError: string;
   isWishlistLoading: boolean;
   wishlistError: string;
+  wishlistInstalledOnlyCount: number;
   moveToTrashError: string;
   onEditProfile: () => void;
   onMoveToTrash: () => void;
@@ -174,6 +177,8 @@ type VehicleDashboardProps = {
   onAddService: () => void;
   onAddExpense: () => void;
   onOpenParts: () => void;
+  onOpenPartsWithStatusFilter: (status: PartWishlistItemStatus) => void;
+  onAddWishlistItem: () => void;
   onOpenPartItem: (itemId: string) => void;
   onOpenAllNodes: () => void;
   onOpenNode: (nodeId: string) => void;
@@ -205,6 +210,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
     expensesError,
     isWishlistLoading,
     wishlistError,
+    wishlistInstalledOnlyCount,
     moveToTrashError,
   } = props;
   const score = calculateGarageScore({
@@ -254,6 +260,22 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
       wishlistItemByNodeId.set(item.nodeId, item);
     }
   }
+  const wishlistPartsSummary = useMemo(() => buildPartsCartSummary(wishlistItems), [wishlistItems]);
+  const wishlistActiveTotal = wishlistPartsSummary.all.count;
+  const hasWishlistRowsOrInstalled = wishlistActiveTotal > 0 || wishlistInstalledOnlyCount > 0;
+  const wishlistDashboardStatusRows = useMemo(
+    () =>
+      (["NEEDED", "ORDERED", "BOUGHT"] as const).map((status) => ({
+        status,
+        count:
+          status === "NEEDED"
+            ? wishlistPartsSummary.needed.count
+            : status === "ORDERED"
+              ? wishlistPartsSummary.ordered.count
+              : wishlistPartsSummary.bought.count,
+      })),
+    [wishlistPartsSummary]
+  );
   const heroMetaLine = [
     vehicle.modelVariant?.year ?? vehicle.year,
     vehicleStateViewModel?.odometerValue ?? `${vehicle.odometer} км`,
@@ -733,7 +755,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
             title="Подбор деталей"
             trailing={
               <Button variant="ghost" size="sm" onClick={props.onOpenParts}>
-                Открыть подбор
+                Список
               </Button>
             }
           />
@@ -745,23 +767,118 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
             </MutedText>
           ) : null}
           {!isWishlistLoading && !wishlistError ? (
-            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-              {wishlistItems.length === 0 ? (
-                <EmptyStateBlock
-                  title="Позиции пока не добавлены"
-                  details="Откройте подбор деталей и добавьте первые расходники или запчасти."
-                />
+            <div style={{ marginTop: 12 }}>
+              {!hasWishlistRowsOrInstalled ? (
+                <MutedText style={{ fontSize: 12, lineHeight: 1.45 }}>
+                  Добавляйте детали из дерева узлов или создавайте позицию вручную.
+                </MutedText>
               ) : (
-                wishlistItems
-                  .slice(0, 3)
-                  .map((item) => (
-                    <PartRecommendationRow
-                      key={item.id}
-                      item={item}
-                      onOpen={() => props.onOpenPartItem(item.id)}
-                    />
-                  ))
+                <>
+                  {wishlistActiveTotal === 0 && wishlistInstalledOnlyCount > 0 ? (
+                    <MutedText
+                      style={{
+                        marginBottom: 10,
+                        display: "block",
+                        fontSize: 12,
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      Нет позиций в работе. Установлено в корзине: {wishlistInstalledOnlyCount}. Ниже —
+                      переход в список с фильтром по статусу.
+                    </MutedText>
+                  ) : null}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: 6,
+                      width: "100%",
+                    }}
+                  >
+                    {wishlistDashboardStatusRows.map((row) => (
+                      <button
+                        key={row.status}
+                        type="button"
+                        onClick={() => props.onOpenPartsWithStatusFilter(row.status)}
+                        style={{
+                          position: "relative",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          minWidth: 0,
+                          padding: "8px 4px 10px",
+                          borderRadius: 12,
+                          border: "1px solid #1F2937",
+                          backgroundColor: "#111923",
+                          cursor: "pointer",
+                          textAlign: "center",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            height: 3,
+                            backgroundColor: wishlistDashboardStatusColor(row.status),
+                          }}
+                        />
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            width: 34,
+                            height: 34,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginTop: 8,
+                            borderRadius: 10,
+                            backgroundColor: "rgba(255,255,255,0.06)",
+                            color: wishlistDashboardStatusColor(row.status),
+                          }}
+                        >
+                          <WishlistDashboardStatusIcon status={row.status} />
+                        </span>
+                        <span
+                          style={{
+                            marginTop: 6,
+                            color: productSemanticColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: 800,
+                            fontVariantNumeric: "tabular-nums",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {row.count}
+                        </span>
+                        <span
+                          style={{
+                            marginTop: 4,
+                            color: productSemanticColors.textMuted,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            lineHeight: 1.3,
+                            maxWidth: "100%",
+                            padding: "0 2px",
+                          }}
+                        >
+                          {partWishlistStatusLabelsRu[row.status]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={props.onAddWishlistItem}
+                style={{ marginTop: 10, width: "100%" }}
+              >
+                Добавить деталь
+              </Button>
             </div>
           ) : null}
         </Card>
@@ -1447,62 +1564,41 @@ function RecentEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: ()
   );
 }
 
-function PartRecommendationRow({
-  item,
-  onOpen,
-}: {
-  item: PartWishlistItemViewModel;
-  onOpen: () => void;
-}) {
-  const skuLines = item.sku ? getWishlistItemSkuDisplayLines(item.sku) : null;
+type WishlistDashboardActiveStatus = "NEEDED" | "ORDERED" | "BOUGHT";
+
+const WISHLIST_DASHBOARD_STATUS_HEX: Record<WishlistDashboardActiveStatus, string> = {
+  NEEDED: "#FF3B30",
+  ORDERED: "#F5C400",
+  BOUGHT: "#36A3FF",
+};
+
+function wishlistDashboardStatusColor(status: WishlistDashboardActiveStatus): string {
+  return WISHLIST_DASHBOARD_STATUS_HEX[status];
+}
+
+function WishlistDashboardStatusIcon(props: { status: WishlistDashboardActiveStatus }) {
+  if (props.status === "NEEDED") {
+    return (
+      <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={2}>
+        <path d="M12 9v4M12 17h.01" />
+        <path d="M10.3 3.3 2 21h20L13.7 3.3a1 1 0 0 0-1.8 0z" />
+      </svg>
+    );
+  }
+  if (props.status === "ORDERED") {
+    return (
+      <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={2}>
+        <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+      </svg>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      style={{
-        display: "flex",
-        width: "100%",
-        alignItems: "center",
-        gap: 10,
-        padding: 10,
-        borderRadius: 14,
-        border: `1px solid ${productSemanticColors.border}`,
-        backgroundColor: productSemanticColors.cardMuted,
-        textAlign: "left",
-        cursor: "pointer",
-      }}
-    >
-      <span
-        aria-hidden
-        style={{
-          display: "inline-flex",
-          width: 42,
-          height: 42,
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 14,
-          backgroundColor: productSemanticColors.cardSubtle,
-          color: productSemanticColors.primaryAction,
-          flexShrink: 0,
-        }}
-      >
-        <PartsIcon />
-      </span>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ color: productSemanticColors.textPrimary, fontSize: 13, fontWeight: 700 }}>
-          {item.title}
-        </div>
-        {skuLines ? (
-          <MutedText style={{ marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {skuLines.primaryLine}
-          </MutedText>
-        ) : null}
-        <MutedText style={{ marginTop: 4 }}>
-          {item.node?.name ? `${item.node.name} • ${item.statusLabelRu}` : item.statusLabelRu}
-        </MutedText>
-      </div>
-      <span style={{ color: productSemanticColors.textTertiary, fontSize: 18 }}>›</span>
-    </button>
+    <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d="M6 6h15l-1.5 9h-12L6 6z" />
+      <path d="M6 6 5 3H2" />
+      <circle cx="9" cy="20" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="20" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 

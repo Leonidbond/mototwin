@@ -1,4 +1,14 @@
-import { Fragment, type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  type ComponentProps,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import {
@@ -31,6 +41,7 @@ import {
   buildNodeMaintenancePlanViewModel,
   buildPartWishlistItemViewModel,
   buildRideProfileViewModel,
+  buildPartsCartSummary,
   buildVehicleDetailViewModel,
   buildVehicleStateViewModel,
   canOpenNodeStatusExplanationModal,
@@ -51,6 +62,7 @@ import {
   formatNodeBadgeSingleLine,
   getNodeTightUiDisplayName,
   resolveGarageVehicleSilhouette,
+  type PartsCartSummary,
 } from "@mototwin/domain";
 import type {
   AttentionItemViewModel,
@@ -671,6 +683,16 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const returnAttentionNodeIdParam =
     typeof params.attentionNodeId === "string" ? params.attentionNodeId : "";
 
+  const pushWishlistFromDashboardForScrollOnReturn = useCallback(
+    (href: string) => {
+      if (!isNodeTreePage) {
+        scrollToPartsWishlistBlockOnNextDashboardFocusRef.current = true;
+      }
+      router.push(href);
+    },
+    [isNodeTreePage, router]
+  );
+
   useEffect(() => {
     if (!shouldRedirectLegacyNodesView || !vehicleId) return;
     router.replace(`/vehicles/${vehicleId}/nodes`);
@@ -698,6 +720,9 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     useState<AttentionItemViewModel | null>(null);
   const [highlightedAttentionNodeId, setHighlightedAttentionNodeId] = useState<string | null>(null);
   const attentionBlockYRef = useRef(0);
+  const partsWishlistBlockYRef = useRef(0);
+  /** После возврата с wishlist/new — прокрутить дашборд к блоку «Подбор деталей» (см. useEffect ниже). */
+  const scrollToPartsWishlistBlockOnNextDashboardFocusRef = useRef(false);
   const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
     PartRecommendationViewModel[]
   >([]);
@@ -1023,6 +1048,14 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     () => buildNodeExpenseSummaryFromItems(yearExpenses, selectedNodeFilterIds, currentExpenseYear),
     [currentExpenseYear, selectedNodeFilterIds, yearExpenses]
   );
+  const wishlistActiveSummary = useMemo((): PartsCartSummary => {
+    const active = filterActiveWishlistItems(wishlistItems).map(buildPartWishlistItemViewModel);
+    return buildPartsCartSummary(active);
+  }, [wishlistItems]);
+  const wishlistInstalledOnlyCount = useMemo(
+    () => wishlistItems.filter((it) => it.status === "INSTALLED").length,
+    [wishlistItems]
+  );
   const nodeSearchResults = useMemo<NodeTreeSearchResultViewModel[]>(
     () =>
       searchNodeTree(filteredTopLevelNodeViewModels, {
@@ -1079,6 +1112,26 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     router,
     vehicleId,
   ]);
+
+  useEffect(() => {
+    if (isLoading || isNodeTreePage || !vehicle) {
+      return;
+    }
+    if (!scrollToPartsWishlistBlockOnNextDashboardFocusRef.current) {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      dashboardScrollViewRef.current?.scrollTo({
+        y: Math.max(0, partsWishlistBlockYRef.current - 14),
+        animated: true,
+      });
+      scrollToPartsWishlistBlockOnNextDashboardFocusRef.current = false;
+    }, 380);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isLoading, isNodeTreePage, vehicle]);
+
   useEffect(() => {
     if (!highlightedAttentionNodeId) {
       return;
@@ -1344,19 +1397,26 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       return;
     }
     closeAttentionActions();
-    router.push(buildVehicleWishlistNewHref(vehicleId, selectedAttentionItem.nodeId));
-  }, [closeAttentionActions, router, selectedAttentionItem, vehicleId]);
+    pushWishlistFromDashboardForScrollOnReturn(
+      buildVehicleWishlistNewHref(vehicleId, selectedAttentionItem.nodeId)
+    );
+  }, [closeAttentionActions, pushWishlistFromDashboardForScrollOnReturn, selectedAttentionItem, vehicleId]);
   const openSelectedAttentionWishlistItem = useCallback(() => {
     if (!selectedAttentionWishlistItem) {
       return;
     }
     closeAttentionActions();
-    router.push(
+    pushWishlistFromDashboardForScrollOnReturn(
       buildVehicleWishlistItemHighlightHref(vehicleId, selectedAttentionWishlistItem.id, {
         partsStatus: selectedAttentionWishlistItem.status,
       })
     );
-  }, [closeAttentionActions, router, selectedAttentionWishlistItem, vehicleId]);
+  }, [
+    closeAttentionActions,
+    pushWishlistFromDashboardForScrollOnReturn,
+    selectedAttentionWishlistItem,
+    vehicleId,
+  ]);
   const openTopOverviewIssueNodes = useCallback(
     (nodeIds: string[]) => {
       if (nodeIds.length === 0) {
@@ -1567,9 +1627,17 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       }
       persistNodeTreeReturnState(selectedNodeContextId);
       closeNodeContextModal();
-      router.push(buildVehicleWishlistNewHref(vehicleId, selectedNodeContextId, { skuId: rec.skuId }));
+      pushWishlistFromDashboardForScrollOnReturn(
+        buildVehicleWishlistNewHref(vehicleId, selectedNodeContextId, { skuId: rec.skuId })
+      );
     },
-    [closeNodeContextModal, persistNodeTreeReturnState, router, selectedNodeContextId, vehicleId]
+    [
+      closeNodeContextModal,
+      persistNodeTreeReturnState,
+      pushWishlistFromDashboardForScrollOnReturn,
+      selectedNodeContextId,
+      vehicleId,
+    ]
   );
   const openWishlistFormForServiceKit = useCallback(
     (kit: ServiceKitViewModel) => {
@@ -1578,9 +1646,17 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       }
       persistNodeTreeReturnState(selectedNodeContextId);
       closeNodeContextModal();
-      router.push(buildVehicleWishlistNewHref(vehicleId, selectedNodeContextId, { kitCode: kit.code }));
+      pushWishlistFromDashboardForScrollOnReturn(
+        buildVehicleWishlistNewHref(vehicleId, selectedNodeContextId, { kitCode: kit.code })
+      );
     },
-    [closeNodeContextModal, persistNodeTreeReturnState, router, selectedNodeContextId, vehicleId]
+    [
+      closeNodeContextModal,
+      persistNodeTreeReturnState,
+      pushWishlistFromDashboardForScrollOnReturn,
+      selectedNodeContextId,
+      vehicleId,
+    ]
   );
   const openWishlistItemFromNodeContext = useCallback(
     (item: PartWishlistItemViewModel) => {
@@ -1589,9 +1665,17 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       }
       persistNodeTreeReturnState(item.nodeId ?? selectedNodeContextId ?? item.id);
       closeNodeContextModal();
-      router.push(buildVehicleWishlistItemHighlightHref(vehicleId, item.id, { partsStatus: item.status }));
+      pushWishlistFromDashboardForScrollOnReturn(
+        buildVehicleWishlistItemHighlightHref(vehicleId, item.id, { partsStatus: item.status })
+      );
     },
-    [closeNodeContextModal, persistNodeTreeReturnState, router, selectedNodeContextId, vehicleId]
+    [
+      closeNodeContextModal,
+      persistNodeTreeReturnState,
+      pushWishlistFromDashboardForScrollOnReturn,
+      selectedNodeContextId,
+      vehicleId,
+    ]
   );
   const advanceWishlistItemStatusFromNodeContext = useCallback(
     async (item: PartWishlistItemViewModel) => {
@@ -2212,11 +2296,27 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
             onPress={() => router.push(`/vehicles/${vehicleId}/expenses`)}
           />
 
-          <PartsDashboardCard
-            onOpenWishlist={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
-            onAddPart={() => router.push(`/vehicles/${vehicleId}/wishlist/new`)}
-            onPressBody={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
-          />
+          <View
+            onLayout={(event) => {
+              partsWishlistBlockYRef.current = event.nativeEvent.layout.y;
+            }}
+          >
+            <PartsDashboardCard
+              activeSummary={wishlistActiveSummary}
+              installedOnlyCount={wishlistInstalledOnlyCount}
+              onOpenWishlist={() =>
+                pushWishlistFromDashboardForScrollOnReturn(`/vehicles/${vehicleId}/wishlist`)
+              }
+              onOpenWishlistStatus={(status) =>
+                pushWishlistFromDashboardForScrollOnReturn(
+                  `/vehicles/${vehicleId}/wishlist?partsStatus=${encodeURIComponent(status)}`
+                )
+              }
+              onAddPart={() =>
+                pushWishlistFromDashboardForScrollOnReturn(`/vehicles/${vehicleId}/wishlist/new`)
+              }
+            />
+          </View>
         </View>
 
           </>
@@ -2850,7 +2950,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                         <Pressable
                           onPress={() => {
                             closeNodeContextModal();
-                            router.push(`/vehicles/${vehicleId}/wishlist`);
+                            pushWishlistFromDashboardForScrollOnReturn(`/vehicles/${vehicleId}/wishlist`);
                           }}
                           hitSlop={6}
                           accessibilityRole="button"
@@ -3280,34 +3380,98 @@ function ExpenseDashboardCard({
   );
 }
 
+const WISHLIST_DASHBOARD_ACTIVE_STATUSES = ["NEEDED", "ORDERED", "BOUGHT"] as const;
+type WishlistDashboardActiveStatus = (typeof WISHLIST_DASHBOARD_ACTIVE_STATUSES)[number];
+const WISHLIST_DASHBOARD_STATUS_COLORS: Record<WishlistDashboardActiveStatus, string> = {
+  NEEDED: "#FF3B30",
+  ORDERED: "#F5C400",
+  BOUGHT: "#36A3FF",
+};
+const WISHLIST_DASHBOARD_STATUS_ICONS: Record<WishlistDashboardActiveStatus, string> = {
+  NEEDED: "report-problem",
+  ORDERED: "inventory-2",
+  BOUGHT: "shopping-bag",
+};
+
 function PartsDashboardCard({
+  activeSummary,
+  installedOnlyCount,
   onOpenWishlist,
+  onOpenWishlistStatus,
   onAddPart,
-  onPressBody,
 }: {
+  activeSummary: PartsCartSummary;
+  installedOnlyCount: number;
   onOpenWishlist: () => void;
+  onOpenWishlistStatus: (status: PartWishlistItemStatus) => void;
   onAddPart: () => void;
-  onPressBody: () => void;
 }) {
+  const activeTotal = activeSummary.all.count;
+  const hasAnyWishlistRows = activeTotal > 0 || installedOnlyCount > 0;
+  const statusRows = WISHLIST_DASHBOARD_ACTIVE_STATUSES.map((status) => {
+    const metric =
+      status === "NEEDED"
+        ? activeSummary.needed
+        : status === "ORDERED"
+          ? activeSummary.ordered
+          : activeSummary.bought;
+    return { status, count: metric.count };
+  });
+
   return (
-    <DashboardSection title="Что нужно купить" actionLabel="Список" onActionPress={onOpenWishlist}>
-      <Pressable
-        onPress={onPressBody}
-        accessibilityRole="button"
-        accessibilityLabel="Открыть список покупок"
-        style={({ pressed }) => [styles.partsDashboardBody, pressed && styles.partsDashboardBodyPressed]}
-      >
-        <View style={styles.partsDashboardIcon}>
-          <MaterialIcons name="shopping-cart" size={24} color={c.primaryAction} />
+    <DashboardSection title="Подбор деталей" actionLabel="Список" onActionPress={onOpenWishlist}>
+      {!hasAnyWishlistRows ? (
+        <Text style={styles.partsDashboardMeta}>
+          Добавляйте детали из дерева узлов или создавайте позицию вручную.
+        </Text>
+      ) : (
+        <View style={styles.partsDashboardFilterColumn}>
+          {activeTotal === 0 && installedOnlyCount > 0 ? (
+            <Text style={styles.partsDashboardMetaAboveCards}>
+              Нет позиций в работе. Установлено в корзине: {installedOnlyCount}. Ниже — переход в список с
+              фильтром по статусу.
+            </Text>
+          ) : null}
+          <View style={styles.partsDashboardFilterRow}>
+            {statusRows.map((row) => (
+              <Pressable
+                key={row.status}
+                accessibilityRole="button"
+                accessibilityLabel={`${partWishlistStatusLabelsRu[row.status]}, ${row.count} позиций`}
+                onPress={() => onOpenWishlistStatus(row.status)}
+                style={({ pressed }) => [
+                  styles.partsDashboardFilterCardCell,
+                  pressed && styles.partsDashboardFilterCardCellPressed,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.partsDashboardFilterTopAccent,
+                    { backgroundColor: WISHLIST_DASHBOARD_STATUS_COLORS[row.status] },
+                  ]}
+                />
+                <View style={styles.partsDashboardFilterCardInner}>
+                  <View style={styles.partsDashboardFilterIconWrapCompact}>
+                    <MaterialIcons
+                      name={
+                        WISHLIST_DASHBOARD_STATUS_ICONS[row.status] as ComponentProps<
+                          typeof MaterialIcons
+                        >["name"]
+                      }
+                      size={20}
+                      color={WISHLIST_DASHBOARD_STATUS_COLORS[row.status]}
+                    />
+                  </View>
+                  <Text style={styles.partsDashboardFilterCountCompact}>{row.count}</Text>
+                  <Text style={styles.partsDashboardFilterLabelCompact} numberOfLines={2}>
+                    {partWishlistStatusLabelsRu[row.status]}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
         </View>
-        <View style={styles.partsDashboardTextCol}>
-          <Text style={styles.partsDashboardTitle}>Запчасти и расходники</Text>
-          <Text style={styles.partsDashboardMeta}>
-            Добавляйте детали из дерева узлов или создавайте позицию вручную.
-          </Text>
-        </View>
-        <MaterialIcons name="chevron-right" size={20} color={c.textTertiary} style={styles.partsDashboardBodyChevron} />
-      </Pressable>
+      )}
       <Pressable onPress={onAddPart} style={({ pressed }) => [styles.partsDashboardButton, pressed && styles.partsDashboardButtonPressed]}>
         <Text style={styles.partsDashboardButtonText}>Добавить деталь</Text>
       </Pressable>
@@ -4113,45 +4277,72 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: c.textSecondary,
   },
-  partsDashboardBody: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 4,
-    marginHorizontal: -2,
-    paddingHorizontal: 4,
-    borderRadius: 12,
-  },
-  partsDashboardBodyPressed: {
-    backgroundColor: c.cardMuted,
-  },
-  partsDashboardBodyChevron: {
-    flexShrink: 0,
-  },
-  partsDashboardIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(249, 115, 22, 0.14)",
-    borderWidth: 1,
-    borderColor: "rgba(249, 115, 22, 0.35)",
-  },
-  partsDashboardTextCol: {
-    flex: 1,
-    minWidth: 0,
-  },
-  partsDashboardTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: c.textPrimary,
-  },
   partsDashboardMeta: {
-    marginTop: 4,
+    marginTop: 2,
     fontSize: 12,
     lineHeight: 17,
     color: c.textMuted,
+  },
+  partsDashboardMetaAboveCards: {
+    marginBottom: 10,
+    fontSize: 12,
+    lineHeight: 17,
+    color: c.textMuted,
+  },
+  partsDashboardFilterColumn: {
+    gap: 8,
+  },
+  partsDashboardFilterRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 6,
+    width: "100%",
+  },
+  partsDashboardFilterCardCell: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#1F2937",
+    backgroundColor: "#111923",
+    overflow: "hidden",
+  },
+  partsDashboardFilterCardCellPressed: {
+    opacity: 0.9,
+    backgroundColor: "#141d28",
+  },
+  partsDashboardFilterTopAccent: {
+    width: "100%",
+    height: 3,
+  },
+  partsDashboardFilterCardInner: {
+    alignItems: "center",
+    paddingTop: 8,
+    paddingBottom: 10,
+    paddingHorizontal: 4,
+  },
+  partsDashboardFilterIconWrapCompact: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+  },
+  partsDashboardFilterCountCompact: {
+    marginTop: 6,
+    fontSize: 18,
+    fontWeight: "800",
+    color: c.textPrimary,
+    fontVariant: ["tabular-nums"],
+  },
+  partsDashboardFilterLabelCompact: {
+    marginTop: 4,
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 13,
+    color: c.textMuted,
+    textAlign: "center",
   },
   partsDashboardButton: {
     marginTop: 10,

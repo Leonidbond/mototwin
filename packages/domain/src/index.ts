@@ -245,6 +245,11 @@ export {
   clearPartWishlistFormSkuSelection,
 } from "./part-wishlist";
 export {
+  buildPartsCartSummary,
+  type CartSummaryMetric,
+  type PartsCartSummary,
+} from "./parts-cart-summary";
+export {
   normalizePartNumber,
   getSkuDisplayPrice,
   buildPartSkuLabel,

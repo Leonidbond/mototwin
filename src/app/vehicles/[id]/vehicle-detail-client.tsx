@@ -1794,6 +1794,10 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     () => filterActiveWishlistItems(wishlistViewModels),
     [wishlistViewModels]
   );
+  const wishlistInstalledOnlyCount = useMemo(
+    () => wishlistViewModels.filter((it) => it.status === "INSTALLED").length,
+    [wishlistViewModels]
+  );
   const wishlistGroups = useMemo(
     () => groupPartWishlistItemsByStatus(wishlistActiveViewModels),
     [wishlistActiveViewModels]
@@ -5541,6 +5545,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   expensesError={dashboardExpensesError}
                   isWishlistLoading={isWishlistLoading}
                   wishlistError={wishlistError}
+                  wishlistInstalledOnlyCount={wishlistInstalledOnlyCount}
                   moveToTrashError={moveToTrashError}
                   onEditProfile={openEditProfileModal}
                   onMoveToTrash={() => void moveVehicleToTrash()}
@@ -5550,6 +5555,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     router.push(`/vehicles/${vehicleId}/expenses`)
                   }
                   onOpenParts={() => router.push(`/vehicles/${vehicleId}/parts`)}
+                  onOpenPartsWithStatusFilter={(status) =>
+                    router.push(
+                      `/vehicles/${vehicleId}/parts?partsStatus=${encodeURIComponent(status)}`
+                    )
+                  }
+                  onAddWishlistItem={() => openWishlistModalForCreate()}
                   onOpenPartItem={(itemId) =>
                     router.push(`/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(itemId)}`)
                   }
@@ -5897,7 +5908,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
             <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
-                  Что нужно купить
+                  Подбор деталей
                 </h2>
                 <button
                   type="button"

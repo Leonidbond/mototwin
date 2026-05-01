@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import {
+  buildPartsCartSummary,
   findNodePathById,
   findNodeTreeItemById,
   formatExpenseAmountRu,
@@ -11,6 +12,7 @@ import {
   getWishlistItemSkuDisplayLines,
   partWishlistStatusLabelsRu,
   PART_WISHLIST_STATUS_ORDER,
+  type CartSummaryMetric,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type {
@@ -20,7 +22,6 @@ import type {
   PartWishlistItemViewModel,
   PartWishlistStatusGroupViewModel,
 } from "@mototwin/types";
-import { buildPartsCartSummary, type CartSummaryMetric } from "./parts-cart-summary";
 import { PARTS_CART_REF } from "./parts-cart-reference-theme";
 import styles from "./PartsCartPage.module.css";
 
