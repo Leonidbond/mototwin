@@ -33,6 +33,7 @@ export {
   getTopLevelNodeTreeItems,
   getNodeSubtreeById,
 } from "./node-tree";
+export { formatNodeBadgeSingleLine, getNodeTightUiDisplayName } from "./node-tight-ui-name";
 export {
   buildNodeTreeItemViewModel,
   buildNodeTreeViewModel,

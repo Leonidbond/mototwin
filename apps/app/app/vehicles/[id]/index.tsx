@@ -48,6 +48,8 @@ import {
   formatExpenseAmountRu,
   filterActiveWishlistItems,
   getRecentServiceEventsForNode,
+  formatNodeBadgeSingleLine,
+  getNodeTightUiDisplayName,
   resolveGarageVehicleSilhouette,
 } from "@mototwin/domain";
 import type {
@@ -3158,7 +3160,7 @@ function TopOverviewDashboardCard({
         accessibilityRole="button"
         accessibilityLabel={`Показать проблемные узлы группы ${card.title}`}
       >
-        <TopNodePngIcon source={TOP_NODE_GROUP_ICON_SRC[card.key]} size={42} color={tokens.foreground} />
+        <TopNodePngIcon source={TOP_NODE_GROUP_ICON_SRC[card.key]} size={36} color={tokens.foreground} />
       </Pressable>
       <View style={styles.systemDashboardTextCol}>
         <Text style={styles.systemDashboardTitle} numberOfLines={1}>
@@ -3187,11 +3189,8 @@ function TopOverviewDashboardCard({
                     },
                   ]}
                 >
-                  <Text
-                    style={[styles.systemDashboardNodeBadgeText, { color: nodeTokens.foreground }]}
-                    numberOfLines={1}
-                  >
-                    {node.name}
+                  <Text style={[styles.systemDashboardNodeBadgeText, { color: nodeTokens.foreground }]}>
+                    {formatNodeBadgeSingleLine(getNodeTightUiDisplayName(node.code, node.name))}
                   </Text>
                 </Pressable>
               );
@@ -3984,25 +3983,25 @@ const styles = StyleSheet.create({
   dashboardSystemsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    gap: 6,
   },
   systemDashboardCard: {
     width: "48%",
-    minWidth: 136,
-    minHeight: 122,
+    minWidth: 132,
+    minHeight: 0,
     flexGrow: 1,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 9,
-    borderRadius: 14,
+    gap: 6,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: c.border,
     backgroundColor: c.cardMuted,
-    padding: 8,
+    padding: 6,
   },
   systemDashboardIcon: {
-    width: 44,
-    height: 44,
+    width: 38,
+    height: 38,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -4011,7 +4010,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   systemDashboardTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800",
     color: c.textPrimary,
   },
@@ -4021,22 +4020,27 @@ const styles = StyleSheet.create({
     color: c.textMuted,
   },
   systemDashboardNodeList: {
-    marginTop: 7,
-    gap: 5,
-    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 4,
+    gap: 6,
+    alignItems: "center",
+    alignContent: "flex-start",
   },
   systemDashboardNodeBadge: {
-    maxWidth: "100%",
-    minHeight: 18,
-    borderRadius: 999,
+    flexShrink: 0,
+    alignSelf: "flex-start",
+    borderRadius: 11,
     borderWidth: 1,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     alignItems: "center",
     justifyContent: "center",
   },
   systemDashboardNodeBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "800",
+    flexShrink: 0,
   },
   recentDashboardRow: {
     paddingVertical: 7,

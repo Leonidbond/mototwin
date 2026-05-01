@@ -66,14 +66,9 @@ import {
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
   applyPartSkuViewModelToPartWishlistFormValues,
   buildPartRecommendationGroupsForDisplay,
-  clearPartWishlistFormSkuSelection,
   buildServiceKitPreview,
   buildTopNodeOverviewCards,
-  getServiceKitPreviewItemStatusLabel,
-  formatPartSkuSearchResultMetaLineRu,
-  getPartRecommendationGroupTitle,
   getPartRecommendationWarningLabel,
-  getPartSkuViewModelDisplayLines,
   getWishlistItemSkuDisplayLines,
   isNodeSnoozed,
   normalizeUserLocalSettings,
@@ -85,9 +80,14 @@ import { productSemanticColors, statusSemanticTokens, statusTextLabelsRu } from 
 import { ACTION_SVG_BODIES, type ActionIconKey } from "@mototwin/icons";
 import { TopNodeIcon } from "@/components/icons/top-nodes";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
-import { BackButton } from "@/components/navigation/BackButton";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
+import { PartsCartPage } from "./parts/_components/PartsCartPage";
+import { PartPickerShell, type PartPickerTab } from "./parts/_components/PartPickerShell";
+import {
+  buildPartSkuViewModelFromRecommendation,
+  normalizePartNumberForLookup,
+} from "./parts/_components/part-picker-utils";
 import type {
   AttentionItemViewModel,
   NodeSnoozeOption,
@@ -991,46 +991,6 @@ function NodeContextReferencePanel({
   );
 }
 
-function normalizePartNumberForLookup(value: string): string {
-  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-}
-
-function buildPartSkuViewModelFromRecommendation(
-  rec: PartRecommendationViewModel
-): PartSkuViewModel {
-  const now = new Date().toISOString();
-  return {
-    id: rec.skuId,
-    seedKey: null,
-    primaryNodeId: rec.primaryNode?.id ?? null,
-    brandName: rec.brandName,
-    canonicalName: rec.canonicalName,
-    partType: rec.partType,
-    description: null,
-    category: null,
-    priceAmount: rec.priceAmount,
-    currency: rec.currency,
-    sourceUrl: null,
-    isOem: false,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-    primaryNode: rec.primaryNode,
-    nodeLinks: [],
-    fitments: [],
-    offers: [],
-    partNumbers: rec.partNumbers.map((number, idx) => ({
-      id: `${rec.skuId}-${idx}`,
-      skuId: rec.skuId,
-      number,
-      normalizedNumber: normalizePartNumberForLookup(number),
-      numberType: "MANUFACTURER",
-      brandName: rec.brandName,
-      createdAt: now,
-    })),
-  };
-}
-
 const SIDEBAR_COLLAPSED_KEY = "vehicle.detail.sidebar.collapsed";
 
 type VehiclePageProps = {
@@ -1064,8 +1024,7 @@ const NODE_STATUS_FILTER_OPTIONS: NodeStatus[] = [
   "RECENTLY_REPLACED",
   "OK",
 ];
-const PARTS_SELECTION_INITIAL_VISIBLE_COUNT = 10;
-const PARTS_SELECTION_VISIBLE_INCREMENT = 10;
+const PARTS_SELECTION_INITIAL_VISIBLE_COUNT = 4;
 
 type NodeStatusFilter = NodeStatus | "ALL";
 
@@ -1397,12 +1356,27 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     null
   );
   const [partsStatusFilter, setPartsStatusFilter] = useState<PartsStatusFilter>("ALL");
+  const [selectedPartsWishlistItemId, setSelectedPartsWishlistItemId] = useState<string | null>(null);
+  const [wishlistPickerInitialTab, setWishlistPickerInitialTab] = useState<PartPickerTab>("search");
+  const [wishlistModalNonce, setWishlistModalNonce] = useState(0);
   const [partsSearchQuery, setPartsSearchQuery] = useState("");
   const [collapsedPartsStatusGroups, setCollapsedPartsStatusGroups] = useState<
     Partial<Record<PartWishlistItemStatus, boolean>>
   >({ INSTALLED: true });
   const [partsVisibleCountByStatus, setPartsVisibleCountByStatus] = useState<
     Partial<Record<PartWishlistItemStatus, number>>
+  >({});
+  const [wishlistStatusTransitionHistoryByItemId, setWishlistStatusTransitionHistoryByItemId] = useState<
+    Partial<
+      Record<
+        string,
+        {
+          changedAt: string;
+          previousStatus: PartWishlistItemStatus;
+          nextStatus: PartWishlistItemStatus;
+        }
+      >
+    >
   >({});
   const [wishlistSkuQuery, setWishlistSkuQuery] = useState("");
   const [wishlistSkuDebouncedQuery, setWishlistSkuDebouncedQuery] = useState("");
@@ -2343,6 +2317,13 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   }, [pageView, partsStatusFromSearchParams]);
 
   useEffect(() => {
+    if (pageView !== "partsSelection") {
+      return;
+    }
+    setSelectedPartsWishlistItemId(highlightedWishlistItemIdFromSearchParams);
+  }, [highlightedWishlistItemIdFromSearchParams, pageView]);
+
+  useEffect(() => {
     if (pageView !== "partsSelection" || !highlightedWishlistItemIdFromSearchParams) {
       return;
     }
@@ -2672,6 +2653,13 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     router.push(fallbackHref);
   };
 
+  const clearPartsNodeUrlFilter = useCallback(() => {
+    const q = new URLSearchParams(searchParams.toString());
+    q.delete("nodeId");
+    const qs = q.toString();
+    router.replace(`/vehicles/${vehicleId}/parts${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [router, searchParams, vehicleId]);
+
   const openAddServiceEventFromLeafNode = (leafNodeId: string) => {
     if (!vehicle) {
       setServiceEventFormError("Не удалось загрузить данные мотоцикла.");
@@ -2754,7 +2742,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     openAddServiceEventFromLeafNode(item.nodeId);
   };
 
-  const openWishlistModalForCreate = (presetNodeId?: string) => {
+  const openWishlistModalForCreate = (presetNodeId?: string, pickerTab: PartPickerTab = "search") => {
+    setWishlistModalNonce((n) => n + 1);
+    setWishlistPickerInitialTab(pickerTab);
     setWishlistNotice("");
     setWishlistEditingId(null);
     wishlistSkuSearchGen.current += 1;
@@ -2780,6 +2770,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   };
 
   const openWishlistModalForServiceKit = (kit: ServiceKitViewModel, presetNodeId?: string) => {
+    setWishlistModalNonce((n) => n + 1);
+    setWishlistPickerInitialTab("kits");
     setWishlistNotice("");
     setWishlistEditingId(null);
     wishlistSkuSearchGen.current += 1;
@@ -2808,6 +2800,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     rec: PartRecommendationViewModel,
     presetNodeId?: string
   ) => {
+    setWishlistModalNonce((n) => n + 1);
+    setWishlistPickerInitialTab("recommendations");
     const skuFromRecommendation = buildPartSkuViewModelFromRecommendation(rec);
     setWishlistNotice("");
     setWishlistEditingId(null);
@@ -2839,6 +2833,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   };
 
   const openWishlistModalForEdit = (item: PartWishlistItem) => {
+    setWishlistModalNonce((n) => n + 1);
+    setWishlistPickerInitialTab("search");
     setWishlistNotice("");
     setWishlistEditingId(item.id);
     wishlistSkuSearchGen.current += 1;
@@ -2860,6 +2856,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   };
 
   const closeWishlistModal = (options: { restorePrevious?: boolean } = {}) => {
+    setWishlistPickerInitialTab("search");
     setIsWishlistModalOpen(false);
     setWishlistEditingId(null);
     setWishlistFormError("");
@@ -2994,11 +2991,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
   };
 
-  const deleteWishlistItemById = async (itemId: string) => {
+  const deleteWishlistItemById = async (itemId: string, options: { skipConfirm?: boolean } = {}) => {
     if (!vehicleId) {
       return;
     }
-    if (!window.confirm("Удалить позицию из списка покупок?")) {
+    if (!options.skipConfirm && !window.confirm("Удалить позицию из списка покупок?")) {
       return;
     }
     try {
@@ -3053,6 +3050,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     try {
       setIsWishlistPurchaseSaving(true);
       setWishlistPurchaseExpenseError("");
+      const sourceItem = wishlistItems.find((item) => item.id === itemId);
       await vehicleDetailApi.createExpenseFromShoppingListItem(itemId, {
         amount,
         currency: wishlistPurchaseExpenseForm.currency.trim().toUpperCase(),
@@ -3061,6 +3059,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         comment: wishlistPurchaseExpenseForm.comment.trim() || null,
       });
       await Promise.all([loadWishlist(), loadDashboardExpenses(), loadNodeExpenseSummary()]);
+      if (sourceItem && sourceItem.status !== "BOUGHT") {
+        setWishlistStatusTransitionHistoryByItemId((prev) => ({
+          ...prev,
+          [itemId]: {
+            changedAt: new Date().toISOString(),
+            previousStatus: sourceItem.status,
+            nextStatus: "BOUGHT",
+          },
+        }));
+      }
       closeWishlistPurchaseExpenseForm();
       setWishlistNotice("Расход создан, позиция отмечена как купленная.");
     } catch (e) {
@@ -3120,6 +3128,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         nodeId: sourceNodeId,
       });
       await Promise.all([loadWishlist(), loadServiceEvents(), loadDashboardExpenses(), loadNodeTree(), loadTopServiceNodes()]);
+      setWishlistStatusTransitionHistoryByItemId((prev) => ({
+        ...prev,
+        [itemId]: {
+          changedAt: res.item.updatedAt,
+          previousStatus,
+          nextStatus: res.item.status,
+        },
+      }));
       const becameInstalled =
         res.item.status === "INSTALLED" &&
         isWishlistTransitionToInstalled(previousStatus, res.item.status);
@@ -5059,544 +5075,74 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   }
 
   function renderPartsSelectionPage() {
-    if (!vehicle) {
+    if (!vehicle || !vehicleStateViewModel) {
       return null;
     }
     const partsBackFallbackHref = targetNodeIdFromSearchParams
       ? `/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(targetNodeIdFromSearchParams)}`
       : `/vehicles/${vehicleId}`;
+    const vehicleDisplayName = detailViewModel?.displayName ?? title;
+    const vehicleYearOdometerLine = `${vehicle.year} · ${vehicleStateViewModel.odometerLabel}`;
 
     return (
-      <div style={{ display: "grid", gap: 16 }}>
-        <div>
-          <BackButton onClick={() => navigateBackWithFallback(partsBackFallbackHref)} />
-        </div>
-
-        <section
-          className="parts-selection-surface garage-dark-surface-text rounded-3xl border border-gray-200 bg-white p-7 shadow-sm"
-          style={{
-            backgroundColor: productSemanticColors.card,
-            borderColor: productSemanticColors.borderStrong,
-            color: productSemanticColors.textPrimary,
-          }}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p
-                className="text-xs font-semibold uppercase tracking-wide"
-                style={{ color: productSemanticColors.textMuted }}
-              >
-                Подбор деталей
-              </p>
-              <h1
-                className="mt-1 text-3xl font-semibold tracking-tight"
-                style={{ color: productSemanticColors.textPrimary }}
-              >
-                Корзина замен и расходников
-              </h1>
-              <p
-                className="mt-2 max-w-3xl text-sm"
-                style={{ color: productSemanticColors.textSecondary }}
-              >
-                Здесь видны все позиции для замены: SKU, узел, стоимость, происхождение из
-                комплекта, комментарий и текущий статус от «Нужно купить» до «Установлено».
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openWishlistModalForCreate()}
-              className="inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold transition"
-              style={{
-                backgroundColor: productSemanticColors.primaryAction,
-                color: productSemanticColors.onPrimaryAction,
-              }}
-            >
-              Подобрать новую позицию
-            </button>
-          </div>
-
-          {wishlistNotice ? (
-            <p
-              className={`mt-4 text-sm ${
-                wishlistNotice.startsWith("Ошибка:")
-                  ? "text-red-700"
-                  : wishlistNotice.includes("не открыто")
-                    ? "text-amber-800"
-                    : "text-emerald-800"
-              }`}
-              role="status"
-            >
-              {wishlistNotice}
-            </p>
-          ) : null}
-
-          {wishlistViewModels.length > 0 ? (
-            <div
-              className="mt-6 rounded-2xl border px-4 py-4"
-              style={{
-                backgroundColor: productSemanticColors.cardMuted,
-                borderColor: productSemanticColors.borderStrong,
-              }}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPartsStatusFilter("ALL")}
-                  className="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
-                  style={{
-                    backgroundColor:
-                      partsStatusFilter === "ALL"
-                        ? productSemanticColors.primaryAction
-                        : productSemanticColors.cardSubtle,
-                    borderColor:
-                      partsStatusFilter === "ALL"
-                        ? productSemanticColors.primaryAction
-                        : productSemanticColors.borderStrong,
-                    color:
-                      partsStatusFilter === "ALL"
-                        ? productSemanticColors.onPrimaryAction
-                        : productSemanticColors.textPrimary,
-                  }}
-                >
-                  Все · {wishlistViewModels.length}
-                </button>
-                {PART_WISHLIST_STATUS_ORDER.map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => setPartsStatusFilter(status)}
-                    className="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
-                    style={{
-                      backgroundColor:
-                        partsStatusFilter === status
-                          ? productSemanticColors.primaryAction
-                          : productSemanticColors.cardSubtle,
-                      borderColor:
-                        partsStatusFilter === status
-                          ? productSemanticColors.primaryAction
-                          : productSemanticColors.borderStrong,
-                      color:
-                        partsStatusFilter === status
-                          ? productSemanticColors.onPrimaryAction
-                          : productSemanticColors.textPrimary,
-                    }}
-                  >
-                    {partWishlistStatusLabelsRu[status]} · {partsStatusCounts.get(status) ?? 0}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <input
-                  value={partsSearchQuery}
-                  onChange={(event) => setPartsSearchQuery(event.target.value)}
-                  className="min-w-[240px] flex-1 rounded-xl border px-3 py-2 text-sm outline-none transition"
-                  style={{
-                    backgroundColor: productSemanticColors.cardSubtle,
-                    borderColor: productSemanticColors.borderStrong,
-                    color: productSemanticColors.textPrimary,
-                    colorScheme: "dark",
-                  }}
-                  placeholder="Поиск по названию, SKU, узлу или комментарию"
-                />
-                {(partsStatusFilter !== "ALL" || partsSearchQuery.trim()) ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPartsStatusFilter("ALL");
-                      setPartsSearchQuery("");
-                    }}
-                    className="rounded-xl border px-3 py-2 text-xs font-semibold transition"
-                    style={{
-                      backgroundColor: productSemanticColors.cardSubtle,
-                      borderColor: productSemanticColors.borderStrong,
-                      color: productSemanticColors.textSecondary,
-                    }}
-                  >
-                    Сбросить
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {isWishlistLoading ? (
-            <p className="mt-6 text-sm" style={{ color: productSemanticColors.textSecondary }}>
-              Загрузка подбора деталей...
-            </p>
-          ) : null}
-          {wishlistError ? (
-            <p className="mt-6 text-sm" style={{ color: productSemanticColors.error }}>
-              {wishlistError}
-            </p>
-          ) : null}
-
-          {!isWishlistLoading && !wishlistError && wishlistViewModels.length === 0 ? (
-            <div
-              className="mt-6 rounded-2xl border border-dashed px-5 py-8 text-center"
-              style={{
-                backgroundColor: productSemanticColors.cardMuted,
-                borderColor: productSemanticColors.borderStrong,
-              }}
-            >
-              <p
-                className="text-sm font-semibold"
-                style={{ color: productSemanticColors.textPrimary }}
-              >
-                Позиции пока не добавлены
-              </p>
-              <p
-                className="mt-1 text-sm"
-                style={{ color: productSemanticColors.textSecondary }}
-              >
-                Добавьте расходники вручную, из дерева узлов, из рекомендаций SKU или комплектом.
-              </p>
-            </div>
-          ) : null}
-
-          {!isWishlistLoading &&
-          !wishlistError &&
-          wishlistViewModels.length > 0 &&
-          filteredPartsWishlistViewModels.length === 0 ? (
-            <div
-              className="mt-6 rounded-2xl border border-dashed px-5 py-8 text-center"
-              style={{
-                backgroundColor: productSemanticColors.cardMuted,
-                borderColor: productSemanticColors.borderStrong,
-              }}
-            >
-              <p
-                className="text-sm font-semibold"
-                style={{ color: productSemanticColors.textPrimary }}
-              >
-                Ничего не найдено
-              </p>
-              <p
-                className="mt-1 text-sm"
-                style={{ color: productSemanticColors.textSecondary }}
-              >
-                Измените статус-фильтр или поисковый запрос.
-              </p>
-            </div>
-          ) : null}
-
-          {!isWishlistLoading && !wishlistError && filteredPartsWishlistGroups.length > 0 ? (
-            <div className="mt-6 grid gap-6">
-              {filteredPartsWishlistGroups.map((group) => {
-                const isCollapsed =
-                  Boolean(collapsedPartsStatusGroups[group.status]) &&
-                  partsStatusFilter === "ALL" &&
-                  !normalizedPartsSearchQuery;
-                const visibleCount =
-                  partsVisibleCountByStatus[group.status] ??
-                  PARTS_SELECTION_INITIAL_VISIBLE_COUNT;
-                const visibleItems = isCollapsed ? [] : group.items.slice(0, visibleCount);
-                const hiddenCount = Math.max(0, group.items.length - visibleItems.length);
-                return (
-                <section key={group.status}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCollapsedPartsStatusGroups((prev) => ({
-                        ...prev,
-                        [group.status]: !prev[group.status],
-                      }))
-                    }
-                    className="flex w-full items-center justify-between gap-3 text-left"
-                  >
-                    <h2
-                      className="text-xs font-semibold uppercase tracking-wide"
-                      style={{ color: productSemanticColors.textMuted }}
-                    >
-                      {group.sectionTitleRu} · {group.items.length}
-                    </h2>
-                    <span
-                      className="text-xs font-medium"
-                      style={{ color: productSemanticColors.textSecondary }}
-                    >
-                      {isCollapsed ? "Развернуть" : "Свернуть"}
-                    </span>
-                  </button>
-                  <div className="mt-3 grid gap-3">
-                    {isCollapsed ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCollapsedPartsStatusGroups((prev) => ({
-                            ...prev,
-                            [group.status]: false,
-                          }))
-                        }
-                        className="rounded-2xl border border-dashed px-4 py-3 text-left text-sm transition hover:opacity-85"
-                        style={{
-                          backgroundColor: productSemanticColors.cardMuted,
-                          borderColor: productSemanticColors.borderStrong,
-                          color: productSemanticColors.textSecondary,
-                        }}
-                      >
-                        Группа свернута. Позиций: {group.items.length}. Нажмите, чтобы развернуть.
-                      </button>
-                    ) : null}
-                    {visibleItems.map((it) => {
-                      const isHighlighted = highlightedWishlistItemIdFromSearchParams === it.id;
-                      const isBusy =
-                        wishlistStatusUpdatingId === it.id || wishlistDeletingId === it.id;
-                      const skuLines = it.sku ? getWishlistItemSkuDisplayLines(it.sku) : null;
-                      const installedServiceEventId =
-                        it.status === "INSTALLED"
-                          ? installedWishlistServiceEventIdByItemId.get(it.id)
-                          : null;
-                      return (
-                        <article
-                          key={it.id}
-                          data-wishlist-item-id={it.id}
-                          className="rounded-2xl border px-4 py-4 text-sm"
-                          style={{
-                            backgroundColor: productSemanticColors.cardMuted,
-                            borderColor: isHighlighted
-                              ? productSemanticColors.primaryAction
-                              : productSemanticColors.border,
-                            boxShadow: isHighlighted
-                              ? `0 0 0 2px ${productSemanticColors.primaryAction}`
-                              : undefined,
-                          }}
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3
-                                  className="text-base font-semibold"
-                                  style={{ color: productSemanticColors.textPrimary }}
-                                >
-                                  {it.title}
-                                </h3>
-                                <span
-                                  className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                                  style={{
-                                    backgroundColor: productSemanticColors.cardSubtle,
-                                    borderColor: productSemanticColors.borderStrong,
-                                    color: productSemanticColors.textSecondary,
-                                  }}
-                                >
-                                  {it.statusLabelRu}
-                                </span>
-                              </div>
-
-                              {skuLines ? (
-                                <div
-                                  className="mt-3 rounded-xl border px-3 py-2"
-                                  style={{
-                                    backgroundColor: productSemanticColors.cardSubtle,
-                                    borderColor: productSemanticColors.borderStrong,
-                                  }}
-                                >
-                                  <p
-                                    className="text-sm font-semibold"
-                                    style={{ color: productSemanticColors.textPrimary }}
-                                  >
-                                    {skuLines.primaryLine}
-                                  </p>
-                                  <p
-                                    className="mt-0.5 text-xs"
-                                    style={{ color: productSemanticColors.textSecondary }}
-                                  >
-                                    {skuLines.secondaryLine}
-                                  </p>
-                                </div>
-                              ) : (
-                                <p
-                                  className="mt-3 rounded-xl border border-dashed px-3 py-2 text-xs"
-                                  style={{
-                                    borderColor: productSemanticColors.borderStrong,
-                                    color: productSemanticColors.textSecondary,
-                                  }}
-                                >
-                                  SKU не выбран. Откройте редактирование, чтобы подобрать позицию из
-                                  каталога или оставить ручную запись.
-                                </p>
-                              )}
-
-                              <div
-                                className="mt-3 grid gap-1 text-xs sm:grid-cols-2"
-                                style={{ color: productSemanticColors.textSecondary }}
-                              >
-                                <p>Количество: {it.quantity}</p>
-                                <p>Узел: {it.node?.name ?? "Не выбран"}</p>
-                                <p>Стоимость: {it.costLabelRu ?? "Не указана"}</p>
-                                <p>ID позиции: {it.id}</p>
-                              </div>
-
-                              {it.kitOriginLabelRu ? (
-                                <p
-                                  className="mt-3 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
-                                  style={{
-                                    backgroundColor: productSemanticColors.serviceBadgeBg,
-                                    color: productSemanticColors.serviceBadgeText,
-                                  }}
-                                >
-                                  {it.kitOriginLabelRu}
-                                </p>
-                              ) : null}
-                              {it.commentBodyRu ? (
-                                <p
-                                  className="mt-2 text-xs leading-5"
-                                  style={{ color: productSemanticColors.textSecondary }}
-                                >
-                                  {it.commentBodyRu}
-                                </p>
-                              ) : null}
-                            </div>
-
-                            <div className="flex shrink-0 flex-wrap items-center gap-2">
-                              {it.status === "NEEDED" || it.status === "ORDERED" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const raw = wishlistItems.find((w) => w.id === it.id);
-                                    if (raw) {
-                                      openWishlistPurchaseExpenseForm(raw);
-                                    }
-                                  }}
-                                  disabled={isBusy}
-                                  className="rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60"
-                                  style={{
-                                    backgroundColor: productSemanticColors.cardSubtle,
-                                    borderColor: productSemanticColors.borderStrong,
-                                    color: productSemanticColors.textPrimary,
-                                  }}
-                                >
-                                  Отметить как куплено
-                                </button>
-                              ) : null}
-                              {it.status === "BOUGHT" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => patchWishlistItemStatus(it.id, "INSTALLED", it.status)}
-                                  disabled={isBusy}
-                                  className="rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60"
-                                  style={{
-                                    backgroundColor: productSemanticColors.cardSubtle,
-                                    borderColor: productSemanticColors.borderStrong,
-                                    color: productSemanticColors.textPrimary,
-                                  }}
-                                >
-                                  Отметить как установленное
-                                </button>
-                              ) : null}
-                              {installedServiceEventId ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    router.push(
-                                      `/vehicles/${vehicleId}/service-log?serviceEventId=${encodeURIComponent(installedServiceEventId)}`
-                                    )
-                                  }
-                                  className="rounded-lg border px-3 py-1.5 text-xs font-medium transition"
-                                  style={{
-                                    backgroundColor: productSemanticColors.cardSubtle,
-                                    borderColor: productSemanticColors.borderStrong,
-                                    color: productSemanticColors.textPrimary,
-                                  }}
-                                >
-                                  В журнал
-                                </button>
-                              ) : null}
-                              <select
-                                value={it.status}
-                                onChange={(e) =>
-                                  patchWishlistItemStatus(
-                                    it.id,
-                                    e.target.value as PartWishlistItem["status"],
-                                    it.status
-                                  )
-                                }
-                                disabled={isBusy}
-                                className="rounded-lg border px-2 py-1.5 text-xs disabled:cursor-wait disabled:opacity-60"
-                                style={{
-                                  backgroundColor: productSemanticColors.cardSubtle,
-                                  borderColor: productSemanticColors.borderStrong,
-                                  color: productSemanticColors.textPrimary,
-                                }}
-                                aria-label="Статус позиции"
-                              >
-                                {PART_WISHLIST_STATUS_ORDER.map((s) => (
-                                  <option key={s} value={s}>
-                                    {partWishlistStatusLabelsRu[s]}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const raw = wishlistItems.find((w) => w.id === it.id);
-                                  if (raw) {
-                                    openWishlistModalForEdit(raw);
-                                  }
-                                }}
-                                className="rounded-lg border px-3 py-1.5 text-xs font-medium transition"
-                                style={{
-                                  backgroundColor: productSemanticColors.cardSubtle,
-                                  borderColor: productSemanticColors.borderStrong,
-                                  color: productSemanticColors.textPrimary,
-                                }}
-                              >
-                                Изменить
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteWishlistItemById(it.id)}
-                                disabled={isBusy}
-                                className="rounded-lg border px-3 py-1.5 text-xs transition disabled:cursor-wait disabled:opacity-60"
-                                style={{
-                                  backgroundColor: productSemanticColors.cardSubtle,
-                                  borderColor: productSemanticColors.border,
-                                  color: productSemanticColors.textSecondary,
-                                }}
-                              >
-                                {wishlistDeletingId === it.id ? "Удаляем..." : "Удалить"}
-                              </button>
-                            </div>
-                          </div>
-                          {wishlistStatusUpdatingId === it.id ? (
-                            <p
-                              className="mt-3 text-xs"
-                              style={{ color: productSemanticColors.textSecondary }}
-                              role="status"
-                            >
-                              Обновляем статус...
-                            </p>
-                          ) : null}
-                        </article>
-                      );
-                    })}
-                    {!isCollapsed && hiddenCount > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPartsVisibleCountByStatus((prev) => ({
-                            ...prev,
-                            [group.status]:
-                              (prev[group.status] ?? PARTS_SELECTION_INITIAL_VISIBLE_COUNT) +
-                              PARTS_SELECTION_VISIBLE_INCREMENT,
-                          }))
-                        }
-                        className="rounded-2xl border border-dashed px-4 py-3 text-sm font-semibold transition"
-                        style={{
-                          backgroundColor: productSemanticColors.cardSubtle,
-                          borderColor: productSemanticColors.borderStrong,
-                          color: productSemanticColors.textPrimary,
-                        }}
-                      >
-                        Показать ещё {Math.min(PARTS_SELECTION_VISIBLE_INCREMENT, hiddenCount)}
-                      </button>
-                    ) : null}
-                  </div>
-                </section>
-                );
-              })}
-            </div>
-          ) : null}
-        </section>
-      </div>
+      <PartsCartPage
+        vehicleDisplayName={vehicleDisplayName}
+        vehicleYearOdometerLine={vehicleYearOdometerLine}
+        onNavigateBack={() => navigateBackWithFallback(partsBackFallbackHref)}
+        nodeTree={nodeTree}
+        vehicleId={vehicleId}
+        wishlistNotice={wishlistNotice}
+        isWishlistLoading={isWishlistLoading}
+        wishlistError={wishlistError}
+        onRetryWishlist={() => void loadWishlist()}
+        wishlistViewModels={wishlistViewModels}
+        filteredGroups={filteredPartsWishlistGroups}
+        filteredViewModels={filteredPartsWishlistViewModels}
+        partsStatusCounts={partsStatusCounts}
+        partsStatusFilter={partsStatusFilter}
+        onPartsStatusFilterChange={setPartsStatusFilter}
+        partsSearchQuery={partsSearchQuery}
+        onPartsSearchQueryChange={setPartsSearchQuery}
+        collapsedPartsStatusGroups={collapsedPartsStatusGroups}
+        onToggleCollapsedGroup={(status) =>
+          setCollapsedPartsStatusGroups((prev) => ({
+            ...prev,
+            [status]: !prev[status],
+          }))
+        }
+        onExpandCollapsedGroup={(status) =>
+          setCollapsedPartsStatusGroups((prev) => ({
+            ...prev,
+            [status]: false,
+          }))
+        }
+        partsVisibleCountByStatus={partsVisibleCountByStatus}
+        onShowMoreInGroup={(status, increment) =>
+          setPartsVisibleCountByStatus((prev) => ({
+            ...prev,
+            [status]: (prev[status] ?? PARTS_SELECTION_INITIAL_VISIBLE_COUNT) + increment,
+          }))
+        }
+        normalizedPartsSearchQuery={normalizedPartsSearchQuery}
+        selectedWishlistItemId={selectedPartsWishlistItemId}
+        statusTransitionHistoryByItemId={wishlistStatusTransitionHistoryByItemId}
+        onSelectWishlistItem={setSelectedPartsWishlistItemId}
+        wishlistItems={wishlistItems}
+        wishlistStatusUpdatingId={wishlistStatusUpdatingId}
+        wishlistDeletingId={wishlistDeletingId}
+        installedWishlistServiceEventIdByItemId={installedWishlistServiceEventIdByItemId}
+        onPatchWishlistItemStatus={patchWishlistItemStatus}
+        onOpenWishlistPurchaseExpense={openWishlistPurchaseExpenseForm}
+        onOpenWishlistEdit={openWishlistModalForEdit}
+        onDeleteWishlistItem={deleteWishlistItemById}
+        onOpenWishlistCreate={() => openWishlistModalForCreate()}
+        onOpenWishlistAddKit={() =>
+          openWishlistModalForCreate(targetNodeIdFromSearchParams ?? undefined, "kits")
+        }
+        router={router}
+        hasNodeFilter={Boolean(partsNodeFilterIds)}
+        onClearNodeFilter={clearPartsNodeUrlFilter}
+      />
     );
   }
 
@@ -5760,12 +5306,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           <section
             style={{
               display: "grid",
-              gap: 12,
-              padding: "10px 18px 24px 16px",
-              maxWidth: 1420,
+              gap: pageView === "partsSelection" ? 0 : 12,
+              padding: pageView === "partsSelection" ? 0 : "10px 18px 24px 16px",
+              maxWidth: pageView === "partsSelection" ? "none" : 1420,
               width: "100%",
               minWidth: 0,
-              justifySelf: "center",
+              justifySelf: pageView === "partsSelection" ? "stretch" : "center",
+              minHeight: pageView === "partsSelection" ? "100vh" : undefined,
+              backgroundColor: pageView === "partsSelection" ? "#070B10" : undefined,
             }}
           >
             {isLoading ? (
@@ -6895,436 +6443,43 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         </div>
       ) : null}
 
-      {isWishlistModalOpen ? (
-        <div
-          className="fixed inset-0 z-[64] flex items-start justify-center px-4 py-6 sm:items-center"
-          style={{ backgroundColor: productSemanticColors.overlayModal }}
-        >
-          <div className="parts-selection-surface garage-dark-surface-text w-full max-w-lg rounded-3xl border border-gray-200 bg-white shadow-xl">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 px-6 py-4">
-              <h2 className="text-xl font-semibold tracking-tight text-gray-950">
-                {wishlistEditingId ? "Позиция списка" : "Новая позиция"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => closeWishlistModal()}
-                className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-              >
-                Закрыть
-              </button>
-            </div>
-            <div className="max-h-[75vh] space-y-4 overflow-y-auto px-6 py-5 text-sm">
-              <div>
-                <label className="block text-xs font-medium text-gray-600">Название</label>
-                <input
-                  type="text"
-                  value={wishlistForm.title}
-                  onChange={(e) =>
-                    setWishlistForm((f) => ({ ...f, title: e.target.value }))
-                  }
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
-                  placeholder="Например: масло моторное"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600">
-                  Узел мотоцикла <span className="text-rose-600">*</span>
-                </label>
-                <select
-                  value={wishlistForm.nodeId}
-                  onChange={(e) =>
-                    setWishlistForm((f) => ({ ...f, nodeId: e.target.value }))
-                  }
-                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"
-                >
-                  <option value="">Выберите узел мотоцикла</option>
-                  {wishlistNodeOptions.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {"\u00A0".repeat(Math.max(0, opt.level - 1) * 2)}
-                      {opt.name}
-                    </option>
-                  ))}
-                </select>
-                {wishlistNodeRequiredError ? (
-                  <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
-                    Выберите узел мотоцикла
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
-                <p className="text-xs font-medium text-gray-700">SKU из каталога</p>
-                <p className="mt-0.5 text-[11px] text-gray-500">
-                  Необязательно. Поиск по названию, бренду или артикулу
-                  {wishlistForm.nodeId.trim()
-                    ? " (учтён выбранный узел)."
-                    : " (от 2 символов). С узлом — можно открыть подбор по узлу без текста."}
-                </p>
-                {wishlistForm.nodeId.trim() ? (
-                  <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2">
-                    <p className="text-[11px] font-medium text-gray-700">Рекомендации по узлу</p>
-                    {wishlistRecommendationsError ? (
-                      <p className="mt-1 text-[11px]" style={{ color: productSemanticColors.error }}>
-                        {wishlistRecommendationsError}
-                      </p>
-                    ) : null}
-                    {wishlistRecommendationsLoading ? (
-                      <p className="mt-1 text-[11px] text-gray-500">Загружаем рекомендации…</p>
-                    ) : null}
-                    {!wishlistRecommendationsLoading && wishlistRecommendations.length === 0 ? (
-                      <p className="mt-1 text-[11px] text-gray-500">
-                        Для этого узла пока нет рекомендаций из каталога
-                      </p>
-                    ) : null}
-                    {!wishlistRecommendationsLoading && wishlistRecommendationGroups.length > 0 ? (
-                      <div className="mt-2 space-y-3">
-                        {wishlistRecommendationGroups.map((group) => (
-                          <div key={group.recommendationType}>
-                            <p className="text-[11px] font-semibold text-gray-800">
-                              {getPartRecommendationGroupTitle(group.recommendationType)}
-                            </p>
-                            <ul className="mt-1.5 space-y-1.5">
-                              {group.items.map((rec) => {
-                                const primaryNo = rec.partNumbers[0]?.trim() || "";
-                                const warn = getPartRecommendationWarningLabel(rec);
-                                const isVerify = rec.recommendationType === "VERIFY_REQUIRED";
-                                return (
-                                  <li
-                                    key={rec.skuId}
-                                    className={`rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 ${
-                                      isVerify ? "border-l-2 border-l-amber-500 bg-amber-50/50" : ""
-                                    }`}
-                                  >
-                                    <p className="text-xs font-medium text-gray-900">
-                                      {rec.canonicalName}
-                                    </p>
-                                    <p className="text-[11px] text-gray-600">{rec.brandName}</p>
-                                    {primaryNo ? (
-                                      <p className="text-[11px] text-gray-500">Арт.: {primaryNo}</p>
-                                    ) : null}
-                                    {rec.partType.trim() ? (
-                                      <p className="text-[11px] text-gray-500">{rec.partType}</p>
-                                    ) : null}
-                                    {rec.priceAmount != null ? (
-                                      <p className="text-[11px] text-gray-500">
-                                        {`${formatExpenseAmountRu(rec.priceAmount)} ${
-                                          rec.currency?.trim() || ""
-                                        }`.trim()}
-                                      </p>
-                                    ) : null}
-                                    <p className="text-[11px] text-gray-700">{rec.recommendationLabel}</p>
-                                    <p className="text-[11px] text-gray-600">{rec.whyRecommended}</p>
-                                    {rec.fitmentNote ? (
-                                      <p className="text-[11px] text-gray-500">{rec.fitmentNote}</p>
-                                    ) : null}
-                                    {warn ? (
-                                      <p
-                                        className={`text-[11px] ${
-                                          isVerify ? "font-medium text-amber-900" : "text-amber-800"
-                                        }`}
-                                      >
-                                        {warn}
-                                      </p>
-                                    ) : null}
-                                    <button
-                                      type="button"
-                                      onClick={() => void addRecommendedSkuToWishlist(rec)}
-                                      disabled={wishlistAddingRecommendedSkuId === rec.skuId}
-                                      className="mt-1 inline-flex rounded-lg border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      {wishlistEditingId
-                                        ? "Применить SKU"
-                                        : wishlistAddingRecommendedSkuId === rec.skuId
-                                          ? "Добавление…"
-                                          : "Добавить в список покупок"}
-                                    </button>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-                {wishlistForm.nodeId.trim() && !wishlistEditingId ? (
-                  <div className="mt-3 rounded-lg border border-gray-200 bg-white p-2">
-                    <p className="text-[11px] font-medium text-gray-700">Комплекты обслуживания</p>
-                    {wishlistServiceKitsError ? (
-                      <p className="mt-1 text-[11px]" style={{ color: productSemanticColors.error }}>
-                        {wishlistServiceKitsError}
-                      </p>
-                    ) : null}
-                    {wishlistServiceKitsLoading ? (
-                      <p className="mt-1 text-[11px] text-gray-500">Загружаем комплекты…</p>
-                    ) : null}
-                    {!wishlistServiceKitsLoading && visibleWishlistServiceKits.length === 0 ? (
-                      <p className="mt-1 text-[11px] text-gray-500">
-                        Для этого узла пока нет подходящих комплектов.
-                      </p>
-                    ) : null}
-                    {visibleWishlistServiceKits.length > 0 ? (
-                      <ul className="mt-2 space-y-2">
-                        {visibleWishlistServiceKits.map((kit) => {
-                          const preview = serviceKitPreviewByCode.get(kit.code);
-                          const isSelectedKit = kit.code === wishlistSelectedKitCode;
-                          return (
-                          <li
-                            key={kit.code}
-                            className={`rounded-md border p-2 ${
-                              isSelectedKit
-                                ? "border-amber-300 bg-amber-50/80"
-                                : "border-gray-200 bg-gray-50"
-                            }`}
-                          >
-                            <p className="text-xs font-semibold text-gray-900">
-                              {kit.title}
-                              {isSelectedKit ? (
-                                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
-                                  выбран
-                                </span>
-                              ) : null}
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-gray-600">{kit.description}</p>
-                            <ul className="mt-1 space-y-1">
-                              {(preview?.items ?? []).map((item) => (
-                                <li
-                                  key={item.itemKey}
-                                  className={`rounded border px-2 py-1 text-[11px] ${
-                                    item.status === "WILL_ADD"
-                                      ? "border-emerald-200 bg-emerald-50/70 text-emerald-800"
-                                      : item.status === "DUPLICATE_ACTIVE_ITEM"
-                                        ? "border-gray-200 bg-white text-gray-500"
-                                        : "border-amber-200 bg-amber-50/80 text-amber-800"
-                                  }`}
-                                >
-                                  <p>
-                                    {item.title}
-                                    {item.matchedSkuTitle ? ` — ${item.matchedSkuTitle}` : ""}
-                                  </p>
-                                  <p className="mt-0.5">
-                                    {item.nodeName ? `Узел: ${item.nodeName}` : `Узел: ${item.nodeCode}`}
-                                    {item.costAmount != null
-                                      ? ` · ${formatExpenseAmountRu(item.costAmount)} ${item.currency ?? ""}`.trim()
-                                      : ""}
-                                  </p>
-                                  <p className="mt-0.5 font-medium">
-                                    {getServiceKitPreviewItemStatusLabel(item.status)}
-                                  </p>
-                                </li>
-                              ))}
-                            </ul>
-                            {preview ? (
-                              <p className="mt-1 text-[11px] text-gray-600">
-                                Доступно к добавлению: {preview.addableCount} · Уже есть: {preview.duplicateCount} ·
-                                Пропуск: {preview.invalidCount}
-                              </p>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => void addServiceKitToWishlist(kit)}
-                              disabled={
-                                wishlistAddingKitCode === kit.code || (preview ? !preview.canAddAny : false)
-                              }
-                              className="mt-2 inline-flex rounded-lg border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {wishlistAddingKitCode === kit.code
-                                ? "Добавление комплекта…"
-                                : "Добавить доступные позиции"}
-                            </button>
-                          </li>
-                        )})}
-                      </ul>
-                    ) : null}
-                  </div>
-                ) : null}
-                <label className="mt-2 block text-[11px] font-medium text-gray-600">
-                  Найти в каталоге
-                </label>
-                <input
-                  type="search"
-                  value={wishlistSkuQuery}
-                  onChange={(e) => setWishlistSkuQuery(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"
-                  placeholder="Motul, Brembo, HF155…"
-                  autoComplete="off"
-                />
-                {wishlistSkuFetchError ? (
-                  <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
-                    {wishlistSkuFetchError}
-                  </p>
-                ) : null}
-                {wishlistSkuLoading ? (
-                  <p className="mt-2 text-xs text-gray-500">Поиск…</p>
-                ) : null}
-                {!wishlistSkuLoading && wishlistSkuResults.length > 0 ? (
-                  <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1">
-                    {wishlistSkuResults.map((sku) => (
-                      <li key={sku.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWishlistSkuPickedPreview(sku);
-                            setWishlistForm((f) =>
-                              applyPartSkuViewModelToPartWishlistFormValues(f, sku)
-                            );
-                          }}
-                          className="w-full rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-gray-50"
-                        >
-                          <span className="font-medium text-gray-900">
-                            {getPartSkuViewModelDisplayLines(sku).primaryLine}
-                          </span>
-                          <span className="mt-0.5 block text-[11px] text-gray-500">
-                            {formatPartSkuSearchResultMetaLineRu(sku)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                {wishlistForm.skuId.trim() ? (
-                  <div className="mt-3 rounded-lg border border-gray-200 bg-white px-2 py-2">
-                    <p className="text-[11px] font-medium text-gray-600">Выбранный SKU</p>
-                    {wishlistSkuPickedPreview?.id === wishlistForm.skuId.trim() ? (
-                      <>
-                        <p className="mt-0.5 text-xs font-medium text-gray-900">
-                          {
-                            getPartSkuViewModelDisplayLines(wishlistSkuPickedPreview)
-                              .primaryLine
-                          }
-                        </p>
-                        <p className="text-[11px] text-gray-500">
-                          {
-                            getPartSkuViewModelDisplayLines(wishlistSkuPickedPreview)
-                              .secondaryLine
-                          }
-                        </p>
-                      </>
-                    ) : wishlistEditingSourceItem?.sku?.id === wishlistForm.skuId.trim() ? (
-                      <>
-                        <p className="mt-0.5 text-xs font-medium text-gray-900">
-                          {
-                            getWishlistItemSkuDisplayLines(wishlistEditingSourceItem.sku)
-                              .primaryLine
-                          }
-                        </p>
-                        <p className="text-[11px] text-gray-500">
-                          {
-                            getWishlistItemSkuDisplayLines(wishlistEditingSourceItem.sku)
-                              .secondaryLine
-                          }
-                        </p>
-                      </>
-                    ) : (
-                      <p className="mt-0.5 text-xs text-gray-600">SKU привязан</p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWishlistSkuPickedPreview(null);
-                        setWishlistForm((f) => clearPartWishlistFormSkuSelection(f));
-                      }}
-                      className="mt-2 inline-flex rounded-lg border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-800 hover:bg-gray-50"
-                    >
-                      Очистить SKU
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600">Количество</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={wishlistForm.quantity}
-                    onChange={(e) =>
-                      setWishlistForm((f) => ({ ...f, quantity: e.target.value }))
-                    }
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600">Статус</label>
-                  <select
-                    value={wishlistForm.status}
-                    onChange={(e) =>
-                      setWishlistForm((f) => ({
-                        ...f,
-                        status: e.target.value as PartWishlistItem["status"],
-                      }))
-                    }
-                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"
-                  >
-                    {PART_WISHLIST_STATUS_ORDER.map((s) => (
-                      <option key={s} value={s}>
-                        {partWishlistStatusLabelsRu[s]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-[1fr_88px]">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600">
-                    Стоимость (необязательно)
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={wishlistForm.costAmount}
-                    onChange={(e) =>
-                      setWishlistForm((f) => ({ ...f, costAmount: e.target.value }))
-                    }
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
-                    placeholder="Например: 1500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600">Валюта</label>
-                  <input
-                    type="text"
-                    value={wishlistForm.currency}
-                    onChange={(e) =>
-                      setWishlistForm((f) => ({ ...f, currency: e.target.value }))
-                    }
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
-                    placeholder="RUB"
-                    maxLength={8}
-                    autoCapitalize="off"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600">Комментарий</label>
-                <textarea
-                  value={wishlistForm.comment}
-                  onChange={(e) =>
-                    setWishlistForm((f) => ({ ...f, comment: e.target.value }))
-                  }
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900"
-                />
-              </div>
-              {wishlistFormError ? (
-                <p style={{ color: productSemanticColors.error }}>{wishlistFormError}</p>
-              ) : null}
-              <div className="flex flex-wrap gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => void submitWishlistForm()}
-                  disabled={isWishlistSaving}
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-gray-950 px-5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-60"
-                >
-                  {isWishlistSaving ? "Сохранение…" : "Сохранить"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <PartPickerShell
+        key={wishlistModalNonce}
+        isOpen={isWishlistModalOpen}
+        initialTab={wishlistPickerInitialTab}
+        title={wishlistEditingId ? "Позиция списка" : "Новая позиция"}
+        onClose={() => closeWishlistModal()}
+        vehicleLabel={detailViewModel?.displayName ?? title}
+        wishlistForm={wishlistForm}
+        setWishlistForm={setWishlistForm}
+        wishlistNodeOptions={wishlistNodeOptions}
+        wishlistNodeRequiredError={wishlistNodeRequiredError}
+        wishlistEditingId={wishlistEditingId}
+        wishlistEditingSourceItem={wishlistEditingSourceItem}
+        wishlistSkuQuery={wishlistSkuQuery}
+        setWishlistSkuQuery={setWishlistSkuQuery}
+        wishlistSkuResults={wishlistSkuResults}
+        wishlistSkuLoading={wishlistSkuLoading}
+        wishlistSkuFetchError={wishlistSkuFetchError}
+        wishlistSkuPickedPreview={wishlistSkuPickedPreview}
+        setWishlistSkuPickedPreview={setWishlistSkuPickedPreview}
+        wishlistRecommendationsLoading={wishlistRecommendationsLoading}
+        wishlistRecommendationsError={wishlistRecommendationsError}
+        wishlistRecommendationGroups={wishlistRecommendationGroups}
+        onAddRecommendedSku={(rec) => void addRecommendedSkuToWishlist(rec)}
+        wishlistAddingRecommendedSkuId={wishlistAddingRecommendedSkuId}
+        wishlistServiceKitsLoading={wishlistServiceKitsLoading}
+        wishlistServiceKitsError={wishlistServiceKitsError}
+        visibleWishlistServiceKits={visibleWishlistServiceKits}
+        serviceKitPreviewByCode={serviceKitPreviewByCode}
+        wishlistSelectedKitCode={wishlistSelectedKitCode}
+        setWishlistSelectedKitCode={setWishlistSelectedKitCode}
+        onAddServiceKit={(kit) => void addServiceKitToWishlist(kit)}
+        wishlistAddingKitCode={wishlistAddingKitCode}
+        wishlistFormError={wishlistFormError}
+        onSubmit={() => void submitWishlistForm()}
+        isWishlistSaving={isWishlistSaving}
+      />
 
       {selectedStatusExplanationNode && selectedStatusExplanation ? (
         <div

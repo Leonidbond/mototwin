@@ -2,6 +2,7 @@
 
 import Image, { type StaticImageData } from "next/image";
 import type { CSSProperties, ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   buildExpenseAnalyticsFromItems,
   calculateGarageScore,
@@ -12,6 +13,7 @@ import {
   getExpenseMonthKeyFromIso,
   getWishlistItemSkuDisplayLines,
   getVehicleSilhouetteClassLabel,
+  getNodeTightUiDisplayName,
   resolveGarageVehicleSilhouette,
 } from "@mototwin/domain";
 import {
@@ -81,6 +83,53 @@ const TOP_NODE_CARD_ICON_SRC = {
   suspension: suspensionIcon,
   tires: tiresIcon,
 } as const satisfies Record<TopNodeOverviewCard["key"], StaticImageData>;
+
+/** С `max-width: 1120px` в `.midGrid` одна колонка — здесь порог двух колонок. */
+const MID_GRID_TWO_COLUMN_MIN_PX = 1121;
+
+function subscribeMidGridTwoColumn(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+  const mq = window.matchMedia(`(min-width: ${MID_GRID_TWO_COLUMN_MIN_PX}px)`);
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
+
+function getMidGridTwoColumnSnapshot(): boolean {
+  if (typeof window === "undefined") {
+    return getMidGridTwoColumnServerSnapshot();
+  }
+  return window.matchMedia(`(min-width: ${MID_GRID_TWO_COLUMN_MIN_PX}px)`).matches;
+}
+
+function getMidGridTwoColumnServerSnapshot(): boolean {
+  return true;
+}
+
+/** Допуск по вертикали: бейджи в одном flex-ряду при align-items:center могли давать разный offsetTop. */
+const BADGE_ROW_CLUSTER_PX = 10;
+
+/** Сколько визуальных строк бейджей в flex-wrap контейнере. */
+function countBadgeRows(strip: HTMLElement): number {
+  if (strip.children.length === 0) {
+    return 0;
+  }
+  const tops = [...strip.children].map((c) =>
+    Math.round((c as HTMLElement).getBoundingClientRect().top)
+  );
+  tops.sort((a, b) => a - b);
+  let rows = 1;
+  let anchor = tops[0]!;
+  for (let i = 1; i < tops.length; i++) {
+    const t = tops[i]!;
+    if (t - anchor > BADGE_ROW_CLUSTER_PX) {
+      rows++;
+      anchor = t;
+    }
+  }
+  return rows;
+}
 
 const TOP_NODE_LEAF_ICON_SRC: Record<string, StaticImageData> = {
   "BRAKES.FLUID": brakesFluidIcon,
@@ -213,6 +262,140 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
     .filter(Boolean)
     .join(" • ");
 
+  const systemsPanelMeasureRef = useRef<HTMLDivElement>(null);
+  const midGridRef = useRef<HTMLDivElement>(null);
+  const [attentionPanelHeightPx, setAttentionPanelHeightPx] = useState<number | null>(null);
+  const [midGridFr, setMidGridFr] = useState({ left: 52, right: 48 });
+  const midGridTwoColumn = useSyncExternalStore(
+    subscribeMidGridTwoColumn,
+    getMidGridTwoColumnSnapshot,
+    getMidGridTwoColumnServerSnapshot
+  );
+
+  useLayoutEffect(() => {
+    const root = midGridRef.current;
+    if (!root) {
+      return;
+    }
+
+    const compute = () => {
+      if (!window.matchMedia(`(min-width: ${MID_GRID_TWO_COLUMN_MIN_PX}px)`).matches) {
+        root.style.removeProperty("grid-template-columns");
+        setMidGridFr({ left: 52, right: 48 });
+        return;
+      }
+
+      const strips = root.querySelectorAll<HTMLElement>("[data-system-badge-strip]");
+      if (strips.length === 0) {
+        return;
+      }
+
+      const total = 100;
+      const ok = (rightFr: number) => {
+        const leftFr = total - rightFr;
+        root.style.setProperty(
+          "grid-template-columns",
+          `minmax(0, ${leftFr}fr) minmax(0, ${rightFr}fr)`
+        );
+        void root.offsetWidth;
+        void strips[0]?.offsetWidth;
+        for (let i = 0; i < strips.length; i++) {
+          if (countBadgeRows(strips[i]!) > 2) {
+            return false;
+          }
+        }
+        return true;
+      };
+
+      let rightFr = 48;
+      if (!ok(48)) {
+        let lo = 49;
+        let hi = 97;
+        let ans = 97;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          if (ok(mid)) {
+            ans = mid;
+            hi = mid - 1;
+          } else {
+            lo = mid + 1;
+          }
+        }
+        rightFr = ans;
+        if (!ok(rightFr)) {
+          rightFr = 97;
+        }
+      }
+      root.style.removeProperty("grid-template-columns");
+      setMidGridFr({ left: total - rightFr, right: rightFr });
+    };
+
+    compute();
+    const ro = new ResizeObserver(() => {
+      compute();
+    });
+    ro.observe(root);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("grid-template-columns");
+    };
+  }, [
+    midGridTwoColumn,
+    vehicle.id,
+    topNodeOverviewCards,
+    isTopServiceNodesLoading,
+    topServiceNodesError,
+  ]);
+
+  useLayoutEffect(() => {
+    const el = systemsPanelMeasureRef.current;
+    if (!el) {
+      return;
+    }
+    const readHeight = (entry?: ResizeObserverEntry) => {
+      const fromRo =
+        entry?.borderBoxSize && entry.borderBoxSize.length > 0
+          ? entry.borderBoxSize[0]?.blockSize
+          : undefined;
+      const rect = el.getBoundingClientRect().height;
+      const fallback = Math.max(el.offsetHeight, el.clientHeight);
+      const raw = fromRo ?? Math.max(rect, fallback);
+      return Math.round(raw);
+    };
+    const apply = (entry?: ResizeObserverEntry) => {
+      const h = readHeight(entry);
+      if (h > 0) {
+        setAttentionPanelHeightPx(h);
+      }
+    };
+    apply();
+    const ro = new ResizeObserver((entries) => {
+      apply(entries[0]);
+    });
+    ro.observe(el);
+    let cancelled = false;
+    requestAnimationFrame(() => {
+      if (cancelled) {
+        return;
+      }
+      apply();
+      requestAnimationFrame(() => {
+        if (!cancelled) {
+          apply();
+        }
+      });
+    });
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+    };
+  }, [
+    vehicle.id,
+    topNodeOverviewCards,
+    isTopServiceNodesLoading,
+    topServiceNodesError,
+  ]);
+
   return (
     <div className={styles.dashboardRoot}>
       <VehicleDashboardTopBar
@@ -322,7 +505,15 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
       </section>
 
       <section
+        ref={midGridRef}
         className={styles.midGrid}
+        style={
+          midGridTwoColumn
+            ? {
+                gridTemplateColumns: `minmax(0, ${midGridFr.left}fr) minmax(0, ${midGridFr.right}fr)`,
+              }
+            : undefined
+        }
       >
         <Card
           className={styles.midGridCard}
@@ -330,9 +521,15 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
           style={{
             display: "flex",
             minHeight: 0,
-            alignSelf: "stretch",
+            alignSelf: "start",
             flexDirection: "column",
             overflow: "hidden",
+            ...(attentionPanelHeightPx != null
+              ? {
+                  height: attentionPanelHeightPx,
+                  maxHeight: attentionPanelHeightPx,
+                }
+              : { minHeight: 220 }),
           }}
         >
           <SectionHeader title="Требует внимания" />
@@ -363,49 +560,58 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
           </div>
         </Card>
 
-        <Card
-          padding="md"
+        <div
+          ref={systemsPanelMeasureRef}
           style={{
-            overflow: "hidden",
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 0,
             minWidth: 0,
+            alignSelf: "start",
+            height: "fit-content",
           }}
         >
-          <SectionHeader
-            title="Состояние узлов"
-            trailing={
-              <Button variant="ghost" size="sm" onClick={props.onOpenAllNodes}>
-                Все узлы
-              </Button>
-            }
-          />
+          <Card
+            padding="md"
+            style={{
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+              minWidth: 0,
+            }}
+          >
+            <SectionHeader
+              title="Состояние узлов"
+              trailing={
+                <Button variant="ghost" size="sm" onClick={props.onOpenAllNodes}>
+                  Все узлы
+                </Button>
+              }
+            />
 
-          <div className={styles.systemsGridBody}>
-            {isTopServiceNodesLoading ? (
-              <MutedText style={{ marginTop: 12 }}>Загрузка основных узлов...</MutedText>
-            ) : null}
-            {!isTopServiceNodesLoading && topServiceNodesError ? (
-              <MutedText style={{ marginTop: 12, color: productSemanticColors.error }}>
-                {topServiceNodesError}
-              </MutedText>
-            ) : null}
+            <div className={styles.systemsGridBody}>
+              {isTopServiceNodesLoading ? (
+                <MutedText style={{ marginTop: 12 }}>Загрузка основных узлов...</MutedText>
+              ) : null}
+              {!isTopServiceNodesLoading && topServiceNodesError ? (
+                <MutedText style={{ marginTop: 12, color: productSemanticColors.error }}>
+                  {topServiceNodesError}
+                </MutedText>
+              ) : null}
 
-            {!isTopServiceNodesLoading && !topServiceNodesError ? (
-              <div className={styles.systemsGrid}>
-                {topNodeOverviewCards.map((card) => (
-                  <SystemStatusCard
-                    key={card.key}
-                    card={card}
-                    onOpenNode={props.onOpenNode}
-                    onOpenNodeIssues={props.onOpenNodeIssues}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </Card>
+              {!isTopServiceNodesLoading && !topServiceNodesError ? (
+                <div className={styles.systemsGrid}>
+                  {topNodeOverviewCards.map((card) => (
+                    <SystemStatusCard
+                      key={card.key}
+                      card={card}
+                      onOpenNode={props.onOpenNode}
+                      onOpenNodeIssues={props.onOpenNodeIssues}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </Card>
+        </div>
       </section>
 
       <section
@@ -806,8 +1012,10 @@ function AttentionRow(props: {
       }}
       style={{
         boxSizing: "border-box",
-        minHeight: 78,
-        padding: "8px 10px",
+        alignSelf: "start",
+        width: "100%",
+        minHeight: 0,
+        padding: "8px 10px 10px",
         borderRadius: 14,
         border: `1px solid ${productSemanticColors.border}`,
         backgroundColor: productSemanticColors.cardMuted,
@@ -816,11 +1024,12 @@ function AttentionRow(props: {
     >
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "36px minmax(0, 1fr) max-content",
-          alignItems: "start",
-          gap: "6px 9px",
-          height: "100%",
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 9,
+          width: "100%",
+          minWidth: 0,
         }}
       >
         <span
@@ -837,7 +1046,7 @@ function AttentionRow(props: {
             boxShadow: `0 0 0 1px rgba(255,255,255,0.025), 0 0 16px ${iconGlow}`,
             flexShrink: 0,
             overflow: "hidden",
-            gridRow: "1 / 3",
+            alignSelf: "flex-start",
           }}
         >
           <Image
@@ -852,8 +1061,8 @@ function AttentionRow(props: {
             }}
           />
         </span>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: "1 1 0%", minHeight: "min-content", overflow: "visible" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             <div
               style={{
                 minWidth: 0,
@@ -871,7 +1080,10 @@ function AttentionRow(props: {
           </div>
           <MutedText
             style={{
-              marginTop: 3,
+              marginTop: 4,
+              paddingBottom: 2,
+              fontSize: 11,
+              lineHeight: "14px",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -882,15 +1094,17 @@ function AttentionRow(props: {
         </div>
         <div
           style={{
-            gridColumn: "3 / 4",
-            gridRow: "1 / 3",
-            display: "grid",
-            gridTemplateColumns: "repeat(2, max-content)",
-            alignItems: "center",
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "wrap",
             justifyContent: "flex-end",
-            alignSelf: "start",
+            alignItems: "center",
+            alignContent: "flex-start",
             gap: 6,
-            paddingTop: 0,
+            flex: "0 1 auto",
+            minWidth: 0,
+            maxWidth: "100%",
+            alignSelf: "flex-start",
           }}
         >
           {props.onOpenService ? (
@@ -945,6 +1159,7 @@ function CompactActionButton(props: {
         props.onClick();
       }}
       style={{
+        flexShrink: 0,
         height: 26,
         padding: "0 8px",
         borderRadius: 9,
@@ -999,7 +1214,7 @@ function SystemStatusCard(props: {
         minWidth: 0,
         boxSizing: "border-box",
         overflow: "hidden",
-        padding: "6px 76px 8px 10px",
+        padding: "4px 54px 5px 8px",
         textAlign: "left",
         borderRadius: 12,
         border: `1px solid ${productSemanticColors.border}`,
@@ -1007,12 +1222,28 @@ function SystemStatusCard(props: {
       }}
     >
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div>
-          <div style={{ color: productSemanticColors.textPrimary, fontSize: 12, fontWeight: 700, lineHeight: "16px" }}>
-            {normalizeTopNodeLabel(props.card)}
-          </div>
+        <div
+          style={{
+            color: productSemanticColors.textPrimary,
+            fontSize: 11,
+            fontWeight: 700,
+            lineHeight: "14px",
+          }}
+        >
+          {normalizeTopNodeLabel(props.card)}
         </div>
-        <div style={{ display: "grid", gap: 8, marginTop: 6 }}>
+        <div
+          data-system-badge-strip
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 6,
+            marginTop: 4,
+            alignItems: "flex-start",
+            alignContent: "flex-start",
+          }}
+        >
           {props.card.nodes.map((node) => {
             const nodeTokens = getStatusTokens(node.status);
             return (
@@ -1024,33 +1255,31 @@ function SystemStatusCard(props: {
                 }}
                 key={node.code}
                 style={{
+                  flexShrink: 0,
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: "fit-content",
-                  maxWidth: "100%",
-                  minHeight: 20,
-                  borderRadius: 999,
+                  borderRadius: 11,
                   border: `1px solid ${nodeTokens.border}`,
                   backgroundColor: nodeTokens.background,
                   color: nodeTokens.foreground,
-                  padding: "0 7px",
-                  fontSize: 10,
+                  padding: "4px 9px",
+                  fontSize: 11,
                   fontWeight: 800,
-                  lineHeight: 1,
+                  lineHeight: 1.25,
+                  textAlign: "center",
                   cursor: "pointer",
+                  boxSizing: "border-box",
                 }}
                 title={`${node.name}: ${node.statusLabel}`}
               >
-                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {node.name}
-                </span>
+                <span style={{ whiteSpace: "nowrap" }}>{getNodeTightUiDisplayName(node.code, node.name)}</span>
               </button>
             );
           })}
         </div>
         {props.card.nodes.length === 0 ? (
-          <MutedText style={{ marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <MutedText style={{ marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {props.card.details}
           </MutedText>
         ) : null}
@@ -1062,13 +1291,13 @@ function SystemStatusCard(props: {
         title="Показать узлы со статусом Скоро или Просрочено"
         style={{
           position: "absolute",
-          right: 2,
+          right: 1,
           top: "50%",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 68,
-          height: 68,
+          width: 50,
+          height: 50,
           opacity: 0.98,
           transform: "translateY(-50%)",
           border: 0,
@@ -1081,8 +1310,8 @@ function SystemStatusCard(props: {
           aria-hidden
           style={{
             display: "inline-flex",
-            width: 64,
-            height: 64,
+            width: 46,
+            height: 46,
             backgroundColor: tokens.foreground,
             maskImage: `url(${TOP_NODE_CARD_ICON_SRC[props.card.key].src})`,
             maskPosition: "center",
@@ -1349,13 +1578,15 @@ function StatusPill({ status }: { status: NodeStatus | null }) {
       style={{
         display: "inline-flex",
         alignItems: "center",
-        padding: "3px 10px",
+        padding: "2px 7px",
         borderRadius: 999,
         border: `1px solid ${tokens.border}`,
         backgroundColor: tokens.background,
         color: tokens.foreground,
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: 700,
+        lineHeight: 1.25,
+        flexShrink: 0,
       }}
     >
       {getStatusLabel(status)}

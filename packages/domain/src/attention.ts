@@ -15,6 +15,7 @@ import {
   getNodeTreeItemReasonShortLine,
   isLeafNode,
 } from "./node-tree";
+import { getNodeTightUiDisplayName } from "./node-tight-ui-name";
 
 function isAttentionEffective(
   s: NodeTreeItem["effectiveStatus"]
@@ -92,7 +93,7 @@ function mapCollectedToItem(entry: CollectedAttentionNode): AttentionItemViewMod
   return {
     nodeId: node.id,
     code: node.code,
-    name: node.name,
+    name: getNodeTightUiDisplayName(node.code, node.name),
     topLevelParentName,
     effectiveStatus: effective,
     statusLabelRu: getNodeStatusLabel(effective),

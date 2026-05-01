@@ -15,17 +15,22 @@
   gap: 10px;
 }
 
+/*
+ * «Требует внимания» : «Состояние узлов» — базовая доля 52fr : 48fr.
+ * На ширине >1120px VehicleDashboard подбирает fr так, чтобы бейджи в карточках
+ * «Состояние узлов» занимали не больше двух строк.
+ */
 .midGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 52fr) minmax(0, 48fr);
   gap: 12px;
   align-items: start;
 }
 
-/* Mid row: left uses fixed height for scroll; right column height follows compact node cards. */
+/* Mid row: left card height is synced to «Состояние узлов» (see VehicleDashboard inline height). */
 .midGridCard {
   box-sizing: border-box;
-  height: 440px;
+  min-height: 0;
 }
 
 .lowerGrid {
@@ -45,8 +50,8 @@
 .systemsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  margin-top: 10px;
   align-content: start;
   justify-items: stretch;
 }
@@ -76,10 +81,12 @@
   max-height: 100%;
   height: 100%;
   min-height: 0;
-  gap: 10px;
+  align-content: start;
+  row-gap: 36px;
+  column-gap: 0;
   overflow-y: auto;
   padding-right: 8px;
-  padding-bottom: 2px;
+  padding-bottom: 8px;
   scrollbar-color: rgba(249, 115, 22, 0.7) rgba(255, 255, 255, 0.06);
   scrollbar-gutter: stable;
 }
