@@ -69,6 +69,19 @@ enum ServiceEventKind {
   STATE_UPDATE
 }
 
+enum ServiceEventMode {
+  BASIC
+  ADVANCED
+}
+
+enum ServiceActionType {
+  REPLACE
+  SERVICE
+  INSPECT
+  CLEAN
+  ADJUST
+}
+
 enum PartWishlistItemStatus {
   NEEDED
   ORDERED
@@ -102,32 +115,32 @@ enum ExpenseInstallationStatus {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  email         String?       @unique
-  displayName   String?
-  passwordHash  String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  displayName  String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  subscription  Subscription?
-  settings      UserSettings?
-  vehicles      Vehicle[]
-  garages       Garage[]
+  subscription Subscription?
+  settings     UserSettings?
+  vehicles     Vehicle[]
+  garages      Garage[]
 
   @@map("users")
 }
 
 model UserSettings {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  defaultCurrency   String   @default("RUB")
-  distanceUnit      String   @default("km")
-  engineHoursUnit   String   @default("h")
-  dateFormat        String   @default("DD.MM.YYYY")
-  defaultSnoozeDays Int      @default(7)
-  vehicleTrashRetentionDays Int @default(30)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  defaultCurrency           String   @default("RUB")
+  distanceUnit              String   @default("km")
+  engineHoursUnit           String   @default("h")
+  dateFormat                String   @default("DD.MM.YYYY")
+  defaultSnoozeDays         Int      @default(7)
+  vehicleTrashRetentionDays Int      @default(30)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -135,62 +148,62 @@ model UserSettings {
 }
 
 model Garage {
-  id           String    @id @default(cuid())
-  ownerUserId  String
-  title        String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String   @id @default(cuid())
+  ownerUserId String
+  title       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  ownerUser    User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  vehicles     Vehicle[]
+  ownerUser User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  vehicles  Vehicle[]
 
-  @@index([ownerUserId])
   @@unique([ownerUserId, title])
+  @@index([ownerUserId])
   @@map("garages")
 }
 
 model Subscription {
-  id         String              @id @default(cuid())
-  userId     String              @unique
-  planType   PlanType            @default(FREE)
-  status     SubscriptionStatus  @default(ACTIVE)
-  startedAt  DateTime            @default(now())
-  endsAt     DateTime?
+  id        String             @id @default(cuid())
+  userId    String             @unique
+  planType  PlanType           @default(FREE)
+  status    SubscriptionStatus @default(ACTIVE)
+  startedAt DateTime           @default(now())
+  endsAt    DateTime?
 
-  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("subscriptions")
 }
 
 model Brand {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  slug      String    @unique
-  createdAt DateTime  @default(now())
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
 
-  models    Model[]
-  vehicles  Vehicle[]
+  models   Model[]
+  vehicles Vehicle[]
 
   @@map("brands")
 }
 
 model Model {
-  id        String         @id @default(cuid())
+  id        String   @id @default(cuid())
   brandId   String
   name      String
   slug      String
-  createdAt DateTime       @default(now())
+  createdAt DateTime @default(now())
 
-  brand     Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  variants  ModelVariant[]
-  vehicles  Vehicle[]
+  brand    Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  variants ModelVariant[]
+  vehicles Vehicle[]
 
   @@unique([brandId, slug])
   @@map("models")
 }
 
 model ModelVariant {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   modelId        String
   year           Int
   generation     String?
@@ -202,17 +215,17 @@ model ModelVariant {
   brakeSystem    String?
   chainPitch     String?
   stockSprockets String?
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime @default(now())
 
-  model          Model     @relation(fields: [modelId], references: [id], onDelete: Cascade)
-  vehicles       Vehicle[]
+  model    Model     @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  vehicles Vehicle[]
 
   @@index([modelId, year])
   @@map("model_variants")
 }
 
 model Vehicle {
-  id             String       @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
   garageId       String?
   trashedAt      DateTime?
@@ -222,22 +235,22 @@ model Vehicle {
   modelVariantId String
   nickname       String?
   vin            String?
-  odometer       Int          @default(0)
+  odometer       Int       @default(0)
   engineHours    Int?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  garage         Garage?      @relation(fields: [garageId], references: [id], onDelete: SetNull)
-  brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  model          Model        @relation(fields: [modelId], references: [id], onDelete: Restrict)
-  modelVariant   ModelVariant @relation(fields: [modelVariantId], references: [id], onDelete: Restrict)
-  rideProfile         RideProfile?
-  serviceEvents       ServiceEvent[]
-  topNodeStates       TopNodeState[]
-  nodeStates          NodeState[]
-  partWishlistItems   PartWishlistItem[]
-  expenseItems        ExpenseItem[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  garage            Garage?            @relation(fields: [garageId], references: [id], onDelete: SetNull)
+  brand             Brand              @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  model             Model              @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  modelVariant      ModelVariant       @relation(fields: [modelVariantId], references: [id], onDelete: Restrict)
+  rideProfile       RideProfile?
+  serviceEvents     ServiceEvent[]
+  topNodeStates     TopNodeState[]
+  nodeStates        NodeState[]
+  partWishlistItems PartWishlistItem[]
+  expenseItems      ExpenseItem[]
 
   @@index([userId])
   @@index([garageId])
@@ -250,87 +263,150 @@ model Vehicle {
 }
 
 model ServiceEvent {
-  id                 String   @id @default(cuid())
+  id                 String           @id @default(cuid())
   vehicleId          String
+  /**
+   * Anchor leaf node — represents the primary affected node and remains for filter/sort/back-compat.
+   */
   nodeId             String
   eventKind          ServiceEventKind @default(SERVICE)
+  /**
+   * Bundle mode: BASIC = single common action across multiple nodes; ADVANCED = per-item details.
+   */
+  mode               ServiceEventMode @default(BASIC)
+  /**
+   * Bundle title (free-form), e.g. «ТО 10 000 км».
+   */
+  title              String?
   eventDate          DateTime
   odometer           Int
   engineHours        Int?
-  serviceType        String
   installedPartsJson Json?
-  costAmount         Float?
+  /**
+   * Sum of parts costs across all bundle items (or manual top-level entry in BASIC mode).
+   */
+  partsCost          Decimal?         @db.Decimal(12, 2)
+  /**
+   * Sum of labor costs across all bundle items (or manual top-level entry in BASIC mode).
+   */
+  laborCost          Decimal?         @db.Decimal(12, 2)
+  /**
+   * partsCost + laborCost; canonical bundle total (replaces legacy `costAmount`).
+   */
+  totalCost          Decimal?         @db.Decimal(12, 2)
   currency           String?
   comment            String?
-  /** Артикул / номер SKU установленной запчасти (отдельно от комментария). */
-  partSku            String?
-  /** Наименование установленной запчасти. */
-  partName           String?
-  createdAt          DateTime @default(now())
+  createdAt          DateTime         @default(now())
 
-  vehicle            Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  node               Node     @relation(fields: [nodeId], references: [id], onDelete: Restrict)
-  expenseItems       ExpenseItem[]
+  vehicle      Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node         Node               @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  items        ServiceEventItem[]
+  expenseItems ExpenseItem[]
 
   @@index([vehicleId])
   @@index([nodeId])
   @@map("service_events")
 }
 
-model Node {
-  id            String         @id @default(cuid())
-  code          String         @unique
-  name          String
-  parentId      String?
-  level         Int
-  displayOrder  Int
-  isActive      Boolean        @default(true)
-  isServiceRelevant Boolean    @default(true)
-  isMvpVisible   Boolean       @default(false)
-  isAdvanced     Boolean       @default(false)
-  isTopNode      Boolean       @default(false)
-  topNodeOrder   Int?
-  serviceGroup   String?
-  defaultServiceOperations String[] @default([])
-  createdAt     DateTime       @default(now())
+/**
+ * One affected node within a Service Bundle event. At least one row per ServiceEvent.
+ */
+model ServiceEventItem {
+  id             String            @id @default(cuid())
+  serviceEventId String
+  nodeId         String
+  actionType     ServiceActionType @default(SERVICE)
+  /**
+   * Optional in BASIC, freely entered in ADVANCED.
+   */
+  partName       String?
+  /**
+   * Optional SKU/article in ADVANCED.
+   */
+  sku            String?
+  /**
+   * Optional quantity in ADVANCED.
+   */
+  quantity       Int?
+  /**
+   * Per-item parts cost in ADVANCED; null in BASIC (totals live on event).
+   */
+  partCost       Decimal?          @db.Decimal(12, 2)
+  /**
+   * Per-item labor cost in ADVANCED; null in BASIC.
+   */
+  laborCost      Decimal?          @db.Decimal(12, 2)
+  comment        String?
+  /**
+   * Stable order for UI rendering (also used for synthesis of legacy single-row view).
+   */
+  sortOrder      Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
-  parent        Node?          @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children      Node[]         @relation("NodeHierarchy")
-  serviceEvents       ServiceEvent[]
-  topNodeStates       TopNodeState[]
-  nodeStates          NodeState[]
+  serviceEvent ServiceEvent @relation(fields: [serviceEventId], references: [id], onDelete: Cascade)
+  node         Node         @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+
+  @@index([serviceEventId])
+  @@index([nodeId])
+  @@map("service_event_items")
+}
+
+model Node {
+  id                       String   @id @default(cuid())
+  code                     String   @unique
+  name                     String
+  parentId                 String?
+  level                    Int
+  displayOrder             Int
+  isActive                 Boolean  @default(true)
+  isServiceRelevant        Boolean  @default(true)
+  isMvpVisible             Boolean  @default(false)
+  isAdvanced               Boolean  @default(false)
+  isTopNode                Boolean  @default(false)
+  topNodeOrder             Int?
+  serviceGroup             String?
+  defaultServiceOperations String[] @default([])
+  createdAt                DateTime @default(now())
+
+  parent            Node?                @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children          Node[]               @relation("NodeHierarchy")
+  serviceEvents     ServiceEvent[]
+  serviceEventItems ServiceEventItem[]
+  topNodeStates     TopNodeState[]
+  nodeStates        NodeState[]
   maintenanceRule   NodeMaintenanceRule?
-  partWishlistItems   PartWishlistItem[]
-  expenseItems        ExpenseItem[]
-  partSkusPrimary     PartSku[]          @relation("PartSkuPrimaryNode")
-  partSkuNodeLinks    PartSkuNodeLink[]
+  partWishlistItems PartWishlistItem[]
+  expenseItems      ExpenseItem[]
+  partSkusPrimary   PartSku[]            @relation("PartSkuPrimaryNode")
+  partSkuNodeLinks  PartSkuNodeLink[]
 
   @@index([parentId])
   @@map("nodes")
 }
 
 model PartSku {
-  id            String    @id @default(cuid())
-  seedKey       String?   @unique
+  id            String  @id @default(cuid())
+  seedKey       String? @unique
   primaryNodeId String?
-  primaryNode   Node?     @relation("PartSkuPrimaryNode", fields: [primaryNodeId], references: [id], onDelete: SetNull)
+  primaryNode   Node?   @relation("PartSkuPrimaryNode", fields: [primaryNodeId], references: [id], onDelete: SetNull)
 
   brandName     String
   canonicalName String
   partType      String
 
-  description   String?
-  category      String?
+  description String?
+  category    String?
 
-  priceAmount   Decimal?  @db.Decimal(12, 2)
-  currency      String?
-  sourceUrl     String?
+  priceAmount Decimal? @db.Decimal(12, 2)
+  currency    String?
+  sourceUrl   String?
 
-  isOem         Boolean   @default(false)
-  isActive      Boolean   @default(true)
+  isOem    Boolean @default(false)
+  isActive Boolean @default(true)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   partNumbers   PartNumber[]
   nodeLinks     PartSkuNodeLink[]
@@ -346,64 +422,64 @@ model PartSku {
 }
 
 model PartNumber {
-  id               String   @id @default(cuid())
-  skuId            String
-  sku              PartSku  @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  id    String  @id @default(cuid())
+  skuId String
+  sku   PartSku @relation(fields: [skuId], references: [id], onDelete: Cascade)
 
   number           String
   normalizedNumber String
   numberType       String
   brandName        String?
 
-  createdAt        DateTime @default(now())
+  createdAt DateTime @default(now())
 
+  @@unique([skuId, normalizedNumber, numberType])
   @@index([skuId])
   @@index([normalizedNumber])
-  @@unique([skuId, normalizedNumber, numberType])
   @@map("part_numbers")
 }
 
 model PartSkuNodeLink {
-  id           String   @id @default(cuid())
-  skuId        String
-  sku          PartSku  @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  id    String  @id @default(cuid())
+  skuId String
+  sku   PartSku @relation(fields: [skuId], references: [id], onDelete: Cascade)
 
-  nodeId       String
-  node         Node     @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  nodeId String
+  node   Node   @relation(fields: [nodeId], references: [id], onDelete: Restrict)
 
   relationType String
-  confidence   Int      @default(80)
+  confidence   Int    @default(80)
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 
+  @@unique([skuId, nodeId, relationType])
   @@index([skuId])
   @@index([nodeId])
-  @@unique([skuId, nodeId, relationType])
   @@map("part_sku_node_links")
 }
 
 model PartFitment {
-  id             String   @id @default(cuid())
-  skuId          String
-  sku            PartSku  @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  id    String  @id @default(cuid())
+  skuId String
+  sku   PartSku @relation(fields: [skuId], references: [id], onDelete: Cascade)
 
   brandId        String?
   modelId        String?
   modelVariantId String?
 
-  yearFrom       Int?
-  yearTo         Int?
+  yearFrom Int?
+  yearTo   Int?
 
-  market         String?
-  engineCode     String?
-  vinFrom        String?
-  vinTo          String?
+  market     String?
+  engineCode String?
+  vinFrom    String?
+  vinTo      String?
 
-  fitmentType    String?
-  confidence     Int      @default(80)
-  note           String?
+  fitmentType String?
+  confidence  Int     @default(80)
+  note        String?
 
-  createdAt      DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([skuId])
   @@index([brandId])
@@ -413,28 +489,28 @@ model PartFitment {
 }
 
 model PartOffer {
-  id              String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  skuId           String?
-  sku             PartSku? @relation(fields: [skuId], references: [id], onDelete: SetNull)
+  skuId String?
+  sku   PartSku? @relation(fields: [skuId], references: [id], onDelete: SetNull)
 
   sourceName      String
   externalOfferId String?
   title           String
   url             String?
 
-  priceAmount     Decimal? @db.Decimal(12, 2)
-  currency        String?
-  availability    String?
+  priceAmount  Decimal? @db.Decimal(12, 2)
+  currency     String?
+  availability String?
 
-  sellerName      String?
-  rawBrand        String?
-  rawArticle      String?
-  rawDataJson     Json?
+  sellerName  String?
+  rawBrand    String?
+  rawArticle  String?
+  rawDataJson Json?
 
-  lastSeenAt      DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([skuId])
   @@index([sourceName])
@@ -443,22 +519,22 @@ model PartOffer {
 }
 
 model PartWishlistItem {
-  id        String                  @id @default(cuid())
-  vehicleId String
-  nodeId    String?
-  skuId     String?
-  title     String
-  quantity  Int                     @default(1)
-  status    PartWishlistItemStatus  @default(NEEDED)
-  comment   String?
+  id         String                 @id @default(cuid())
+  vehicleId  String
+  nodeId     String?
+  skuId      String?
+  title      String
+  quantity   Int                    @default(1)
+  status     PartWishlistItemStatus @default(NEEDED)
+  comment    String?
   costAmount Float?
   currency   String?
-  createdAt DateTime                @default(now())
-  updatedAt DateTime                @updatedAt
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
 
-  vehicle   Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  node      Node?                   @relation(fields: [nodeId], references: [id], onDelete: SetNull)
-  sku       PartSku?                @relation(fields: [skuId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node         Node?         @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  sku          PartSku?      @relation(fields: [skuId], references: [id], onDelete: SetNull)
   expenseItems ExpenseItem[]
 
   @@index([vehicleId])
@@ -469,7 +545,7 @@ model PartWishlistItem {
 }
 
 model ExpenseItem {
-  id                 String               @id @default(cuid())
+  id                 String                    @id @default(cuid())
   vehicleId          String
   nodeId             String?
   serviceEventId     String?
@@ -480,9 +556,9 @@ model ExpenseItem {
   installationStatus ExpenseInstallationStatus @default(INSTALLED)
   expenseDate        DateTime
   title              String
-  amount             Decimal              @db.Decimal(12, 2)
+  amount             Decimal                   @db.Decimal(12, 2)
   currency           String
-  quantity           Int                  @default(1)
+  quantity           Int                       @default(1)
   comment            String?
   partSku            String?
   partName           String?
@@ -491,13 +567,13 @@ model ExpenseItem {
   installedAt        DateTime?
   odometer           Int?
   engineHours        Int?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
 
-  vehicle            Vehicle              @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  node               Node?                @relation(fields: [nodeId], references: [id], onDelete: SetNull)
-  serviceEvent       ServiceEvent?        @relation(fields: [serviceEventId], references: [id], onDelete: SetNull)
-  shoppingListItem   PartWishlistItem?    @relation(fields: [shoppingListItemId], references: [id], onDelete: SetNull)
+  vehicle          Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node             Node?             @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  serviceEvent     ServiceEvent?     @relation(fields: [serviceEventId], references: [id], onDelete: SetNull)
+  shoppingListItem PartWishlistItem? @relation(fields: [shoppingListItemId], references: [id], onDelete: SetNull)
 
   @@index([vehicleId, expenseDate])
   @@index([vehicleId, category])
@@ -520,12 +596,12 @@ model TopNodeState {
   updatedAt          DateTime      @updatedAt
   createdAt          DateTime      @default(now())
 
-  vehicle            Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  node               Node          @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node    Node    @relation(fields: [nodeId], references: [id], onDelete: Restrict)
 
+  @@unique([vehicleId, nodeId])
   @@index([vehicleId])
   @@index([nodeId])
-  @@unique([vehicleId, nodeId])
   @@map("top_node_states")
 }
 
@@ -539,12 +615,12 @@ model NodeState {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  vehicle            Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  node               Node       @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  node    Node    @relation(fields: [nodeId], references: [id], onDelete: Restrict)
 
+  @@unique([vehicleId, nodeId])
   @@index([vehicleId])
   @@index([nodeId])
-  @@unique([vehicleId, nodeId])
   @@map("node_states")
 }
 
@@ -562,24 +638,24 @@ model NodeMaintenanceRule {
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
 
-  node          Node                   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
-  @@index([nodeId])
   @@unique([nodeId])
+  @@index([nodeId])
   @@map("node_maintenance_rules")
 }
 
 model RideProfile {
-  id             String          @id @default(cuid())
-  vehicleId      String          @unique
+  id             String         @id @default(cuid())
+  vehicleId      String         @unique
   usageType      UsageType
   ridingStyle    RidingStyle
   loadType       LoadType
   usageIntensity UsageIntensity
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  vehicle        Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@map("ride_profiles")
 }

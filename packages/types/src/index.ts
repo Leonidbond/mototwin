@@ -40,8 +40,12 @@ export type {
 } from "./node";
 export type {
   ServiceEventKind,
+  ServiceEventMode,
+  ServiceActionType,
   ServiceEventNode,
   ServiceEventItem,
+  ServiceBundleItem,
+  CreateServiceBundleItemInput,
   CreateServiceEventInput,
   UpdateServiceEventInput,
 } from "./service-event";
@@ -76,6 +80,7 @@ export type {
 export type {
   AddServiceEventFormValues,
   AddServiceEventPayload,
+  BundleItemFormValues,
   UpdateVehicleStateFormValues,
   UpdateVehicleStatePayload,
   EditVehicleProfileFormValues,
@@ -137,6 +142,7 @@ export type {
   ServiceLogEntryViewModel,
   ServiceLogMonthlySummaryViewModel,
   ServiceLogMonthGroupViewModel,
+  ServiceLogBundleItemSummary,
 } from "./service-log";
 export type {
   MotoTwinApiErrorBody,

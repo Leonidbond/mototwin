@@ -1239,30 +1239,47 @@ async function upsertDemoServiceEvent(input: {
   const existing = await prisma.serviceEvent.findFirst({
     where: {
       vehicleId: input.vehicleId,
-      serviceType: input.serviceType,
+      title: input.serviceType,
       comment: { contains: "[seed:expense-demo]" },
     },
-    select: { id: true },
+    select: { id: true, items: { select: { id: true } } },
   });
 
   const data = {
     nodeId: input.nodeId,
+    title: input.serviceType,
+    mode: "BASIC" as const,
     eventDate: input.eventDate,
     odometer: input.odometer,
     engineHours: input.engineHours,
-    serviceType: input.serviceType,
     installedPartsJson: Prisma.JsonNull,
-    costAmount: null,
+    partsCost: null,
+    laborCost: null,
+    totalCost: null,
     currency: null,
     comment: input.comment,
-    partSku: input.partSku ?? null,
-    partName: input.partName ?? null,
   };
+
+  const itemsCreate = [
+    {
+      nodeId: input.nodeId,
+      actionType: "REPLACE" as const,
+      partName: input.partName ?? null,
+      sku: input.partSku ?? null,
+      sortOrder: 0,
+    },
+  ];
 
   if (existing) {
     return prisma.serviceEvent.update({
       where: { id: existing.id },
-      data,
+      data: {
+        ...data,
+        items: {
+          deleteMany: {},
+          create: itemsCreate,
+        },
+      },
       select: { id: true },
     });
   }
@@ -1271,6 +1288,7 @@ async function upsertDemoServiceEvent(input: {
     data: {
       vehicleId: input.vehicleId,
       ...data,
+      items: { create: itemsCreate },
     },
     select: { id: true },
   });

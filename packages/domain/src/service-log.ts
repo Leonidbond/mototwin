@@ -11,10 +11,11 @@ import { applyServiceLogNodeFilter } from "./service-log-node-filter";
 
 /** Positive finite amount and non-empty currency (any event kind). */
 export function isPaidServiceEvent(event: ServiceEventItem): boolean {
-  if (event.costAmount === null || !Number.isFinite(event.costAmount)) {
+  const amount = event.totalCost ?? event.costAmount;
+  if (amount === null || amount === undefined || !Number.isFinite(amount)) {
     return false;
   }
-  if (event.costAmount <= 0) {
+  if (amount <= 0) {
     return false;
   }
   const cur = event.currency?.trim();
@@ -174,7 +175,10 @@ export function sortServiceLogEntries(
       case "engineHours":
         return compareNullableNumbers(left.engineHours, right.engineHours);
       case "cost":
-        return compareNullableNumbers(left.costAmount, right.costAmount);
+        return compareNullableNumbers(
+          left.totalCost ?? left.costAmount,
+          right.totalCost ?? right.costAmount
+        );
       case "comment":
         return compareStrings(left.comment || "", right.comment || "");
       default:
@@ -210,6 +214,7 @@ export function groupServiceEventsByMonth(
     const monthStart = getMonthStartTimestamp(event.eventDate);
     const existingGroup = groupsMap.get(key);
 
+    const eventTotal = event.totalCost ?? event.costAmount ?? null;
     if (existingGroup) {
       existingGroup.events.push(event);
       if (event.eventKind === "STATE_UPDATE") {
@@ -217,9 +222,9 @@ export function groupServiceEventsByMonth(
       } else {
         existingGroup.summary.serviceCount += 1;
       }
-      if (event.costAmount !== null && event.costAmount > 0 && event.currency) {
+      if (eventTotal !== null && eventTotal > 0 && event.currency) {
         existingGroup.summary.costByCurrency[event.currency] =
-          (existingGroup.summary.costByCurrency[event.currency] || 0) + event.costAmount;
+          (existingGroup.summary.costByCurrency[event.currency] || 0) + eventTotal;
       }
       return;
     }
@@ -233,8 +238,8 @@ export function groupServiceEventsByMonth(
         serviceCount: event.eventKind === "STATE_UPDATE" ? 0 : 1,
         stateUpdateCount: event.eventKind === "STATE_UPDATE" ? 1 : 0,
         costByCurrency:
-          event.costAmount !== null && event.costAmount > 0 && event.currency
-            ? { [event.currency]: event.costAmount }
+          eventTotal !== null && eventTotal > 0 && event.currency
+            ? { [event.currency]: eventTotal }
             : {},
       },
     });

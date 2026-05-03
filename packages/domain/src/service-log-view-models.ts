@@ -1,8 +1,10 @@
 import type {
   MonthlyServiceLogSummary,
+  ServiceBundleItem,
   ServiceEventItem,
   ServiceEventKind,
   ServiceEventsFilters,
+  ServiceLogBundleItemSummary,
   ServiceLogEntryDateStyle,
   ServiceLogEntryViewModel,
   ServiceLogMonthGroupViewModel,
@@ -15,6 +17,12 @@ import {
   getStateUpdateSummary,
   groupServiceEventsByMonth,
 } from "./service-log";
+import { formatExpenseAmountRu } from "./expense-summary";
+import {
+  getServiceActionTypeLabelRu,
+  getServiceEventModeLabelRu,
+  mapServiceTypeStringToActionType,
+} from "./forms";
 import { isLikelyWishlistInstallServiceEvent } from "./part-wishlist";
 
 /** Preview length for collapsed journal comments (web + Expo). */
@@ -248,6 +256,50 @@ function getHistoryPreviousStateByEventId(
   return previousByEventId;
 }
 
+function buildBundleItemSummaries(event: ServiceEventItem): ServiceLogBundleItemSummary[] {
+  const items: ServiceBundleItem[] =
+    event.items && event.items.length > 0
+      ? event.items
+      : [
+          {
+            id: `${event.id}_legacy`,
+            nodeId: event.nodeId,
+            actionType: mapServiceTypeStringToActionType(event.serviceType),
+            partName: event.partName ?? null,
+            sku: event.partSku ?? null,
+            quantity: null,
+            partCost: null,
+            laborCost: null,
+            comment: null,
+            sortOrder: 0,
+            node: event.node,
+          },
+        ];
+  return items
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map((item) => ({
+      id: item.id,
+      nodeId: item.nodeId,
+      nodeName: item.node?.name?.trim() || item.nodeId,
+      actionType: item.actionType,
+      actionLabelRu: getServiceActionTypeLabelRu(item.actionType),
+      partName: item.partName?.trim() ? item.partName.trim() : null,
+      sku: item.sku?.trim() ? item.sku.trim() : null,
+      quantity: item.quantity ?? null,
+      partCost: item.partCost ?? null,
+      laborCost: item.laborCost ?? null,
+      comment: item.comment?.trim() ? item.comment.trim() : null,
+    }));
+}
+
+function formatBundleCostLabel(label: string, amount: number | null, currency: string | null): string | null {
+  if (amount == null || !Number.isFinite(amount) || amount <= 0 || !currency) {
+    return null;
+  }
+  return `${label} ${formatExpenseAmountRu(amount)} ${currency}`;
+}
+
 export function buildServiceLogEntryViewModel(
   event: ServiceEventItem,
   dateStyle: ServiceLogEntryDateStyle = "default",
@@ -255,12 +307,35 @@ export function buildServiceLogEntryViewModel(
 ): ServiceLogEntryViewModel {
   const kind = event.eventKind === "STATE_UPDATE" ? "STATE_UPDATE" : "SERVICE";
   const isState = kind === "STATE_UPDATE";
-  const nodeTitle = event.node?.name || event.nodeId;
   const dateLabel = formatServiceLogEntryDate(event.eventDate, dateStyle);
+
+  const bundleItemsSummary = isState ? [] : buildBundleItemSummaries(event);
+  const nodeChips = bundleItemsSummary.map((item) => item.nodeName);
+  const nodeCount = bundleItemsSummary.length;
+  const isMultiNode = nodeCount > 1;
+
+  const titleFallback = event.title?.trim() || event.serviceType?.trim() || "";
+  const firstActionLabel =
+    bundleItemsSummary[0]?.actionLabelRu ?? getServiceActionTypeLabelRu("SERVICE");
+  const mainTitle = isState
+    ? "Обновление состояния"
+    : titleFallback || firstActionLabel;
+
+  const singleNodeName = bundleItemsSummary[0]?.nodeName || event.node?.name || event.nodeId;
+  const secondaryTitle = isMultiNode
+    ? `${nodeCount} узлов`
+    : singleNodeName;
+  const expoServiceNodeLabel = isState
+    ? null
+    : isMultiNode
+      ? `${nodeCount} узлов`
+      : (event.node?.name ?? bundleItemsSummary[0]?.nodeName ?? "—");
+
+  const totalAmount = event.totalCost ?? event.costAmount ?? null;
   const hasCost =
     !isState &&
-    event.costAmount !== null &&
-    event.costAmount > 0 &&
+    totalAmount !== null &&
+    totalAmount > 0 &&
     Boolean(event.currency);
 
   const wishlistOriginLabelRu =
@@ -269,13 +344,22 @@ export function buildServiceLogEntryViewModel(
     ? buildStateUpdateDisplayViewModelWithFallback(event, previousFromHistory)
     : null;
 
+  const mode = event.mode ?? "BASIC";
+
+  // Для legacy single-node BASIC оставляем partSku/partName на верхнем уровне.
+  const firstItem = bundleItemsSummary[0] ?? null;
+  const headerPartSku =
+    !isMultiNode && firstItem?.sku ? firstItem.sku : event.partSku?.trim() || null;
+  const headerPartName =
+    !isMultiNode && firstItem?.partName ? firstItem.partName : event.partName?.trim() || null;
+
   return {
     id: event.id,
     eventKind: kind,
     visualKind: isState ? "secondary" : "primary",
-    mainTitle: isState ? "Обновление состояния" : event.serviceType,
-    secondaryTitle: nodeTitle,
-    expoServiceNodeLabel: isState ? null : (event.node?.name ?? "—"),
+    mainTitle,
+    secondaryTitle,
+    expoServiceNodeLabel,
     stateUpdateSubtitle: stateUpdateDisplay?.summary ?? null,
     stateUpdateLines: stateUpdateDisplay?.lines ?? [],
     dateLabel,
@@ -285,12 +369,20 @@ export function buildServiceLogEntryViewModel(
     engineHoursValue: event.engineHours !== null ? String(event.engineHours) : null,
     compactMetricsLine: buildCompactMetricsLine(event),
     costLabel: hasCost ? "Стоимость" : null,
-    costAmount: hasCost ? event.costAmount : null,
+    costAmount: hasCost ? totalAmount : null,
     costCurrency: hasCost ? event.currency : null,
     comment: event.comment,
-    partSku: event.partSku?.trim() ? event.partSku.trim() : null,
-    partName: event.partName?.trim() ? event.partName.trim() : null,
+    partSku: headerPartSku,
+    partName: headerPartName,
     wishlistOriginLabelRu,
+    mode,
+    modeBadgeRu: getServiceEventModeLabelRu(mode),
+    nodeChips,
+    nodeCount,
+    bundleItemsSummary,
+    partsCostLabel: formatBundleCostLabel("Детали", event.partsCost ?? null, event.currency ?? null),
+    laborCostLabel: formatBundleCostLabel("Работа", event.laborCost ?? null, event.currency ?? null),
+    totalCostLabel: formatBundleCostLabel("Итого", totalAmount, event.currency ?? null),
   };
 }
 

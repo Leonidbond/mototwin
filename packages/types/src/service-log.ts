@@ -1,4 +1,9 @@
-import type { ServiceEventItem, ServiceEventKind } from "./service-event";
+import type {
+  ServiceActionType,
+  ServiceEventItem,
+  ServiceEventKind,
+  ServiceEventMode,
+} from "./service-event";
 
 export type ServiceEventsSortField =
   | "eventDate"
@@ -77,16 +82,35 @@ export type ServiceLogEntryVisualKind = "primary" | "secondary";
  */
 export type ServiceLogEntryDateStyle = "default" | "compact";
 
+/**
+ * Сводка по одному пункту bundle для рендеринга в журнале/детальной панели.
+ */
+export type ServiceLogBundleItemSummary = {
+  id: string;
+  nodeId: string;
+  nodeName: string;
+  actionType: ServiceActionType;
+  /** RU-лейбл действия — «Замена», «Проверка», … */
+  actionLabelRu: string;
+  partName: string | null;
+  sku: string | null;
+  quantity: number | null;
+  partCost: number | null;
+  laborCost: number | null;
+  comment: string | null;
+};
+
 export type ServiceLogEntryViewModel = {
   id: string;
   eventKind: ServiceEventKind;
   visualKind: ServiceLogEntryVisualKind;
   mainTitle: string;
-  /** Node or `nodeId` (web-style). */
+  /** Node or `nodeId` (web-style). Для bundle с >1 узлами: «N узлов». */
   secondaryTitle: string;
   /**
    * Expo service cards historically used an em dash when the nested `node`
    * object was absent (`node?.name ?? "—"`), even if `nodeId` exists.
+   * Для bundle с >1 узлами: «N узлов».
    */
   expoServiceNodeLabel: string | null;
   stateUpdateSubtitle: string | null;
@@ -111,6 +135,26 @@ export type ServiceLogEntryViewModel = {
    * `null` for other events.
    */
   wishlistOriginLabelRu: string | null;
+
+  // ---------------------------------------------------------------------------
+  // Service Bundle (Wave 1) — extra fields, всегда заполнены.
+  // ---------------------------------------------------------------------------
+  /** Bundle режим (BASIC / ADVANCED). */
+  mode: ServiceEventMode;
+  /** RU-лейбл режима — «Быстро» / «Подробно». */
+  modeBadgeRu: string;
+  /** Имена затронутых узлов (для chips). */
+  nodeChips: string[];
+  /** Кол-во узлов в bundle (= `items.length`; >=1). */
+  nodeCount: number;
+  /** Полная сводка по items (для раскрытой карточки и detail-view). */
+  bundleItemsSummary: ServiceLogBundleItemSummary[];
+  /** Лейбл сводки для детали запчастей (`«Детали 12 000 ₽»`); `null` если 0 / нет валюты. */
+  partsCostLabel: string | null;
+  /** Лейбл сводки работы. */
+  laborCostLabel: string | null;
+  /** Лейбл итоговой суммы (`«Итого 17 000 ₽»`). */
+  totalCostLabel: string | null;
 };
 
 export type ServiceLogMonthlySummaryViewModel = MonthlyServiceLogSummary & {

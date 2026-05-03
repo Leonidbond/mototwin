@@ -62,7 +62,10 @@ export type UpdateServiceEventResponse = {
 export type DeleteServiceEventResponse = {
   deleted: true;
   eventId: string;
+  /** Anchor node id (для обратной совместимости вызывающих); фактически статусы пересчитаны для всех `items[].nodeId`. */
   affectedNodeId: string;
+  /** Все nodeId, чьи статусы пересчитаны после удаления (включая anchor). */
+  affectedNodeIds?: string[];
 };
 
 export type {

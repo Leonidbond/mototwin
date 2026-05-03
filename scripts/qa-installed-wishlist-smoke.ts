@@ -117,11 +117,11 @@ async function main() {
       : form.engineHours === String(v.engineHours),
     "engineHours = current",
   );
-  assert(form.nodeId === installed.nodeId, "nodeId prefill");
-  assert(form.serviceType === WISHLIST_INSTALL_SERVICE_TYPE_RU, "serviceType");
+  assert(form.items[0]?.nodeId === installed.nodeId, "nodeId prefill in items[0]");
+  assert(form.title === WISHLIST_INSTALL_SERVICE_TYPE_RU, "title (legacy serviceType)");
   assert(
     installed.costAmount != null &&
-      form.costAmount === formatExpenseAmountRu(installed.costAmount) &&
+      form.partsCost === formatExpenseAmountRu(installed.costAmount) &&
       form.currency === (installed.currency?.trim() || "RUB").toUpperCase(),
     "cost/currency from wishlist",
   );
@@ -143,13 +143,13 @@ async function main() {
   const listRes = await fetch(`${BASE}/api/vehicles/${vid}/service-events`);
   await assertResponseOk(listRes, "GET service-events");
   const events = (await listRes.json()) as {
-    serviceEvents: Array<{ id: string; costAmount: number | null }>;
+    serviceEvents: Array<{ id: string; totalCost: number | null }>;
   };
   const inJournal = events.serviceEvents.find((e) => e.id === createdId);
   assert(inJournal, "event in journal");
   assert(
-    inJournal.costAmount === payload.costAmount,
-    `journal cost ${inJournal.costAmount} vs ${payload.costAmount}`,
+    inJournal.totalCost === payload.totalCost,
+    `journal totalCost ${inJournal.totalCost} vs ${payload.totalCost}`,
   );
 
   const wlAfter = await fetch(`${BASE}/api/vehicles/${vid}/wishlist`);
@@ -157,8 +157,12 @@ async function main() {
   assert(!filterActiveWishlistItems(wl2.items).some((i) => i.id === itemId), "still not active after save");
 
   const prisma2 = makePrisma();
+  const anchorNodeId = payload.nodeId ?? payload.items[0]?.nodeId;
+  if (!anchorNodeId) {
+    throw new Error("payload should have an anchor nodeId or items[0].nodeId");
+  }
   const nodeState = await prisma2.nodeState.findUnique({
-    where: { vehicleId_nodeId: { vehicleId: vid, nodeId: payload.nodeId } },
+    where: { vehicleId_nodeId: { vehicleId: vid, nodeId: anchorNodeId } },
     select: { status: true, lastServiceEventId: true },
   });
   assert(nodeState?.status === "RECENTLY_REPLACED", "leaf NodeState after install event");
@@ -169,8 +173,8 @@ async function main() {
     vehicleId: vid,
     wishlistItemId: itemId,
     serviceEventId: createdId,
-    serviceType: payload.serviceType,
-    cost: payload.costAmount,
+    title: payload.title,
+    totalCost: payload.totalCost,
     currency: payload.currency,
   });
 }

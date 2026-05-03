@@ -214,20 +214,38 @@ function ServiceCard({
           <Text style={styles.wishlistOriginLabel}>{entry.wishlistOriginLabelRu}</Text>
         )
       ) : null}
-      {entry.partName || entry.partSku ? (
-        <View style={styles.partDetails}>
-          {entry.partName ? (
-            <Text style={styles.partDetailLine}>
-              <Text style={styles.partDetailLabel}>Запчасть · </Text>
-              {entry.partName}
-            </Text>
+      <View style={styles.bundleBadgeRow}>
+        <View style={styles.bundleModeBadge}>
+          <Text style={styles.bundleModeBadgeText}>{entry.modeBadgeRu}</Text>
+        </View>
+        {entry.nodeCount > 1 ? (
+          <Text style={styles.bundleNodeCount}>{`${entry.nodeCount} узлов`}</Text>
+        ) : null}
+      </View>
+      {entry.nodeChips.length > 0 ? (
+        <View style={styles.bundleChipsRow}>
+          {entry.nodeChips.slice(0, 4).map((chip, idx) => (
+            <View key={`${entry.id}.chip.${idx}.${chip}`} style={styles.bundleChip}>
+              <Text style={styles.bundleChipText}>{chip}</Text>
+            </View>
+          ))}
+          {entry.nodeChips.length > 4 ? (
+            <Text style={styles.bundleNodeCount}>{`+${entry.nodeChips.length - 4}`}</Text>
           ) : null}
-          {entry.partSku ? (
-            <Text style={styles.partDetailLine}>
-              <Text style={styles.partDetailLabel}>SKU · </Text>
-              {entry.partSku}
+        </View>
+      ) : null}
+      {entry.bundleItemsSummary.length > 0 &&
+      (entry.mode === "ADVANCED" || entry.bundleItemsSummary.some((it) => it.partName || it.sku)) ? (
+        <View style={styles.bundleItemsList}>
+          {entry.bundleItemsSummary.map((it) => (
+            <Text key={it.id} style={styles.bundleItemLine}>
+              <Text style={styles.bundleItemAction}>{it.actionLabelRu}</Text>
+              <Text> · {it.nodeName}</Text>
+              {it.partName ? <Text> · {it.partName}</Text> : null}
+              {it.sku ? <Text style={styles.bundleItemMuted}>{` · SKU ${it.sku}`}</Text> : null}
+              {it.quantity != null ? <Text>{` · ×${it.quantity}`}</Text> : null}
             </Text>
-          ) : null}
+          ))}
         </View>
       ) : null}
       <Text style={styles.eventNode}>{entry.secondaryTitle}</Text>
@@ -252,7 +270,19 @@ function ServiceCard({
           ) : null}
         </View>
       ) : null}
-      {entry.costAmount != null && entry.costCurrency ? (
+      {entry.totalCostLabel || entry.partsCostLabel || entry.laborCostLabel ? (
+        <View style={styles.bundleCostsRow}>
+          {entry.partsCostLabel ? (
+            <Text style={styles.bundleCostMuted}>{entry.partsCostLabel}</Text>
+          ) : null}
+          {entry.laborCostLabel ? (
+            <Text style={styles.bundleCostMuted}>{entry.laborCostLabel}</Text>
+          ) : null}
+          {entry.totalCostLabel ? (
+            <Text style={styles.eventCost}>{entry.totalCostLabel}</Text>
+          ) : null}
+        </View>
+      ) : entry.costAmount != null && entry.costCurrency ? (
         <Text style={styles.eventCost}>
           {entry.costAmount.toLocaleString("ru-RU")} {entry.costCurrency}
         </Text>
@@ -1639,6 +1669,76 @@ const styles = StyleSheet.create({
   partDetailLabel: {
     fontWeight: "600",
     color: c.textMuted,
+  },
+  bundleBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+  },
+  bundleModeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: c.indigoSoftBorder,
+    backgroundColor: c.serviceBadgeBg,
+  },
+  bundleModeBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: c.serviceBadgeText,
+    textTransform: "uppercase",
+  },
+  bundleNodeCount: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textMuted,
+  },
+  bundleChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 6,
+  },
+  bundleChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+  },
+  bundleChipText: {
+    fontSize: 11,
+    color: c.textSecondary,
+  },
+  bundleItemsList: {
+    marginTop: 6,
+    gap: 3,
+  },
+  bundleItemLine: {
+    fontSize: 12,
+    color: c.textSecondary,
+    lineHeight: 17,
+  },
+  bundleItemAction: {
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  bundleItemMuted: {
+    color: c.textMuted,
+  },
+  bundleCostsRow: {
+    marginTop: 6,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    alignItems: "center",
+  },
+  bundleCostMuted: {
+    fontSize: 12,
+    color: c.textSecondary,
   },
   stateUpdateMainTitle: {
     fontSize: 14,

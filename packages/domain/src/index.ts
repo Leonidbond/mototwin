@@ -141,6 +141,12 @@ export type { VehicleOdometerStateForServiceEvent, CreateInitialRepeatServiceEve
 export {
   getTodayDateYmdLocal,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
+  SERVICE_ACTION_TYPE_OPTIONS,
+  SERVICE_EVENT_MODE_LABELS_RU,
+  getServiceActionTypeLabelRu,
+  getServiceEventModeLabelRu,
+  mapServiceTypeStringToActionType,
+  createEmptyBundleItemFormValues,
   getServiceEventTemplateForNode,
   createInitialAddServiceEventFromNode,
   buildAddServiceEventCommentFromWishlistItem,

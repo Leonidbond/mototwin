@@ -43,5 +43,10 @@ export function applyServiceLogNodeFilter(
     return serviceEvents;
   }
   const allowed = new Set(filter.nodeIds);
-  return serviceEvents.filter((e) => allowed.has(e.nodeId));
+  return serviceEvents.filter((e) => {
+    if (allowed.has(e.nodeId)) {
+      return true;
+    }
+    return e.items?.some((item) => allowed.has(item.nodeId)) ?? false;
+  });
 }

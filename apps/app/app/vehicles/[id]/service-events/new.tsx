@@ -1,47 +1,28 @@
-import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  createInitialAddServiceEventFormValues,
+  createInitialAddServiceEventFromNode,
+  createInitialAddServiceEventFromWishlistItem,
   createInitialEditServiceEventValues,
   createInitialRepeatServiceEventValues,
-  createInitialAddServiceEventFromNode,
-  createInitialAddServiceEventFormValues,
-  createInitialAddServiceEventFromWishlistItem,
   getDefaultCurrencyFromSettings,
   getNodePathById,
-  getNodeSelectLevels,
-  getNodeShortExplanationLabel,
   getSelectedNodeFromPath,
   getTodayDateYmdLocal,
-  isLeafNode,
   normalizeAddServiceEventPayload,
   normalizeEditServiceEventPayload,
-  validateAddServiceEventFormValuesMobile,
-  formatExpenseAmountRu,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import type {
-  AddServiceEventFormValues,
-  ExpenseItem,
-  NodeTreeItem,
-  PartSkuViewModel,
-  PartWishlistItem,
-  SelectedNodePath,
-} from "@mototwin/types";
+import type { AddServiceEventFormValues, NodeTreeItem, PartWishlistItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../../components/keyboard-aware-scroll-screen";
 import { ScreenHeader } from "../../../components/screen-header";
 import { readUserLocalSettings } from "../../../../src/ui-user-local-settings";
+import { BasicServiceEventBundleForm } from "../_components/basic-service-event-bundle-form";
 
 export default function NewServiceEventScreen() {
   const router = useRouter();
@@ -78,36 +59,20 @@ export default function NewServiceEventScreen() {
   const apiBaseUrl = getApiBaseUrl();
 
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
-  const [selectedPath, setSelectedPath] = useState<SelectedNodePath>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const [eventDate, setEventDate] = useState(() => getTodayDateYmdLocal());
-  const [odometer, setOdometer] = useState("");
-  const [engineHours, setEngineHours] = useState("");
-  const [serviceType, setServiceType] = useState("");
-  const [costAmount, setCostAmount] = useState("");
-  const [currency, setCurrency] = useState(
-    () => createInitialAddServiceEventFormValues().currency
+  const [bundleInitial, setBundleInitial] = useState<AddServiceEventFormValues>(() =>
+    createInitialAddServiceEventFormValues()
   );
-  const [comment, setComment] = useState("");
-  const [partSku, setPartSku] = useState("");
-  const [partName, setPartName] = useState("");
-  const [installedPartsJson, setInstalledPartsJson] = useState("");
+  const [bundleSessionKey, setBundleSessionKey] = useState(0);
   const [currentVehicleOdometer, setCurrentVehicleOdometer] = useState<number | null>(null);
   const [currentVehicleEngineHours, setCurrentVehicleEngineHours] = useState<number | null>(null);
-  const [uninstalledExpenses, setUninstalledExpenses] = useState<ExpenseItem[]>([]);
-  const [selectedExpenseIds, setSelectedExpenseIds] = useState<string[]>([]);
-  const [uninstalledExpensesError, setUninstalledExpensesError] = useState("");
-  const [isLoadingUninstalledExpenses, setIsLoadingUninstalledExpenses] = useState(false);
-  const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
-  const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
-  const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
-  const [serviceEventSkuError, setServiceEventSkuError] = useState("");
-  const serviceEventSkuSearchGen = useRef(0);
+
   const isEditMode = editingEventId.length > 0;
   const isRepeatMode = !isEditMode && repeatFromId.length > 0;
+
+  const clearError = useCallback(() => setError(""), []);
 
   useEffect(() => {
     const load = async () => {
@@ -132,13 +97,17 @@ export default function NewServiceEventScreen() {
         ]);
         const nextTree = treeData.nodeTree ?? [];
         setNodeTree(nextTree);
-        let initialPath = initialNodeId ? getNodePathById(nextTree, initialNodeId) : null;
-        let prefillApplied = false;
+
+        const v = vehicleData.vehicle;
+        const vehicleOdometer = v?.odometer ?? null;
+        const vehicleEngineHours = v?.engineHours ?? null;
+        setCurrentVehicleOdometer(vehicleOdometer);
+        setCurrentVehicleEngineHours(vehicleEngineHours ?? null);
+
+        let nextForm: AddServiceEventFormValues;
 
         if (isEditMode && eventsData) {
-          const editableEvent = (eventsData.serviceEvents ?? []).find(
-            (event) => event.id === editingEventId
-          );
+          const editableEvent = (eventsData.serviceEvents ?? []).find((e) => e.id === editingEventId);
           if (!editableEvent) {
             setError("Сервисное событие не найдено.");
             setIsLoading(false);
@@ -149,23 +118,9 @@ export default function NewServiceEventScreen() {
             setIsLoading(false);
             return;
           }
-          initialPath = getNodePathById(nextTree, editableEvent.nodeId);
-          const prefill = createInitialEditServiceEventValues(editableEvent);
-          setServiceType(prefill.serviceType);
-          setEventDate(prefill.eventDate);
-          setOdometer(prefill.odometer);
-          setEngineHours(prefill.engineHours);
-          setCostAmount(prefill.costAmount);
-          setCurrency(prefill.currency);
-          setComment(prefill.comment);
-          setPartSku(prefill.partSku);
-          setPartName(prefill.partName);
-          setInstalledPartsJson(prefill.installedPartsJson);
-          prefillApplied = true;
-        } else if (isRepeatMode && eventsData && vehicleData.vehicle) {
-          const sourceEvent = (eventsData.serviceEvents ?? []).find(
-            (event) => event.id === repeatFromId
-          );
+          nextForm = createInitialEditServiceEventValues(editableEvent);
+        } else if (isRepeatMode && eventsData && v) {
+          const sourceEvent = (eventsData.serviceEvents ?? []).find((e) => e.id === repeatFromId);
           if (!sourceEvent) {
             setError("Исходное событие не найдено.");
             setIsLoading(false);
@@ -176,59 +131,23 @@ export default function NewServiceEventScreen() {
             setIsLoading(false);
             return;
           }
-          initialPath = getNodePathById(nextTree, sourceEvent.nodeId);
-          const v = vehicleData.vehicle;
-          const prefill = createInitialRepeatServiceEventValues(
+          nextForm = createInitialRepeatServiceEventValues(
             sourceEvent,
             { odometer: v.odometer, engineHours: v.engineHours ?? null },
             { todayDateYmd: getTodayDateYmdLocal() }
           );
-          setServiceType(prefill.serviceType);
-          setEventDate(prefill.eventDate);
-          setOdometer(prefill.odometer);
-          setEngineHours(prefill.engineHours);
-          setCostAmount(prefill.costAmount);
-          setCurrency(prefill.currency);
-          setComment(prefill.comment);
-          setPartSku(prefill.partSku);
-          setPartName(prefill.partName);
-          setInstalledPartsJson(prefill.installedPartsJson);
-          prefillApplied = true;
-        } else if (initialNodeId) {
-          initialPath = getNodePathById(nextTree, initialNodeId);
-        }
-        if (initialPath) {
-          setSelectedPath(initialPath);
-        }
-        const vehicleOdometer = vehicleData.vehicle?.odometer;
-        setCurrentVehicleOdometer(vehicleOdometer != null ? vehicleOdometer : null);
-        setCurrentVehicleEngineHours(vehicleData.vehicle?.engineHours ?? null);
-        if (!prefillApplied && !isEditMode) {
-          setOdometer(vehicleOdometer != null ? String(vehicleOdometer) : "");
-          setEngineHours(
-            vehicleData.vehicle?.engineHours != null ? String(vehicleData.vehicle.engineHours) : ""
-          );
-          setCurrency(defaultCurrency);
-        }
-
-        const fromWishlist =
+        } else if (
           !isEditMode &&
           !isRepeatMode &&
           source === "wishlist" &&
           wlTitle.length > 0 &&
-          vehicleData.vehicle;
-        if (fromWishlist) {
-          const v = vehicleData.vehicle!;
+          v
+        ) {
           const parsedWlCost =
-            wlCostStr !== ""
-              ? Number.parseFloat(wlCostStr.replace(",", "."))
-              : Number.NaN;
+            wlCostStr !== "" ? Number.parseFloat(wlCostStr.replace(",", ".")) : Number.NaN;
           const wishlistCostAmount =
-            wlCostStr !== "" && Number.isFinite(parsedWlCost) && parsedWlCost >= 0
-              ? parsedWlCost
-              : null;
-          const wishlistCurrency =
-            wishlistCostAmount != null ? wlCurrency || "RUB" : null;
+            wlCostStr !== "" && Number.isFinite(parsedWlCost) && parsedWlCost >= 0 ? parsedWlCost : null;
+          const wishlistCurrency = wishlistCostAmount != null ? wlCurrency || "RUB" : null;
           const synthetic: PartWishlistItem = {
             id: wlId,
             vehicleId,
@@ -245,63 +164,48 @@ export default function NewServiceEventScreen() {
             node: null,
             sku: null,
           };
-          const prefill = createInitialAddServiceEventFromWishlistItem(
+          nextForm = createInitialAddServiceEventFromWishlistItem(
             synthetic,
             { odometer: v.odometer, engineHours: v.engineHours ?? null },
             { todayDateYmd: getTodayDateYmdLocal() }
           );
-          setServiceType(prefill.serviceType);
-          setEventDate(prefill.eventDate);
-          setOdometer(prefill.odometer);
-          setEngineHours(prefill.engineHours);
-          setCostAmount(prefill.costAmount);
-          setCurrency(prefill.currency);
-          setComment(prefill.comment);
-          setPartSku(prefill.partSku);
-          setPartName(prefill.partName);
-          setInstalledPartsJson(prefill.installedPartsJson);
         } else if (
           !isEditMode &&
           !isRepeatMode &&
           initialNodeId &&
           (source === "tree" || source === "attention" || source === "search" || source === "node-context")
         ) {
-          const selectedInitialNode = getSelectedNodeFromPath(
-            nextTree,
-            getNodePathById(nextTree, initialNodeId) ?? []
-          );
-          if (selectedInitialNode && vehicleData.vehicle) {
-            const prefill = createInitialAddServiceEventFromNode({
+          const path = getNodePathById(nextTree, initialNodeId) ?? [];
+          const selectedInitialNode = getSelectedNodeFromPath(nextTree, path);
+          if (selectedInitialNode && v) {
+            nextForm = createInitialAddServiceEventFromNode({
               nodeId: selectedInitialNode.id,
               nodeCode: selectedInitialNode.code,
               nodeName: selectedInitialNode.name,
               vehicle: {
-                odometer: vehicleData.vehicle.odometer,
-                engineHours: vehicleData.vehicle.engineHours ?? null,
+                odometer: v.odometer,
+                engineHours: v.engineHours ?? null,
               },
               currentDateYmd: getTodayDateYmdLocal(),
             });
-            setServiceType(prefill.serviceType);
-            setEventDate(prefill.eventDate);
-            setOdometer(prefill.odometer);
-            setEngineHours(prefill.engineHours);
-            setCostAmount(prefill.costAmount);
-            setCurrency(defaultCurrency);
-            setComment(prefill.comment);
-            setPartSku(prefill.partSku);
-            setPartName(prefill.partName);
-            setInstalledPartsJson(prefill.installedPartsJson);
+            nextForm.currency = defaultCurrency;
           } else {
-            setCurrency(defaultCurrency);
-            setInstalledPartsJson("");
-            setPartSku("");
-            setPartName("");
+            nextForm = createInitialAddServiceEventFormValues();
+            nextForm.currency = defaultCurrency;
+            nextForm.odometer = vehicleOdometer != null ? String(vehicleOdometer) : "";
+            nextForm.engineHours = vehicleEngineHours != null ? String(vehicleEngineHours) : "";
           }
-        } else if (!prefillApplied && !isEditMode && !fromWishlist) {
-          setInstalledPartsJson("");
-          setPartSku("");
-          setPartName("");
+        } else {
+          nextForm = createInitialAddServiceEventFormValues();
+          nextForm.currency = defaultCurrency;
+          if (!isEditMode && v) {
+            nextForm.odometer = vehicleOdometer != null ? String(vehicleOdometer) : "";
+            nextForm.engineHours = vehicleEngineHours != null ? String(vehicleEngineHours) : "";
+          }
         }
+
+        setBundleInitial(nextForm);
+        setBundleSessionKey((k) => k + 1);
       } catch (requestError) {
         console.error(requestError);
         setError("Не удалось загрузить данные для формы.");
@@ -310,7 +214,7 @@ export default function NewServiceEventScreen() {
       }
     };
 
-    load();
+    void load();
   }, [
     apiBaseUrl,
     vehicleId,
@@ -328,200 +232,40 @@ export default function NewServiceEventScreen() {
     wlCurrency,
   ]);
 
-  const levels = getNodeSelectLevels(nodeTree, selectedPath);
-  const selectedNode = getSelectedNodeFromPath(nodeTree, selectedPath);
-  const isLeafSelected = Boolean(selectedNode && isLeafNode(selectedNode));
-  const selectedLeafNodeId = selectedNode && isLeafNode(selectedNode) ? selectedNode.id : "";
-
-  useEffect(() => {
-    if (!vehicleId || !selectedLeafNodeId) {
-      setUninstalledExpenses([]);
-      setSelectedExpenseIds([]);
-      return;
-    }
-    let cancelled = false;
-    setIsLoadingUninstalledExpenses(true);
-    setUninstalledExpensesError("");
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
-    void endpoints
-      .getUninstalledExpenses({ vehicleId, nodeId: selectedLeafNodeId })
-      .then((res) => {
-        if (cancelled) {
-          return;
-        }
-        setUninstalledExpenses(res.expenses ?? []);
-        setSelectedExpenseIds((prev) =>
-          prev.filter((id) => (res.expenses ?? []).some((expense) => expense.id === id))
-        );
-      })
-      .catch((requestError) => {
-        if (cancelled) {
-          return;
-        }
-        console.error(requestError);
-        setUninstalledExpenses([]);
-        setUninstalledExpensesError("Не удалось загрузить купленные детали.");
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoadingUninstalledExpenses(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiBaseUrl, selectedLeafNodeId, vehicleId]);
-
-  function toggleInstalledExpense(expense: ExpenseItem) {
-    const isSelected = selectedExpenseIds.includes(expense.id);
-    setSelectedExpenseIds((prev) =>
-      isSelected ? prev.filter((id) => id !== expense.id) : [...prev, expense.id]
-    );
-    if (isSelected) {
-      return;
-    }
-    if (!selectedNode && expense.nodeId) {
-      const path = getNodePathById(nodeTree, expense.nodeId);
-      if (path) {
-        setSelectedPath(path);
-      }
-    }
-    const title = expense.title?.trim() || "купленная деталь";
-    if (!eventDate.trim()) {
-      setEventDate(getTodayDateYmdLocal());
-    }
-    if (!serviceType.trim()) {
-      setServiceType(`Установка: ${title}`);
-    }
-    if (!partName.trim()) {
-      setPartName(title);
-    }
-    if (!partSku.trim() && expense.partSku?.trim()) {
-      setPartSku(expense.partSku.trim());
-    }
-    if (!comment.trim()) {
-      setComment(`Установка ранее купленной детали: ${title}`);
-    }
-    if (!odometer.trim() && currentVehicleOdometer != null) {
-      setOdometer(String(currentVehicleOdometer));
-    }
-    if (!engineHours.trim() && currentVehicleEngineHours != null) {
-      setEngineHours(String(currentVehicleEngineHours));
-    }
-  }
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setServiceEventSkuLookup(partSku.trim());
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [partSku]);
-
-  useEffect(() => {
-    const query = serviceEventSkuLookup;
-    if (query.length < 2) {
-      setServiceEventSkuResults([]);
-      setServiceEventSkuError("");
-      setServiceEventSkuLoading(false);
-      return;
-    }
-    const gen = serviceEventSkuSearchGen.current + 1;
-    serviceEventSkuSearchGen.current = gen;
-    setServiceEventSkuLoading(true);
-    setServiceEventSkuError("");
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
-    void endpoints
-      .getPartSkus({
-        search: query,
-        nodeId: selectedNode?.id || undefined,
-      })
-      .then((res) => {
-        if (serviceEventSkuSearchGen.current !== gen) {
-          return;
-        }
-        setServiceEventSkuResults((res.skus ?? []).slice(0, 6));
-      })
-      .catch(() => {
-        if (serviceEventSkuSearchGen.current !== gen) {
-          return;
-        }
-        setServiceEventSkuResults([]);
-        setServiceEventSkuError("Не удалось выполнить поиск в каталоге.");
-      })
-      .finally(() => {
-        if (serviceEventSkuSearchGen.current !== gen) {
-          return;
-        }
-        setServiceEventSkuLoading(false);
-      });
-  }, [apiBaseUrl, selectedNode?.id, serviceEventSkuLookup]);
-
-  async function save() {
+  const handleSubmit = async (form: AddServiceEventFormValues) => {
     if (!vehicleId) {
       setError("Не удалось определить ID мотоцикла.");
       return;
     }
 
-    if (!selectedNode || !isLeafNode(selectedNode)) {
-      setError("Выберите конечный (leaf) узел.");
-      return;
-    }
+    const anchorNodeId = form.items[0]?.nodeId?.trim() ?? "";
 
-    const serviceFormValues: AddServiceEventFormValues = {
-      nodeId: selectedNode.id,
-      eventDate,
-      serviceType,
-      odometer,
-      engineHours,
-      costAmount,
-      currency,
-      comment,
-      partSku,
-      partName,
-      installedPartsJson,
-      installedExpenseItemIds: selectedExpenseIds,
-    };
-
-    const validation = validateAddServiceEventFormValuesMobile(serviceFormValues, {
-      todayDateYmd: getTodayDateYmdLocal(),
-      currentVehicleOdometer,
-      isLeafNode: selectedNode ? isLeafSelected : undefined,
-    });
-    if (validation.errors.length > 0) {
-      setError(validation.errors[0]);
-      return;
-    }
-
-    const input = normalizeAddServiceEventPayload(serviceFormValues);
+    const client = createApiClient({ baseUrl: apiBaseUrl });
+    const endpoints = createMotoTwinEndpoints(client);
+    const input = normalizeAddServiceEventPayload(form);
 
     try {
       setIsSaving(true);
       setError("");
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
       if (isEditMode) {
         await endpoints.updateServiceEvent(
           vehicleId,
           editingEventId,
-          normalizeEditServiceEventPayload(serviceFormValues)
+          normalizeEditServiceEventPayload(form)
         );
       } else {
         await endpoints.createServiceEvent(vehicleId, input);
         if (source === "wishlist" && wlId.trim()) {
           await endpoints.updateWishlistItem(vehicleId, wlId.trim(), {
             status: "INSTALLED",
-            nodeId: selectedNode.id,
+            nodeId: anchorNodeId,
           });
         }
       }
       const feedback = isEditMode ? "updated" : "created";
       if (source === "attention") {
         const q = new URLSearchParams({ returnFocus: "attention" });
-        if (initialNodeId) {
-          q.set("attentionNodeId", initialNodeId);
-        }
+        if (initialNodeId) q.set("attentionNodeId", initialNodeId);
         router.replace(`/vehicles/${vehicleId}?${q.toString()}`);
       } else if (source === "tree" || source === "search" || source === "node-context") {
         router.replace(`/vehicles/${vehicleId}`);
@@ -540,7 +284,7 @@ export default function NewServiceEventScreen() {
     } finally {
       setIsSaving(false);
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -557,257 +301,23 @@ export default function NewServiceEventScreen() {
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title={isEditMode ? "Редактировать обслуживание" : "Новое обслуживание"} />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
-        <Text style={styles.sectionTitle}>Узел обслуживания</Text>
-        {levels.map((levelNodes, levelIndex) => (
-          <View key={`level-${levelIndex}`} style={styles.levelBlock}>
-            <Text style={styles.levelTitle}>Уровень {levelIndex + 1}</Text>
-            <View style={styles.optionWrap}>
-              {levelNodes.map((node) => {
-                const active = selectedPath[levelIndex] === node.id;
-                return (
-                  <Pressable
-                    key={node.id}
-                    style={[styles.optionChip, active && styles.optionChipActive]}
-                    onPress={() => {
-                      const nextPath = [...selectedPath.slice(0, levelIndex), node.id];
-                      setSelectedPath(nextPath);
-                    }}
-                  >
-                    <Text style={[styles.optionChipText, active && styles.optionChipTextActive]}>
-                      {node.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        ))}
-
-        <View style={styles.selectedNodeCard}>
-          <Text style={styles.selectedNodeLabel}>Выбранный узел</Text>
-          <Text style={styles.selectedNodeValue}>
-            {selectedNode ? selectedNode.name : "Не выбран"}
-          </Text>
-          <Text style={styles.selectedNodeHint}>
-            {selectedNode
-              ? !isLeafNode(selectedNode)
-                ? "Выберите конечный дочерний узел"
-                : getNodeShortExplanationLabel(selectedNode) || "Готово к созданию события"
-              : "Выберите узел по уровням"}
-          </Text>
-        </View>
-
-        {selectedNode && isLeafSelected ? (
-          <View style={styles.uninstalledCard}>
-            <Text style={styles.uninstalledTitle}>Купленные, но не установленные детали</Text>
-            <Text style={styles.uninstalledHint}>
-              Выберите позиции, которые устанавливаются этим сервисным событием. После сохранения они будут связаны с журналом.
-            </Text>
-            {isLoadingUninstalledExpenses ? (
-              <Text style={styles.uninstalledHint}>Загружаю купленные детали...</Text>
-            ) : uninstalledExpensesError ? (
-              <Text style={styles.errorText}>{uninstalledExpensesError}</Text>
-            ) : uninstalledExpenses.length === 0 ? (
-              <Text style={styles.uninstalledHint}>Для выбранного узла нет купленных деталей в ожидании установки.</Text>
-            ) : (
-              <View style={styles.uninstalledList}>
-                {uninstalledExpenses.map((expense) => {
-                  const selected = selectedExpenseIds.includes(expense.id);
-                  return (
-                    <Pressable
-                      key={expense.id}
-                      onPress={() => toggleInstalledExpense(expense)}
-                      style={({ pressed }) => [
-                        styles.uninstalledItem,
-                        selected && styles.uninstalledItemSelected,
-                        pressed && styles.uninstalledItemPressed,
-                      ]}
-                    >
-                      <View style={styles.uninstalledCheckbox}>
-                        <Text style={styles.uninstalledCheckboxText}>{selected ? "✓" : ""}</Text>
-                      </View>
-                      <View style={styles.uninstalledBody}>
-                        <Text style={styles.uninstalledName}>{expense.title}</Text>
-                        <Text style={styles.uninstalledMeta}>
-                          {formatExpenseAmountRu(expense.amount)} {expense.currency} · {new Date(expense.expenseDate).toLocaleDateString("ru-RU")}
-                        </Text>
-                        {expense.partSku ? (
-                          <Text style={styles.uninstalledMeta}>SKU · {expense.partSku}</Text>
-                        ) : null}
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        ) : null}
-
-        <Text style={styles.sectionTitle}>Данные события</Text>
-        <Field label="Дата (YYYY-MM-DD)">
-          <TextInput
-            value={eventDate}
-            onChangeText={setEventDate}
-            style={styles.input}
-            autoCapitalize="none"
-            placeholder="2026-04-17"
-          />
-        </Field>
-        <Field label="Пробег, км">
-          <TextInput
-            value={odometer}
-            onChangeText={setOdometer}
-            style={styles.input}
-            keyboardType="number-pad"
-            placeholder="15000"
-          />
-        </Field>
-        <Field label="Моточасы">
-          <TextInput
-            value={engineHours}
-            onChangeText={setEngineHours}
-            style={styles.input}
-            keyboardType="number-pad"
-            placeholder="Опционально"
-          />
-        </Field>
-        <Field label="Тип обслуживания">
-          <TextInput
-            value={serviceType}
-            onChangeText={setServiceType}
-            style={styles.input}
-            placeholder="Замена масла"
-          />
-        </Field>
-        <Field label="Артикул (SKU)">
-          <TextInput
-            value={partSku}
-            onChangeText={setPartSku}
-            style={styles.input}
-            placeholder="Опционально"
-            maxLength={200}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </Field>
-        {partSku.trim().length >= 2 ? (
-          <View style={styles.skuLookupCard}>
-            <Text style={styles.skuLookupTitle}>Поиск в каталоге по артикулу</Text>
-            {serviceEventSkuLoading ? <Text style={styles.skuLookupHint}>Ищем совпадения...</Text> : null}
-            {!serviceEventSkuLoading && serviceEventSkuError ? (
-              <Text style={styles.skuLookupError}>{serviceEventSkuError}</Text>
-            ) : null}
-            {!serviceEventSkuLoading && !serviceEventSkuError && serviceEventSkuResults.length === 0 ? (
-              <Text style={styles.skuLookupHint}>Ничего не найдено.</Text>
-            ) : null}
-            {!serviceEventSkuLoading && serviceEventSkuResults.length > 0 ? (
-              <View style={styles.skuLookupList}>
-                {serviceEventSkuResults.map((sku) => {
-                  const firstPartNumber = sku.partNumbers[0]?.number?.trim() ?? "";
-                  return (
-                    <Pressable
-                      key={sku.id}
-                      onPress={() => {
-                        setPartSku(firstPartNumber || partSku.trim());
-                        setPartName(sku.canonicalName?.trim() || partName);
-                      }}
-                      style={({ pressed }) => [
-                        styles.skuLookupItem,
-                        pressed && styles.skuLookupItemPressed,
-                      ]}
-                    >
-                      <Text style={styles.skuLookupItemPrimary}>
-                        {firstPartNumber || "Без артикула"}
-                      </Text>
-                      <Text style={styles.skuLookupItemSecondary}>
-                        {sku.brandName} · {sku.canonicalName}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-        <Field label="Наименование запчасти">
-          <TextInput
-            value={partName}
-            onChangeText={setPartName}
-            style={styles.input}
-            placeholder="Опционально"
-            maxLength={500}
-          />
-        </Field>
-        <View style={styles.row}>
-          <View style={styles.rowField}>
-            <Field label="Стоимость">
-              <TextInput
-                value={costAmount}
-                onChangeText={setCostAmount}
-                style={styles.input}
-                keyboardType="decimal-pad"
-                placeholder="Опционально"
-              />
-            </Field>
-          </View>
-          <View style={styles.currencyField}>
-            <Field label="Валюта">
-              <TextInput
-                value={currency}
-                onChangeText={setCurrency}
-                style={styles.input}
-                autoCapitalize="characters"
-                placeholder="RUB"
-              />
-            </Field>
-          </View>
-        </View>
-        <Field label="Комментарий">
-          <TextInput
-            value={comment}
-            onChangeText={setComment}
-            style={[styles.input, styles.multilineInput]}
-            placeholder="Опционально"
-            multiline
-          />
-        </Field>
-
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-        <Pressable
-          onPress={save}
-          disabled={isSaving || !isLeafSelected}
-          style={({ pressed }) => [
-            styles.saveButton,
-            (!isLeafSelected || isSaving) && styles.saveButtonDisabled,
-            pressed && isLeafSelected && !isSaving && styles.saveButtonPressed,
-          ]}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color={c.onPrimaryAction} />
-          ) : (
-            <Text style={styles.saveButtonText}>
-              {isEditMode ? "Сохранить изменения" : "Сохранить событие"}
-            </Text>
-          )}
-        </Pressable>
+        <BasicServiceEventBundleForm
+          key={bundleSessionKey}
+          vehicleId={vehicleId}
+          apiBaseUrl={apiBaseUrl}
+          nodeTree={nodeTree}
+          vehicleOdometer={currentVehicleOdometer}
+          vehicleEngineHours={currentVehicleEngineHours}
+          todayDateYmd={getTodayDateYmdLocal()}
+          initialForm={bundleInitial}
+          isSubmitting={isSaving}
+          submitError={error}
+          onClearSubmitError={clearError}
+          onSubmit={handleSubmit}
+          isEditMode={isEditMode}
+        />
       </KeyboardAwareScrollScreen>
     </SafeAreaView>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      {children}
-    </View>
   );
 }
 
@@ -831,242 +341,5 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: c.textSecondary,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: c.textMeta,
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  levelBlock: {
-    marginBottom: 8,
-  },
-  levelTitle: {
-    fontSize: 12,
-    color: c.textMuted,
-    marginBottom: 6,
-  },
-  optionWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  optionChip: {
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    backgroundColor: c.card,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  optionChipActive: {
-    borderColor: c.primaryAction,
-    backgroundColor: c.primaryAction,
-  },
-  optionChipText: {
-    fontSize: 13,
-    color: c.textMeta,
-  },
-  optionChipTextActive: {
-    color: c.onPrimaryAction,
-    fontWeight: "600",
-  },
-  selectedNodeCard: {
-    marginTop: 8,
-    marginBottom: 12,
-    backgroundColor: c.card,
-    borderColor: c.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-  },
-  selectedNodeLabel: {
-    fontSize: 12,
-    color: c.textMuted,
-  },
-  selectedNodeValue: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: c.textPrimary,
-    marginTop: 4,
-  },
-  selectedNodeHint: {
-    fontSize: 12,
-    color: c.textMuted,
-    marginTop: 4,
-  },
-  uninstalledCard: {
-    marginBottom: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.card,
-    padding: 12,
-    gap: 8,
-  },
-  uninstalledTitle: {
-    color: c.textPrimary,
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  uninstalledHint: {
-    color: c.textSecondary,
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  uninstalledList: {
-    gap: 8,
-  },
-  uninstalledItem: {
-    flexDirection: "row",
-    gap: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.cardMuted,
-    padding: 10,
-  },
-  uninstalledItemSelected: {
-    borderColor: c.primaryAction,
-    backgroundColor: c.cardSubtle,
-  },
-  uninstalledItemPressed: {
-    opacity: 0.85,
-  },
-  uninstalledCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  uninstalledCheckboxText: {
-    color: c.primaryAction,
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  uninstalledBody: {
-    flex: 1,
-  },
-  uninstalledName: {
-    color: c.textPrimary,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  uninstalledMeta: {
-    marginTop: 3,
-    color: c.textSecondary,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  field: {
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 12,
-    color: c.textMuted,
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: c.card,
-    borderColor: c.borderStrong,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: c.textPrimary,
-  },
-  multilineInput: {
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  skuLookupCard: {
-    marginTop: -2,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    backgroundColor: c.cardSubtle,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  skuLookupTitle: {
-    fontSize: 12,
-    color: c.textSecondary,
-    fontWeight: "600",
-  },
-  skuLookupHint: {
-    marginTop: 4,
-    fontSize: 12,
-    color: c.textMuted,
-  },
-  skuLookupError: {
-    marginTop: 4,
-    fontSize: 12,
-    color: c.error,
-  },
-  skuLookupList: {
-    marginTop: 8,
-    gap: 6,
-  },
-  skuLookupItem: {
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    backgroundColor: c.cardMuted,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  skuLookupItemPressed: {
-    opacity: 0.88,
-  },
-  skuLookupItemPrimary: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: c.textPrimary,
-  },
-  skuLookupItemSecondary: {
-    marginTop: 2,
-    fontSize: 12,
-    color: c.textSecondary,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  rowField: {
-    flex: 1,
-  },
-  currencyField: {
-    width: 96,
-  },
-  errorText: {
-    marginTop: 4,
-    marginBottom: 8,
-    color: c.error,
-    fontSize: 13,
-  },
-  saveButton: {
-    marginTop: 6,
-    backgroundColor: c.primaryAction,
-    borderRadius: 12,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  saveButtonDisabled: {
-    opacity: 0.45,
-  },
-  saveButtonPressed: {
-    opacity: 0.9,
-  },
-  saveButtonText: {
-    color: c.onPrimaryAction,
-    fontSize: 14,
-    fontWeight: "700",
   },
 });

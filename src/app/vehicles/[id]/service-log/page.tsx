@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildServiceLogTimelineProps,
@@ -11,21 +11,18 @@ import {
   expenseCategoryLabelsRu,
   filterPaidServiceEvents,
   formatExpenseAmountRu,
-  flattenNodeTreeToSelectOptions,
   getServiceLogEventKindBadgeLabel,
   isServiceLogTimelineQueryActive,
   normalizeAddServiceEventPayload,
   normalizeEditServiceEventPayload,
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
-  validateAddServiceEventFormValues,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import { BackButton } from "@/components/navigation/BackButton";
+import { BasicServiceEventModal } from "../_components/BasicServiceEventModal";
 import type {
   AddServiceEventFormValues,
-  ExpenseItem,
   NodeTreeItem,
-  PartSkuViewModel,
   ServiceEventItem,
   ServiceEventsFilters,
   ServiceEventsSortDirection,
@@ -33,39 +30,10 @@ import type {
   ServiceLogNodeFilter,
 } from "@mototwin/types";
 
-/** Native controls default to browser light styling; anchor them to Garage dark palette. */
-const SERVICE_EVENT_MODAL_FIELD_BASE: CSSProperties = {
-  marginTop: 4,
-  width: "100%",
-  borderRadius: "0.75rem",
-  border: `1px solid ${productSemanticColors.borderStrong}`,
-  backgroundColor: productSemanticColors.cardSubtle,
-  color: productSemanticColors.textPrimary,
-  padding: "12px 16px",
-  fontSize: "0.875rem",
-  outline: "none",
-};
-
-const SERVICE_EVENT_MODAL_LABEL_STYLE: CSSProperties = {
-  color: productSemanticColors.textMeta,
-};
-
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
 function parsePaidOnly(v: string | null): boolean {
   return v === "1" || v === "true";
-}
-
-function normalizePartNumber(value: string): string {
-  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-}
-
-function pickSkuPartNumberOrFallback(
-  sku: PartSkuViewModel,
-  fallback: string
-): string {
-  const first = sku.partNumbers[0]?.number?.trim() ?? "";
-  return first || fallback;
 }
 
 function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
@@ -113,19 +81,12 @@ export default function VehicleServiceLogPage() {
   const [isServiceEventModalOpen, setIsServiceEventModalOpen] = useState(false);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const [editingServiceEventId, setEditingServiceEventId] = useState<string | null>(null);
-  const [serviceEventForm, setServiceEventForm] = useState<AddServiceEventFormValues>(
+  const [serviceEventModalResetKey, setServiceEventModalResetKey] = useState(0);
+  const [serviceEventModalInitialForm, setServiceEventModalInitialForm] = useState<AddServiceEventFormValues>(() =>
     createInitialAddServiceEventFormValues()
   );
   const [serviceEventFormError, setServiceEventFormError] = useState("");
   const [isSavingServiceEvent, setIsSavingServiceEvent] = useState(false);
-  const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
-  const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
-  const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
-  const [serviceEventSkuError, setServiceEventSkuError] = useState("");
-  const [uninstalledExpenses, setUninstalledExpenses] = useState<ExpenseItem[]>([]);
-  const [uninstalledExpensesLoading, setUninstalledExpensesLoading] = useState(false);
-  const [uninstalledExpensesError, setUninstalledExpensesError] = useState("");
-  const serviceEventSkuSearchGen = useRef(0);
   const [filters, setFilters] = useState<ServiceEventsFilters>({
     dateFrom: "",
     dateTo: "",
@@ -164,99 +125,12 @@ export default function VehicleServiceLogPage() {
     }
   }, [expandExpensesFromQuery]);
 
-  useEffect(() => {
-    if (!isServiceEventModalOpen) {
-      setServiceEventSkuLookup("");
-      setServiceEventSkuResults([]);
-      setServiceEventSkuError("");
-      setServiceEventSkuLoading(false);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      setServiceEventSkuLookup(serviceEventForm.partSku.trim());
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [isServiceEventModalOpen, serviceEventForm.partSku]);
+  const bumpServiceEventModalInitial = useCallback((values: AddServiceEventFormValues) => {
+    setServiceEventModalInitialForm(values);
+    setServiceEventModalResetKey((key) => key + 1);
+  }, []);
 
-  useEffect(() => {
-    if (!isServiceEventModalOpen) {
-      return;
-    }
-    const query = serviceEventSkuLookup;
-    if (query.length < 2) {
-      setServiceEventSkuResults([]);
-      setServiceEventSkuError("");
-      setServiceEventSkuLoading(false);
-      return;
-    }
-    const gen = serviceEventSkuSearchGen.current + 1;
-    serviceEventSkuSearchGen.current = gen;
-    setServiceEventSkuLoading(true);
-    setServiceEventSkuError("");
-    void api
-      .getPartSkus({
-        search: query,
-        nodeId: serviceEventForm.nodeId.trim() || undefined,
-      })
-      .then((res) => {
-        if (serviceEventSkuSearchGen.current !== gen) {
-          return;
-        }
-        const list = res.skus ?? [];
-        const normalizedQuery = normalizePartNumber(query);
-        const exact = list.find((sku) =>
-          sku.partNumbers.some((partNumber) => normalizePartNumber(partNumber.number) === normalizedQuery)
-        );
-        const ordered = exact
-          ? [exact, ...list.filter((candidate) => candidate.id !== exact.id)]
-          : list;
-        setServiceEventSkuResults(ordered.slice(0, 6));
-      })
-      .catch(() => {
-        if (serviceEventSkuSearchGen.current !== gen) {
-          return;
-        }
-        setServiceEventSkuResults([]);
-        setServiceEventSkuError("Не удалось выполнить поиск по каталогу.");
-      })
-      .finally(() => {
-        if (serviceEventSkuSearchGen.current !== gen) {
-          return;
-        }
-        setServiceEventSkuLoading(false);
-      });
-  }, [isServiceEventModalOpen, serviceEventForm.nodeId, serviceEventSkuLookup]);
-
-  useEffect(() => {
-    if (!isServiceEventModalOpen || !vehicleId) {
-      setUninstalledExpenses([]);
-      return;
-    }
-    let cancelled = false;
-    setUninstalledExpensesLoading(true);
-    setUninstalledExpensesError("");
-    void api
-      .getUninstalledExpenses({ vehicleId })
-      .then((res) => {
-        if (!cancelled) {
-          setUninstalledExpenses(res.expenses ?? []);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setUninstalledExpenses([]);
-          setUninstalledExpensesError("Не удалось загрузить купленные детали.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setUninstalledExpensesLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isServiceEventModalOpen, vehicleId]);
+  const clearServiceEventSubmitError = useCallback(() => setServiceEventFormError(""), []);
 
   const load = useCallback(async () => {
     try {
@@ -327,64 +201,6 @@ export default function VehicleServiceLogPage() {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
-  const leafNodeOptions = useMemo(
-    () => flattenNodeTreeToSelectOptions(nodeTree).filter((option) => !option.hasChildren),
-    [nodeTree]
-  );
-  const orderedUninstalledExpenses = useMemo(() => {
-    const selectedNodeId = serviceEventForm.nodeId.trim();
-    return [...uninstalledExpenses].sort((left, right) => {
-      const leftMatches = selectedNodeId && left.nodeId === selectedNodeId ? 0 : 1;
-      const rightMatches = selectedNodeId && right.nodeId === selectedNodeId ? 0 : 1;
-      if (leftMatches !== rightMatches) {
-        return leftMatches - rightMatches;
-      }
-      return new Date(right.purchasedAt ?? right.expenseDate).getTime() - new Date(left.purchasedAt ?? left.expenseDate).getTime();
-    });
-  }, [serviceEventForm.nodeId, uninstalledExpenses]);
-
-  const toggleInstalledExpenseSelection = (expense: ExpenseItem) => {
-    setServiceEventForm((prev) => {
-      const selected = new Set(prev.installedExpenseItemIds);
-      const isSelecting = !selected.has(expense.id);
-      if (isSelecting) {
-        selected.add(expense.id);
-      } else {
-        selected.delete(expense.id);
-      }
-
-      if (!isSelecting) {
-        return { ...prev, installedExpenseItemIds: Array.from(selected) };
-      }
-
-      const expenseTitle = expense.partName?.trim() || expense.title.trim();
-      const commentLine = `Установлена ранее купленная деталь: ${expenseTitle}`;
-      const serviceType = `Установка: ${expenseTitle}`;
-      const nextComment = prev.comment.trim()
-        ? prev.comment.includes(commentLine)
-          ? prev.comment
-          : `${prev.comment.trim()}\n${commentLine}`
-        : commentLine;
-
-      return {
-        ...prev,
-        installedExpenseItemIds: Array.from(selected),
-        nodeId: prev.nodeId.trim() || expense.nodeId || "",
-        eventDate: prev.eventDate.trim() || new Date().toISOString().slice(0, 10),
-        serviceType: prev.serviceType.trim() || serviceType,
-        odometer:
-          prev.odometer.trim() ||
-          (vehicleOdometer != null ? String(vehicleOdometer) : ""),
-        engineHours:
-          prev.engineHours.trim() ||
-          (vehicleEngineHours != null ? String(vehicleEngineHours) : ""),
-        partName: prev.partName.trim() || expense.partName?.trim() || expense.title.trim(),
-        partSku: prev.partSku.trim() || expense.partSku?.trim() || "",
-        comment: nextComment,
-      };
-    });
-  };
-
   const resetFilters = () => {
     setFilters({
       dateFrom: "",
@@ -415,7 +231,7 @@ export default function VehicleServiceLogPage() {
 
   const openCreate = () => {
     setEditingServiceEventId(null);
-    setServiceEventForm(createInitialAddServiceEventFormValues());
+    bumpServiceEventModalInitial(createInitialAddServiceEventFormValues());
     setServiceEventFormError("");
     setIsServiceEventModalOpen(true);
   };
@@ -427,7 +243,7 @@ export default function VehicleServiceLogPage() {
     }
     const odometerForForm = vehicleOdometer ?? event.odometer;
     setEditingServiceEventId(null);
-    setServiceEventForm(
+    bumpServiceEventModalInitial(
       createInitialRepeatServiceEventValues(
         event,
         { odometer: odometerForForm, engineHours: vehicleEngineHours ?? null },
@@ -444,29 +260,12 @@ export default function VehicleServiceLogPage() {
       return;
     }
     setEditingServiceEventId(eventId);
-    setServiceEventForm(createInitialEditServiceEventValues(event));
+    bumpServiceEventModalInitial(createInitialEditServiceEventValues(event));
     setServiceEventFormError("");
     setIsServiceEventModalOpen(true);
   };
 
-  const applyServiceEventSkuSuggestion = (sku: PartSkuViewModel) => {
-    setServiceEventForm((prev) => ({
-      ...prev,
-      partSku: pickSkuPartNumberOrFallback(sku, prev.partSku.trim()),
-      partName: sku.canonicalName?.trim() || prev.partName,
-    }));
-  };
-
-  const saveServiceEvent = async () => {
-    const validation = validateAddServiceEventFormValues(serviceEventForm, {
-      todayDateYmd: new Date().toISOString().slice(0, 10),
-      currentVehicleOdometer: vehicleOdometer,
-      isLeafNode: true,
-    });
-    if (validation.errors.length > 0) {
-      setServiceEventFormError(validation.errors[0]);
-      return;
-    }
+  const saveServiceEvent = async (form: AddServiceEventFormValues) => {
     try {
       setIsSavingServiceEvent(true);
       setServiceEventFormError("");
@@ -474,11 +273,11 @@ export default function VehicleServiceLogPage() {
         await api.updateServiceEvent(
           vehicleId,
           editingServiceEventId,
-          normalizeEditServiceEventPayload(serviceEventForm)
+          normalizeEditServiceEventPayload(form)
         );
         setActionMessage("Сервисное событие обновлено. Статусы и расходы обновлены.");
       } else {
-        await api.createServiceEvent(vehicleId, normalizeAddServiceEventPayload(serviceEventForm));
+        await api.createServiceEvent(vehicleId, normalizeAddServiceEventPayload(form));
         setActionMessage("Сервисное событие добавлено. Статусы и расходы обновлены.");
       }
       setIsServiceEventModalOpen(false);
@@ -1139,31 +938,72 @@ export default function VehicleServiceLogPage() {
                                       </p>
                                     )
                                   ) : null}
-                                  {!isStateUpdate && (entry.partName || entry.partSku) ? (
-                                    <div className="mt-2 space-y-1 text-sm">
-                                      {entry.partName ? (
-                                        <p style={{ color: productSemanticColors.textSecondary }}>
-                                          <span
-                                            className="font-medium"
-                                            style={{ color: productSemanticColors.textMeta }}
-                                          >
-                                            Запчасть:{" "}
-                                          </span>
-                                          {entry.partName}
-                                        </p>
+                                  {!isStateUpdate ? (
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                      <span
+                                        className="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                                        title={entry.mode === "ADVANCED" ? "Подробный bundle (per-item details)" : "Быстрый bundle (общее действие)"}
+                                        style={{
+                                          borderColor: productSemanticColors.indigoSoftBorder,
+                                          backgroundColor: productSemanticColors.serviceBadgeBg,
+                                          color: productSemanticColors.serviceBadgeText,
+                                        }}
+                                      >
+                                        {entry.modeBadgeRu}
+                                      </span>
+                                      {entry.nodeCount > 1 ? (
+                                        <span
+                                          className="text-[11px] font-medium"
+                                          style={{ color: productSemanticColors.textMuted }}
+                                        >
+                                          {entry.nodeCount} узл{entry.nodeCount % 10 === 1 && entry.nodeCount % 100 !== 11 ? "а" : "ов"}
+                                        </span>
                                       ) : null}
-                                      {entry.partSku ? (
-                                        <p style={{ color: productSemanticColors.textSecondary }}>
-                                          <span
-                                            className="font-medium"
-                                            style={{ color: productSemanticColors.textMeta }}
-                                          >
-                                            SKU / артикул:{" "}
-                                          </span>
-                                          {entry.partSku}
-                                        </p>
+                                      {entry.nodeChips.slice(0, 3).map((chip, idx) => (
+                                        <span
+                                          key={`${entry.id}.chip.${idx}.${chip}`}
+                                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px]"
+                                          style={{
+                                            borderColor: productSemanticColors.border,
+                                            backgroundColor: productSemanticColors.cardMuted,
+                                            color: productSemanticColors.textSecondary,
+                                          }}
+                                        >
+                                          {chip}
+                                        </span>
+                                      ))}
+                                      {entry.nodeChips.length > 3 ? (
+                                        <span
+                                          className="text-[11px]"
+                                          style={{ color: productSemanticColors.textMuted }}
+                                        >
+                                          +{entry.nodeChips.length - 3}
+                                        </span>
                                       ) : null}
                                     </div>
+                                  ) : null}
+                                  {!isStateUpdate && entry.bundleItemsSummary.length > 0 && (entry.mode === "ADVANCED" || entry.bundleItemsSummary.some((it) => it.partName || it.sku)) ? (
+                                    <ul className="mt-2 space-y-1 text-sm">
+                                      {entry.bundleItemsSummary.map((it) => (
+                                        <li
+                                          key={it.id}
+                                          className="leading-snug"
+                                          style={{ color: productSemanticColors.textSecondary }}
+                                        >
+                                          <span className="font-medium" style={{ color: productSemanticColors.textPrimary }}>
+                                            {it.actionLabelRu}
+                                          </span>
+                                          <span> · {it.nodeName}</span>
+                                          {it.partName ? <span> · {it.partName}</span> : null}
+                                          {it.sku ? (
+                                            <span style={{ color: productSemanticColors.textMuted }}>
+                                              {" "}· SKU {it.sku}
+                                            </span>
+                                          ) : null}
+                                          {it.quantity != null ? <span> · ×{it.quantity}</span> : null}
+                                        </li>
+                                      ))}
+                                    </ul>
                                   ) : null}
                                 </>
                               )}
@@ -1190,7 +1030,39 @@ export default function VehicleServiceLogPage() {
                                   {entry.engineHoursLabel}: {entry.engineHoursValue}
                                 </span>
                               ) : null}
-                              {!isStateUpdate && entry.costAmount !== null && entry.costCurrency ? (
+                              {!isStateUpdate && entry.partsCostLabel ? (
+                                <span
+                                  className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardMuted,
+                                    color: productSemanticColors.textSecondary,
+                                  }}
+                                >
+                                  {entry.partsCostLabel}
+                                </span>
+                              ) : null}
+                              {!isStateUpdate && entry.laborCostLabel ? (
+                                <span
+                                  className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700"
+                                  style={{
+                                    backgroundColor: productSemanticColors.cardMuted,
+                                    color: productSemanticColors.textSecondary,
+                                  }}
+                                >
+                                  {entry.laborCostLabel}
+                                </span>
+                              ) : null}
+                              {!isStateUpdate && entry.totalCostLabel ? (
+                                <span
+                                  className="rounded-lg px-2.5 py-1 text-gray-900 font-semibold"
+                                  style={{
+                                    backgroundColor: productSemanticColors.serviceBadgeBg,
+                                    color: productSemanticColors.serviceBadgeText,
+                                  }}
+                                >
+                                  {entry.totalCostLabel}
+                                </span>
+                              ) : !isStateUpdate && entry.costAmount !== null && entry.costCurrency ? (
                                 <span
                                   className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700"
                                   style={{
@@ -1267,376 +1139,22 @@ export default function VehicleServiceLogPage() {
         ) : null}
       </div>
 
-      {isServiceEventModalOpen ? (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 px-4 py-6 sm:items-center">
-          <div
-            className="w-full max-w-4xl rounded-3xl border border-gray-200 bg-white shadow-xl"
-            style={{
-              backgroundColor: productSemanticColors.card,
-              borderColor: productSemanticColors.borderStrong,
-              color: productSemanticColors.textPrimary,
-            }}
-          >
-            <div
-              className="flex items-center justify-between border-b border-gray-200 px-6 py-4"
-              style={{ borderBottomColor: productSemanticColors.borderStrong }}
-            >
-              <h2
-                className="text-xl font-semibold tracking-tight text-gray-950"
-                style={{ color: productSemanticColors.textPrimary }}
-              >
-                {editingServiceEventId ? "Редактировать сервисное событие" : "Добавить сервисное событие"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsServiceEventModalOpen(false)}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-                style={{
-                  backgroundColor: productSemanticColors.cardSubtle,
-                  borderColor: productSemanticColors.borderStrong,
-                  color: productSemanticColors.textPrimary,
-                }}
-              >
-                Закрыть
-              </button>
-            </div>
-            <div className="max-h-[72vh] overflow-y-auto px-6 py-6">
-              <div className="space-y-5">
-                <div
-                  className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4"
-                  style={{
-                    backgroundColor: productSemanticColors.cardMuted,
-                    borderColor: productSemanticColors.border,
-                  }}
-                >
-                  <h3 className="text-sm font-semibold text-gray-950" style={{ color: productSemanticColors.textPrimary }}>
-                    Выбор узла
-                  </h3>
-                  <label className="mt-3 block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                    Узел (leaf)
-                    <select
-                      value={serviceEventForm.nodeId}
-                      onChange={(e) => setServiceEventForm((prev) => ({ ...prev, nodeId: e.target.value }))}
-                      style={{
-                        ...SERVICE_EVENT_MODAL_FIELD_BASE,
-                        colorScheme: "dark",
-                      }}
-                      className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                    >
-                      <option
-                        value=""
-                        style={{
-                          backgroundColor: productSemanticColors.card,
-                          color: productSemanticColors.textPrimary,
-                        }}
-                      >
-                        Выберите узел
-                      </option>
-                      {leafNodeOptions.map((option) => (
-                        <option
-                          key={option.id}
-                          value={option.id}
-                          style={{
-                            backgroundColor: productSemanticColors.card,
-                            color: productSemanticColors.textPrimary,
-                          }}
-                        >
-                          {`${"— ".repeat(Math.max(0, option.level - 1))}${option.name}`}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div
-                  className="rounded-2xl border border-gray-200 bg-white p-4"
-                  style={{
-                    backgroundColor: productSemanticColors.cardMuted,
-                    borderColor: productSemanticColors.border,
-                  }}
-                >
-                  <h3 className="text-sm font-semibold text-gray-950" style={{ color: productSemanticColors.textPrimary }}>
-                    Данные события
-                  </h3>
-                  <div className="mt-3 grid gap-4.5 sm:grid-cols-2">
-                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                      Дата события
-                      <input
-                        type="date"
-                        value={serviceEventForm.eventDate}
-                        onChange={(e) => setServiceEventForm((prev) => ({ ...prev, eventDate: e.target.value }))}
-                        style={{ ...SERVICE_EVENT_MODAL_FIELD_BASE, colorScheme: "dark" }}
-                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                      />
-                    </label>
-                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                      Тип сервиса
-                      <input
-                        value={serviceEventForm.serviceType}
-                        onChange={(e) => setServiceEventForm((prev) => ({ ...prev, serviceType: e.target.value }))}
-                        placeholder="Например: Oil change"
-                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
-                        className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                      />
-                    </label>
-                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                      Пробег, км
-                      <input
-                        value={serviceEventForm.odometer}
-                        onChange={(e) => setServiceEventForm((prev) => ({ ...prev, odometer: e.target.value }))}
-                        inputMode="numeric"
-                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
-                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                      />
-                    </label>
-                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                      Моточасы
-                      <input
-                        value={serviceEventForm.engineHours}
-                        onChange={(e) => setServiceEventForm((prev) => ({ ...prev, engineHours: e.target.value }))}
-                        inputMode="numeric"
-                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
-                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                      />
-                    </label>
-                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                      Стоимость
-                      <input
-                        value={serviceEventForm.costAmount}
-                        onChange={(e) => setServiceEventForm((prev) => ({ ...prev, costAmount: e.target.value }))}
-                        inputMode="decimal"
-                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
-                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                      />
-                    </label>
-                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                      Валюта
-                      <input
-                        value={serviceEventForm.currency}
-                        onChange={(e) =>
-                          setServiceEventForm((prev) => ({
-                            ...prev,
-                            currency: e.target.value.toUpperCase(),
-                          }))
-                        }
-                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
-                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                      Артикул (SKU)
-                      <input
-                        value={serviceEventForm.partSku}
-                        onChange={(e) =>
-                          setServiceEventForm((prev) => ({ ...prev, partSku: e.target.value }))
-                        }
-                        maxLength={200}
-                        placeholder="Опционально"
-                        autoComplete="off"
-                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
-                        className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                      />
-                    </label>
-                    <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                      Наименование запчасти
-                      <input
-                        value={serviceEventForm.partName}
-                        onChange={(e) =>
-                          setServiceEventForm((prev) => ({ ...prev, partName: e.target.value }))
-                        }
-                        maxLength={500}
-                        placeholder="Опционально"
-                        style={SERVICE_EVENT_MODAL_FIELD_BASE}
-                        className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                      />
-                    </label>
-                  </div>
-
-                  {serviceEventForm.partSku.trim().length >= 2 ? (
-                    <div className="mt-2 rounded-xl border px-3 py-2" style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardSubtle }}>
-                      <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                        Поиск в каталоге по артикулу
-                      </p>
-                      {serviceEventSkuLoading ? (
-                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
-                          Ищем совпадения...
-                        </p>
-                      ) : null}
-                      {!serviceEventSkuLoading && serviceEventSkuError ? (
-                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
-                          {serviceEventSkuError}
-                        </p>
-                      ) : null}
-                      {!serviceEventSkuLoading && !serviceEventSkuError && serviceEventSkuResults.length === 0 ? (
-                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
-                          Ничего не найдено.
-                        </p>
-                      ) : null}
-                      {!serviceEventSkuLoading && serviceEventSkuResults.length > 0 ? (
-                        <div className="mt-2 space-y-1.5">
-                          {serviceEventSkuResults.map((sku) => {
-                            const partNumber = pickSkuPartNumberOrFallback(sku, "");
-                            return (
-                              <button
-                                key={sku.id}
-                                type="button"
-                                onClick={() => applyServiceEventSkuSuggestion(sku)}
-                                className="w-full rounded-lg border px-2.5 py-2 text-left text-xs transition hover:opacity-90"
-                                style={{
-                                  borderColor: productSemanticColors.borderStrong,
-                                  backgroundColor: productSemanticColors.cardMuted,
-                                  color: productSemanticColors.textPrimary,
-                                }}
-                              >
-                                <div style={{ fontWeight: 600 }}>{partNumber || "Без артикула"}</div>
-                                <div style={{ color: productSemanticColors.textSecondary }}>{sku.brandName} · {sku.canonicalName}</div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  <div
-                    className="mt-4 rounded-2xl border p-4"
-                    style={{
-                      backgroundColor: productSemanticColors.cardSubtle,
-                      borderColor: productSemanticColors.borderStrong,
-                    }}
-                  >
-                    <h3 className="text-sm font-semibold" style={{ color: productSemanticColors.textPrimary }}>
-                      Купленные, но не установленные детали
-                    </h3>
-                    {uninstalledExpensesLoading ? (
-                      <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                        Загружаю купленные детали...
-                      </p>
-                    ) : null}
-                    {uninstalledExpensesError ? (
-                      <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
-                        {uninstalledExpensesError}
-                      </p>
-                    ) : null}
-                    {!uninstalledExpensesLoading && !uninstalledExpensesError && orderedUninstalledExpenses.length === 0 ? (
-                      <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                        Нет купленных деталей без установки.
-                      </p>
-                    ) : null}
-                    {orderedUninstalledExpenses.length > 0 ? (
-                      <div className="mt-3 grid gap-2">
-                        {orderedUninstalledExpenses.map((expense) => {
-                          const isSelected = serviceEventForm.installedExpenseItemIds.includes(expense.id);
-                          const isSameNode = expense.nodeId === serviceEventForm.nodeId;
-                          return (
-                            <label
-                              key={expense.id}
-                              className="flex gap-3 rounded-xl border px-3 py-2 text-sm"
-                              style={{
-                                backgroundColor: productSemanticColors.cardMuted,
-                                borderColor: isSelected ? productSemanticColors.primaryAction : productSemanticColors.border,
-                                color: productSemanticColors.textPrimary,
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleInstalledExpenseSelection(expense)}
-                                className="mt-1"
-                              />
-                              <span className="min-w-0 flex-1">
-                                <span className="block font-semibold">
-                                  {expense.title}
-                                  {isSameNode ? (
-                                    <span className="ml-2 text-[11px]" style={{ color: productSemanticColors.textMeta }}>
-                                      этот узел
-                                    </span>
-                                  ) : null}
-                                </span>
-                                <span className="mt-1 block text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                                  {formatExpenseAmountRu(expense.amount)} {expense.currency}
-                                  {" · "}
-                                  {new Date(expense.purchasedAt ?? expense.expenseDate).toLocaleDateString("ru-RU")}
-                                  {expense.node?.name ? ` · ${expense.node.name}` : ""}
-                                  {expense.vendor ? ` · ${expense.vendor}` : ""}
-                                </span>
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <label className="mt-4 block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                    Комментарий
-                    <textarea
-                      value={serviceEventForm.comment}
-                      onChange={(e) => setServiceEventForm((prev) => ({ ...prev, comment: e.target.value }))}
-                      placeholder="Опционально"
-                      style={{ ...SERVICE_EVENT_MODAL_FIELD_BASE, minHeight: "7rem" }}
-                      className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40 resize-y"
-                    />
-                  </label>
-
-                  <label className="mt-4 block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                    Установленные запчасти (JSON)
-                    <textarea
-                      value={serviceEventForm.installedPartsJson}
-                      onChange={(e) =>
-                        setServiceEventForm((prev) => ({ ...prev, installedPartsJson: e.target.value }))
-                      }
-                      style={{
-                        ...SERVICE_EVENT_MODAL_FIELD_BASE,
-                        minHeight: "7rem",
-                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                        fontSize: "0.75rem",
-                      }}
-                      className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40 resize-y"
-                    />
-                  </label>
-                </div>
-
-                {serviceEventFormError ? (
-                  <p className="text-sm" style={{ color: productSemanticColors.error }}>
-                    {serviceEventFormError}
-                  </p>
-                ) : null}
-
-                <div className="flex justify-end gap-2 border-t border-gray-100 pt-5" style={{ borderTopColor: productSemanticColors.border }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsServiceEventModalOpen(false)}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-                    style={{
-                      backgroundColor: productSemanticColors.cardSubtle,
-                      borderColor: productSemanticColors.borderStrong,
-                      color: productSemanticColors.textPrimary,
-                    }}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void saveServiceEvent()}
-                    disabled={isSavingServiceEvent}
-                    className="inline-flex h-10 items-center justify-center rounded-xl bg-gray-950 px-4 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-                    style={{
-                      backgroundColor: productSemanticColors.primaryAction,
-                      color: productSemanticColors.onPrimaryAction,
-                    }}
-                  >
-                    {isSavingServiceEvent ? "Сохранение..." : "Сохранить"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <BasicServiceEventModal
+        open={isServiceEventModalOpen}
+        onClose={() => setIsServiceEventModalOpen(false)}
+        resetKey={serviceEventModalResetKey}
+        initialForm={serviceEventModalInitialForm}
+        vehicleId={vehicleId}
+        nodeTree={nodeTree}
+        vehicleOdometer={vehicleOdometer}
+        vehicleEngineHours={vehicleEngineHours}
+        todayDateYmd={new Date().toISOString().slice(0, 10)}
+        editingServiceEventId={editingServiceEventId}
+        submitError={serviceEventFormError}
+        onClearSubmitError={clearServiceEventSubmitError}
+        isSubmitting={isSavingServiceEvent}
+        onSubmit={saveServiceEvent}
+      />
 
     </main>
   );

@@ -28,9 +28,6 @@ import {
   searchNodeTree,
   formatIsoCalendarDateRu,
   getRecentServiceEventsForNode,
-  getAvailableChildrenForSelectedPath,
-  getNodeSelectLevels,
-  getSelectedNodeFromPath,
   getStatusExplanationTriggeredByLabel,
   normalizeAddServiceEventPayload,
   normalizeEditServiceEventPayload,
@@ -40,7 +37,6 @@ import {
   RIDE_RIDING_STYLE_OPTIONS,
   RIDE_USAGE_INTENSITY_OPTIONS,
   RIDE_USAGE_TYPE_OPTIONS,
-  validateAddServiceEventFormValues,
   validateVehicleProfileFormValues,
   validateVehicleStateFormValues,
   buildExpenseSummaryFromServiceEvents,
@@ -78,10 +74,10 @@ import { ACTION_SVG_BODIES, type ActionIconKey } from "@mototwin/icons";
 import { TopNodeIcon } from "@/components/icons/top-nodes";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
+import { BasicServiceEventModal } from "./_components/BasicServiceEventModal";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
 import { PartsCartPage, type PartsAdvancedFilterState } from "./parts/_components/PartsCartPage";
 import { WishlistItemEditModal } from "./parts/_components/WishlistItemEditModal";
-import { normalizePartNumberForLookup } from "./parts/_components/part-picker-utils";
 import type {
   AttentionItemViewModel,
   NodeSnoozeOption,
@@ -92,7 +88,6 @@ import type {
   NodeTreeSearchResultViewModel,
   NodeTreeSearchActionKey,
   NodeContextViewModel,
-  SelectedNodePath,
   ExpenseNodeSummaryItem,
   ExpenseItem,
   ServiceEventItem,
@@ -1302,7 +1297,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [serviceEventFormError, setServiceEventFormError] = useState("");
   const [serviceLogActionNotice, setServiceLogActionNotice] =
     useState<ServiceLogActionNotice | null>(null);
-  const [selectedNodePath, setSelectedNodePath] = useState<SelectedNodePath>([]);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [nodeStatusFilter, setNodeStatusFilter] = useState<NodeStatusFilter>("ALL");
   const [nodeTreeTopOnly, setNodeTreeTopOnly] = useState(false);
@@ -1317,7 +1311,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [statusHighlightedNodeIds, setStatusHighlightedNodeIds] = useState<Set<string>>(new Set());
   const [selectedNodeContextId, setSelectedNodeContextId] = useState<string | null>(null);
   const overlayReturnStackRef = useRef<OverlayReturnTarget[]>([]);
-  const serviceEventCommentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [nodeContextRecommendations, setNodeContextRecommendations] = useState<
     PartRecommendationViewModel[]
   >([]);
@@ -1405,24 +1398,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [vehicleStateEngineHours, setVehicleStateEngineHours] = useState("");
   const [vehicleStateError, setVehicleStateError] = useState("");
   const [isSavingVehicleState, setIsSavingVehicleState] = useState(false);
-  const [serviceType, setServiceType] = useState("");
   const [isAdvancedDetailsOpen, setIsAdvancedDetailsOpen] = useState(false);
-  const [eventDate, setEventDate] = useState("");
-  const [odometer, setOdometer] = useState("");
-  const [engineHours, setEngineHours] = useState("");
-  const [costAmount, setCostAmount] = useState("");
-  const [currency, setCurrency] = useState(
-    () => createInitialAddServiceEventFormValues().currency
+  const [serviceEventModalResetKey, setServiceEventModalResetKey] = useState(0);
+  const [serviceEventModalInitialForm, setServiceEventModalInitialForm] = useState<AddServiceEventFormValues>(() =>
+    createInitialAddServiceEventFormValues()
   );
-  const [comment, setComment] = useState("");
-  const [partSku, setPartSku] = useState("");
-  const [partName, setPartName] = useState("");
-  const [installedPartsJson, setInstalledPartsJson] = useState("");
-  const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
-  const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
-  const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
-  const [serviceEventSkuError, setServiceEventSkuError] = useState("");
-  const serviceEventSkuSearchGen = useRef(0);
   useEffect(() => {
     try {
       if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
@@ -1453,22 +1433,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     return () => window.clearTimeout(timer);
   }, [profileFormSuccess]);
   const todayDate = getTodayDateString();
-  const nodeSelectLevels = useMemo(() => {
-    return getNodeSelectLevels(nodeTree, selectedNodePath);
-  }, [nodeTree, selectedNodePath]);
-
-  const selectedFinalNode = useMemo(() => {
-    return getSelectedNodeFromPath(nodeTree, selectedNodePath);
-  }, [nodeTree, selectedNodePath]);
-
-  const selectedPathChildren = useMemo(() => {
-    return getAvailableChildrenForSelectedPath(nodeTree, selectedNodePath);
-  }, [nodeTree, selectedNodePath]);
-
-  const isLeafNodeSelected = Boolean(
-    selectedFinalNode && selectedPathChildren.length === 0
-  );
-
 
   const { roots: nodeTreeViewModel } = useMemo(
     () => buildNodeTreeSectionProps(nodeTree),
@@ -2202,19 +2166,19 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       setServiceEventFormError("");
       setEditingServiceEventId(serviceEvent.id);
       setPendingWishlistInstallItemId(null);
-      applyAddServiceEventFormValues(createInitialEditServiceEventValues(serviceEvent));
-      setSelectedNodePath(nodePath);
+      bumpServiceEventModalInitial(createInitialEditServiceEventValues(serviceEvent));
       setIsAddServiceEventModalOpen(true);
       return;
     }
     setEditingServiceEventId(null);
     setPendingWishlistInstallItemId(null);
-    setSelectedNodePath([]);
     const empty = createInitialAddServiceEventFormValues();
     empty.currency = readDefaultCurrencySetting();
-    applyAddServiceEventFormValues(empty);
+    bumpServiceEventModalInitial(empty);
     setServiceEventFormError("");
     setIsAddServiceEventModalOpen(true);
+    // bumpServiceEventModalInitial is stable; listing it would require defining it above this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, serviceEvents, nodeTree]);
 
   useEffect(() => {
@@ -2428,81 +2392,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     wishlistItems,
   ]);
 
-  useEffect(() => {
-    if (!isAddServiceEventModalOpen || !serviceEventCommentTextareaRef.current) {
-      return;
-    }
-    const textarea = serviceEventCommentTextareaRef.current;
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.max(textarea.scrollHeight, 64)}px`;
-  }, [comment, isAddServiceEventModalOpen]);
-
-  useEffect(() => {
-    if (!isAddServiceEventModalOpen) {
-      setServiceEventSkuLookup("");
-      setServiceEventSkuResults([]);
-      setServiceEventSkuError("");
-      setServiceEventSkuLoading(false);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      setServiceEventSkuLookup(partSku.trim());
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [isAddServiceEventModalOpen, partSku]);
-
-  useEffect(() => {
-    if (!isAddServiceEventModalOpen) {
-      return;
-    }
-    const query = serviceEventSkuLookup;
-    if (query.length < 2) {
-      setServiceEventSkuResults([]);
-      setServiceEventSkuError("");
-      setServiceEventSkuLoading(false);
-      return;
-    }
-    const gen = serviceEventSkuSearchGen.current + 1;
-    serviceEventSkuSearchGen.current = gen;
-    setServiceEventSkuLoading(true);
-    setServiceEventSkuError("");
-    void vehicleDetailApi
-      .getPartSkus({
-        search: query,
-        nodeId: selectedFinalNode?.id || undefined,
-      })
-      .then((res) => {
-        if (serviceEventSkuSearchGen.current !== gen) {
-          return;
-        }
-        const list = res.skus ?? [];
-        const normalizedQuery = normalizePartNumberForLookup(query);
-        const exact = list.find((sku) =>
-          sku.partNumbers.some(
-            (partNumber) =>
-              normalizePartNumberForLookup(partNumber.number) === normalizedQuery
-          )
-        );
-        const ordered = exact
-          ? [exact, ...list.filter((candidate) => candidate.id !== exact.id)]
-          : list;
-        setServiceEventSkuResults(ordered.slice(0, 6));
-      })
-      .catch(() => {
-        if (serviceEventSkuSearchGen.current !== gen) {
-          return;
-        }
-        setServiceEventSkuResults([]);
-        setServiceEventSkuError("Не удалось выполнить поиск в каталоге.");
-      })
-      .finally(() => {
-        if (serviceEventSkuSearchGen.current !== gen) {
-          return;
-        }
-        setServiceEventSkuLoading(false);
-      });
-  }, [isAddServiceEventModalOpen, selectedFinalNode?.id, serviceEventSkuLookup]);
-
   const loadServiceEvents = useCallback(async () => {
     if (!vehicleId) {
       return;
@@ -2665,18 +2554,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     });
   };
 
-  const applyAddServiceEventFormValues = (values: AddServiceEventFormValues) => {
-    setServiceType(values.serviceType);
-    setEventDate(values.eventDate);
-    setOdometer(values.odometer);
-    setEngineHours(values.engineHours);
-    setCostAmount(values.costAmount);
-    setCurrency(values.currency);
-    setComment(values.comment);
-    setPartSku(values.partSku);
-    setPartName(values.partName);
-    setInstalledPartsJson(values.installedPartsJson);
-  };
+  const bumpServiceEventModalInitial = useCallback((values: AddServiceEventFormValues) => {
+    setServiceEventModalInitialForm(values);
+    setServiceEventModalResetKey((key) => key + 1);
+  }, []);
+
+  const clearServiceEventSubmitError = useCallback(() => setServiceEventFormError(""), []);
 
   const readDefaultCurrencySetting = () => {
     try {
@@ -2733,8 +2616,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setServiceEventFormError("");
     setEditingServiceEventId(null);
     setPendingWishlistInstallItemId(null);
-    applyAddServiceEventFormValues(values);
-    setSelectedNodePath(nodePath);
+    bumpServiceEventModalInitial(values);
     setIsAddServiceEventModalOpen(true);
   };
 
@@ -2761,8 +2643,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       { odometer: vehicle.odometer, engineHours: vehicle.engineHours },
       { todayDateYmd: todayDate }
     );
-    applyAddServiceEventFormValues(values);
-    setSelectedNodePath(nodePath);
+    bumpServiceEventModalInitial(values);
     setPendingWishlistInstallItemId(options.pendingInstall ? item.id : null);
     setIsAddServiceEventModalOpen(true);
     return true;
@@ -4196,10 +4077,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const resetServiceEventForm = () => {
     setEditingServiceEventId(null);
     setPendingWishlistInstallItemId(null);
-    setSelectedNodePath([]);
     const empty = createInitialAddServiceEventFormValues();
     empty.currency = readDefaultCurrencySetting();
-    applyAddServiceEventFormValues(empty);
+    bumpServiceEventModalInitial(empty);
   };
 
   const openCreateServiceEventModal = () => {
@@ -4216,7 +4096,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
   };
 
-  const handleSubmitServiceEvent = async () => {
+  const handleSubmitServiceEvent = async (form: AddServiceEventFormValues) => {
     try {
       setServiceEventFormError("");
 
@@ -4225,43 +4105,19 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         return;
       }
 
-      const serviceFormValues: AddServiceEventFormValues = {
-        nodeId: selectedFinalNode?.id ?? "",
-        serviceType,
-        eventDate,
-        odometer,
-        engineHours,
-        costAmount,
-        currency,
-        comment,
-        installedPartsJson,
-        partSku,
-        partName,
-        installedExpenseItemIds: [],
-      };
-
-      const validation = validateAddServiceEventFormValues(serviceFormValues, {
-        todayDateYmd: todayDate,
-        currentVehicleOdometer: vehicle?.odometer ?? null,
-        isLeafNode: selectedFinalNode ? isLeafNodeSelected : undefined,
-      });
-
-      if (validation.errors.length > 0) {
-        setServiceEventFormError(validation.errors[0]);
-        return;
-      }
+      const anchorNodeId = form.items[0]?.nodeId?.trim() ?? "";
 
       setIsCreatingServiceEvent(true);
       if (editingServiceEventId) {
         await vehicleDetailApi.updateServiceEvent(
           vehicleId,
           editingServiceEventId,
-          normalizeEditServiceEventPayload(serviceFormValues)
+          normalizeEditServiceEventPayload(form)
         );
       } else {
         await vehicleDetailApi.createServiceEvent(
           vehicleId,
-          normalizeAddServiceEventPayload(serviceFormValues)
+          normalizeAddServiceEventPayload(form)
         );
       }
 
@@ -4269,7 +4125,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         const sourceWishlistItem = wishlistItems.find((item) => item.id === pendingWishlistInstallItemId);
         await vehicleDetailApi.updateWishlistItem(vehicleId, pendingWishlistInstallItemId, {
           status: "INSTALLED",
-          nodeId: serviceFormValues.nodeId,
+          nodeId: anchorNodeId,
         });
         if (sourceWishlistItem && sourceWishlistItem.status !== "INSTALLED") {
           setWishlistStatusTransitionHistoryByItemId((prev) => ({
@@ -5078,18 +4934,10 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     color: productSemanticColors.textPrimary,
     colorScheme: "dark" as const,
   };
-  const darkModalSectionStyle = {
-    backgroundColor: productSemanticColors.cardMuted,
-    borderColor: productSemanticColors.borderStrong,
-    color: productSemanticColors.textPrimary,
-  };
   const darkModalButtonStyle = {
     backgroundColor: productSemanticColors.cardSubtle,
     borderColor: productSemanticColors.borderStrong,
     color: productSemanticColors.textPrimary,
-  };
-  const darkModalInputLabelStyle = {
-    color: productSemanticColors.textSecondary,
   };
 
   return (
@@ -6027,327 +5875,26 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         </div>
       ) : null}
 
-      {isAddServiceEventModalOpen ? (
-        <div
-          className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto px-2 py-2"
-          style={{ backgroundColor: productSemanticColors.overlayModal }}
-        >
-          <div
-            className="garage-dark-surface-text flex w-full max-w-3xl flex-col rounded-2xl border border-gray-200 bg-white shadow-xl"
-            style={{
-              backgroundColor: productSemanticColors.card,
-              borderColor: productSemanticColors.borderStrong,
-              color: productSemanticColors.textPrimary,
-              maxHeight: "calc(100dvh - 16px)",
-              minHeight: 0,
-            }}
-          >
-            <div
-              className="flex items-center justify-between border-b border-gray-200 px-4 py-2"
-              style={{
-                backgroundColor: productSemanticColors.card,
-                borderBottomColor: productSemanticColors.borderStrong,
-                color: productSemanticColors.textPrimary,
-              }}
-            >
-              <h2
-                className="text-lg font-semibold tracking-tight"
-                style={{ color: productSemanticColors.textPrimary }}
-              >
-                {editingServiceEventId
-                  ? "Редактировать сервисное событие"
-                  : "Добавить сервисное событие"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => closeAddServiceEventModal()}
-                className="inline-flex h-8 items-center justify-center rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-900 transition hover:bg-gray-50"
-                style={darkModalButtonStyle}
-              >
-                Закрыть
-              </button>
-            </div>
-
-            <div
-              className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
-              style={{
-                backgroundColor: productSemanticColors.card,
-                color: productSemanticColors.textPrimary,
-              }}
-            >
-              <div className="space-y-2">
-                <div
-                  className="rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-2"
-                  style={darkModalSectionStyle}
-                >
-                  <h3
-                    className="text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: productSemanticColors.textPrimary }}
-                  >
-                    Выбор узла
-                  </h3>
-                  <div className="mt-1 flex flex-wrap items-end gap-1.5">
-                    {nodeSelectLevels.map((nodesAtLevel, levelIndex) => (
-                      <div
-                        key={`level-${levelIndex}`}
-                        className="min-w-[140px] flex-1"
-                      >
-                        <label
-                          className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide"
-                          style={{ color: productSemanticColors.textSecondary }}
-                        >
-                          {`Уровень ${levelIndex + 1}`}
-                        </label>
-                        <select
-                          value={selectedNodePath[levelIndex] ?? ""}
-                          onChange={(event) => {
-                            const nextNodeId = event.target.value;
-                            setSelectedNodePath((prev) => {
-                              const next = prev.slice(0, levelIndex);
-                              if (nextNodeId) {
-                                next[levelIndex] = nextNodeId;
-                              }
-                              return next;
-                            });
-                          }}
-                          className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                          style={darkModalFormControlStyle}
-                        >
-                          <option value="">{`Уровень ${levelIndex + 1}`}</option>
-                          {nodesAtLevel.map((nodeAtLevel) => (
-                            <option key={nodeAtLevel.id} value={nodeAtLevel.id}>
-                              {nodeAtLevel.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div
-                  className="rounded-xl border border-gray-200 bg-white px-3 py-2"
-                  style={darkModalSectionStyle}
-                >
-                  <h3
-                    className="text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: productSemanticColors.textPrimary }}
-                  >
-                    Данные события
-                  </h3>
-                  <div className="mt-1 grid gap-x-2.5 gap-y-1.5 sm:grid-cols-2">
-                    <InputField label="Тип сервиса" labelStyle={darkModalInputLabelStyle}>
-                      <input
-                        value={serviceType}
-                        onChange={(event) => setServiceType(event.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                        style={darkModalFormControlStyle}
-                        placeholder="Например: Oil change"
-                      />
-                    </InputField>
-
-                    <InputField label="Дата события" labelStyle={darkModalInputLabelStyle}>
-                      <input
-                        type="date"
-                        value={eventDate}
-                        onChange={(event) => setEventDate(event.target.value)}
-                        max={todayDate}
-                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                        style={darkModalFormControlStyle}
-                      />
-                    </InputField>
-
-                    <InputField label="Пробег, км" labelStyle={darkModalInputLabelStyle}>
-                      <input
-                        value={odometer}
-                        onChange={(event) => setOdometer(event.target.value)}
-                        inputMode="numeric"
-                        max={vehicle?.odometer ?? undefined}
-                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                        style={darkModalFormControlStyle}
-                        placeholder="Например: 15000"
-                      />
-                    </InputField>
-
-                    <InputField label="Моточасы" labelStyle={darkModalInputLabelStyle}>
-                      <input
-                        value={engineHours}
-                        onChange={(event) => setEngineHours(event.target.value)}
-                        inputMode="numeric"
-                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                        style={darkModalFormControlStyle}
-                        placeholder="Если применимо"
-                      />
-                    </InputField>
-
-                    <InputField label="Стоимость" labelStyle={darkModalInputLabelStyle}>
-                      <input
-                        value={costAmount}
-                        onChange={(event) => setCostAmount(event.target.value)}
-                        inputMode="decimal"
-                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                        style={darkModalFormControlStyle}
-                        placeholder="Например: 120.5"
-                      />
-                    </InputField>
-
-                    <InputField label="Валюта" labelStyle={darkModalInputLabelStyle}>
-                      <select
-                        value={currency}
-                        onChange={(event) => setCurrency(event.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                        style={darkModalFormControlStyle}
-                      >
-                        <option value="">Не выбрана</option>
-                        <option value="EUR">EUR</option>
-                        <option value="USD">USD</option>
-                        <option value="RUB">RUB</option>
-                      </select>
-                    </InputField>
-                  </div>
-
-                  <div className="mt-2 grid gap-x-2.5 gap-y-1.5 sm:grid-cols-2">
-                    <InputField label="Артикул (SKU)" labelStyle={darkModalInputLabelStyle}>
-                      <input
-                        value={partSku}
-                        onChange={(event) => setPartSku(event.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                        style={darkModalFormControlStyle}
-                        placeholder="Опционально"
-                        maxLength={200}
-                        autoComplete="off"
-                      />
-                    </InputField>
-                    <InputField label="Наименование запчасти" labelStyle={darkModalInputLabelStyle}>
-                      <input
-                        value={partName}
-                        onChange={(event) => setPartName(event.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                        style={darkModalFormControlStyle}
-                        placeholder="Опционально"
-                        maxLength={500}
-                      />
-                    </InputField>
-                  </div>
-
-                  {partSku.trim().length >= 2 ? (
-                    <div
-                      className="mt-1.5 rounded-xl border px-3 py-2"
-                      style={{
-                        borderColor: productSemanticColors.borderStrong,
-                        backgroundColor: productSemanticColors.cardSubtle,
-                      }}
-                    >
-                      <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                        Поиск в каталоге по артикулу
-                      </p>
-                      {serviceEventSkuLoading ? (
-                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
-                          Ищем совпадения...
-                        </p>
-                      ) : null}
-                      {!serviceEventSkuLoading && serviceEventSkuError ? (
-                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
-                          {serviceEventSkuError}
-                        </p>
-                      ) : null}
-                      {!serviceEventSkuLoading &&
-                      !serviceEventSkuError &&
-                      serviceEventSkuResults.length === 0 ? (
-                        <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
-                          Ничего не найдено.
-                        </p>
-                      ) : null}
-                      {!serviceEventSkuLoading && serviceEventSkuResults.length > 0 ? (
-                        <div className="mt-2 space-y-1.5">
-                          {serviceEventSkuResults.map((sku) => {
-                            const partNumber = sku.partNumbers[0]?.number?.trim() ?? "";
-                            return (
-                              <button
-                                key={sku.id}
-                                type="button"
-                                onClick={() => {
-                                  setPartSku(partNumber || partSku.trim());
-                                  setPartName(sku.canonicalName?.trim() || partName);
-                                }}
-                                className="w-full rounded-lg border px-2.5 py-2 text-left text-xs transition hover:opacity-90"
-                                style={{
-                                  borderColor: productSemanticColors.borderStrong,
-                                  backgroundColor: productSemanticColors.cardMuted,
-                                  color: productSemanticColors.textPrimary,
-                                }}
-                              >
-                                <div style={{ fontWeight: 600 }}>{partNumber || "Без артикула"}</div>
-                                <div style={{ color: productSemanticColors.textSecondary }}>
-                                  {sku.brandName} · {sku.canonicalName}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  <div className="mt-2">
-                    <InputField label="Комментарий" labelStyle={darkModalInputLabelStyle}>
-                      <textarea
-                        ref={serviceEventCommentTextareaRef}
-                        value={comment}
-                        onChange={(event) => setComment(event.target.value)}
-                        className="min-h-16 w-full resize-none overflow-hidden rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs outline-none transition focus:border-gray-950"
-                        style={darkModalFormControlStyle}
-                        placeholder="Опционально"
-                      />
-                    </InputField>
-                  </div>
-                </div>
-
-                <div
-                  className="sticky bottom-0 border-t border-gray-100 py-2"
-                  style={{
-                    backgroundColor: productSemanticColors.card,
-                    borderTopColor: productSemanticColors.borderStrong,
-                  }}
-                >
-                <button
-                  type="button"
-                  onClick={handleSubmitServiceEvent}
-                  disabled={
-                    isCreatingServiceEvent ||
-                    !isLeafNodeSelected ||
-                    !eventDate
-                  }
-                  className="inline-flex h-9 items-center justify-center rounded-xl bg-gray-950 px-4 text-xs font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{
-                    backgroundColor: productSemanticColors.primaryAction,
-                    color: productSemanticColors.onPrimaryAction,
-                  }}
-                >
-                  {isCreatingServiceEvent
-                    ? "Сохраняем..."
-                    : editingServiceEventId
-                      ? "Сохранить изменения"
-                      : "Добавить событие"}
-                </button>
-
-                {!isLeafNodeSelected && selectedFinalNode ? (
-                  <p className="mt-3 text-sm" style={{ color: statusSemanticTokens.SOON.foreground }}>
-                    Для создания события выберите узел последнего уровня.
-                  </p>
-                ) : null}
-
-                {serviceEventFormError ? (
-                  <p className="mt-3 text-sm" style={{ color: productSemanticColors.error }}>
-                    {serviceEventFormError}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </div>
-        </div>
-      ) : null}
+      <BasicServiceEventModal
+        open={isAddServiceEventModalOpen}
+        onClose={() => closeAddServiceEventModal()}
+        resetKey={serviceEventModalResetKey}
+        initialForm={serviceEventModalInitialForm}
+        vehicleId={vehicleId}
+        nodeTree={nodeTree}
+        vehicleOdometer={vehicle?.odometer ?? null}
+        vehicleEngineHours={vehicle?.engineHours ?? null}
+        todayDateYmd={todayDate}
+        editingServiceEventId={editingServiceEventId}
+        submitError={serviceEventFormError}
+        onClearSubmitError={clearServiceEventSubmitError}
+        isSubmitting={isCreatingServiceEvent}
+        onSubmit={handleSubmitServiceEvent}
+        eventDateMaxYmd={todayDate}
+        odometerInputMax={vehicle?.odometer ?? null}
+        overlayClassName="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto px-2 py-2"
+        overlayStyle={{ backgroundColor: productSemanticColors.overlayModal }}
+      />
 
       <WishlistItemEditModal
         key={wishlistEditingId ?? "wishlist-edit"}

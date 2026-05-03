@@ -16,18 +16,66 @@ type ExpenseMutationClient = {
 type ServiceExpenseSource = {
   id: string;
   vehicleId: string;
+  /** Anchor node — для записи на ExpenseItem.nodeId в BASIC. */
   nodeId: string;
   eventKind?: string | null;
   eventDate: Date;
-  serviceType: string;
-  costAmount: number | null;
+  /** Bundle title (заменяет legacy serviceType). */
+  title?: string | null;
+  /** Bundle total (заменяет legacy costAmount). */
+  totalCost?: number | { toString(): string } | null;
   currency: string | null;
   comment: string | null;
   installedPartsJson?: unknown | null;
-  partSku?: string | null;
-  partName?: string | null;
+  /**
+   * Items bundle — для синтеза «PartSku/PartName» категории и установки.
+   * В BASIC обычно один item с anchor nodeId.
+   */
+  items?: Array<{
+    partName?: string | null;
+    sku?: string | null;
+  }>;
   createdAt?: Date;
 };
+
+function readTotalCostNumber(value: ServiceExpenseSource["totalCost"]): number | null {
+  if (value == null) {
+    return null;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  const parsed = Number(value.toString());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readFirstItemPartSku(event: ServiceExpenseSource): string | null {
+  for (const item of event.items ?? []) {
+    const v = item.sku?.trim();
+    if (v) {
+      return v;
+    }
+  }
+  return null;
+}
+
+function readFirstItemPartName(event: ServiceExpenseSource): string | null {
+  for (const item of event.items ?? []) {
+    const v = item.partName?.trim();
+    if (v) {
+      return v;
+    }
+  }
+  return null;
+}
+
+function readEventTitleOrFallback(event: ServiceExpenseSource): string {
+  const t = event.title?.trim();
+  if (t) {
+    return t;
+  }
+  return "Сервисное событие";
+}
 
 type WishlistExpenseSource = {
   id: string;
@@ -53,9 +101,9 @@ function normalizeCurrency(currency: string): string {
 
 function getSearchText(event: ServiceExpenseSource): string {
   return [
-    event.serviceType,
-    event.partName,
-    event.partSku,
+    event.title,
+    readFirstItemPartName(event),
+    readFirstItemPartSku(event),
     event.comment,
   ]
     .filter(Boolean)
@@ -88,9 +136,10 @@ function classifyServiceExpense(event: ServiceExpenseSource): ExpenseCategory {
   if (isConsumableExpense(text)) {
     return "CONSUMABLE";
   }
+  const hasItemPartInfo =
+    Boolean(readFirstItemPartSku(event) || readFirstItemPartName(event));
   if (
-    event.partSku?.trim() ||
-    event.partName?.trim() ||
+    hasItemPartInfo ||
     getWishlistItemIdFromExpenseSource(event.installedPartsJson)
   ) {
     return "PART";
@@ -135,9 +184,14 @@ export async function syncExpenseItemForServiceEvent(
   const db = tx as ExpenseMutationClient;
   await db.expenseItem.deleteMany({ where: { serviceEventId: event.id } });
 
-  if (event.eventKind === "STATE_UPDATE" || !hasPositiveAmount(event.costAmount, event.currency)) {
+  const totalCost = readTotalCostNumber(event.totalCost);
+  if (event.eventKind === "STATE_UPDATE" || !hasPositiveAmount(totalCost, event.currency)) {
     return;
   }
+
+  const title = readEventTitleOrFallback(event);
+  const headerPartSku = readFirstItemPartSku(event);
+  const headerPartName = readFirstItemPartName(event);
 
   const shoppingListItemId = getWishlistItemIdFromExpenseSource(event.installedPartsJson);
   if (shoppingListItemId) {
@@ -159,13 +213,13 @@ export async function syncExpenseItemForServiceEvent(
           installationStatus: "INSTALLED",
           installedAt: event.eventDate,
           expenseDate: event.eventDate,
-          title: event.serviceType.trim(),
-          amount: event.costAmount,
+          title,
+          amount: totalCost,
           currency: normalizeCurrency(event.currency as string),
           quantity: 1,
           comment: event.comment?.trim() || null,
-          partSku: event.partSku?.trim() || null,
-          partName: event.partName?.trim() || null,
+          partSku: headerPartSku,
+          partName: headerPartName,
         },
       });
     }
@@ -198,13 +252,13 @@ export async function syncExpenseItemForServiceEvent(
       purchaseStatus: "PURCHASED",
       installationStatus: installStatus === "BOUGHT_NOT_INSTALLED" ? "NOT_INSTALLED" : "INSTALLED",
       expenseDate: event.eventDate,
-      title: event.serviceType.trim(),
-      amount: event.costAmount,
+      title,
+      amount: totalCost,
       currency: normalizeCurrency(event.currency as string),
       quantity: 1,
       comment: event.comment?.trim() || null,
-      partSku: event.partSku?.trim() || null,
-      partName: event.partName?.trim() || null,
+      partSku: headerPartSku,
+      partName: headerPartName,
       purchasedAt: event.eventDate,
       installedAt: installStatus === "BOUGHT_NOT_INSTALLED" ? null : event.eventDate,
       createdAt: event.createdAt,

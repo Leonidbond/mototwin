@@ -1,4 +1,8 @@
-import type { CreateServiceEventInput } from "./service-event";
+import type {
+  CreateServiceEventInput,
+  ServiceActionType,
+  ServiceEventMode,
+} from "./service-event";
 import type {
   CreateVehicleInput,
   RideLoadType,
@@ -9,14 +13,41 @@ import type {
   UpdateVehicleStateInput,
 } from "./vehicle";
 
+/**
+ * Stringly-typed form values для одного пункта bundle (узел + детали).
+ * В BASIC режиме UI скрывает per-item поля и делает actionType общим.
+ */
+export type BundleItemFormValues = {
+  /** Стабильный локальный ключ для React-list (не отправляется на сервер). */
+  key: string;
+  nodeId: string;
+  actionType: ServiceActionType;
+  partName: string;
+  sku: string;
+  quantity: string;
+  partCost: string;
+  laborCost: string;
+  comment: string;
+};
+
 /** Stringly-typed fields as entered in inputs (web or mobile). */
 export type AddServiceEventFormValues = {
-  nodeId: string;
+  /** Bundle title — основной заголовок события. */
+  title: string;
+  /** Текущий режим формы. */
+  mode: ServiceEventMode;
+  /**
+   * Общий action type для BASIC-режима — применяется ко всем выбранным узлам.
+   * В ADVANCED игнорируется (action type живёт в `items[].actionType`).
+   */
+  commonActionType: ServiceActionType;
   eventDate: string;
-  serviceType: string;
   odometer: string;
   engineHours: string;
-  costAmount: string;
+  /** Сумма по запчастям (BASIC: ручной ввод; ADVANCED: можно автосчитать из items). */
+  partsCost: string;
+  /** Сумма работы (BASIC: ручной ввод; ADVANCED: можно автосчитать из items). */
+  laborCost: string;
   /** ISO 4217; default for new forms is `RUB` via `createInitialAddServiceEventFormValues`. */
   currency: string;
   comment: string;
@@ -25,11 +56,9 @@ export type AddServiceEventFormValues = {
    * Used e.g. when prefilling from a wishlist item.
    */
   installedPartsJson: string;
-  /** Артикул / номер SKU (опционально). */
-  partSku: string;
-  /** Наименование запчасти (опционально). */
-  partName: string;
   installedExpenseItemIds: string[];
+  /** Items bundle (>= 1 строка). */
+  items: BundleItemFormValues[];
 };
 
 /** API-ready shape; alias of existing contract. */
@@ -85,6 +114,9 @@ export type AddServiceEventValidationContext = {
   todayDateYmd: string;
   /** When set, event odometer must not exceed this (web rule). */
   currentVehicleOdometer: number | null;
-  /** When false and `nodeId` is set, selection is not a leaf (web cascaded picker). */
-  isLeafNode?: boolean;
+  /**
+   * Set of nodeIds known to be leaves (для валидации каждого `items[].nodeId`).
+   * Если не передан, проверка leaf-уровня пропускается (доверяем серверу).
+   */
+  leafNodeIds?: ReadonlySet<string>;
 };

@@ -1,32 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma, TopNodeStatus } from "@prisma/client";
+import { ServiceEventMode } from "@prisma/client";
 import { z } from "zod";
 import {
-  calculateAllRootEffectiveStatuses,
-  type LatestServiceEventView,
-  type NodeMaintenanceRuleView,
-} from "@/lib/maintenance-status";
+  recomputeTopNodeStates,
+  syncNodeStateForLeafNode,
+  updateBundleServiceEventInTransaction,
+} from "@/lib/bundle-service-event-transaction";
 import { syncExpenseItemForServiceEvent } from "@/lib/expense-items";
 import { linkInstalledExpenseItemsToServiceEvent } from "@/lib/service-event-expense-links";
 import { prisma } from "@/lib/prisma";
+import {
+  serializeServiceEventRow,
+  type RawServiceEventRow,
+} from "@/lib/service-event-serialize";
 import { getVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
-
-function normalizeServiceEventPartSku(value: string | null | undefined): string | null {
-  if (value == null) {
-    return null;
-  }
-  const t = value.trim().slice(0, 200);
-  return t.length > 0 ? t : null;
-}
-
-function normalizeServiceEventPartName(value: string | null | undefined): string | null {
-  if (value == null) {
-    return null;
-  }
-  const t = value.trim().slice(0, 500);
-  return t.length > 0 ? t : null;
-}
 
 type RouteContext = {
   params: Promise<{
@@ -35,9 +23,24 @@ type RouteContext = {
   }>;
 };
 
+const ACTION_TYPE_VALUES = ["REPLACE", "SERVICE", "INSPECT", "CLEAN", "ADJUST"] as const;
+
+const updateServiceBundleItemSchema = z.object({
+  nodeId: z.string().trim().min(1),
+  actionType: z.enum(ACTION_TYPE_VALUES),
+  partName: z.string().trim().nullable().optional(),
+  sku: z.string().trim().nullable().optional(),
+  quantity: z.number().int().positive().nullable().optional(),
+  partCost: z.number().nonnegative().nullable().optional(),
+  laborCost: z.number().nonnegative().nullable().optional(),
+  comment: z.string().trim().nullable().optional(),
+});
+
 const updateServiceEventSchema = z
   .object({
-    nodeId: z.string().trim().min(1),
+    nodeId: z.string().trim().min(1).optional(),
+    title: z.string().trim().min(1),
+    mode: z.enum(["BASIC", "ADVANCED"]),
     eventDate: z
       .string()
       .trim()
@@ -47,203 +50,46 @@ const updateServiceEventSchema = z
       }),
     odometer: z.number().int().min(0).optional(),
     engineHours: z.number().int().min(0).nullable().optional(),
-    serviceType: z.string().trim().min(1),
     installedPartsJson: z.unknown().nullable().optional(),
-    costAmount: z.number().min(0).nullable().optional(),
+    partsCost: z.number().nonnegative().nullable().optional(),
+    laborCost: z.number().nonnegative().nullable().optional(),
+    totalCost: z.number().nonnegative().nullable().optional(),
     currency: z.string().trim().nullable().optional(),
     comment: z.string().trim().nullable().optional(),
-    partSku: z.union([z.string(), z.null()]).optional(),
-    partName: z.union([z.string(), z.null()]).optional(),
     installedExpenseItemIds: z.array(z.string().trim().min(1)).optional(),
+    items: z.array(updateServiceBundleItemSchema).min(1),
   })
   .superRefine((value, ctx) => {
-    if (value.costAmount != null && !value.currency?.trim()) {
+    if (value.mode === "BASIC") {
+      value.items.forEach((item, index) => {
+        if (item.partName || item.sku || item.quantity != null || item.partCost != null || item.laborCost != null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["items", index],
+            message: "Per-item part/cost fields are not allowed in BASIC mode",
+          });
+        }
+      });
+    }
+    const seenNodeIds = new Set<string>();
+    value.items.forEach((item, index) => {
+      if (seenNodeIds.has(item.nodeId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["items", index, "nodeId"],
+          message: "Duplicate nodeId in items",
+        });
+      }
+      seenNodeIds.add(item.nodeId);
+    });
+    if (value.totalCost != null && !value.currency?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["currency"],
-        message: "currency is required when costAmount is provided",
+        message: "currency is required when totalCost is provided",
       });
     }
   });
-
-type MutableTx = Prisma.TransactionClient;
-
-function mapToPersistedTopNodeStatus(status: string | null, fallback: TopNodeStatus): TopNodeStatus {
-  if (status === "OVERDUE") {
-    return TopNodeStatus.OVERDUE;
-  }
-  if (status === "SOON") {
-    return TopNodeStatus.SOON;
-  }
-  if (status === "RECENTLY_REPLACED") {
-    return TopNodeStatus.RECENTLY_REPLACED;
-  }
-  if (status === "OK") {
-    return TopNodeStatus.OK;
-  }
-  return fallback;
-}
-
-async function syncNodeStateForLeafNode(tx: MutableTx, vehicleId: string, nodeId: string) {
-  const latestServiceEvent = await tx.serviceEvent.findFirst({
-    where: {
-      vehicleId,
-      nodeId,
-      eventKind: "SERVICE",
-    },
-    orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
-    select: { id: true },
-  });
-
-  if (!latestServiceEvent) {
-    await tx.nodeState.deleteMany({
-      where: {
-        vehicleId,
-        nodeId,
-      },
-    });
-    return;
-  }
-
-  await tx.nodeState.upsert({
-    where: {
-      vehicleId_nodeId: {
-        vehicleId,
-        nodeId,
-      },
-    },
-    update: {
-      status: "RECENTLY_REPLACED",
-      lastServiceEventId: latestServiceEvent.id,
-      note: null,
-    },
-    create: {
-      vehicleId,
-      nodeId,
-      status: "RECENTLY_REPLACED",
-      lastServiceEventId: latestServiceEvent.id,
-      note: null,
-    },
-  });
-}
-
-async function recomputeTopNodeStates(tx: MutableTx, vehicleId: string) {
-  const vehicle = await tx.vehicle.findUnique({
-    where: { id: vehicleId },
-    select: { id: true, odometer: true, engineHours: true },
-  });
-  if (!vehicle) {
-    throw new Error("Vehicle not found");
-  }
-
-  const allNodes = await tx.node.findMany({
-    select: { id: true, parentId: true },
-  });
-
-  const nodeStates = await tx.nodeState.findMany({
-    where: { vehicleId },
-    select: { nodeId: true, status: true },
-  });
-  const nodeStateByNodeId = new Map<string, { status: string | null }>(
-    nodeStates.map((state) => [state.nodeId, { status: state.status }])
-  );
-
-  const nodeMaintenanceRuleModel = (tx as MutableTx & {
-    nodeMaintenanceRule?: {
-      findMany: typeof tx.nodeState.findMany;
-    };
-  }).nodeMaintenanceRule;
-  const maintenanceRules = nodeMaintenanceRuleModel
-    ? await nodeMaintenanceRuleModel.findMany({
-        select: {
-          nodeId: true,
-          triggerMode: true,
-          intervalKm: true,
-          intervalHours: true,
-          intervalDays: true,
-          warningKm: true,
-          warningHours: true,
-          warningDays: true,
-          isActive: true,
-        },
-      })
-    : [];
-  const maintenanceRuleByNodeId = new Map<string, NodeMaintenanceRuleView>(
-    maintenanceRules.map((rule) => [
-      rule.nodeId,
-      {
-        triggerMode: rule.triggerMode,
-        intervalKm: rule.intervalKm,
-        intervalHours: rule.intervalHours,
-        intervalDays: rule.intervalDays,
-        warningKm: rule.warningKm,
-        warningHours: rule.warningHours,
-        warningDays: rule.warningDays,
-        isActive: rule.isActive,
-      },
-    ])
-  );
-
-  const serviceEvents = await tx.serviceEvent.findMany({
-    where: {
-      vehicleId,
-      eventKind: "SERVICE",
-    },
-    orderBy: [{ nodeId: "asc" }, { eventDate: "desc" }, { createdAt: "desc" }],
-    select: { nodeId: true, eventDate: true, odometer: true, engineHours: true },
-  });
-  const latestServiceEventByNodeId = new Map<string, LatestServiceEventView>();
-  for (const serviceEventItem of serviceEvents) {
-    if (!latestServiceEventByNodeId.has(serviceEventItem.nodeId)) {
-      latestServiceEventByNodeId.set(serviceEventItem.nodeId, {
-        eventDate: serviceEventItem.eventDate,
-        odometer: serviceEventItem.odometer,
-        engineHours: serviceEventItem.engineHours,
-      });
-    }
-  }
-
-  const existingTopNodeStates = await tx.topNodeState.findMany({
-    where: { vehicleId },
-    select: { nodeId: true, status: true },
-  });
-  const fallbackStatusByRootId = new Map(
-    existingTopNodeStates.map((state) => [state.nodeId, state.status])
-  );
-
-  const calculatedTopNodeStatuses = calculateAllRootEffectiveStatuses({
-    nodes: allNodes,
-    nodeStateByNodeId,
-    maintenanceRuleByNodeId,
-    latestServiceEventByNodeId,
-    currentOdometer: vehicle.odometer,
-    currentEngineHours: vehicle.engineHours,
-    now: new Date(),
-  });
-
-  for (const calculatedStatus of calculatedTopNodeStatuses) {
-    const fallback = fallbackStatusByRootId.get(calculatedStatus.rootNodeId) ?? TopNodeStatus.OK;
-    const persistedStatus = mapToPersistedTopNodeStatus(calculatedStatus.effectiveStatus, fallback);
-    await tx.topNodeState.upsert({
-      where: {
-        vehicleId_nodeId: {
-          vehicleId,
-          nodeId: calculatedStatus.rootNodeId,
-        },
-      },
-      update: {
-        status: persistedStatus,
-      },
-      create: {
-        vehicleId,
-        nodeId: calculatedStatus.rootNodeId,
-        status: persistedStatus,
-        lastServiceEventId: null,
-        note: null,
-      },
-    });
-  }
-}
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
@@ -275,24 +121,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const nextNode = await prisma.node.findUnique({
-      where: { id: payload.nodeId },
-      select: { id: true },
-    });
-    if (!nextNode) {
-      return NextResponse.json({ error: "Node not found" }, { status: 404 });
-    }
-
-    const childCount = await prisma.node.count({
-      where: { parentId: payload.nodeId },
-    });
-    if (childCount > 0) {
-      return NextResponse.json(
-        { error: "Service events can only be linked to a leaf node" },
-        { status: 400 }
-      );
-    }
-
     const eventDate = new Date(payload.eventDate);
     if (eventDate.getTime() > Date.now()) {
       return NextResponse.json(
@@ -302,7 +130,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const nextOdometer = payload.odometer ?? existingServiceEvent.odometer;
-
     if (nextOdometer > vehicle.odometer) {
       return NextResponse.json(
         {
@@ -312,43 +139,65 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const anchorNodeId = (payload.nodeId ?? payload.items[0]?.nodeId)?.trim();
+    if (!anchorNodeId) {
+      return NextResponse.json({ error: "Anchor nodeId required" }, { status: 400 });
+    }
+
+    const partsCost = payload.partsCost ?? null;
+    const laborCost = payload.laborCost ?? null;
+    const explicitTotal = payload.totalCost ?? null;
+    const computedTotal =
+      partsCost != null || laborCost != null ? (partsCost ?? 0) + (laborCost ?? 0) : null;
+    const totalCost = explicitTotal ?? computedTotal;
+
     const updatedServiceEvent = await prisma.$transaction(async (tx) => {
-      const updated = await tx.serviceEvent.update({
-        where: { id: existingServiceEvent.id },
-        data: {
-          nodeId: payload.nodeId,
-          eventDate,
-          odometer: nextOdometer,
-          engineHours: payload.engineHours ?? null,
-          serviceType: payload.serviceType.trim(),
-          installedPartsJson:
-            payload.installedPartsJson === null || payload.installedPartsJson === undefined
-              ? Prisma.JsonNull
-              : payload.installedPartsJson,
-          costAmount: payload.costAmount ?? null,
-          currency: payload.costAmount != null ? payload.currency?.trim().toUpperCase() ?? null : null,
-          comment: payload.comment || null,
-          partSku: normalizeServiceEventPartSku(payload.partSku),
-          partName: normalizeServiceEventPartName(payload.partName),
-        },
-        include: {
-          node: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              level: true,
-              displayOrder: true,
-            },
-          },
-        },
+      const updated = await updateBundleServiceEventInTransaction(tx, eventId, {
+        vehicleId,
+        anchorNodeId,
+        title: payload.title,
+        mode: payload.mode === "ADVANCED" ? ServiceEventMode.ADVANCED : ServiceEventMode.BASIC,
+        eventDate,
+        odometer: nextOdometer,
+        engineHours: payload.engineHours ?? null,
+        partsCost,
+        laborCost,
+        totalCost,
+        currency:
+          totalCost != null
+            ? (payload.currency?.trim().toUpperCase() ?? null)
+            : payload.currency?.trim().toUpperCase() ?? null,
+        comment: payload.comment || null,
+        installedPartsJson:
+          payload.installedPartsJson === null || payload.installedPartsJson === undefined
+            ? null
+            : (payload.installedPartsJson as Parameters<typeof updateBundleServiceEventInTransaction>[2]["installedPartsJson"]),
+        items: payload.items.map((item) => ({
+          nodeId: item.nodeId,
+          actionType: item.actionType,
+          partName: item.partName ?? null,
+          sku: item.sku ?? null,
+          quantity: item.quantity ?? null,
+          partCost: item.partCost ?? null,
+          laborCost: item.laborCost ?? null,
+          comment: item.comment ?? null,
+        })),
       });
 
-      const affectedNodeIds = new Set<string>([existingServiceEvent.nodeId, payload.nodeId]);
-      for (const nodeId of affectedNodeIds) {
-        await syncNodeStateForLeafNode(tx, vehicleId, nodeId);
-      }
-      await syncExpenseItemForServiceEvent(tx, updated);
+      await syncExpenseItemForServiceEvent(tx, {
+        id: updated.id,
+        vehicleId: updated.vehicleId,
+        nodeId: updated.nodeId,
+        eventKind: updated.eventKind,
+        eventDate: updated.eventDate,
+        title: updated.title,
+        totalCost: updated.totalCost,
+        currency: updated.currency,
+        comment: updated.comment,
+        installedPartsJson: updated.installedPartsJson,
+        items: updated.items?.map((item) => ({ partName: item.partName, sku: item.sku })),
+        createdAt: updated.createdAt,
+      });
       await linkInstalledExpenseItemsToServiceEvent(tx, {
         vehicleId,
         serviceEventId: updated.id,
@@ -357,12 +206,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         odometer: updated.odometer,
         engineHours: updated.engineHours,
       });
-      await recomputeTopNodeStates(tx, vehicleId);
 
       return updated;
     });
 
-    return NextResponse.json({ serviceEvent: updatedServiceEvent });
+    return NextResponse.json({
+      serviceEvent: serializeServiceEventRow(updatedServiceEvent as unknown as RawServiceEventRow),
+    });
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
@@ -374,11 +224,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { status: 400 }
       );
     }
-    if (
-      error instanceof Error &&
-      error.message === "Selected expense items are not available for this service event"
-    ) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error instanceof Error) {
+      if (error.message === "Selected expense items are not available for this service event") {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      if (error.message === "Node not found") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+      if (error.message === "Service events can only be created for the last available node level") {
+        return NextResponse.json(
+          { error: "Service events can only be linked to a leaf node" },
+          { status: 400 }
+        );
+      }
     }
 
     console.error("Failed to update service event:", error);
@@ -405,6 +263,7 @@ export async function DELETE(_: NextRequest, context: RouteContext) {
         vehicleId: true,
         nodeId: true,
         eventKind: true,
+        items: { select: { nodeId: true } },
       },
     });
     if (!serviceEvent || serviceEvent.vehicleId !== vehicleId) {
@@ -417,16 +276,21 @@ export async function DELETE(_: NextRequest, context: RouteContext) {
       );
     }
 
+    const affectedNodeIds = new Set<string>([serviceEvent.nodeId, ...serviceEvent.items.map((item) => item.nodeId)]);
+
     await prisma.$transaction(async (tx) => {
       const expenseDb = tx as unknown as {
         expenseItem: { deleteMany(args: unknown): Promise<unknown> };
       };
       await expenseDb.expenseItem.deleteMany({ where: { serviceEventId: serviceEvent.id } });
+      // Items сами каскадятся (onDelete: Cascade); удаляем event целиком.
       await tx.serviceEvent.delete({
         where: { id: serviceEvent.id },
       });
 
-      await syncNodeStateForLeafNode(tx, vehicleId, serviceEvent.nodeId);
+      for (const nodeId of affectedNodeIds) {
+        await syncNodeStateForLeafNode(tx, vehicleId, nodeId);
+      }
       await recomputeTopNodeStates(tx, vehicleId);
     });
 
@@ -434,6 +298,7 @@ export async function DELETE(_: NextRequest, context: RouteContext) {
       deleted: true as const,
       eventId: serviceEvent.id,
       affectedNodeId: serviceEvent.nodeId,
+      affectedNodeIds: Array.from(affectedNodeIds),
     });
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);

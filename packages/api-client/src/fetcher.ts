@@ -37,14 +37,23 @@ export async function readHttpErrorMessage(response: Response): Promise<string> 
   }
 
   try {
-    const parsed = JSON.parse(trimmed) as { error?: unknown };
+    const parsed = JSON.parse(trimmed) as {
+      error?: unknown;
+      hint?: unknown;
+      devMessage?: unknown;
+    };
     if (
       parsed &&
       typeof parsed === "object" &&
       typeof parsed.error === "string" &&
       parsed.error.length > 0
     ) {
-      return parsed.error;
+      const hint = typeof parsed.hint === "string" && parsed.hint.length > 0 ? `\n${parsed.hint}` : "";
+      const dev =
+        typeof parsed.devMessage === "string" && parsed.devMessage.length > 0
+          ? `\n(${parsed.devMessage})`
+          : "";
+      return `${parsed.error}${hint}${dev}`;
     }
   } catch {
     // Body is not JSON.
