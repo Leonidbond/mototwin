@@ -150,7 +150,7 @@
 ## 7) Связанные документы
 
 - `docs/node-tree.md`
-- `docs/expo-screen-node-tree.md`
-- `docs/expo-screen-node-tree-ux-improvements.md`
+- `docs/archive/expo-screen-node-tree.md`
+- `docs/archive/expo-screen-node-tree-ux-improvements.md`
 - `docs/web-expo-node-tree-parity-fixes.md`
-- `docs/expences.md` (разделы про расходы по узлам)
+- `docs/archive/expenses-analytics-vision-draft.md` (черновик расширенной аналитики расходов по узлам; MVP — `expense-tracking-mvp.md`)

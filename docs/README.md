@@ -1,74 +1,96 @@
-# MotoTwin Documentation Index
+# MotoTwin — индекс документации
 
-Этот индекс описывает актуальную структуру документации по MotoTwin и разделяет:
+Структура:
 
-- **canonical docs** — текущий source of truth;
-- **feature specs** — живые продуктовые/MVP-спецификации по областям;
-- **parity history** — аудит и журналы выравнивания web/Expo;
-- **archive candidates** — исторические артефакты, которые не должны использоваться как основной источник.
+1. **Canonical** — source of truth по архитектуре и клиентам.
+2. **Feature specs (MVP)** — продуктовые спеки живых областей.
+3. **UI / крупные спеки** — детальные макеты и сценарии.
+4. **Shared contracts** — типы и контракты UI между web и Expo.
+5. **Parity history** — журналы выравнивания web/Expo (не заменяют canonical).
+6. **Архив** — [`archive/`](./archive/) (миграции, старые аудиты, пошаговые `expo-screen-*`, черновики).
 
-## Canonical documentation
+---
 
-- `technical-overview.md` — общий технический обзор текущей архитектуры и направлений миграции.
-- `repository-structure.md` — структура репозитория и назначение ключевых директорий.
-- `data-model.md` — Prisma/PostgreSQL модель: сущности, enum, связи, ограничения.
-- `api-backend.md` — backend routes, payloads, response shape, правила.
-- `frontend-web.md` — актуальное описание web-клиента.
-- `frontend-expo.md` — актуальное описание Expo-клиента.
-- `shared-packages.md` — shared packages (`types`, `domain`, `api-client`) и границы reuse.
-- `functional-logic.md` — бизнес-логика обслуживания: события, статусы, агрегация, пересчет.
-- `cross-platform-parity.md` — текущая продуктовая матрица parity и намеренные отличия.
-- `mototwin_unified_design_concept.md` — единый дизайн-концепт.
-- `mototwin_ui_refactor_playbook.md` — инженерный playbook UI-рефакторинга.
-- `top-node-icons.md` — правила хранения, именования и подключения TOP-node иконок.
+## 1. Canonical
 
-## Feature specs (durable product docs)
+| Документ | Назначение |
+|----------|------------|
+| [`technical-overview.md`](./technical-overview.md) | Общий технический обзор |
+| [`repository-structure.md`](./repository-structure.md) | Монорепо: директории и роли |
+| [`data-model.md`](./data-model.md) | Prisma: сущности, enum, связи |
+| [`api-backend.md`](./api-backend.md) | HTTP API, правила, формы ответов |
+| [`frontend-web.md`](./frontend-web.md) | Next.js клиент |
+| [`frontend-expo.md`](./frontend-expo.md) | Expo Router, экраны, потоки |
+| [`shared-packages.md`](./shared-packages.md) | `types`, `domain`, `api-client`, границы reuse |
+| [`functional-logic.md`](./functional-logic.md) | События, статусы узлов, агрегация |
+| [`cross-platform-parity.md`](./cross-platform-parity.md) | Матрица parity и намеренные отличия |
+| [`mototwin_unified_design_concept.md`](./mototwin_unified_design_concept.md) | Единый дизайн-концепт |
+| [`mototwin_ui_refactor_playbook.md`](./mototwin_ui_refactor_playbook.md) | Playbook UI-рефакторинга |
+| [`top-node-icons.md`](./top-node-icons.md) | TOP-node иконки: хранение и именование |
 
-Эти документы остаются актуальными, пока соответствующая продуктовая область жива:
+---
 
-- `garage-dashboard-mvp.md`
-- `service-log-mvp.md`
-- `expense-tracking-mvp.md`
-- `attention-flow-mvp.md`
-- `vehicle-profile-mvp.md`
-- `vehicle-trash-mvp.md`
-- `upcoming-maintenance-mvp.md`
-- `parts-wishlist-mvp.md`
-- `parts-catalog-mvp.md`
-- `service-kits-mvp.md`
-- `user-settings-mvp.md`
+## 2. Feature specs (MVP)
 
-Если feature spec расходится с canonical docs, truth должен быть синхронизирован, а не дублирован.
+[`garage-dashboard-mvp.md`](./garage-dashboard-mvp.md) · [`service-log-mvp.md`](./service-log-mvp.md) · [`expense-tracking-mvp.md`](./expense-tracking-mvp.md) · [`attention-flow-mvp.md`](./attention-flow-mvp.md) · [`vehicle-profile-mvp.md`](./vehicle-profile-mvp.md) · [`vehicle-trash-mvp.md`](./vehicle-trash-mvp.md) · [`upcoming-maintenance-mvp.md`](./upcoming-maintenance-mvp.md) · [`parts-wishlist-mvp.md`](./parts-wishlist-mvp.md) · [`parts-catalog-mvp.md`](./parts-catalog-mvp.md) · [`service-kits-mvp.md`](./service-kits-mvp.md) · [`user-settings-mvp.md`](./user-settings-mvp.md)
 
-## Web + Expo parity history
+При расхождении с canonical — править спеки или canonical так, чтобы остался один согласованный источник.
 
-- `web-expo-parity-audit.md` — индекс статуса и карта parity-документов.
-- `web-expo-parity-audit-repeat-2.md` — актуальная детальная повторная сверка.
-- `web-mobile-parity-workflow.md` — процесс планирования фич на двух клиентах.
-- `parity-task-template.md` — шаблон parity-задачи.
-- `web-expo-*-fixes.md` — тематические журналы выполненных parity/fix батчей.
+---
 
-Эти документы полезны как история решений и подтверждение regressions/fixes, но не заменяют canonical docs.
+## 3. UI и крупные спеки
 
-## Governance and process docs
+| Документ | Назначение |
+|----------|------------|
+| [`mototwin-parts-cart-and-picker-ui-spec.md`](./mototwin-parts-cart-and-picker-ui-spec.md) | Корзина замен + single-page подбор детали (web + mobile) |
+| [`node-tree.md`](./node-tree.md) | Справочник иерархии узлов (коды дерева) |
+| [`node-tree-page-functional-overview.md`](./node-tree-page-functional-overview.md) | Поведение страницы «Узлы» (web + Expo) |
+| [`node-context-mvp.md`](./node-context-mvp.md) | Контекст узла, быстрые действия |
+| [`parts-catalog-architecture.md`](./parts-catalog-architecture.md) | Архитектура каталога запчастей |
+| [`ui-action-icons-mvp.md`](./ui-action-icons-mvp.md) | Иконки действий в UI |
 
-- `coding-rules.md` — правила разработки и quality constraints.
-- `cursor-workflow.md` — правила рабочего процесса в Cursor.
+Папка **[`Service-Bundle/`](./Service-Bundle/)** — концепт и модели «сервисного бандла» (черновик под будущую реализацию).
 
-## Archive / legacy notes
+---
 
-Следующие документы либо уже historical по смыслу, либо должны использоваться только как контекст миграции:
+## 4. Shared contracts и дизайн-токены
 
-- `project.md`
-- `node-status.md`
-- `documentation-gap-analysis.md`
-- `expo-screen-*` step docs (если их содержание уже отражено в `frontend-expo.md` или feature specs)
-- точечные parity/journal changelog docs, если итог уже перенесен в canonical/feature specs
+[`shared-component-contracts.md`](./shared-component-contracts.md) · [`shared-service-log-view-models.md`](./shared-service-log-view-models.md) · [`shared-node-tree-view-models.md`](./shared-node-tree-view-models.md) · [`shared-form-contracts.md`](./shared-form-contracts.md) · [`shared-api-client.md`](./shared-api-client.md) · [`shared-vehicle-view-models.md`](./shared-vehicle-view-models.md) · [`shared-design-tokens.md`](./shared-design-tokens.md)
 
-## Cleanup rules
+---
 
-1. Не использовать historical/step docs как source of truth для текущего поведения.
-2. Перед удалением любого документа:
-   - обновить входящие ссылки из `docs/` и `src/`;
-   - убедиться, что финальное знание перенесено в canonical/feature spec.
-3. При расхождении между canonical docs и parity history ориентироваться на canonical set, а parity history использовать как changelog.
+## 5. Parity history (web ↔ Expo)
+
+**Индекс:** [`web-expo-parity-audit.md`](./web-expo-parity-audit.md) → детальная сверка [`web-expo-parity-audit-repeat-2.md`](./web-expo-parity-audit-repeat-2.md).
+
+**Процесс:** [`web-mobile-parity-workflow.md`](./web-mobile-parity-workflow.md) · [`parity-task-template.md`](./parity-task-template.md)
+
+**Журналы фиксов:** [`web-expo-parity-fixes.md`](./web-expo-parity-fixes.md) · [`web-expo-data-parity-fixes.md`](./web-expo-data-parity-fixes.md) · [`web-expo-node-tree-parity-fixes.md`](./web-expo-node-tree-parity-fixes.md) · [`web-expo-visual-parity-fixes.md`](./web-expo-visual-parity-fixes.md) · [`web-expo-service-log-parity-fixes.md`](./web-expo-service-log-parity-fixes.md) (в конце — приложение с ранними заметками по Expo journal; отдельные файлы `expo-service-log-*-parity.md` удалены как дубли).
+
+**QA:** [`status-cache-frontend-qa.md`](./status-cache-frontend-qa.md) · [`parts-catalog-regression-qa.md`](./parts-catalog-regression-qa.md) · [`parts-catalog-qa-seed.md`](./parts-catalog-qa-seed.md)
+
+---
+
+## 6. Auth (дорожная карта)
+
+[`auth-roadmap.md`](./auth-roadmap.md) · [`auth-data-ownership-architecture.md`](./auth-data-ownership-architecture.md) · [`auth-implementation-plan.md`](./auth-implementation-plan.md)
+
+---
+
+## 7. Governance
+
+[`coding-rules.md`](./coding-rules.md) · [`cursor-workflow.md`](./cursor-workflow.md)
+
+---
+
+## 8. Архив
+
+Каталог **[`archive/`](./archive/)** — перенесённые «кандидаты в архив» из старого индекса: `project.md`, `node-status.md`, `documentation-gap-analysis.md`, планы `expo-bootstrap` / `expo-first-migration`, все **`expo-screen-*.md`**, черновик расходов `expenses-analytics-vision-draft.md`. См. [`archive/README.md`](./archive/README.md).
+
+---
+
+## Правила сопровождения
+
+1. Не использовать архив и parity-журналы как единственный источник истины для текущего поведения.
+2. Перед удалением файла из `docs/` — обновить ссылки в `docs/`, при необходимости в `README` и в коде.
+3. При конфликте canonical vs parity — приоритет у canonical и MVP-спеков; parity — changelog.

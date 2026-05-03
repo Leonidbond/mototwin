@@ -56,12 +56,12 @@
   - Почему важно: сейчас есть отдельные canonical docs `frontend-web.md` и `frontend-expo.md`.
   - Действие: хранить только как архивный контекст либо удалять после переноса значимого содержимого.
 
-- `docs/project.md`
+- `docs/archive/project.md` (перенесён в архив)
   - Проблема: содержит большой объем product-scope и API/modules, которые не реализованы (auth, fitment engine, expenses module, subscription flows и др.).
   - Почему важно: сильный риск считать несуществующее реализованным.
   - Действие: репозиционировать как historical product brief (не source of truth для реализации).
 
-- `docs/node-status.md`
+- `docs/archive/node-status.md` (перенесён в архив)
   - Проблема: смешивает планируемое и реализованное; формат не соответствует текущему набору canonical docs.
   - Почему важно: дублирует и размывает source-of-truth по статусной логике.
   - Действие: пометить как historical working notes, основной источник — `functional-logic.md`.
@@ -128,7 +128,7 @@
 ### Business logic
 - Статус: **good but needs consolidation**.
 - Gap: часть логики размазана между `functional-logic.md` и legacy notes.
-- Fix: обновить `functional-logic.md`, перевести `node-status.md` в historical.
+- Fix: обновить `functional-logic.md`; `node-status.md` перенесён в `docs/archive/`.
 
 ### Cross-platform parity
 - Статус: **missing**.
