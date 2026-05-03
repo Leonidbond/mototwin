@@ -1647,7 +1647,10 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       persistNodeTreeReturnState(selectedNodeContextId);
       closeNodeContextModal();
       pushWishlistFromDashboardForScrollOnReturn(
-        buildVehicleWishlistNewHref(vehicleId, selectedNodeContextId, { kitCode: kit.code })
+        buildVehicleWishlistNewHref(vehicleId, selectedNodeContextId, {
+          kitCode: kit.code,
+          focusKits: true,
+        })
       );
     },
     [

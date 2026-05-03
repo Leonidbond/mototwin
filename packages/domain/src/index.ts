@@ -294,3 +294,39 @@ export {
   resolveGarageVehicleSilhouette,
   getVehicleSilhouetteClassLabel,
 } from "./vehicle-silhouette";
+
+export {
+  MERCHANDISE_LABELS_RU,
+  classifyRecommendationsForPicker,
+} from "./picker-merchandising";
+export {
+  getServiceKitTagRu,
+  getServiceKitTagLabelRu,
+} from "./service-kit-tags";
+export {
+  formatRideStyleChipRu,
+  formatRideStyleChipLabelRu,
+} from "./ride-style-chip";
+export {
+  buildWhyMatchesReasons,
+  type WhyMatchesInput,
+} from "./picker-why-matches";
+export {
+  createEmptyDraftCart,
+  addSkuToDraft,
+  addKitToDraft,
+  removeFromDraft,
+  clearDraft,
+  isDraftEmpty,
+  isKitInDraft,
+  getDraftTotals,
+  buildPickerSubmitPreview,
+  type AddSkuToDraftInput,
+  type AddKitToDraftInput,
+  type BuildPickerSubmitPreviewInput,
+} from "./picker-draft-cart";
+export {
+  PICKER_MODAL_TOP_NODES_LIMIT,
+  getOrderedTopNodeIdsPresentInNodeTree,
+  filterLeafOptionsUnderTopNodeAncestors,
+} from "./picker-top-nodes";

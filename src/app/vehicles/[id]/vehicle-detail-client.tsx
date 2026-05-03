@@ -64,9 +64,6 @@ import {
   validatePartWishlistFormValues,
   isWishlistTransitionToInstalled,
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
-  applyPartSkuViewModelToPartWishlistFormValues,
-  buildPartRecommendationGroupsForDisplay,
-  buildServiceKitPreview,
   buildTopNodeOverviewCards,
   getPartRecommendationWarningLabel,
   getWishlistItemSkuDisplayLines,
@@ -83,11 +80,8 @@ import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
 import { PartsCartPage, type PartsAdvancedFilterState } from "./parts/_components/PartsCartPage";
-import { PartPickerShell, type PartPickerTab } from "./parts/_components/PartPickerShell";
-import {
-  buildPartSkuViewModelFromRecommendation,
-  normalizePartNumberForLookup,
-} from "./parts/_components/part-picker-utils";
+import { WishlistItemEditModal } from "./parts/_components/WishlistItemEditModal";
+import { normalizePartNumberForLookup } from "./parts/_components/part-picker-utils";
 import type {
   AttentionItemViewModel,
   NodeSnoozeOption,
@@ -106,9 +100,7 @@ import type {
   VehicleDetailApiRecord,
   AddServiceEventFormValues,
   PartRecommendationViewModel,
-  PartRecommendationGroup,
   ServiceKitViewModel,
-  ServiceKitPreviewViewModel,
   PartWishlistItemStatus,
   PartWishlistFormValues,
   PartWishlistItem,
@@ -1366,8 +1358,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   );
   const [partsStatusFilter, setPartsStatusFilter] = useState<PartsStatusFilter>("ALL");
   const [selectedPartsWishlistItemId, setSelectedPartsWishlistItemId] = useState<string | null>(null);
-  const [wishlistPickerInitialTab, setWishlistPickerInitialTab] = useState<PartPickerTab>("search");
-  const [wishlistModalNonce, setWishlistModalNonce] = useState(0);
+  const [pickedReturnHighlightIds, setPickedReturnHighlightIds] = useState<string[]>([]);
+  const previousVehicleIdForPickedHighlightRef = useRef("");
   const [partsSearchQuery, setPartsSearchQuery] = useState("");
   const [partsAdvancedFilters, setPartsAdvancedFilters] = useState<PartsAdvancedFilterState>(
     DEFAULT_PARTS_ADVANCED_FILTERS
@@ -1398,17 +1390,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [wishlistSkuPickedPreview, setWishlistSkuPickedPreview] = useState<PartSkuViewModel | null>(
     null
   );
-  const [wishlistRecommendations, setWishlistRecommendations] = useState<
-    PartRecommendationViewModel[]
-  >([]);
-  const [wishlistRecommendationsLoading, setWishlistRecommendationsLoading] = useState(false);
-  const [wishlistRecommendationsError, setWishlistRecommendationsError] = useState("");
-  const [wishlistAddingRecommendedSkuId, setWishlistAddingRecommendedSkuId] = useState("");
-  const [wishlistServiceKits, setWishlistServiceKits] = useState<ServiceKitViewModel[]>([]);
-  const [wishlistServiceKitsLoading, setWishlistServiceKitsLoading] = useState(false);
-  const [wishlistServiceKitsError, setWishlistServiceKitsError] = useState("");
-  const [wishlistAddingKitCode, setWishlistAddingKitCode] = useState("");
-  const [wishlistSelectedKitCode, setWishlistSelectedKitCode] = useState("");
   const wishlistSkuSearchGen = useRef(0);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -1930,49 +1911,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     return byWishlistItemId;
   }, [serviceEvents]);
-  const serviceKitNodesByCode = useMemo(() => {
-    const out = new Map<string, { id: string; name: string; hasChildren: boolean }>();
-    const stack = [...nodeTree];
-    while (stack.length > 0) {
-      const node = stack.pop();
-      if (!node) {
-        continue;
-      }
-      out.set(node.code, { id: node.id, name: node.name, hasChildren: node.children.length > 0 });
-      for (const child of node.children) {
-        stack.push(child);
-      }
-    }
-    return out;
-  }, [nodeTree]);
-  const serviceKitPreviewByCode = useMemo(() => {
-    const out = new Map<string, ServiceKitPreviewViewModel>();
-    for (const kit of wishlistServiceKits) {
-      out.set(
-        kit.code,
-        buildServiceKitPreview({
-          kit,
-          nodesByCode: serviceKitNodesByCode,
-          activeWishlistItems: wishlistItems,
-        })
-      );
-    }
-    return out;
-  }, [serviceKitNodesByCode, wishlistItems, wishlistServiceKits]);
-  const visibleWishlistServiceKits = useMemo(() => {
-    if (!wishlistSelectedKitCode) {
-      return wishlistServiceKits;
-    }
-    return [...wishlistServiceKits].sort((a, b) => {
-      if (a.code === wishlistSelectedKitCode) {
-        return -1;
-      }
-      if (b.code === wishlistSelectedKitCode) {
-        return 1;
-      }
-      return 0;
-    });
-  }, [wishlistSelectedKitCode, wishlistServiceKits]);
   const wishlistNodeOptions = useMemo(
     () => flattenNodeTreeToSelectOptions(nodeTree),
     [nodeTree]
@@ -1983,11 +1921,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     [wishlistEditingId, wishlistItems]
   );
 
-  const wishlistRecommendationGroups = useMemo(
-    (): PartRecommendationGroup[] =>
-      buildPartRecommendationGroupsForDisplay(wishlistRecommendations),
-    [wishlistRecommendations]
-  );
   const wishlistNodeRequiredError = wishlistFormError.includes("Выберите узел мотоцикла");
 
   useEffect(() => {
@@ -2126,7 +2059,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   }, [wishlistSkuQuery]);
 
   useEffect(() => {
-    if (!isWishlistModalOpen) {
+    if (!isWishlistModalOpen || !wishlistEditingId) {
       return;
     }
     const q = wishlistSkuDebouncedQuery;
@@ -2166,72 +2099,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         }
         setWishlistSkuLoading(false);
       });
-  }, [isWishlistModalOpen, wishlistSkuDebouncedQuery, wishlistForm.nodeId]);
-
-  useEffect(() => {
-    if (!isWishlistModalOpen || !vehicleId) {
-      return;
-    }
-    const nodeId = wishlistForm.nodeId.trim();
-    if (!nodeId) {
-      setWishlistRecommendations([]);
-      setWishlistRecommendationsError("");
-      setWishlistRecommendationsLoading(false);
-      return;
-    }
-    setWishlistRecommendationsLoading(true);
-    setWishlistRecommendationsError("");
-    void vehicleDetailApi
-      .getRecommendedSkusForNode(vehicleId, nodeId)
-      .then((res) => {
-        setWishlistRecommendations(res.recommendations ?? []);
-      })
-      .catch(() => {
-        setWishlistRecommendations([]);
-        setWishlistRecommendationsError("Не удалось загрузить рекомендации по узлу.");
-      })
-      .finally(() => {
-        setWishlistRecommendationsLoading(false);
-      });
-  }, [isWishlistModalOpen, vehicleId, wishlistForm.nodeId]);
-
-  useEffect(() => {
-    if (!isWishlistModalOpen || !vehicleId) {
-      return;
-    }
-    const nodeId = wishlistForm.nodeId.trim();
-    if (!nodeId) {
-      setWishlistServiceKits([]);
-      setWishlistServiceKitsError("");
-      setWishlistServiceKitsLoading(false);
-      return;
-    }
-    setWishlistServiceKitsLoading(true);
-    setWishlistServiceKitsError("");
-    void vehicleDetailApi
-      .getServiceKits({ nodeId, vehicleId })
-      .then((res) => {
-        const nextKits = res.kits ?? [];
-        setWishlistServiceKits((currentKits) => {
-          if (!wishlistSelectedKitCode) {
-            return nextKits;
-          }
-          const selectedKit = currentKits.find((kit) => kit.code === wishlistSelectedKitCode);
-          if (selectedKit && !nextKits.some((kit) => kit.code === wishlistSelectedKitCode)) {
-            return [selectedKit, ...nextKits];
-          }
-          return nextKits;
-        });
-      })
-      .catch(() => {
-        setWishlistServiceKits((currentKits) => (wishlistSelectedKitCode ? currentKits : []));
-        setWishlistServiceKitsError("Не удалось загрузить комплекты обслуживания.");
-      })
-      .finally(() => {
-        setWishlistServiceKitsLoading(false);
-      });
-  }, [isWishlistModalOpen, vehicleId, wishlistForm.nodeId, wishlistSelectedKitCode]);
-
+  }, [isWishlistModalOpen, wishlistEditingId, wishlistSkuDebouncedQuery, wishlistForm.nodeId]);
 
   useEffect(() => {
     if (!serviceLogActionNotice) {
@@ -2425,6 +2293,112 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     });
     return () => window.cancelAnimationFrame(frame);
   }, [highlightedWishlistItemIdFromSearchParams, pageView, wishlistViewModels]);
+
+  useEffect(() => {
+    if (pageView !== "partsSelection" || !vehicleId) {
+      return;
+    }
+    const raw = searchParams.get("picked");
+    if (!raw || isWishlistLoading) {
+      return;
+    }
+    const ids = raw
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (ids.length === 0) {
+      const q = new URLSearchParams(searchParams.toString());
+      q.delete("picked");
+      const suffix = q.toString() ? `?${q.toString()}` : "";
+      router.replace(`/vehicles/${encodeURIComponent(vehicleId)}/parts${suffix}`, { scroll: false });
+      return;
+    }
+
+    const found = ids.filter((id) => wishlistViewModels.some((w) => w.id === id));
+
+    const q = new URLSearchParams(searchParams.toString());
+    q.delete("picked");
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    router.replace(`/vehicles/${encodeURIComponent(vehicleId)}/parts${suffix}`, { scroll: false });
+
+    if (found.length === 0) {
+      return;
+    }
+
+    setPickedReturnHighlightIds(found);
+    setSelectedPartsWishlistItemId(found[0]);
+    setPartsStatusFilter("ALL");
+    setPartsSearchQuery("");
+    setCollapsedPartsStatusGroups((prev) => {
+      const next = { ...prev };
+      for (const id of found) {
+        const vm = wishlistViewModels.find((w) => w.id === id);
+        if (vm) {
+          next[vm.status] = false;
+        }
+      }
+      return next;
+    });
+    setPartsVisibleCountByStatus((prev) => {
+      const next = { ...prev };
+      for (const id of found) {
+        const vm = wishlistViewModels.find((w) => w.id === id);
+        if (!vm) {
+          continue;
+        }
+        const itemsInStatus = wishlistViewModels.filter((item) => item.status === vm.status);
+        const highlightedIndex = itemsInStatus.findIndex((item) => item.id === vm.id);
+        if (highlightedIndex >= 0) {
+          next[vm.status] = Math.max(
+            next[vm.status] ?? PARTS_SELECTION_INITIAL_VISIBLE_COUNT,
+            highlightedIndex + 1
+          );
+        }
+      }
+      return next;
+    });
+
+    const frame = window.requestAnimationFrame(() => {
+      const first = found[0];
+      const target = document.querySelector(`[data-wishlist-item-id="${CSS.escape(first)}"]`);
+      target?.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    isWishlistLoading,
+    pageView,
+    router,
+    searchParams,
+    vehicleId,
+    wishlistViewModels,
+  ]);
+
+  useEffect(() => {
+    if (pickedReturnHighlightIds.length === 0) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setPickedReturnHighlightIds([]);
+    }, 8000);
+    return () => window.clearTimeout(timeoutId);
+  }, [pickedReturnHighlightIds]);
+
+  useEffect(() => {
+    if (pageView !== "partsSelection") {
+      setPickedReturnHighlightIds([]);
+    }
+  }, [pageView]);
+
+  useEffect(() => {
+    if (!vehicleId) {
+      return;
+    }
+    const prev = previousVehicleIdForPickedHighlightRef.current;
+    if (prev && prev !== vehicleId) {
+      setPickedReturnHighlightIds([]);
+    }
+    previousVehicleIdForPickedHighlightRef.current = vehicleId;
+  }, [vehicleId]);
 
   useEffect(() => {
     if (pageView !== "partsSelection" || !installWishlistItemIdFromSearchParams) {
@@ -2813,99 +2787,25 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     openAddServiceEventFromLeafNode(item.nodeId);
   };
 
-  const openWishlistModalForCreate = (presetNodeId?: string, pickerTab: PartPickerTab = "search") => {
-    setWishlistModalNonce((n) => n + 1);
-    setWishlistPickerInitialTab(pickerTab);
-    setWishlistNotice("");
-    setWishlistEditingId(null);
-    wishlistSkuSearchGen.current += 1;
-    setWishlistSkuQuery("");
-    setWishlistSkuDebouncedQuery("");
-    setWishlistSkuResults([]);
-    setWishlistSkuFetchError("");
-    setWishlistSkuPickedPreview(null);
-    setWishlistRecommendations([]);
-    setWishlistRecommendationsError("");
-    setWishlistAddingRecommendedSkuId("");
-    setWishlistServiceKits([]);
-    setWishlistServiceKitsError("");
-    setWishlistAddingKitCode("");
-    setWishlistSelectedKitCode("");
-    const initialWishlistForm = createInitialPartWishlistFormValues({
-      nodeId: presetNodeId ?? "",
-      status: "NEEDED",
-    });
-    setWishlistForm({ ...initialWishlistForm, currency: readDefaultCurrencySetting() });
-    setWishlistFormError("");
-    setIsWishlistModalOpen(true);
-  };
-
-  const openWishlistModalForServiceKit = (kit: ServiceKitViewModel, presetNodeId?: string) => {
-    setWishlistModalNonce((n) => n + 1);
-    setWishlistPickerInitialTab("kits");
-    setWishlistNotice("");
-    setWishlistEditingId(null);
-    wishlistSkuSearchGen.current += 1;
-    setWishlistSkuQuery("");
-    setWishlistSkuDebouncedQuery("");
-    setWishlistSkuResults([]);
-    setWishlistSkuFetchError("");
-    setWishlistSkuPickedPreview(null);
-    setWishlistRecommendations([]);
-    setWishlistRecommendationsError("");
-    setWishlistAddingRecommendedSkuId("");
-    setWishlistServiceKits([kit]);
-    setWishlistServiceKitsError("");
-    setWishlistAddingKitCode("");
-    setWishlistSelectedKitCode(kit.code);
-    const initialWishlistForm = createInitialPartWishlistFormValues({
-      nodeId: presetNodeId ?? "",
-      status: "NEEDED",
-    });
-    setWishlistForm({ ...initialWishlistForm, currency: readDefaultCurrencySetting() });
-    setWishlistFormError("");
-    setIsWishlistModalOpen(true);
-  };
-
-  const openWishlistModalForRecommendedSku = (
-    rec: PartRecommendationViewModel,
-    presetNodeId?: string
-  ) => {
-    setWishlistModalNonce((n) => n + 1);
-    setWishlistPickerInitialTab("recommendations");
-    const skuFromRecommendation = buildPartSkuViewModelFromRecommendation(rec);
-    setWishlistNotice("");
-    setWishlistEditingId(null);
-    wishlistSkuSearchGen.current += 1;
-    setWishlistSkuQuery("");
-    setWishlistSkuDebouncedQuery("");
-    setWishlistSkuResults([]);
-    setWishlistSkuFetchError("");
-    setWishlistSkuPickedPreview(skuFromRecommendation);
-    setWishlistRecommendations([]);
-    setWishlistRecommendationsError("");
-    setWishlistAddingRecommendedSkuId("");
-    setWishlistServiceKits([]);
-    setWishlistServiceKitsError("");
-    setWishlistAddingKitCode("");
-    setWishlistSelectedKitCode("");
-    const initialWishlistForm = createInitialPartWishlistFormValues({
-      nodeId: presetNodeId ?? rec.primaryNode?.id ?? "",
-      status: "NEEDED",
-    });
-    setWishlistForm(
-      applyPartSkuViewModelToPartWishlistFormValues(
-        { ...initialWishlistForm, currency: readDefaultCurrencySetting() },
-        skuFromRecommendation
-      )
-    );
-    setWishlistFormError("");
-    setIsWishlistModalOpen(true);
-  };
+  const pushPartsPicker = useCallback(
+    (opts?: { nodeId?: string; focusKits?: boolean }) => {
+      if (!vehicleId) {
+        return;
+      }
+      const q = new URLSearchParams();
+      if (opts?.nodeId) {
+        q.set("nodeId", opts.nodeId);
+      }
+      if (opts?.focusKits) {
+        q.set("focus", "kits");
+      }
+      const suffix = q.toString() ? `?${q.toString()}` : "";
+      router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts/picker${suffix}`);
+    },
+    [vehicleId, router]
+  );
 
   const openWishlistModalForEdit = (item: PartWishlistItem) => {
-    setWishlistModalNonce((n) => n + 1);
-    setWishlistPickerInitialTab("search");
     setWishlistNotice("");
     setWishlistEditingId(item.id);
     wishlistSkuSearchGen.current += 1;
@@ -2914,20 +2814,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setWishlistSkuResults([]);
     setWishlistSkuFetchError("");
     setWishlistSkuPickedPreview(null);
-    setWishlistRecommendations([]);
-    setWishlistRecommendationsError("");
-    setWishlistAddingRecommendedSkuId("");
-    setWishlistServiceKits([]);
-    setWishlistServiceKitsError("");
-    setWishlistAddingKitCode("");
-    setWishlistSelectedKitCode("");
     setWishlistForm(partWishlistFormValuesFromItem(item));
     setWishlistFormError("");
     setIsWishlistModalOpen(true);
   };
 
   const closeWishlistModal = (options: { restorePrevious?: boolean } = {}) => {
-    setWishlistPickerInitialTab("search");
     setIsWishlistModalOpen(false);
     setWishlistEditingId(null);
     setWishlistFormError("");
@@ -2937,20 +2829,13 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setWishlistSkuResults([]);
     setWishlistSkuFetchError("");
     setWishlistSkuPickedPreview(null);
-    setWishlistRecommendations([]);
-    setWishlistRecommendationsError("");
-    setWishlistAddingRecommendedSkuId("");
-    setWishlistServiceKits([]);
-    setWishlistServiceKitsError("");
-    setWishlistAddingKitCode("");
-    setWishlistSelectedKitCode("");
     if (options.restorePrevious ?? true) {
       restorePreviousOverlay();
     }
   };
 
   const submitWishlistForm = async () => {
-    if (!vehicleId) {
+    if (!vehicleId || !wishlistEditingId) {
       return;
     }
     const validation = validatePartWishlistFormValues(wishlistForm);
@@ -2961,25 +2846,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setIsWishlistSaving(true);
     setWishlistFormError("");
     try {
-      const prevForTransition = wishlistEditingId
-        ? wishlistItems.find((w) => w.id === wishlistEditingId)?.status ?? "NEEDED"
-        : "NEEDED";
-      let savedItem: PartWishlistItem | null = null;
-
-      if (wishlistEditingId) {
-        const res = await vehicleDetailApi.updateWishlistItem(
-          vehicleId,
-          wishlistEditingId,
-          normalizeUpdatePartWishlistPayload(wishlistForm)
-        );
-        savedItem = res.item;
-      } else {
-        const res = await vehicleDetailApi.createWishlistItem(
-          vehicleId,
-          normalizeCreatePartWishlistPayload(wishlistForm)
-        );
-        savedItem = res.item;
-      }
+      const prevForTransition =
+        wishlistItems.find((w) => w.id === wishlistEditingId)?.status ?? "NEEDED";
+      const res = await vehicleDetailApi.updateWishlistItem(
+        vehicleId,
+        wishlistEditingId,
+        normalizeUpdatePartWishlistPayload(wishlistForm)
+      );
+      const savedItem = res.item;
 
       await Promise.all([loadWishlist(), loadServiceEvents(), loadDashboardExpenses(), loadNodeTree(), loadTopServiceNodes()]);
       closeWishlistModal({ restorePrevious: false });
@@ -3001,64 +2875,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       );
     } finally {
       setIsWishlistSaving(false);
-    }
-  };
-
-  const addRecommendedSkuToWishlist = async (rec: PartRecommendationViewModel) => {
-    if (!vehicleId || wishlistEditingId) {
-      const skuFromRecommendation = buildPartSkuViewModelFromRecommendation(rec);
-      setWishlistSkuPickedPreview(skuFromRecommendation);
-      setWishlistForm((f) => applyPartSkuViewModelToPartWishlistFormValues(f, skuFromRecommendation));
-      return;
-    }
-    try {
-      setWishlistAddingRecommendedSkuId(rec.skuId);
-      const payload = normalizeCreatePartWishlistPayload({
-        ...createInitialPartWishlistFormValues({
-          nodeId: wishlistForm.nodeId,
-          status: "NEEDED",
-        }),
-        skuId: rec.skuId,
-      });
-      await vehicleDetailApi.createWishlistItem(vehicleId, payload);
-      await Promise.all([loadWishlist(), loadNodeTree()]);
-      setWishlistNotice("Рекомендованный SKU добавлен в список покупок.");
-      closeWishlistModal({ restorePrevious: false });
-    } catch (e) {
-      setWishlistFormError(
-        e instanceof Error ? e.message : "Не удалось добавить рекомендованный SKU."
-      );
-    } finally {
-      setWishlistAddingRecommendedSkuId("");
-    }
-  };
-
-  const addServiceKitToWishlist = async (kit: ServiceKitViewModel) => {
-    if (!vehicleId || wishlistEditingId) {
-      return;
-    }
-    const contextNodeId = wishlistForm.nodeId.trim();
-    if (!contextNodeId) {
-      setWishlistFormError("Выберите узел мотоцикла");
-      return;
-    }
-    try {
-      setWishlistAddingKitCode(kit.code);
-      const res = await vehicleDetailApi.addServiceKitToWishlist(vehicleId, {
-        kitCode: kit.code,
-        contextNodeId,
-      });
-      await Promise.all([loadWishlist(), loadNodeTree()]);
-      setWishlistNotice(
-        `Комплект добавлен: ${res.result.createdItems.length} создано, ${res.result.skippedItems.length} пропущено.`
-      );
-      closeWishlistModal({ restorePrevious: false });
-    } catch (e) {
-      setWishlistFormError(
-        e instanceof Error ? e.message : "Не удалось добавить комплект обслуживания."
-      );
-    } finally {
-      setWishlistAddingKitCode("");
     }
   };
 
@@ -3267,7 +3083,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
   };
   const openWishlistFromAttentionItem = (item: AttentionItemViewModel) => {
-    openWishlistModalForCreate(item.nodeId);
+    pushPartsPicker({ nodeId: item.nodeId });
   };
   const openTopOverviewNode = (nodeId: string) => {
     if (pageView === "nodeTree") {
@@ -3430,7 +3246,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (actionKey === "add_wishlist" && !selectedNodeContextNode.hasChildren) {
       pushOverlayReturnTarget({ type: "nodeContext", nodeId: selectedNodeContextNode.id });
       closeNodeContextModal({ restorePrevious: false });
-      openWishlistModalForCreate(selectedNodeContextNode.id);
+      pushPartsPicker({ nodeId: selectedNodeContextNode.id });
       return;
     }
     if (actionKey === "add_kit" && nodeContextServiceKits[0]) {
@@ -3450,7 +3266,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setNodeSearchQuery("");
     setDebouncedNodeSearchQuery("");
     setHighlightedNodeId(null);
-    openWishlistModalForCreate(result.nodeId);
+    pushPartsPicker({ nodeId: result.nodeId });
   };
   const handleSearchResultAction = (
     actionKey: NodeTreeSearchActionKey,
@@ -3483,7 +3299,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (target) {
       pushOverlayReturnTarget(target);
     }
-    openWishlistModalForCreate(nodeId);
+    pushPartsPicker({ nodeId });
   };
   const openStatusExplanationFromTreeContext = (node: NodeTreeItemViewModel) => {
     openStatusExplanationModal(node);
@@ -5104,17 +4920,17 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           }
         }}
         onOpenStatusExplanation={() => handleNodeContextAction("open_status_explanation")}
-        onOpenCompatiblePart={(rec) => {
+        onOpenCompatiblePart={() => {
           if (selectedNodeContextNode) {
             pushOverlayReturnTarget({ type: "nodeContext", nodeId: selectedNodeContextNode.id });
-            openWishlistModalForRecommendedSku(rec, selectedNodeContextNode.id);
+            pushPartsPicker({ nodeId: selectedNodeContextNode.id });
           }
         }}
         onAddCompatiblePart={(rec) => void addRecommendedSkuToWishlistFromNodeContext(rec)}
-        onOpenServiceKit={(kit) => {
+        onOpenServiceKit={() => {
           if (selectedNodeContextNode) {
             pushOverlayReturnTarget({ type: "nodeContext", nodeId: selectedNodeContextNode.id });
-            openWishlistModalForServiceKit(kit, selectedNodeContextNode.id);
+            pushPartsPicker({ nodeId: selectedNodeContextNode.id, focusKits: true });
           }
         }}
         onAddServiceKit={(kit) => void addServiceKitToWishlistFromNodeContext(kit)}
@@ -5221,13 +5037,10 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         onOpenWishlistPurchaseExpense={openWishlistPurchaseExpenseForm}
         onOpenWishlistEdit={openWishlistModalForEdit}
         onDeleteWishlistItem={deleteWishlistItemById}
-        onOpenWishlistCreate={() => openWishlistModalForCreate()}
-        onOpenWishlistAddKit={() =>
-          openWishlistModalForCreate(targetNodeIdFromSearchParams ?? undefined, "kits")
-        }
         router={router}
         hasNodeFilter={Boolean(partsNodeFilterIds)}
         onClearNodeFilter={clearPartsNodeUrlFilter}
+        pickedHighlightWishlistItemIds={pickedReturnHighlightIds}
       />
     );
   }
@@ -5560,7 +5373,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       `/vehicles/${vehicleId}/parts?partsStatus=${encodeURIComponent(status)}`
                     )
                   }
-                  onAddWishlistItem={() => openWishlistModalForCreate()}
+                  onAddWishlistItem={() => pushPartsPicker()}
                   onOpenPartItem={(itemId) =>
                     router.push(`/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(itemId)}`)
                   }
@@ -5912,7 +5725,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                 </h2>
                 <button
                   type="button"
-                  onClick={() => openWishlistModalForCreate()}
+                  onClick={() => pushPartsPicker()}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
                 >
                   Добавить
@@ -6536,18 +6349,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         </div>
       ) : null}
 
-      <PartPickerShell
-        key={wishlistModalNonce}
-        isOpen={isWishlistModalOpen}
-        initialTab={wishlistPickerInitialTab}
-        title={wishlistEditingId ? "Позиция списка" : "Новая позиция"}
+      <WishlistItemEditModal
+        key={wishlistEditingId ?? "wishlist-edit"}
+        isOpen={isWishlistModalOpen && Boolean(wishlistEditingId)}
+        title="Позиция списка"
         onClose={() => closeWishlistModal()}
         vehicleLabel={detailViewModel?.displayName ?? title}
         wishlistForm={wishlistForm}
         setWishlistForm={setWishlistForm}
         wishlistNodeOptions={wishlistNodeOptions}
         wishlistNodeRequiredError={wishlistNodeRequiredError}
-        wishlistEditingId={wishlistEditingId}
         wishlistEditingSourceItem={wishlistEditingSourceItem}
         wishlistSkuQuery={wishlistSkuQuery}
         setWishlistSkuQuery={setWishlistSkuQuery}
@@ -6556,19 +6367,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         wishlistSkuFetchError={wishlistSkuFetchError}
         wishlistSkuPickedPreview={wishlistSkuPickedPreview}
         setWishlistSkuPickedPreview={setWishlistSkuPickedPreview}
-        wishlistRecommendationsLoading={wishlistRecommendationsLoading}
-        wishlistRecommendationsError={wishlistRecommendationsError}
-        wishlistRecommendationGroups={wishlistRecommendationGroups}
-        onAddRecommendedSku={(rec) => void addRecommendedSkuToWishlist(rec)}
-        wishlistAddingRecommendedSkuId={wishlistAddingRecommendedSkuId}
-        wishlistServiceKitsLoading={wishlistServiceKitsLoading}
-        wishlistServiceKitsError={wishlistServiceKitsError}
-        visibleWishlistServiceKits={visibleWishlistServiceKits}
-        serviceKitPreviewByCode={serviceKitPreviewByCode}
-        wishlistSelectedKitCode={wishlistSelectedKitCode}
-        setWishlistSelectedKitCode={setWishlistSelectedKitCode}
-        onAddServiceKit={(kit) => void addServiceKitToWishlist(kit)}
-        wishlistAddingKitCode={wishlistAddingKitCode}
         wishlistFormError={wishlistFormError}
         onSubmit={() => void submitWishlistForm()}
         isWishlistSaving={isWishlistSaving}

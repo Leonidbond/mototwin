@@ -5,6 +5,7 @@ import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
 } from "../../_shared/current-user-context";
+import { nextResponseFromUnexpectedRouteError } from "../../_shared/route-error-response";
 
 type RouteContext = {
   params: Promise<{
@@ -28,6 +29,9 @@ const updateVehicleProfileSchema = z
 export async function GET(_: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
+    if (!id?.trim()) {
+      return NextResponse.json({ error: "Vehicle id is required" }, { status: 400 });
+    }
     const currentUser = await getCurrentUserContext();
 
     const vehicle = await prisma.vehicle.findFirst({
@@ -57,17 +61,19 @@ export async function GET(_: Request, context: RouteContext) {
     if (currentUserContextError) {
       return currentUserContextError;
     }
-    console.error("Failed to fetch vehicle:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch vehicle" },
-      { status: 500 }
-    );
+    return nextResponseFromUnexpectedRouteError(error, {
+      fallbackMessage: "Не удалось загрузить данные мотоцикла",
+      logLabel: "Failed to fetch vehicle:",
+    });
   }
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+    if (!id?.trim()) {
+      return NextResponse.json({ error: "Vehicle id is required" }, { status: 400 });
+    }
     const json = await request.json();
     const parsed = updateVehicleProfileSchema.safeParse(json);
     if (!parsed.success) {
@@ -133,7 +139,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (currentUserContextError) {
       return currentUserContextError;
     }
-    console.error("Failed to update vehicle profile:", error);
-    return NextResponse.json({ error: "Failed to update vehicle profile" }, { status: 500 });
+    return nextResponseFromUnexpectedRouteError(error, {
+      fallbackMessage: "Не удалось сохранить профиль мотоцикла",
+      logLabel: "Failed to update vehicle profile:",
+    });
   }
 }

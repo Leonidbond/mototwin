@@ -100,7 +100,7 @@ export function GarageSidebar({
       },
       {
         href: vehicleBaseHref ? `${vehicleBaseHref}/parts` : "/details",
-        label: "Детали",
+        label: "Подбор деталей",
         icon: "details",
         isActive: Boolean(vehicleBaseHref) && pathname.startsWith(`${vehicleBaseHref}/parts`),
       },

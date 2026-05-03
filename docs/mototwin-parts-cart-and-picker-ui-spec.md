@@ -1,9 +1,11 @@
 # MotoTwin UI Spec: Корзина замен и расходников + Подбор детали
 
-Версия: 1.0  
+Версия: 2.0  
 Назначение: точный UI-спек для реализации в Cursor / Next.js / TypeScript  
 Экраны: desktop + mobile  
-Стиль: MotoTwin dark UI  
+Стиль: MotoTwin dark UI
+
+В версии 2.0 Часть B полностью переработана: модальный picker с тремя вкладками (Поиск / Рекомендации / Комплекты) удалён, вместо него — отдельная страница «Подбор детали» (single-page), на которой рекомендации, комплекты и поиск показаны одновременно, а справа — локальная **черновая корзина**, которая отправляет позиции в wishlist по `«Перейти к оформлению»`.  
 
 ---
 
@@ -93,9 +95,10 @@ const radius = {
   - Узлы
   - Журнал
   - Расходы
-  - Детали
+  - Подбор деталей
   - Профиль
-- активный пункт: `Детали`, orange accent слева;
+- пункт `Подбор деталей` (ранее `Детали`) ведёт на **корзину замен и расходников** `/vehicles/[id]/parts` (Часть A);
+- активный пункт подсвечивается orange accent слева;
 - блок Pro внизу;
 - user card и выход.
 
@@ -529,94 +532,145 @@ Only after service event is saved:
 
 ---
 
-# Часть B. Подбор детали
+# Часть B. Подбор детали (single-page)
 
 ---
 
-## 6. Экран: Подбор детали — common
+## 6. Экран: Подбор детали — общее
 
 Файлы-референсы:
 
-- `Подбор Поиск web.png`
-- `Подбор Рекомендации web.png`
-- `Подбор Комплекты web.png`
-- `Подбор Поиск mobile.png`
-- `Подбор Рекомендации mobile.png`
-- `Подбор Комплекты mobile.png`
+- `Подбор детали web.png`
+- `Подбор детали mobile.png`
 
 ### 6.1. Назначение
 
-Экран помогает выбрать новую деталь или комплект для добавления в корзину замен.
+Отдельная страница, на которой пользователь одновременно видит:
 
-Три режима:
+- **рекомендации SKU для выбранного узла** (3 крупные карточки `BEST FIT` / `BEST VALUE` / `FOR YOUR RIDE`);
+- **комплекты обслуживания** для мотоцикла (горизонтальные строки с тегами `Популярный` / `Выгодный` / `Рекомендуем`);
+- **поиск SKU и фильтры** (всегда вверху страницы, без отдельной вкладки).
 
-1. `Поиск (SKU)`
-2. `Рекомендации`
-3. `Комплекты`
+Справа — **черновая корзина (draft buffer)**, куда добавляются выбранные SKU и комплекты до отправки в `wishlist` единым batch-запросом по `«Перейти к оформлению»`.
 
-Главное правило: layout сохраняется, меняется только содержимое активной вкладки.
+### 6.2. Точки входа
+
+- **Web:** только страница `«Корзина замен и расходников»` (`/vehicles/[id]/parts`):
+  - кнопка `«+ Добавить позицию»` → `/vehicles/[id]/parts/picker`
+  - кнопка `«Добавить комплект»` → `/vehicles/[id]/parts/picker?focus=kits`
+  - быстрое действие из дерева узлов и блока «Требует внимания» → `/vehicles/[id]/parts/picker?nodeId=...`
+  - дашборд мотоцикла, секция «Подбор деталей», `«+ Добавить деталь»` → `/vehicles/[id]/parts/picker`
+- **Mobile (Expo):** только экран wishlist (`/vehicles/[id]/wishlist`):
+  - `«+ Добавить деталь»` / `«+ Добавить комплект»` → `/vehicles/[id]/wishlist/picker[?focus=kits]`
+  - дашборд мотоцикла, секция «Подбор деталей», `«+ Добавить деталь»` → `/vehicles/[id]/wishlist/picker`
+  - быстрое действие из дерева узлов и attention → `/vehicles/[id]/wishlist/picker?nodeId=...`
+  - старый маршрут `/vehicles/[id]/wishlist/new` остаётся **редиректом** на picker с пробросом query.
+
+В sidebar и tab-bar **отдельного пункта меню** для picker нет: пункт `«Подбор деталей»` ведёт на корзину (см. раздел «Навигация»).
+
+### 6.3. Поведение черновой корзины (draft buffer)
+
+- `«+»` на карточке SKU и `«Добавить комплект»` на строке комплекта добавляют запись в локальный draft (state страницы / экрана). **БД не пишется.**
+- Кит хранится в драфте как одна агрегированная строка с `kitCode`, общим количеством позиций и общей ориентировочной суммой.
+- `«Очистить корзину»` чистит только локальный draft.
+- `«Перейти к оформлению»` открывает preview-модалку (web) или bottom-sheet (mobile), показывает «будет добавлено / уже есть в активном wishlist / будет пропущено», и по подтверждению делает batch-вызовы:
+  - для каждого одиночного SKU — `POST /api/vehicles/[id]/wishlist`;
+  - для каждого кита — `POST /api/vehicles/[id]/wishlist/kits`;
+  - агрегирует `created/skipped/warnings`, на успехе ведёт на `/vehicles/[id]/parts` (web) или `/vehicles/[id]/wishlist` (Expo) с тостом и подсветкой созданных позиций.
+- При частичной ошибке picker остаётся открыт, draft сохраняет невыполненные позиции, в preview показываются ошибки.
+
+### 6.4. Merchandising-метки и теги
+
+| Сущность | Метка | Как считается (MVP) |
+|----------|-------|---------------------|
+| Recommendation card 1 | `BEST FIT` (orange) | первый по `sortPartRecommendations` среди `EXACT_FIT` / `MODEL_FIT` |
+| Recommendation card 2 | `BEST VALUE` (yellow) | минимальный `priceAmount` среди тех же fits-групп (исключая bestFit) |
+| Recommendation card 3 | `FOR YOUR RIDE` (blue) | следующий «не bestFit/bestValue» из `EXACT_FIT` / `MODEL_FIT` / `GENERIC_NODE_MATCH` |
+| Service kit | `Популярный` / `Выгодный` / `Рекомендуем` | статичный лукап `{ kitCode → tag }` в `@mototwin/domain` |
+
+Реализация: `classifyRecommendationsForPicker` и `getServiceKitTagRu` в `@mototwin/domain` (см. раздел 16.2 «Domain helpers»). Если сигналов нет — карточка `FOR YOUR RIDE` скрывается, тег кита не показывается.
+
+### 6.5. Ride style chip
+
+Чип `«Стиль езды: Mixed / Touring»` (с карандашом-edit) формируется из `RideProfile` хелпером `formatRideStyleChipRu`. Пустой профиль → `«Стиль езды: не задан»`. Клик на карандаш ведёт на форму ride profile (существующая страница / экран).
+
+### 6.6. «Почему это подходит»
+
+Под draft cart на web — небольшой блок `«Почему это подходит»` с 3–4 чекмарками (`buildWhyMatchesReasons`). На mobile — раскрываемая секция в самом низу скролла.
 
 ---
 
 ## 7. Подбор детали — desktop layout
 
 ```txt
-┌ Sidebar ┐ ┌ Modal/Page container: Подбор детали                              ┐
-│         │ │ Header                                                           │
-│         │ │ Tabs: Search / Recommendations / Kits                            │
-│         │ │ ┌ Context panel ┐ ┌ Active tab content               ┐ ┌ Detail ┐ │
-│         │ │ │ Node/qty/etc  │ │ Search results / recommendations │ │ panel  │ │
-│         │ │ │ Selected SKU  │ │ kits list                        │ │        │ │
-│         │ │ └───────────────┘ └──────────────────────────────────┘ └────────┘ │
-│         │ │ Bottom actions: Cancel + Add detail / Add kit                    │
-└─────────┘ └──────────────────────────────────────────────────────────────────┘
+┌ Sidebar ┐ ┌ /vehicles/[id]/parts/picker                                            ┐
+│ Подбор  │ │ Header: «Подбор детали»                                                │
+│ деталей │ │ Top chips: VehicleChip · NodeChip · ResetSelectionChip                 │
+│         │ │ Search bar: PickerSearchBar (search + Фильтры)                         │
+│         │ │ ┌ Center column ──────────────────────────┐ ┌ Right column ─────────┐ │
+│         │ │ │ RecommendationsSection                  │ │ PickerDraftCartPanel  │ │
+│         │ │ │   • title + ride style chip             │ │   • Корзина (N поз.)  │ │
+│         │ │ │   • 3 cards: BEST FIT / VALUE / RIDE    │ │   • DraftCartItemRow  │ │
+│         │ │ │ KitsSection                             │ │   • Очистить корзину  │ │
+│         │ │ │   • title + Показать ещё (N)            │ │   • Сумма + CTA       │ │
+│         │ │ │   • horizontal kit rows                 │ │ WhyMatchesPanel       │ │
+│         │ │ │ PickerLegalFooter                       │ │                       │ │
+│         │ │ └─────────────────────────────────────────┘ └───────────────────────┘ │
+└─────────┘ └────────────────────────────────────────────────────────────────────────┘
 ```
 
 Width:
 
-- использовать широкий контейнер почти на всю рабочую область;
-- modal/page max width: `calc(100vw - 220px)`;
-- right detail panel: 340–380 px;
-- left context panel: 300–340 px;
-- center content: flexible.
+- основной контейнер `max-w-[1280px]` на всю рабочую область;
+- right column: `360 px` фиксированной ширины (sticky);
+- center column: flexible.
 
 Recommended CSS grid:
 
 ```tsx
-<div className="grid grid-cols-[320px_1fr_360px] gap-5">
-  <PartPickerContextPanel />
-  <PartPickerContent />
-  <PartPickerSelectionPanel />
+<div className="grid grid-cols-[1fr_360px] gap-5">
+  <PartPickerCenterColumn />
+  <PartPickerRightColumn />
 </div>
 ```
+
+При ширине `<1280 px` правая колонка сворачивается в **sticky bottom bar** с тем же CTA, как mobile.
 
 ---
 
 ## 8. Подбор детали — mobile layout
 
-Mobile uses one vertical flow, not three columns.
+Mobile использует один вертикальный поток, без трёх колонок и без вкладок.
 
-Order:
+Порядок:
 
-1. Top header
-2. Vehicle card
-3. Tabs
-4. Active tab content
-5. Sticky selected item / selected kit bottom bar
-6. Bottom navigation
+1. `MobilePickerHeader` (back · «Подбор детали» · `…`).
+2. `VehiclePickerCard` (мото image, name, year/km, ride style label).
+3. **`PickerNodeCtaBar`** — выбор leaf-узла: первичный CTA `«Выберите узел мотоцикла»` или строка `«Узел … · Изменить»`; открывает тот же bottom-sheet выбора узла. Блок **всегда над** строкой поиска (и в режиме поиска по каталогу, и при показе рекомендаций).
+4. `PickerSearchBar` (search input + кнопка `«Фильтры»`).
+5. При пустом / коротком поиске — `PickerRecommendationsSection` (реализация Expo; аналог `RecommendationsSection` на web):
+   - заголовок `«Рекомендации для узла «...»»` + info icon;
+   - chip справа `«Стиль езды: ...»` с карандашом;
+   - при отсутствии узла — подсказка в пунктирной рамке («сначала выберите узел над строкой поиска»), без дублирующего CTA выбора узла;
+   - при выбранном узле — 3 vertical-карточки в горизонтальном `ScrollView` (BEST FIT / BEST VALUE / FOR YOUR RIDE);
+   - кнопка `«Показать ещё рекомендации (N)»`.
+   При поиске ≥ 2 символов — **`PickerSearchResultsSection`** вместо рекомендаций; отдельной строки узла внутри результатов нет (узел — только в `PickerNodeCtaBar` выше).
+6. `KitsSection`:
+   - заголовок `«Комплекты обслуживания»`;
+   - subtitle `«Готовые наборы для обслуживания узлов вашего мотоцикла»`;
+   - вертикальные kit rows;
+   - кнопка `«Показать ещё комплекты (N)»`.
+7. `WhyMatchesPanel` свернутая секция (опционально, в самом низу скролла).
+8. `MobileDraftCartBar` sticky внизу: cart-icon + `«Корзина (N позиций)»` + сумма + primary `«Перейти к оформлению»`.
+9. Bottom tab bar (Гараж / Узлы / Журнал / Расходы / Профиль) — без отдельного пункта picker.
 
-Context fields are not shown as a full left panel on mobile. They are folded into:
-
-- selected vehicle card;
-- selected node title;
-- filters/chips;
-- selected item sticky bar.
+Контекст мото — в `VehiclePickerCard`; **текущий leaf-узел** — в `PickerNodeCtaBar` над поиском; имя узла дополнительно фигурирует в заголовке секции рекомендаций.
 
 ---
 
-## 9. Components: common picker
+## 9. Components: shared picker
 
-### `PartPickerPage`
+### `PartPickerPage` (web) / `MobilePickerScreen` (Expo)
 
 Props:
 
@@ -624,525 +678,282 @@ Props:
 type PartPickerPageProps = {
   vehicle: VehicleSummary;
   initialNodeId?: string;
-  initialTab?: PartPickerTab;
+  initialFocus?: PickerFocus; // "all" | "kits"
+  initialDraft?: PickerDraftCart; // optional rehydrate from URL/localStorage
 };
 
-type PartPickerTab = "search" | "recommendations" | "kits";
+type PickerFocus = "all" | "kits";
 ```
 
 Responsibilities:
 
-- manage active tab;
-- manage selected node;
-- manage selected SKU;
-- manage selected kit;
-- manage quantity, status, price, comment;
-- submit add detail / add kit.
+- держать `selectedNodeId`, `searchQuery`, `searchFilters`, `draftCart`, `pendingSubmission`;
+- грузить `recommendations` через `getRecommendedSkusForNode(vehicleId, nodeId)` при изменении `selectedNodeId`;
+- грузить `kits` через `getServiceKits({ vehicleId, nodeId })` при изменении `selectedNodeId`;
+- грузить `searchResults` через `getPartSkus({ nodeId, search })` при ненулевом `searchQuery`;
+- управлять draft cart и сабмитом.
 
 ---
 
-### `PartPickerHeader`
+### `PickerHeader`
 
 Desktop:
 
-- title: `Подбор детали`;
-- subtitle: `BMW F 850 GS Adventure • 2021 • 42 180 км`;
-- close button.
+- большой заголовок `«Подбор детали»` слева;
+- три chips справа от заголовка через flex/wrap (см. ниже).
 
 Mobile:
 
-- back button;
-- centered title: `Подбор детали`;
-- menu button;
-- `VehiclePickerCard` below.
+- back button слева;
+- centered title `«Подбор детали»`;
+- `…` menu справа;
+- `VehiclePickerCard` ниже.
 
----
-
-### `VehiclePickerCard`
-
-Mobile required, desktop optional.
-
-Content:
-
-- motorcycle image;
-- `BMW F 850 GS Adventure`;
-- `2021 • 42 180 км • Mixed Touring`;
-- chevron.
-
----
-
-### `PartPickerTabs`
-
-Tabs:
-
-- `Поиск (SKU)` with search icon
-- `Рекомендации` with star icon
-- `Комплекты` with box icon
-
-Active:
-
-- orange underline;
-- text white;
-- icon white/orange.
-
-Desktop: full width row.  
-Mobile: segmented control.
-
----
-
-### `PartPickerContextPanel` desktop
-
-Left context block. Required on all desktop picker tabs.
-
-Fields:
-
-1. `Узел *`
-   - selected node card
-   - example: `Задняя шина`
-   - path: `WHEELS > Шины > Rear`
-2. `Количество`
-   - stepper `- 1 +`
-3. `Статус`
-   - default: `Нужно купить`
-4. `Стоимость (опционально)`
-   - input + currency select
-5. `Комментарий (опционально)`
-   - textarea
-6. `Выбранный SKU (опционально)`
-   - compact SKU card if selected
-   - `Очистить выбор`
-
-For kits tab:
-
-- keep the same context block for layout consistency;
-- selected SKU block may remain optional or show selected kit preview depending on implementation.
-
-Validation:
-
-- node is required;
-- quantity must be > 0;
-- status required;
-- price optional;
-- currency defaults to `RUB`.
-
----
-
-### `PartPickerSelectionPanel` desktop
-
-Right detail panel.
-
-Search / recommendations mode:
-
-Title: `Выбранная деталь`
-
-Content:
-
-- product image;
-- SKU name;
-- specs;
-- brand + article;
-- tag;
-- compatibility status;
-- node;
-- quantity;
-- price/currency;
-- comment;
-- description;
-- compatibility checklist;
-- actions:
-  - `Добавить в список`
-  - `Открыть в каталоге` optional.
-
-Kits mode:
-
-Title: `Выбранный комплект`
-
-Content:
-
-- kit image;
-- kit name;
-- tag;
-- node/category;
-- included items list;
-- estimated amount;
-- duplicate warning;
-- `Предварительный просмотр`;
-- action area.
-
----
-
-### `PartPickerBottomActions`
+### `VehicleChip` (top chip 1)
 
 Desktop:
 
-- bottom-right sticky inside modal/page;
-- buttons:
-  - `Отмена`
-  - primary:
-    - `Добавить деталь` for search/recommendations
-    - `Добавить комплект` for kits
+- широкая chip-карточка: motorcycle thumbnail + `BMW F 850 GS Adventure` + `2021 • 42 180 км • Mixed Touring` + chevron;
+- клик открывает picker мотоцикла (если в гараже несколько мото).
+
+Mobile: используется `VehiclePickerCard` под header (тот же контент в полную ширину).
+
+### `NodeChip` (top chip 2)
+
+Desktop:
+
+- chip-карточка: leaf icon + label `«Узел»` + name + path (`WHEELS / Шины > Rear`) + chevron;
+- клик открывает popover/modal выбора узла (дерево или поиск).
+
+Mobile: компонент **`PickerNodeCtaBar`** (`apps/app/app/vehicles/[id]/wishlist/picker-node-cta.tsx`) — полоса **над** `PickerSearchBar` (не внутри секции рекомендаций).
+
+### `ResetSelectionChip` (top chip 3)
+
+Desktop only chip с иконкой обновления и текстом `«Сбросить выбор»`. Сбрасывает выбранный узел и текущий draft cart (с подтверждением, если draft не пустой).
+
+### `PickerSearchBar`
+
+Desktop:
+
+- широкий search input с иконкой;
+- placeholder: `«Поиск по SKU, названию или бренду»`;
+- кнопка `«Фильтры»` справа (popover).
 
 Mobile:
 
-- sticky bottom selected bar above bottom navigation;
-- shows selected item/kit state;
-- disabled primary button if nothing selected.
+- search input full width;
+- кнопка `«Фильтры»` справа (опционально вместе с chip-row фильтров).
 
----
-
-# Вкладка 1. Поиск (SKU)
-
----
-
-## 10. Search tab desktop
-
-### Layout
-
-Center content:
-
-- search input with typed query;
-- filters button;
-- result count;
-- vertical list of SKU result rows;
-- info note at bottom.
-
-### Components
-
-#### `PartSkuSearchTab`
-
-Props:
-
-```ts
-type PartSkuSearchTabProps = {
-  nodeId: string;
-  query: string;
-  results: PartSku[];
-  selectedSkuId?: string;
-  onQueryChange: (value: string) => void;
-  onSelectSku: (sku: PartSku) => void;
-};
-```
-
-#### `PartSkuSearchInput`
-
-Placeholder:
-
-`Поиск по SKU или названию`
-
-Behavior:
-
-- search from 2 characters;
-- debounce 250–400 ms;
-- clear button when query is not empty.
-
-#### `PartSkuFilterButton`
-
-Opens filters panel / popover.
-
-Filters:
+Фильтры popover (одинаковые на web и mobile):
 
 - OEM
 - Аналоги
 - Дешевле
 - В наличии
-- Brand
-- Category
-- Compatibility only
+- Бренд (multi)
 
-#### `PartSkuResultRow`
+Поведение поиска:
 
-Content:
-
-- image;
-- name;
-- specs;
-- brand + article;
-- tag;
-- price;
-- green `Подходит`;
-- add/select button `+`.
-
-Click behavior:
-
-- row click selects SKU and updates right panel;
-- plus click selects SKU and can optionally submit immediately only if UX says so. Recommended: select only.
+- search активен от 2 символов;
+- debounce 250–400 ms;
+- очистка по `×`;
+- при пустом search показываются обычные секции (рекомендации + комплекты);
+- при заполненном search центральная колонка показывает `SearchResultsSection` (vertical SKU rows) **вместо** рекомендаций; секция комплектов остаётся ниже.
 
 ---
 
-## 11. Search tab mobile
+## 10. Recommendations section
 
-Content order:
+### `RecommendationsSection`
 
-1. Search input
-2. filter chips
-3. result count + sorting
-4. result cards
-5. sticky selected bar
+Header:
 
-Components:
+- title: `«Рекомендации для узла «{nodeName}»»`
+- subtitle: `«Подобрано на основе вашего мотоцикла, профиля езды и условий эксплуатации»`
+- справа: `«Стиль езды: {chip}»` + edit-icon (карандаш) → ride profile form
 
-- `MobilePartSkuSearchInput`
-- `MobileFilterChips`
-- `MobilePartSkuCard`
-- `MobileSelectedSkuBar`
+Body:
 
-Mobile chips:
+- 3 vertical карточки `RecommendationCard` в горизонтальном grid (`grid-cols-3` на desktop, horizontal scroll на mobile);
+- ниже: кнопка `«Показать ещё рекомендации (N)»` (если есть alternatives).
 
-- `Все`
-- `OEM`
-- `Аналоги`
-- `Дешевле`
-- `В наличии`
+### `RecommendationCard`
 
-Selected bar empty state:
+Содержание:
 
-- icon placeholder;
-- `Ничего не выбрано`;
-- `Выберите деталь, чтобы добавить её`;
-- disabled button `Добавить деталь`.
-
-Selected bar filled state:
-
-- SKU image;
-- SKU name;
-- price;
-- enabled button `Добавить деталь`.
-
----
-
-# Вкладка 2. Рекомендации
-
----
-
-## 12. Recommendations tab desktop
-
-### Layout
-
-Center content:
-
-- title: `Рекомендации для узла «Задняя шина»`
-- subtitle: `Подобрано на основе вашего мотоцикла, профиля езды и условий эксплуатации`
-- ride style chip: `Стиль езды: Mixed / Touring`
-- 3 recommendation cards:
-  - `Best fit`
-  - `Best value`
-  - `For your ride`
-- alternative variants row;
-- disclaimer note.
-
-### Components
-
-#### `PartRecommendationsTab`
-
-Props:
-
-```ts
-type PartRecommendationsTabProps = {
-  node: NodeSummary;
-  rideProfile: RideProfileSummary;
-  recommendations: RecommendationCardData[];
-  alternatives: PartSku[];
-  selectedSkuId?: string;
-  onSelectSku: (sku: PartSku) => void;
-};
-```
-
-#### `RecommendationCard`
-
-Content:
-
-- recommendation label:
-  - `BEST FIT`
-  - `BEST VALUE`
-  - `FOR YOUR RIDE`
-- image;
-- SKU name;
-- specs;
-- brand/article;
-- price;
-- reasons list;
-- compatibility green label;
-- add/select button.
+- `MerchandiseLabel` сверху (`BEST FIT` orange / `BEST VALUE` yellow / `FOR YOUR RIDE` blue);
+- product image / placeholder: **компактная** панель-превью (web: `RecommendationCard.tsx` — высота слота **~55 px**, emoji **~16 px**, `minHeight` карточки **~305 px**; Expo: `picker-recommendation-card.tsx` — **~48 px** / **~18 px** / `minHeight` **~312 px**);
+- brand bold + model;
+- specs (моноширинный текст);
+- `MtTagBadge` (`TOURING` / `DUAL SPORT` / `RALLY` — берётся из `partType` или meta);
+- bullet-list `whyRecommended` (3–4 строки с зелёными чекмарками);
+- цена внизу слева крупно (`12 600 ₽`);
+- `«Подходит»` зелёная подпись;
+- primary `+` button справа внизу (добавить в draft cart).
 
 Visual accents:
 
-- Best fit: orange border/accent.
-- Best value: yellow border/accent.
-- For your ride: blue border/accent.
+- `BEST FIT`: orange border + orange label background.
+- `BEST VALUE`: yellow border + yellow label background.
+- `FOR YOUR RIDE`: blue border + blue label background.
 
-Reason examples:
-
-- `Полное соответствие OEM`
-- `Отличная износостойкость`
-- `Оптимальная цена`
-- `Ресурс до 11 000 км`
-- `Максимальное сцепление`
+При отсутствии данных для одной из меток (например, нет дешёвого варианта) карточка скрывается.
 
 ---
 
-## 13. Recommendations tab mobile
+## 11. Search results section
 
-Content order:
+Показывается **вместо** `RecommendationsSection`, когда `searchQuery.length >= 2`.
 
-1. title and subtitle;
-2. filter/settings icon on the right;
-3. context chips:
-   - `Для вашего стиля езды`
-   - `Mixed / Touring`
-   - `90% асфальт / 10% грунт`
-4. recommendation cards stacked vertically;
-5. alternative variants section;
-6. sticky selected bar.
+### `SearchResultsSection`
 
-Mobile card:
+Header:
 
-- image on left;
-- content on right;
-- price top-right;
-- green compatibility;
-- plus button bottom-right;
-- `Почему рекомендован` expandable row.
+- title: `«Найдено: N»` или `«Поиск: «{query}»»`;
+- кнопка `«Сбросить поиск»`.
 
-Expandable state:
+Body:
 
-- closed by default for most cards;
-- tapping expands explanation.
+- vertical список `SearchResultRow` (3–6 видимых, остальные через scroll).
+
+### `SearchResultRow`
+
+- product image / placeholder;
+- brand + name;
+- specs / category;
+- цена;
+- `«Подходит»` / `«Требует проверки»` / `«Не подходит»` (по `compatibility`);
+- primary `+` button (добавить в draft cart).
+
+Empty state: «Ничего не найдено» + подсказка изменить запрос или сбросить фильтры.
 
 ---
 
-# Вкладка 3. Комплекты
+## 12. Kits section
+
+### `KitsSection`
+
+Header:
+
+- title: `«Комплекты обслуживания»`;
+- subtitle: `«Готовые наборы для обслуживания узлов вашего мотоцикла. Экономия времени и денег.»`;
+- справа: кнопка `«Показать ещё (N)»`.
+
+Body:
+
+- horizontal-list `ServiceKitRow` (на desktop в одну строку из 3 карточек или вертикальный список — выбирается по дизайну; на mobile — vertical stack с компактными rows).
+
+### `ServiceKitRow` (mobile-style горизонтальная строка)
+
+- kit image слева (квадрат);
+- центр: kit title bold + subtitle (`«Колодки + тормозная жидкость»`) + `MtTagBadge` (`«Популярный»` / `«Выгодный»` / `«Рекомендуем»`) + count `«Включает N позиций»`;
+- справа: цена + (deferred) `oldAmount` + (deferred) `−10%` discount badge + `«Подходит»` зелёная подпись;
+- primary CTA `«Добавить комплект»` или chevron.
+
+Поведение:
+
+- `«Добавить комплект»` добавляет кит в draft cart как одну агрегированную строку (`kind: "kit"`);
+- если кит уже в drafte — кнопка `«В корзине ✓»` (disabled);
+- если все items кита уже в активном wishlist — кнопка disabled с tooltip.
+
+> Discount/oldAmount/изображения SKU и китов **не реализуются в этой итерации** (нет полей в данных). Спека описывает целевой UI, реальный код пока показывает только `priceAmount` и иконку-плейсхолдер.
 
 ---
 
-## 14. Kits tab desktop
+## 13. Draft cart panel
 
-### Layout
+### `PickerDraftCartPanel` (web, sticky right column)
 
-Center content:
+Содержимое:
 
-- title: `Комплекты обслуживания`
-- subtitle: `Добавьте готовый комплект — все позиции будут добавлены в корзину замен и расходников.`
-- vertical list of kit rows;
-- info note.
+- header: `«Корзина (N позиций)»`;
+- list of `DraftCartItemRow` (см. ниже);
+- ghost button `«Очистить корзину»`;
+- divider;
+- `«Сумма»` + total amount;
+- primary CTA `«Перейти к оформлению»`.
 
-Right panel:
+### `DraftCartItemRow`
 
-- selected kit details;
-- included items;
-- amount;
-- warning about duplicates;
-- preview button;
-- add kit action.
+Для одиночного SKU:
 
-### Components
+- product thumbnail / иконка;
+- brand + name;
+- specs (одна строка);
+- `1 шт.` + цена справа;
+- кнопка `×` (удалить из draft).
 
-#### `ServiceKitsTab`
+Для кита (агрегированная строка):
 
-Props:
-
-```ts
-type ServiceKitsTabProps = {
-  nodeId?: string;
-  kits: ServiceKit[];
-  selectedKitId?: string;
-  onSelectKit: (kit: ServiceKit) => void;
-};
-```
-
-#### `ServiceKitRow`
-
-Content:
-
-- kit image;
-- kit name;
-- tag:
-  - `Популярный`
-  - `Лучшее соотношение`
-  - `Выгодный`
-- category/path;
-- number of positions;
-- item chips;
-- amount;
-- green positions count;
-- button `Добавить комплект`.
-
-Click behavior:
-
-- row click selects kit and updates right panel;
-- button can open preview before adding.
-
-#### `SelectedKitPanel`
-
-Content:
-
-- image;
-- kit name;
-- tag;
-- category/path;
-- included items list:
-  - item name;
-  - quantity;
-- estimated amount;
-- duplicate warning;
-- button `Предварительный просмотр`.
-
-Duplicate warning text:
-
-`Дубликаты активных позиций не будут добавлены. Вы сможете проверить и подтвердить состав перед добавлением.`
-
----
-
-## 15. Kits tab mobile
-
-Important: mobile screen title remains `Подбор детали`, active tab can be `Комплекты` or, if product decision requires, section title can be `Рекомендуемые комплекты`.
-
-Content order:
-
-1. `Рекомендуемые комплекты`
-2. subtitle:
-   `Готовые наборы для обслуживания узлов вашего мотоцикла. Экономия времени и денег.`
-3. filter/settings icon;
-4. category chips:
-   - `Все узлы`
-   - `Тормоза`
-   - `Цепь и звезды`
-   - `Фильтры`
-   - `Масла`
-5. kit cards stacked vertically;
-6. sticky selected kit bar;
-7. bottom navigation.
-
-#### `MobileServiceKitCard`
-
-Content:
-
-- image;
-- label:
-  - `BEST FIT`
-  - `BEST VALUE`
-  - `FOR YOUR RIDE`
+- kit thumbnail / иконка-комплект;
 - kit title;
-- subtitle;
-- compatibility green label;
-- included bullet list;
-- current price;
-- old price if discount exists;
-- discount badge;
-- button `Подробнее`;
-- primary button `Добавить комплект`.
+- `«N позиций»`;
+- `1 шт.` + общая цена;
+- кнопка `×`.
 
-Selected bar empty:
+Empty state:
 
-- `Ничего не выбрано`
-- `Выберите комплект, чтобы добавить его`
-- disabled `Добавить комплект`
+- иконка корзины;
+- `«Корзина пуста»`;
+- `«Добавьте позиции из рекомендаций или комплектов»`;
+- CTA disabled.
 
-Selected bar filled:
+### `MobileDraftCartBar` (mobile sticky bottom)
 
-- kit icon/image;
-- kit name;
-- amount;
-- enabled `Добавить комплект`.
+- cart-icon слева;
+- `«Корзина (N позиций)»` + сумма (две строки);
+- primary CTA `«Перейти к оформлению»` справа.
+
+Tap по бару (где не CTA) разворачивает sheet со списком draft items и `«Очистить корзину»`.
+
+---
+
+## 14. Why matches panel
+
+### `WhyMatchesPanel`
+
+Web: компактный блок под draft cart с 3–4 чекмарками:
+
+- `«Полная совместимость с вашим мотоциклом»`
+- `«Соответствует штатным размерам»`
+- `«Проверено владельцами {model}»`
+- `«Оптимально для вашего стиля езды»` (только при наличии ride profile)
+
+Mobile: collapsible секция в самом низу скролла с тем же содержимым.
+
+Reasons формируются `buildWhyMatchesReasons(input)` (см. раздел 16.2).
+
+---
+
+## 15. Submit preview & flow
+
+### `PickerSubmitPreviewModal` (web) / `PickerSubmitSheet` (mobile)
+
+Открывается по `«Перейти к оформлению»` если draft не пустой.
+
+Содержимое:
+
+- title: `«Подтвердите состав»`;
+- список draft items, разбитых на:
+  - `«Будет добавлено»` (зелёная иконка);
+  - `«Уже в активном wishlist»` (синяя иконка, будет пропущено);
+  - `«Невозможно добавить»` (красная иконка, с причиной — `«Узел не выбран»` / `«SKU неактивен»`);
+- сводка: `«Будет добавлено: N позиций, ~{total} ₽»`;
+- кнопки: `«Назад»`, primary `«Подтвердить»`.
+
+При submit:
+
+- последовательно `POST /api/vehicles/[id]/wishlist` для каждого `kind: "sku"` и `POST /api/vehicles/[id]/wishlist/kits` для каждого `kind: "kit"`;
+- агрегируется итоговый `created/skipped/warnings`;
+- toast: `«Добавлено: {n} позиций. Пропущено: {m}»`;
+- redirect: web → `/vehicles/[id]/parts?picked={ids}`; Expo → `/vehicles/[id]/wishlist?picked={ids}`;
+- cart-страница / wishlist-экран подсвечивает первые `picked` позиции и скроллит к ним.
+
+При частичной ошибке:
+
+- preview закрывается;
+- draft сохраняет невыполненные позиции;
+- inline-баннер на picker `«N позиций не удалось добавить — попробуйте ещё раз»`.
 
 ---
 
@@ -1232,12 +1043,41 @@ type ServiceKit = {
   tag?: string;
   items: ServiceKitItem[];
   amount?: number;
-  oldAmount?: number;
+  oldAmount?: number; // deferred — нет в данных
   currency: CurrencyCode;
-  discountPercent?: number;
+  discountPercent?: number; // deferred — нет в данных
   compatibility: "fits" | "partial" | "unknown";
 };
+
+// Picker draft cart (новое в v2.0)
+type PickerDraftItem =
+  | { kind: "sku"; sku: PartSku; quantity: number }
+  | { kind: "kit"; kit: ServiceKit; addableCount: number };
+
+type PickerDraftCart = {
+  vehicleId: string;
+  items: PickerDraftItem[];
+  totalAmount: number;
+  currency: CurrencyCode;
+};
+
+type PickerSubmitResult = {
+  createdSkuIds: string[];
+  createdKitCodes: string[];
+  skipped: { kind: "sku" | "kit"; reason: string; label: string }[];
+  warnings: string[];
+};
 ```
+
+### 16.2. Domain helpers (`@mototwin/domain`)
+
+| Helper | Назначение |
+|--------|------------|
+| `classifyRecommendationsForPicker(recs)` | Возвращает `{ bestFit, bestValue, forYourRide, alternatives }` для трёх крупных карточек на picker. |
+| `getServiceKitTagRu(kit)` | Возвращает `{ kind, labelRu }` для бейджа кита (`Популярный` / `Выгодный` / `Рекомендуем`) или `null`. |
+| `formatRideStyleChipRu(profile)` | Формирует строку `«Mixed / Touring»` из `RideProfile` (или `«Стиль езды: не задан»`). |
+| `buildWhyMatchesReasons(input)` | Возвращает 3–4 фразы для `WhyMatchesPanel` по контексту мото и draft. |
+| `addSkuToDraft / addKitToDraft / removeFromDraft / clearDraft / getDraftTotals` | Чистые операции над `PickerDraftCart` (модуль `picker-draft-cart`). |
 
 ---
 
@@ -1245,54 +1085,49 @@ type ServiceKit = {
 
 ---
 
-## 17. Add detail flow
+## 17. Add detail flow (через draft cart)
 
-When user adds a selected SKU:
+Шаги пользователя:
 
-Create `WishlistItem`:
+1. На picker нажимает `«+»` на recommendation card / search row → SKU попадает в **draft cart** (БД не трогается).
+2. Может добавить ещё SKU и/или комплекты.
+3. Нажимает `«Перейти к оформлению»` → preview-модалка / sheet (см. секцию 15).
+4. Подтверждает → выполняется batch:
+   - для каждого `kind: "sku"` — `POST /api/vehicles/[id]/wishlist`:
+     - `vehicleId` из текущего мото;
+     - `nodeId` из контекста picker (`selectedNodeId`) или из `sku.primaryNodeId`;
+     - `title` из `sku.canonicalName`;
+     - `quantity = 1` (количество правится позже на cart-странице);
+     - `status = NEEDED`;
+     - `costAmount = sku.priceAmount`, `currency = sku.currency` (если есть);
+     - `skuId` привязан;
+     - `comment` пустой (можно дописать после на cart-странице).
 
-- vehicleId from current vehicle;
-- nodeId from selected node or SKU node;
-- name from SKU name unless user overrides;
-- quantity from context;
-- status default `needed`;
-- amount from SKU price or manual price;
-- currency default `RUB`;
-- skuId attached;
-- comment from context.
+Toast после успеха:
 
-Success:
+`«Добавлено: {n} позиций»`
 
-- show toast: `Деталь добавлена в корзину замен`
-- navigate to cart or stay on picker depending on route.
-
-Recommended: stay on picker and show selected bar success, unless user came from cart.
+Redirect на `/vehicles/[id]/parts?picked={ids}` с подсветкой первых добавленных позиций.
 
 ---
 
-## 18. Add kit flow
+## 18. Add kit flow (через draft cart)
 
-Kit is not stored as one cart item. It creates multiple `WishlistItem` records.
+Кит в draft cart хранится как **одна агрегированная строка**. На сабмит:
 
-Before adding:
+- для каждого `kind: "kit"` — `POST /api/vehicles/[id]/wishlist/kits` с `{ kitCode, contextNodeId? }`;
+- backend сам делает duplicate-фильтрацию и создаёт несколько `PartWishlistItem` записей;
+- ответ возвращает `createdItems`, `skippedItems`, `warnings`.
 
-- open preview modal/sheet;
-- show:
-  - will be added;
-  - already exists;
-  - conflicts / missing node;
-- allow user to confirm.
+Preview-модалка / sheet перед сабмитом показывает merge всех drafts (SKU + kit items) против активного wishlist:
 
-When confirmed:
-
-- create one WishlistItem per kit item;
-- set status = selected status, default `needed`;
-- preserve `kitName` as UI marker;
-- skip duplicates unless user chooses to add duplicates.
+- `«Будет добавлено»`;
+- `«Уже в активном wishlist»` (skipped);
+- `«Невозможно добавить»` (с причиной).
 
 Success toast:
 
-`Комплект добавлен в корзину замен`
+`«Добавлено: {n} позиций. Пропущено: {m}»`
 
 ---
 
@@ -1357,25 +1192,21 @@ All POST/PATCH input must be validated with Zod.
 
 ## 22. Recommended build order
 
-1. Create shared visual primitives:
-   - `MtCard`
-   - `MtButton`
-   - `MtBadge`
-   - `MtTabs`
-   - `MtSearchInput`
-   - `MtStatusBadge`
-2. Build cart desktop page with static data.
-3. Build cart mobile responsive layout.
-4. Add item selection and detail panel.
-5. Add status filters and search.
-6. Build picker shell with tabs and context panel.
-7. Build search tab.
-8. Build recommendations tab.
-9. Build kits tab.
-10. Add sticky mobile bars.
-11. Connect APIs.
-12. Add install flow via service event.
-13. Add empty/loading/error states.
+Часть A (Корзина) — уже реализована, см. раздел 4.
+
+Часть B (Подбор детали v2.0):
+
+1. **Domain helpers** в `@mototwin/domain`: `picker-merchandising`, `service-kit-tags`, `ride-style-chip`, `picker-why-matches`, `picker-draft-cart` + типы в `@mototwin/types`.
+2. **Web каркас**: новый маршрут `/vehicles/[id]/parts/picker` с `PartPickerPage`, заглушки секций.
+3. **Web данные**: подключить `getRecommendedSkusForNode`, `getServiceKits`, `getPartSkus`.
+4. **Web draft cart**: реализовать `PickerDraftCartPanel`, `DraftCartItemRow`, кнопки `+` и `Добавить комплект`.
+5. **Web submit flow**: `submitPickerDraft` в `@mototwin/api-client` (`picker-submit-draft.ts`) + `PickerSubmitPreviewModal`, batch POST, redirect с подсветкой.
+6. **Web cleanup**: переименовать sidebar `«Детали»` → `«Подбор деталей»`, переключить точки входа на новый маршрут, выделить `WishlistItemEditModal` (для edit-only), удалить `PartPickerShell`.
+7. **Web polish**: skeletons, empty/error состояния, `?focus=kits`, стили под референс.
+8. **Mobile (Expo) экран**: `wishlist/picker.tsx` с тем же flow, `MobileDraftCartBar`, submit sheet.
+9. **Mobile cleanup**: переключить точки входа (`wishlist/index`, `wishlist/new` redirect, дашборд, дерево, attention), упростить `wishlist-item-editor` до edit-only.
+10. **Mobile polish**: keyboard-aware, scroll-on-focus, обработка частичных ошибок submit.
+11. **Verification**: tsc/eslint/тесты домена; ручная проверка 5 сценариев (см. План 4 / Этап C).
 
 ---
 
@@ -1385,51 +1216,84 @@ All POST/PATCH input must be validated with Zod.
 
 ## 23. Suggested files
 
+### Web (Next.js)
+
+Корзина (Часть A — уже существует):
+
 ```txt
-src/app/(app)/vehicles/[vehicleId]/parts-cart/page.tsx
-src/app/(app)/vehicles/[vehicleId]/part-picker/page.tsx
-
-src/components/mototwin/shell/desktop-shell.tsx
-src/components/mototwin/shell/mobile-shell.tsx
-src/components/mototwin/ui/mt-card.tsx
-src/components/mototwin/ui/mt-button.tsx
-src/components/mototwin/ui/mt-badge.tsx
-src/components/mototwin/ui/mt-tabs.tsx
-src/components/mototwin/ui/mt-search-input.tsx
-src/components/mototwin/ui/mt-status-badge.tsx
-
-src/features/parts-cart/components/cart-header.tsx
-src/features/parts-cart/components/cart-summary-cards.tsx
-src/features/parts-cart/components/cart-search-and-filters.tsx
-src/features/parts-cart/components/cart-grouped-list.tsx
-src/features/parts-cart/components/cart-item-row.tsx
-src/features/parts-cart/components/cart-item-detail-panel.tsx
-src/features/parts-cart/components/cart-mobile-bottom-actions.tsx
-
-Web (Next.js) — текущая реализация корзины в монорепо:
-
+src/app/vehicles/[id]/parts/page.tsx
 src/app/vehicles/[id]/parts/_components/PartsCartPage.tsx
 src/app/vehicles/[id]/parts/_components/PartsCartPage.module.css
 src/app/vehicles/[id]/_components/VehicleDashboard.tsx
-packages/domain/src/parts-cart-summary.ts
+src/app/garage/_components/GarageSidebar.tsx        # переименовать «Детали» → «Подбор деталей»
+```
 
-Expo — список покупок и превью на экране мотоцикла:
+Picker (Часть B v2.0 — новый маршрут):
 
-apps/app/app/vehicles/[id]/wishlist/index.tsx
-apps/app/app/vehicles/[id]/index.tsx
-apps/app/app/components/vehicles/CompactVehicleContextRow.tsx
+```txt
+src/app/vehicles/[id]/parts/picker/page.tsx
+src/app/vehicles/[id]/parts/picker/_components/PartPickerPage.tsx
+src/app/vehicles/[id]/parts/picker/_components/PickerHeader.tsx
+src/app/vehicles/[id]/parts/picker/_components/VehicleChip.tsx
+src/app/vehicles/[id]/parts/picker/_components/NodeChip.tsx
+src/app/vehicles/[id]/parts/picker/_components/ResetSelectionChip.tsx
+src/app/vehicles/[id]/parts/picker/_components/PickerSearchBar.tsx
+src/app/vehicles/[id]/parts/picker/_components/RecommendationsSection.tsx
+src/app/vehicles/[id]/parts/picker/_components/RecommendationCard.tsx
+src/app/vehicles/[id]/parts/picker/_components/SearchResultsSection.tsx
+src/app/vehicles/[id]/parts/picker/_components/SearchResultRow.tsx
+src/app/vehicles/[id]/parts/picker/_components/KitsSection.tsx
+src/app/vehicles/[id]/parts/picker/_components/ServiceKitRow.tsx
+src/app/vehicles/[id]/parts/picker/_components/PickerDraftCartPanel.tsx
+src/app/vehicles/[id]/parts/picker/_components/DraftCartItemRow.tsx
+src/app/vehicles/[id]/parts/picker/_components/WhyMatchesPanel.tsx
+src/app/vehicles/[id]/parts/picker/_components/PickerLegalFooter.tsx
+src/app/vehicles/[id]/parts/picker/_components/PickerSubmitPreviewModal.tsx
 
-src/features/part-picker/components/part-picker-header.tsx
-src/features/part-picker/components/part-picker-tabs.tsx
-src/features/part-picker/components/part-picker-context-panel.tsx
-src/features/part-picker/components/part-picker-selection-panel.tsx
-src/features/part-picker/components/part-sku-search-tab.tsx
-src/features/part-picker/components/part-recommendations-tab.tsx
-src/features/part-picker/components/service-kits-tab.tsx
-src/features/part-picker/components/mobile-selected-bar.tsx
+src/app/vehicles/[id]/parts/picker/_utils/picker-page-state.ts
+packages/api-client/src/picker-submit-draft.ts
 
-src/features/part-picker/types.ts
-src/features/parts-cart/types.ts
+# edit-only модалка для редактирования существующей wishlist-позиции (вместо PartPickerShell)
+src/app/vehicles/[id]/parts/_components/WishlistItemEditModal.tsx
+```
+
+К удалению после миграции:
+
+```txt
+src/app/vehicles/[id]/parts/_components/WishlistItemEditModal.tsx
+src/app/vehicles/[id]/parts/_components/part-picker-utils.ts  # перенести в picker/_utils
+```
+
+### Expo (Mobile)
+
+```txt
+apps/app/app/vehicles/[id]/wishlist/picker.tsx               # новый экран picker (single-page)
+apps/app/app/vehicles/[id]/wishlist/index.tsx                # точка входа (+ Добавить деталь → /picker)
+apps/app/app/vehicles/[id]/wishlist/new.tsx                  # станет Redirect на /picker
+apps/app/app/vehicles/[id]/wishlist/[itemId].tsx             # edit-only режим
+apps/app/app/vehicles/[id]/wishlist/wishlist-item-editor.tsx # упрощается до edit-only
+apps/app/app/vehicles/[id]/index.tsx                         # точки входа из дашборда + дерева
+
+apps/app/app/components/wishlist/picker/MobilePickerHeader.tsx
+apps/app/app/components/wishlist/picker/VehiclePickerCard.tsx
+apps/app/app/components/wishlist/picker/MobileDraftCartBar.tsx
+apps/app/app/components/wishlist/picker/MobilePickerSubmitSheet.tsx
+```
+
+### Shared packages
+
+```txt
+packages/domain/src/picker-merchandising.ts
+packages/domain/src/service-kit-tags.ts
+packages/domain/src/ride-style-chip.ts
+packages/domain/src/picker-why-matches.ts
+packages/domain/src/picker-draft-cart.ts
+packages/domain/__tests__/picker-merchandising.test.ts
+packages/domain/__tests__/picker-draft-cart.test.ts
+packages/domain/__tests__/service-kit-tags.test.ts
+packages/domain/__tests__/ride-style-chip.test.ts
+
+packages/types/src/picker.ts
 ```
 
 Keep components small. If a component exceeds 250–300 lines, split it.
@@ -1452,28 +1316,38 @@ Done when:
 - rows are grouped by status;
 - selected desktop row opens detail panel;
 - mobile row opens detail bottom sheet or detail page;
-- add position button opens picker;
-- add kit button opens picker kits tab;
+- add position button навигирует на `/vehicles/[id]/parts/picker`;
+- add kit button навигирует на `/vehicles/[id]/parts/picker?focus=kits`;
 - installed action opens service event flow, not direct status change.
 
 ---
 
-## 25. Подбор детали
+## 25. Подбор детали (v2.0)
 
 Done when:
 
-- desktop picker preserves three-column structure on all tabs;
-- left context panel is visible on all desktop tabs;
-- changing tabs only changes center content and right panel details;
-- search tab shows SKU search and result list;
-- recommendations tab shows best fit / best value / for your ride;
-- kits tab shows service kits and selected kit details;
-- mobile search tab matches stacked search UI;
-- mobile recommendations tab matches recommendation card UI;
-- mobile kits tab matches recommended kits UI;
-- selected item/kit sticky bar works on mobile;
-- add detail creates one cart item;
-- add kit creates multiple cart items with duplicate preview.
+- web: новый маршрут `/vehicles/[id]/parts/picker` показывает single-page layout (header + chips + search + recommendations + kits + draft cart + why matches + footer);
+- web: вкладок (Поиск / Рекомендации / Комплекты) **нет**;
+- web: 3 recommendation карточки показывают `BEST FIT` / `BEST VALUE` / `FOR YOUR RIDE` метки и `whyRecommended` bullets;
+- web: kit rows показывают тег `Популярный` / `Выгодный` / `Рекомендуем` (если есть в лукапе);
+- web: `«+»` на карточке SKU и `«Добавить комплект»` добавляют в **локальный** draft cart, БД не пишется;
+- web: `«Очистить корзину»` чистит только draft;
+- web: `«Перейти к оформлению»` открывает preview, делает batch-вызовы, redirect на `/parts?picked=...` с подсветкой;
+- web: при ширине `<1280 px` правая колонка сворачивается в sticky bottom bar;
+- web: sidebar показывает `«Подбор деталей»` (не `«Детали»`), маршрут остаётся `/parts`;
+- web: точки входа (cart `«Добавить позицию»`/`«Добавить комплект»`, дашборд, дерево узлов, attention) ведут на новый picker, `PartPickerShell` удалён;
+- web: редактирование существующей позиции открывает компактный `WishlistItemEditModal` (без секций рекомендаций/китов, без поиска нового SKU кроме привязки);
+- mobile: новый экран `/vehicles/[id]/wishlist/picker` показывает тот же flow в одну колонку с `MobileDraftCartBar`;
+- mobile: точки входа из wishlist/дашборда/дерева/attention ведут на новый picker;
+- mobile: `/wishlist/new` редиректит на `/wishlist/picker`;
+- mobile: `wishlist-item-editor` упрощён до edit-only;
+- domain: `classifyRecommendationsForPicker`, `getServiceKitTagRu`, `formatRideStyleChipRu`, `buildWhyMatchesReasons`, `picker-draft-cart` покрыты unit-тестами;
+- одноимённый CTA `«Перейти к оформлению»` отключён, если draft пустой.
+
+Cart-страница (Часть A) при этом:
+
+- кнопка `«Добавить позицию»` ведёт на picker (а не модалку);
+- кнопка `«Добавить комплект»` ведёт на picker с `?focus=kits`.
 
 ---
 

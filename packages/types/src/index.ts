@@ -209,6 +209,19 @@ export type {
   ServiceKitPreviewViewModel,
 } from "./service-kit";
 export type {
+  PickerMerchandiseLabel,
+  ServiceKitMerchandiseTag,
+  PickerDraftItem,
+  PickerDraftItemSku,
+  PickerDraftItemKit,
+  PickerDraftCart,
+  PickerDraftTotals,
+  PickerMerchandiseRecommendations,
+  PickerSubmitDecision,
+  PickerSubmitPreview,
+  PickerSubmitResult,
+} from "./picker";
+export type {
   NodeContextActionKey,
   NodeContextActionViewModel,
   NodeContextRecommendationSummary,

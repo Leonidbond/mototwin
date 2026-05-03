@@ -1,30 +1,41 @@
-import { useMemo } from "react";
-import { useLocalSearchParams } from "expo-router";
-import { WishlistItemEditor } from "./wishlist-item-editor";
+import { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
-export default function NewWishlistItemScreen() {
-  const params = useLocalSearchParams<{ id?: string; nodeId?: string; skuId?: string; kitCode?: string }>();
-  const vehicleId = typeof params.id === "string" ? params.id : "";
-  const presetNodeId = useMemo(() => {
-    const raw = params.nodeId;
-    return typeof raw === "string" ? raw : "";
-  }, [params.nodeId]);
-  const presetSkuId = useMemo(() => {
-    const raw = params.skuId;
-    return typeof raw === "string" ? raw : "";
-  }, [params.skuId]);
-  const presetKitCode = useMemo(() => {
-    const raw = params.kitCode;
-    return typeof raw === "string" ? raw : "";
-  }, [params.kitCode]);
+/**
+ * Legacy `/wishlist/new` — редирект на single-page picker (см. `parts-wishlist-mvp.md`).
+ */
+export default function LegacyWishlistNewRedirect() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{
+    id?: string;
+    nodeId?: string;
+    skuId?: string;
+    kitCode?: string;
+  }>();
+
+  useEffect(() => {
+    const id = typeof params.id === "string" ? params.id : "";
+    if (!id) {
+      return;
+    }
+    const q = new URLSearchParams();
+    if (typeof params.nodeId === "string" && params.nodeId.trim()) {
+      q.set("nodeId", params.nodeId.trim());
+    }
+    if (typeof params.skuId === "string" && params.skuId.trim()) {
+      q.set("skuId", params.skuId.trim());
+    }
+    if (typeof params.kitCode === "string" && params.kitCode.trim()) {
+      q.set("kitCode", params.kitCode.trim());
+    }
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    router.replace(`/vehicles/${id}/wishlist/picker${suffix}`);
+  }, [params.id, params.nodeId, params.skuId, params.kitCode, router]);
 
   return (
-    <WishlistItemEditor
-      mode="create"
-      vehicleId={vehicleId}
-      presetNodeId={presetNodeId}
-      presetSkuId={presetSkuId}
-      presetKitCode={presetKitCode}
-    />
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+      <ActivityIndicator size="large" />
+    </View>
   );
 }

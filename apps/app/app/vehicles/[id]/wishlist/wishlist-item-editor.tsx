@@ -21,17 +21,13 @@ import {
   clearPartWishlistFormSkuSelection,
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
-  getDefaultCurrencyFromSettings,
   buildPartRecommendationGroupsForDisplay,
-  buildServiceKitPreview,
   formatExpenseAmountRu,
   formatPartSkuSearchResultMetaLineRu,
   getPartRecommendationGroupTitle,
   getPartRecommendationWarningLabel,
   getPartSkuViewModelDisplayLines,
   getWishlistItemSkuDisplayLines,
-  getServiceKitPreviewItemStatusLabel,
-  normalizeCreatePartWishlistPayload,
   normalizeUpdatePartWishlistPayload,
   partWishlistFormValuesFromItem,
   partWishlistStatusLabelsRu,
@@ -41,11 +37,8 @@ import {
 } from "@mototwin/domain";
 import type {
   FlattenedNodeSelectOption,
-  NodeTreeItem,
   PartRecommendationGroup,
   PartRecommendationViewModel,
-  ServiceKitPreviewViewModel,
-  ServiceKitViewModel,
   PartSkuViewModel,
   PartWishlistFormValues,
   PartWishlistItem,
@@ -53,17 +46,12 @@ import type {
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
-import { readUserLocalSettings } from "../../../../src/ui-user-local-settings";
 import { ScreenHeader } from "../../../components/screen-header";
 import { buildServiceEventNewFromWishlistHref } from "./hrefs";
 
 type WishlistItemEditorProps = {
-  mode: "create" | "edit";
   vehicleId: string;
-  itemId?: string;
-  presetNodeId?: string;
-  presetSkuId?: string;
-  presetKitCode?: string;
+  itemId: string;
 };
 
 function findOptionById(
@@ -73,14 +61,7 @@ function findOptionById(
   return options.find((o) => o.id === nodeId);
 }
 
-export function WishlistItemEditor({
-  mode,
-  vehicleId,
-  itemId,
-  presetNodeId,
-  presetSkuId,
-  presetKitCode,
-}: WishlistItemEditorProps) {
+export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProps) {
   const router = useRouter();
   const apiBaseUrl = getApiBaseUrl();
 
@@ -89,11 +70,7 @@ export function WishlistItemEditor({
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [nodeTreeOptions, setNodeTreeOptions] = useState<FlattenedNodeSelectOption[]>([]);
-  const [nodeTreeRaw, setNodeTreeRaw] = useState<NodeTreeItem[]>([]);
-  const [wishlistItemsForPreview, setWishlistItemsForPreview] = useState<PartWishlistItem[]>([]);
-  const [form, setForm] = useState<PartWishlistFormValues>(() =>
-    createInitialPartWishlistFormValues({ nodeId: presetNodeId })
-  );
+  const [form, setForm] = useState<PartWishlistFormValues>(() => createInitialPartWishlistFormValues());
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const statusWhenLoadedRef = useRef<PartWishlistItemStatus | null>(null);
   const [wishlistSkuQuery, setWishlistSkuQuery] = useState("");
@@ -107,12 +84,6 @@ export function WishlistItemEditor({
   const [recommendations, setRecommendations] = useState<PartRecommendationViewModel[]>([]);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [recommendationsError, setRecommendationsError] = useState("");
-  const [addingRecommendedSkuId, setAddingRecommendedSkuId] = useState("");
-  const [serviceKits, setServiceKits] = useState<ServiceKitViewModel[]>([]);
-  const [serviceKitsLoading, setServiceKitsLoading] = useState(false);
-  const [serviceKitsError, setServiceKitsError] = useState("");
-  const [addingKitCode, setAddingKitCode] = useState("");
-  const [selectedKitCode, setSelectedKitCode] = useState(presetKitCode?.trim() ?? "");
   const wishlistSkuSearchGen = useRef(0);
   const [loadedWishlistItem, setLoadedWishlistItem] = useState<PartWishlistItem | null>(null);
 
@@ -130,35 +101,6 @@ export function WishlistItemEditor({
     (): PartRecommendationGroup[] => buildPartRecommendationGroupsForDisplay(recommendations),
     [recommendations]
   );
-  const serviceKitNodesByCode = useMemo(() => {
-    const out = new Map<string, { id: string; name: string; hasChildren: boolean }>();
-    const stack = [...nodeTreeRaw];
-    while (stack.length > 0) {
-      const node = stack.pop();
-      if (!node) {
-        continue;
-      }
-      out.set(node.code, { id: node.id, name: node.name, hasChildren: node.children.length > 0 });
-      for (const child of node.children) {
-        stack.push(child);
-      }
-    }
-    return out;
-  }, [nodeTreeRaw]);
-  const serviceKitPreviewByCode = useMemo(() => {
-    const out = new Map<string, ServiceKitPreviewViewModel>();
-    for (const kit of serviceKits) {
-      out.set(
-        kit.code,
-        buildServiceKitPreview({
-          kit,
-          nodesByCode: serviceKitNodesByCode,
-          activeWishlistItems: wishlistItemsForPreview,
-        })
-      );
-    }
-    return out;
-  }, [serviceKitNodesByCode, serviceKits, wishlistItemsForPreview]);
 
   const load = useCallback(async () => {
     if (!vehicleId) {
@@ -172,46 +114,26 @@ export function WishlistItemEditor({
       setLoadError("");
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
-      const localSettings = await readUserLocalSettings();
-      const defaultCurrency = getDefaultCurrencyFromSettings(localSettings);
-
-      if (mode === "create") {
-        const [tree, wishlist] = await Promise.all([
-          endpoints.getNodeTree(vehicleId),
-          endpoints.getVehicleWishlist(vehicleId),
-        ]);
-        const nodes = tree.nodeTree ?? [];
-        setNodeTreeRaw(nodes);
-        setNodeTreeOptions(flattenNodeTreeToSelectOptions(nodes));
-        setWishlistItemsForPreview(wishlist.items ?? []);
-        const initial = createInitialPartWishlistFormValues({ nodeId: presetNodeId });
-        setForm({ ...initial, currency: defaultCurrency });
-        statusWhenLoadedRef.current = initial.status;
+      const itemIdSafe = itemId.trim();
+      if (!itemIdSafe) {
+        setLoadError("Не указана позиция списка.");
+        setIsLoading(false);
+        return;
+      }
+      const [tree, wishlist] = await Promise.all([
+        endpoints.getNodeTree(vehicleId),
+        endpoints.getVehicleWishlist(vehicleId),
+      ]);
+      const nodes = tree.nodeTree ?? [];
+      setNodeTreeOptions(flattenNodeTreeToSelectOptions(nodes));
+      const row = wishlist.items.find((i) => i.id === itemIdSafe);
+      if (!row) {
+        setLoadError("Позиция не найдена.");
         setLoadedWishlistItem(null);
       } else {
-        const itemIdSafe = itemId?.trim();
-        if (!itemIdSafe) {
-          setLoadError("Не указана позиция списка.");
-          setIsLoading(false);
-          return;
-        }
-        const [tree, wishlist] = await Promise.all([
-          endpoints.getNodeTree(vehicleId),
-          endpoints.getVehicleWishlist(vehicleId),
-        ]);
-        const nodes = tree.nodeTree ?? [];
-        setNodeTreeRaw(nodes);
-        setNodeTreeOptions(flattenNodeTreeToSelectOptions(nodes));
-        setWishlistItemsForPreview(wishlist.items ?? []);
-        const row = wishlist.items.find((i) => i.id === itemIdSafe);
-        if (!row) {
-          setLoadError("Позиция не найдена.");
-          setLoadedWishlistItem(null);
-        } else {
-          setForm(partWishlistFormValuesFromItem(row));
-          statusWhenLoadedRef.current = row.status;
-          setLoadedWishlistItem(row);
-        }
+        setForm(partWishlistFormValuesFromItem(row));
+        statusWhenLoadedRef.current = row.status;
+        setLoadedWishlistItem(row);
       }
     } catch (e) {
       console.error(e);
@@ -219,49 +141,11 @@ export function WishlistItemEditor({
     } finally {
       setIsLoading(false);
     }
-  }, [apiBaseUrl, vehicleId, mode, itemId, presetNodeId]);
+  }, [apiBaseUrl, vehicleId, itemId]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    const nextKitCode = presetKitCode?.trim() ?? "";
-    setSelectedKitCode(nextKitCode);
-  }, [presetKitCode]);
-
-  useEffect(() => {
-    const skuId = presetSkuId?.trim();
-    if (isLoading || mode !== "create" || !vehicleId || !skuId) {
-      return;
-    }
-    const nodeId = form.nodeId.trim();
-    let isCancelled = false;
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
-    void endpoints
-      .getPartSkus({ nodeId: nodeId || undefined })
-      .then((res) => {
-        if (isCancelled) {
-          return;
-        }
-        const sku = (res.skus ?? []).find((candidate) => candidate.id === skuId);
-        if (!sku) {
-          setForm((current) => ({ ...current, skuId }));
-          return;
-        }
-        setWishlistSkuPickedPreview(sku);
-        setForm((current) => applyPartSkuViewModelToPartWishlistFormValues(current, sku));
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setForm((current) => ({ ...current, skuId }));
-        }
-      });
-    return () => {
-      isCancelled = true;
-    };
-  }, [apiBaseUrl, form.nodeId, isLoading, mode, presetSkuId, vehicleId]);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -344,44 +228,6 @@ export function WishlistItemEditor({
       });
   }, [apiBaseUrl, form.nodeId, isLoading, vehicleId]);
 
-  useEffect(() => {
-    if (isLoading || !vehicleId) {
-      return;
-    }
-    const nodeId = form.nodeId.trim();
-    if (!nodeId || mode === "edit") {
-      setServiceKits([]);
-      setServiceKitsError("");
-      setServiceKitsLoading(false);
-      return;
-    }
-    setServiceKitsLoading(true);
-    setServiceKitsError("");
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
-    void endpoints
-      .getServiceKits({ nodeId, vehicleId })
-      .then((res) => {
-        const kits = res.kits ?? [];
-        setServiceKits(
-          selectedKitCode
-            ? [...kits].sort((a, b) => {
-                if (a.code === selectedKitCode) return -1;
-                if (b.code === selectedKitCode) return 1;
-                return 0;
-              })
-            : kits
-        );
-      })
-      .catch(() => {
-        setServiceKits([]);
-        setServiceKitsError("Не удалось загрузить комплекты обслуживания.");
-      })
-      .finally(() => {
-        setServiceKitsLoading(false);
-      });
-  }, [apiBaseUrl, form.nodeId, isLoading, mode, selectedKitCode, vehicleId]);
-
   const applyRecommendedSkuToForm = (rec: PartRecommendationViewModel) => {
     const skuFromRecommendation: PartSkuViewModel = {
       id: rec.skuId,
@@ -417,59 +263,8 @@ export function WishlistItemEditor({
     setForm((f) => applyPartSkuViewModelToPartWishlistFormValues(f, skuFromRecommendation));
   };
 
-  async function addRecommendedSku(rec: PartRecommendationViewModel) {
-    if (mode === "edit") {
-      applyRecommendedSkuToForm(rec);
-      return;
-    }
-    try {
-      setAddingRecommendedSkuId(rec.skuId);
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-      const payload = normalizeCreatePartWishlistPayload({
-        ...createInitialPartWishlistFormValues({ nodeId: form.nodeId, status: "NEEDED" }),
-        skuId: rec.skuId,
-      });
-      await endpoints.createWishlistItem(vehicleId, payload);
-      router.replace(`/vehicles/${vehicleId}/wishlist`);
-    } catch (e) {
-      console.error(e);
-      setSaveError(
-        e instanceof Error ? e.message : "Не удалось добавить рекомендованный SKU."
-      );
-    } finally {
-      setAddingRecommendedSkuId("");
-    }
-  }
-
-  async function addServiceKit(kit: ServiceKitViewModel) {
-    if (!vehicleId || mode === "edit") {
-      return;
-    }
-    const contextNodeId = form.nodeId.trim();
-    if (!contextNodeId) {
-      setSaveError("Выберите узел мотоцикла");
-      return;
-    }
-    try {
-      setAddingKitCode(kit.code);
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-      const res = await endpoints.addServiceKitToWishlist(vehicleId, {
-        kitCode: kit.code,
-        contextNodeId,
-      });
-      Alert.alert(
-        "Список покупок",
-        `Комплект добавлен: ${res.result.createdItems.length} создано, ${res.result.skippedItems.length} пропущено.`
-      );
-      router.replace(`/vehicles/${vehicleId}/wishlist`);
-    } catch (e) {
-      console.error(e);
-      setSaveError(e instanceof Error ? e.message : "Не удалось добавить комплект.");
-    } finally {
-      setAddingKitCode("");
-    }
+  function addRecommendedSku(rec: PartRecommendationViewModel) {
+    applyRecommendedSkuToForm(rec);
   }
 
   async function save() {
@@ -493,41 +288,24 @@ export function WishlistItemEditor({
       const prevStatus = statusWhenLoadedRef.current ?? "NEEDED";
       const shouldDeferInstalledStatus = isWishlistTransitionToInstalled(prevStatus, form.status);
 
-      if (mode === "create") {
-        const input = normalizeCreatePartWishlistPayload(
-          shouldDeferInstalledStatus ? { ...form, status: prevStatus } : form
-        );
-        const res = await endpoints.createWishlistItem(vehicleId, input);
-        if (shouldDeferInstalledStatus) {
-          if (res.item.nodeId) {
-            router.replace(buildServiceEventNewFromWishlistHref(vehicleId, res.item));
-          } else {
-            Alert.alert("Список покупок", WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT);
-            router.replace(`/vehicles/${vehicleId}/wishlist`);
-          }
+      const itemIdSafe = itemId.trim();
+      if (!itemIdSafe) {
+        setSaveError("Не указана позиция списка.");
+        return;
+      }
+      const input = normalizeUpdatePartWishlistPayload(
+        shouldDeferInstalledStatus ? { ...form, status: prevStatus } : form
+      );
+      const res = await endpoints.updateWishlistItem(vehicleId, itemIdSafe, input);
+      if (shouldDeferInstalledStatus) {
+        if (res.item.nodeId) {
+          router.replace(buildServiceEventNewFromWishlistHref(vehicleId, res.item));
         } else {
+          Alert.alert("Список покупок", WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT);
           router.replace(`/vehicles/${vehicleId}/wishlist`);
         }
       } else {
-        const itemIdSafe = itemId?.trim();
-        if (!itemIdSafe) {
-          setSaveError("Не указана позиция списка.");
-          return;
-        }
-        const input = normalizeUpdatePartWishlistPayload(
-          shouldDeferInstalledStatus ? { ...form, status: prevStatus } : form
-        );
-        const res = await endpoints.updateWishlistItem(vehicleId, itemIdSafe, input);
-        if (shouldDeferInstalledStatus) {
-          if (res.item.nodeId) {
-            router.replace(buildServiceEventNewFromWishlistHref(vehicleId, res.item));
-          } else {
-            Alert.alert("Список покупок", WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT);
-            router.replace(`/vehicles/${vehicleId}/wishlist`);
-          }
-        } else {
-          router.replace(`/vehicles/${vehicleId}/wishlist`);
-        }
+        router.replace(`/vehicles/${vehicleId}/wishlist`);
       }
     } catch (e) {
       console.error(e);
@@ -572,7 +350,7 @@ export function WishlistItemEditor({
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScreenHeader title={mode === "create" ? "Новая позиция" : "Редактирование позиции"} />
+      <ScreenHeader title="Редактирование позиции" />
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -668,21 +446,13 @@ export function WishlistItemEditor({
                                 </Text>
                               ) : null}
                               <Pressable
-                                onPress={() => void addRecommendedSku(rec)}
-                                disabled={addingRecommendedSkuId === rec.skuId}
+                                onPress={() => addRecommendedSku(rec)}
                                 style={({ pressed }) => [
                                   styles.recommendationBtn,
                                   pressed && styles.recommendationBtnPressed,
-                                  addingRecommendedSkuId === rec.skuId && styles.recommendationBtnDisabled,
                                 ]}
                               >
-                                <Text style={styles.recommendationBtnText}>
-                                  {mode === "edit"
-                                    ? "Применить SKU"
-                                    : addingRecommendedSkuId === rec.skuId
-                                      ? "Добавление…"
-                                      : "Добавить в список покупок"}
-                                </Text>
+                                <Text style={styles.recommendationBtnText}>Применить SKU</Text>
                               </Pressable>
                             </View>
                           );
@@ -690,77 +460,6 @@ export function WishlistItemEditor({
                       </View>
                     ))
                   : null}
-                {mode === "create" ? (
-                  <View style={styles.kitsBox}>
-                    <Text style={styles.labelCompact}>Комплекты обслуживания</Text>
-                    {serviceKitsError ? <Text style={styles.inlineError}>{serviceKitsError}</Text> : null}
-                    {serviceKitsLoading ? <Text style={styles.mutedSmall}>Загружаем комплекты…</Text> : null}
-                    {!serviceKitsLoading && serviceKits.length === 0 ? (
-                      <Text style={styles.mutedSmall}>Для этого узла пока нет подходящих комплектов.</Text>
-                    ) : null}
-                    {!serviceKitsLoading
-                      ? serviceKits.map((kit) => {
-                          const preview = serviceKitPreviewByCode.get(kit.code);
-                          const isSelectedKit = kit.code === selectedKitCode;
-                          return (
-                          <View
-                            key={kit.code}
-                            style={[styles.kitCard, isSelectedKit && styles.kitCardSelected]}
-                          >
-                            <Text style={styles.recName}>
-                              {kit.title}
-                              {isSelectedKit ? " · выбран" : ""}
-                            </Text>
-                            <Text style={styles.skuResultMeta}>{kit.description}</Text>
-                            {(preview?.items ?? []).map((item) => {
-                              const muted = item.status !== "WILL_ADD";
-                              return (
-                                <View
-                                  key={item.itemKey}
-                                  style={[styles.kitPreviewRow, muted && styles.kitPreviewRowMuted]}
-                                >
-                                  <Text style={[styles.skuResultMeta, muted && styles.kitPreviewTextMuted]}>
-                                    {item.title}
-                                    {item.matchedSkuTitle ? ` — ${item.matchedSkuTitle}` : ""}
-                                  </Text>
-                                  <Text style={[styles.skuResultMeta, muted && styles.kitPreviewTextMuted]}>
-                                    {item.nodeName ? `Узел: ${item.nodeName}` : `Узел: ${item.nodeCode}`}
-                                    {item.costAmount != null
-                                      ? ` · ${formatExpenseAmountRu(item.costAmount)} ${item.currency ?? ""}`.trim()
-                                      : ""}
-                                  </Text>
-                                  <Text style={[styles.kitPreviewStatus, muted && styles.kitPreviewTextMuted]}>
-                                    {getServiceKitPreviewItemStatusLabel(item.status)}
-                                  </Text>
-                                </View>
-                              );
-                            })}
-                            {preview ? (
-                              <Text style={styles.skuResultMeta}>
-                                Доступно: {preview.addableCount} · Уже есть: {preview.duplicateCount} · Пропуск:{" "}
-                                {preview.invalidCount}
-                              </Text>
-                            ) : null}
-                            <Pressable
-                              onPress={() => void addServiceKit(kit)}
-                              disabled={addingKitCode === kit.code || (preview ? !preview.canAddAny : false)}
-                              style={({ pressed }) => [
-                                styles.recommendationBtn,
-                                pressed && styles.recommendationBtnPressed,
-                                addingKitCode === kit.code && styles.recommendationBtnDisabled,
-                              ]}
-                            >
-                              <Text style={styles.recommendationBtnText}>
-                                {addingKitCode === kit.code
-                                  ? "Добавление комплекта…"
-                                  : "Добавить доступные позиции"}
-                              </Text>
-                            </Pressable>
-                          </View>
-                        )})
-                      : null}
-                  </View>
-                ) : null}
               </View>
             ) : null}
             <Text style={styles.labelCompact}>Найти в каталоге</Text>
@@ -915,7 +614,7 @@ export function WishlistItemEditor({
             {isSaving ? (
               <ActivityIndicator size="small" color={c.onPrimaryAction} />
             ) : (
-              <Text style={styles.saveBtnText}>{mode === "create" ? "Добавить" : "Сохранить"}</Text>
+              <Text style={styles.saveBtnText}>Сохранить</Text>
             )}
           </Pressable>
         </ScrollView>
@@ -1045,44 +744,6 @@ const styles = StyleSheet.create({
   recommendationLabel: { marginTop: 4, fontSize: 11, color: c.textSecondary, fontWeight: "600" },
   recommendationWarning: { marginTop: 2, fontSize: 11, color: c.textSecondary },
   recommendationWarningVerify: { fontWeight: "600", color: c.textPrimary },
-  kitsBox: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: c.border,
-    paddingTop: 8,
-  },
-  kitCard: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: 10,
-    padding: 8,
-    backgroundColor: c.card,
-  },
-  kitCardSelected: {
-    borderColor: c.indigoSoftBorder,
-    backgroundColor: c.indigoSoftBg,
-  },
-  kitPreviewRow: {
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: 8,
-    padding: 6,
-    backgroundColor: c.cardMuted,
-  },
-  kitPreviewRowMuted: {
-    opacity: 0.75,
-  },
-  kitPreviewStatus: {
-    marginTop: 2,
-    fontSize: 11,
-    fontWeight: "600",
-    color: c.textSecondary,
-  },
-  kitPreviewTextMuted: {
-    color: c.textMuted,
-  },
   recommendationBtn: {
     marginTop: 8,
     alignSelf: "flex-start",
@@ -1094,7 +755,6 @@ const styles = StyleSheet.create({
     backgroundColor: c.card,
   },
   recommendationBtnPressed: { opacity: 0.9 },
-  recommendationBtnDisabled: { opacity: 0.65 },
   recommendationBtnText: { fontSize: 12, fontWeight: "600", color: c.textPrimary },
   skuResults: {
     marginTop: 8,

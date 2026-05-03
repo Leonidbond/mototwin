@@ -4,38 +4,22 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   applyPartSkuViewModelToPartWishlistFormValues,
   clearPartWishlistFormSkuSelection,
-  formatExpenseAmountRu,
   formatPartSkuSearchResultMetaLineRu,
-  getPartRecommendationGroupTitle,
-  getPartRecommendationWarningLabel,
   getPartSkuViewModelDisplayLines,
-  getServiceKitPreviewItemStatusLabel,
   getWishlistItemSkuDisplayLines,
   partWishlistStatusLabelsRu,
   PART_WISHLIST_STATUS_ORDER,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
-import type {
-  PartRecommendationGroup,
-  PartRecommendationViewModel,
-  PartSkuViewModel,
-  PartWishlistFormValues,
-  PartWishlistItem,
-  PartWishlistItemStatus,
-  ServiceKitPreviewViewModel,
-  ServiceKitViewModel,
-} from "@mototwin/types";
-
-export type PartPickerTab = "search" | "recommendations" | "kits";
+import type { PartSkuViewModel, PartWishlistFormValues, PartWishlistItem, PartWishlistItemStatus } from "@mototwin/types";
 
 const RADIUS_MODAL = 24;
 const RADIUS_INNER = 14;
 
 export type WishlistNodeSelectOption = { id: string; name: string; level: number };
 
-export type PartPickerShellProps = {
+export type WishlistItemEditModalProps = {
   isOpen: boolean;
-  initialTab: PartPickerTab;
   title: string;
   onClose: () => void;
   vehicleLabel: string;
@@ -43,7 +27,6 @@ export type PartPickerShellProps = {
   setWishlistForm: React.Dispatch<React.SetStateAction<PartWishlistFormValues>>;
   wishlistNodeOptions: WishlistNodeSelectOption[];
   wishlistNodeRequiredError: boolean;
-  wishlistEditingId: string | null;
   wishlistEditingSourceItem: PartWishlistItem | undefined;
   wishlistSkuQuery: string;
   setWishlistSkuQuery: (value: string) => void;
@@ -52,19 +35,6 @@ export type PartPickerShellProps = {
   wishlistSkuFetchError: string;
   wishlistSkuPickedPreview: PartSkuViewModel | null;
   setWishlistSkuPickedPreview: (value: PartSkuViewModel | null) => void;
-  wishlistRecommendationsLoading: boolean;
-  wishlistRecommendationsError: string;
-  wishlistRecommendationGroups: PartRecommendationGroup[];
-  onAddRecommendedSku: (rec: PartRecommendationViewModel) => void;
-  wishlistAddingRecommendedSkuId: string;
-  wishlistServiceKitsLoading: boolean;
-  wishlistServiceKitsError: string;
-  visibleWishlistServiceKits: ServiceKitViewModel[];
-  serviceKitPreviewByCode: Map<string, ServiceKitPreviewViewModel>;
-  wishlistSelectedKitCode: string;
-  setWishlistSelectedKitCode: (code: string) => void;
-  onAddServiceKit: (kit: ServiceKitViewModel) => void;
-  wishlistAddingKitCode: string;
   wishlistFormError: string;
   onSubmit: () => void;
   isWishlistSaving: boolean;
@@ -77,10 +47,9 @@ const control: CSSProperties = {
   colorScheme: "dark",
 };
 
-export function PartPickerShell(props: PartPickerShellProps) {
+export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
   const {
     isOpen,
-    initialTab,
     title,
     onClose,
     vehicleLabel,
@@ -88,7 +57,6 @@ export function PartPickerShell(props: PartPickerShellProps) {
     setWishlistForm,
     wishlistNodeOptions,
     wishlistNodeRequiredError,
-    wishlistEditingId,
     wishlistEditingSourceItem,
     wishlistSkuQuery,
     setWishlistSkuQuery,
@@ -97,25 +65,11 @@ export function PartPickerShell(props: PartPickerShellProps) {
     wishlistSkuFetchError,
     wishlistSkuPickedPreview,
     setWishlistSkuPickedPreview,
-    wishlistRecommendationsLoading,
-    wishlistRecommendationsError,
-    wishlistRecommendationGroups,
-    onAddRecommendedSku,
-    wishlistAddingRecommendedSkuId,
-    wishlistServiceKitsLoading,
-    wishlistServiceKitsError,
-    visibleWishlistServiceKits,
-    serviceKitPreviewByCode,
-    wishlistSelectedKitCode,
-    setWishlistSelectedKitCode,
-    onAddServiceKit,
-    wishlistAddingKitCode,
     wishlistFormError,
     onSubmit,
     isWishlistSaving,
   } = props;
 
-  const [tab, setTab] = useState<PartPickerTab>(initialTab);
   const [isNarrow, setIsNarrow] = useState(false);
 
   useEffect(() => {
@@ -127,10 +81,6 @@ export function PartPickerShell(props: PartPickerShellProps) {
   }, []);
 
   const stickySelectionLabel = useMemo(() => {
-    if (wishlistSelectedKitCode.trim()) {
-      const kit = visibleWishlistServiceKits.find((k) => k.code === wishlistSelectedKitCode);
-      return kit ? `Комплект: ${kit.title}` : "Комплект выбран";
-    }
     if (wishlistForm.skuId.trim()) {
       if (wishlistSkuPickedPreview?.id === wishlistForm.skuId.trim()) {
         return getPartSkuViewModelDisplayLines(wishlistSkuPickedPreview).primaryLine;
@@ -141,53 +91,11 @@ export function PartPickerShell(props: PartPickerShellProps) {
       return "SKU привязан";
     }
     return "";
-  }, [
-    wishlistSelectedKitCode,
-    visibleWishlistServiceKits,
-    wishlistForm.skuId,
-    wishlistSkuPickedPreview,
-    wishlistEditingSourceItem,
-  ]);
+  }, [wishlistForm.skuId, wishlistSkuPickedPreview, wishlistEditingSourceItem]);
 
   if (!isOpen) {
     return null;
   }
-
-  const tabs: { id: PartPickerTab; label: string }[] = [
-    { id: "search", label: "Поиск (SKU)" },
-    { id: "recommendations", label: "Рекомендации" },
-    { id: "kits", label: "Комплекты" },
-  ];
-
-  const tabRow = (
-    <div
-      className="flex gap-0 overflow-x-auto border-b"
-      style={{ borderColor: productSemanticColors.borderStrong }}
-    >
-      {tabs.map((t) => {
-        const active = tab === t.id;
-        return (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className="relative shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium transition"
-            style={{
-              color: active ? productSemanticColors.textPrimary : productSemanticColors.textMuted,
-            }}
-          >
-            {t.label}
-            {active ? (
-              <span
-                className="absolute inset-x-3 bottom-0 h-0.5 rounded-full"
-                style={{ backgroundColor: productSemanticColors.primaryAction }}
-              />
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
-  );
 
   const leftContext = (
     <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
@@ -328,7 +236,10 @@ export function PartPickerShell(props: PartPickerShellProps) {
         </p>
       ) : null}
       {!wishlistSkuLoading && wishlistSkuResults.length > 0 ? (
-        <ul className="max-h-[min(40vh,320px)] space-y-1 overflow-y-auto rounded-[12px] border p-1" style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardSubtle }}>
+        <ul
+          className="max-h-[min(40vh,320px)] space-y-1 overflow-y-auto rounded-[12px] border p-1"
+          style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardSubtle }}
+        >
           {wishlistSkuResults.map((sku) => (
             <li key={sku.id}>
               <button
@@ -351,210 +262,6 @@ export function PartPickerShell(props: PartPickerShellProps) {
       ) : null}
     </div>
   );
-
-  const centerRecommendations =
-    !wishlistForm.nodeId.trim() ? (
-      <p className="text-sm" style={{ color: productSemanticColors.textMuted }}>
-        Выберите узел — появятся рекомендации каталога для этой позиции.
-      </p>
-    ) : (
-      <div className="min-h-0 min-w-0 overflow-y-auto">
-        {wishlistRecommendationsError ? (
-          <p className="text-xs" style={{ color: productSemanticColors.error }}>
-            {wishlistRecommendationsError}
-          </p>
-        ) : null}
-        {wishlistRecommendationsLoading ? (
-          <p className="text-xs" style={{ color: productSemanticColors.textMuted }}>
-            Загружаем рекомендации…
-          </p>
-        ) : null}
-        {!wishlistRecommendationsLoading && wishlistRecommendationGroups.length === 0 ? (
-          <p className="text-xs" style={{ color: productSemanticColors.textMuted }}>
-            Для этого узла пока нет рекомендаций из каталога
-          </p>
-        ) : null}
-        {!wishlistRecommendationsLoading && wishlistRecommendationGroups.length > 0 ? (
-          <div className="space-y-3">
-            {wishlistRecommendationGroups.map((group) => (
-              <div key={group.recommendationType}>
-                <p className="text-[11px] font-semibold" style={{ color: productSemanticColors.textPrimary }}>
-                  {getPartRecommendationGroupTitle(group.recommendationType)}
-                </p>
-                <ul className="mt-1.5 space-y-1.5">
-                  {group.items.map((rec) => {
-                    const primaryNo = rec.partNumbers[0]?.trim() || "";
-                    const warn = getPartRecommendationWarningLabel(rec);
-                    const isVerify = rec.recommendationType === "VERIFY_REQUIRED";
-                    return (
-                      <li
-                        key={rec.skuId}
-                        className="rounded-md border px-2 py-2"
-                        style={{
-                          borderColor: isVerify ? productSemanticColors.primaryAction : productSemanticColors.borderStrong,
-                          backgroundColor: productSemanticColors.cardMuted,
-                        }}
-                      >
-                        <p className="text-xs font-medium" style={{ color: productSemanticColors.textPrimary }}>
-                          {rec.canonicalName}
-                        </p>
-                        <p className="text-[11px]" style={{ color: productSemanticColors.textSecondary }}>
-                          {rec.brandName}
-                        </p>
-                        {primaryNo ? (
-                          <p className="text-[11px]" style={{ color: productSemanticColors.textMuted }}>
-                            Арт.: {primaryNo}
-                          </p>
-                        ) : null}
-                        {rec.priceAmount != null ? (
-                          <p className="text-[11px]" style={{ color: productSemanticColors.textMuted }}>
-                            {`${formatExpenseAmountRu(rec.priceAmount)} ${rec.currency?.trim() || ""}`.trim()}
-                          </p>
-                        ) : null}
-                        <p className="text-[11px]" style={{ color: productSemanticColors.textSecondary }}>
-                          {rec.recommendationLabel}
-                        </p>
-                        {warn ? (
-                          <p className={`text-[11px] ${isVerify ? "font-medium" : ""}`} style={{ color: productSemanticColors.textSecondary }}>
-                            {warn}
-                          </p>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => onAddRecommendedSku(rec)}
-                          disabled={wishlistAddingRecommendedSkuId === rec.skuId}
-                          className="mt-2 inline-flex rounded-[12px] border px-2 py-1 text-[11px] font-semibold transition disabled:opacity-60"
-                          style={{
-                            borderColor: productSemanticColors.borderStrong,
-                            backgroundColor: productSemanticColors.cardSubtle,
-                            color: productSemanticColors.textPrimary,
-                          }}
-                        >
-                          {wishlistEditingId
-                            ? "Применить SKU"
-                            : wishlistAddingRecommendedSkuId === rec.skuId
-                              ? "Добавление…"
-                              : "Добавить в список покупок"}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    );
-
-  const centerKits =
-    !wishlistForm.nodeId.trim() || wishlistEditingId ? (
-      <p className="text-sm" style={{ color: productSemanticColors.textMuted }}>
-        {wishlistEditingId
-          ? "Комплекты доступны только при создании новой позиции."
-          : "Выберите узел, чтобы увидеть комплекты обслуживания."}
-      </p>
-    ) : (
-      <div className="min-h-0 min-w-0 overflow-y-auto">
-        {wishlistServiceKitsError ? (
-          <p className="text-xs" style={{ color: productSemanticColors.error }}>
-            {wishlistServiceKitsError}
-          </p>
-        ) : null}
-        {wishlistServiceKitsLoading ? (
-          <p className="text-xs" style={{ color: productSemanticColors.textMuted }}>
-            Загружаем комплекты…
-          </p>
-        ) : null}
-        {!wishlistServiceKitsLoading && visibleWishlistServiceKits.length === 0 ? (
-          <p className="text-xs" style={{ color: productSemanticColors.textMuted }}>
-            Для этого узла пока нет подходящих комплектов.
-          </p>
-        ) : null}
-        {visibleWishlistServiceKits.length > 0 ? (
-          <ul className="space-y-2">
-            {visibleWishlistServiceKits.map((kit) => {
-              const preview = serviceKitPreviewByCode.get(kit.code);
-              const isSelectedKit = kit.code === wishlistSelectedKitCode;
-              return (
-                <li
-                  key={kit.code}
-                  className="rounded-md border p-2"
-                  style={{
-                    borderColor: isSelectedKit ? productSemanticColors.primaryAction : productSemanticColors.borderStrong,
-                    backgroundColor: productSemanticColors.cardMuted,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setWishlistSelectedKitCode(kit.code)}
-                    className="w-full text-left"
-                  >
-                    <p className="text-xs font-semibold" style={{ color: productSemanticColors.textPrimary }}>
-                      {kit.title}
-                      {isSelectedKit ? (
-                        <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: productSemanticColors.cardSubtle }}>
-                          выбран
-                        </span>
-                      ) : null}
-                    </p>
-                    <p className="mt-0.5 text-[11px]" style={{ color: productSemanticColors.textSecondary }}>
-                      {kit.description}
-                    </p>
-                  </button>
-                  <ul className="mt-1 space-y-1">
-                    {(preview?.items ?? []).map((item) => (
-                      <li
-                        key={item.itemKey}
-                        className="rounded border px-2 py-1 text-[11px]"
-                        style={{
-                          borderColor: productSemanticColors.border,
-                          backgroundColor: productSemanticColors.cardSubtle,
-                          color: productSemanticColors.textSecondary,
-                        }}
-                      >
-                        <p style={{ color: productSemanticColors.textPrimary }}>
-                          {item.title}
-                          {item.matchedSkuTitle ? ` — ${item.matchedSkuTitle}` : ""}
-                        </p>
-                        <p className="mt-0.5">
-                          {item.nodeName ? `Узел: ${item.nodeName}` : `Узел: ${item.nodeCode}`}
-                          {item.costAmount != null
-                            ? ` · ${formatExpenseAmountRu(item.costAmount)} ${item.currency ?? ""}`.trim()
-                            : ""}
-                        </p>
-                        <p className="mt-0.5 font-medium">{getServiceKitPreviewItemStatusLabel(item.status)}</p>
-                      </li>
-                    ))}
-                  </ul>
-                  {preview ? (
-                    <p className="mt-1 text-[11px]" style={{ color: productSemanticColors.textMuted }}>
-                      Доступно: {preview.addableCount} · Уже есть: {preview.duplicateCount} · Пропуск:{" "}
-                      {preview.invalidCount}
-                    </p>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void onAddServiceKit(kit)}
-                    disabled={wishlistAddingKitCode === kit.code || (preview ? !preview.canAddAny : false)}
-                    className="mt-2 inline-flex rounded-[12px] border px-2 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                    style={{
-                      borderColor: productSemanticColors.borderStrong,
-                      backgroundColor: productSemanticColors.cardSubtle,
-                      color: productSemanticColors.textPrimary,
-                    }}
-                  >
-                    {wishlistAddingKitCode === kit.code ? "Добавление комплекта…" : "Добавить доступные позиции"}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-      </div>
-    );
-
-  const centerPanel = tab === "search" ? centerSearch : tab === "recommendations" ? centerRecommendations : centerKits;
 
   const rightSelection = (
     <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
@@ -607,7 +314,7 @@ export function PartPickerShell(props: PartPickerShellProps) {
         </div>
       ) : (
         <p className="text-xs" style={{ color: productSemanticColors.textMuted }}>
-          Выберите SKU в поиске или через рекомендации.
+          Выберите SKU в каталоге.
         </p>
       )}
       <div>
@@ -653,7 +360,7 @@ export function PartPickerShell(props: PartPickerShellProps) {
         className="inline-flex h-10 items-center justify-center rounded-[14px] px-5 text-sm font-bold transition disabled:opacity-60"
         style={{ backgroundColor: productSemanticColors.primaryAction, color: productSemanticColors.onPrimaryAction }}
       >
-        {isWishlistSaving ? "Сохранение…" : wishlistEditingId ? "Сохранить" : "Добавить деталь"}
+        {isWishlistSaving ? "Сохранение…" : "Сохранить"}
       </button>
     </div>
   );
@@ -675,13 +382,22 @@ export function PartPickerShell(props: PartPickerShellProps) {
 
   const mainGrid = isNarrow ? (
     <div className="flex max-h-[calc(100dvh-200px)] flex-col gap-4 overflow-y-auto px-4 py-4">
-      <section className="rounded-[14px] border p-3" style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardMuted }}>
+      <section
+        className="rounded-[14px] border p-3"
+        style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardMuted }}
+      >
         {leftContext}
       </section>
-      <section className="min-h-[160px] rounded-[14px] border p-3" style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardMuted }}>
-        {centerPanel}
+      <section
+        className="min-h-[160px] rounded-[14px] border p-3"
+        style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardMuted }}
+      >
+        {centerSearch}
       </section>
-      <section className="rounded-[14px] border p-3" style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardMuted }}>
+      <section
+        className="rounded-[14px] border p-3"
+        style={{ borderColor: productSemanticColors.borderStrong, backgroundColor: productSemanticColors.cardMuted }}
+      >
         {rightSelection}
       </section>
     </div>
@@ -694,7 +410,7 @@ export function PartPickerShell(props: PartPickerShellProps) {
         {leftContext}
       </div>
       <div className="min-h-0 min-w-0 border-r px-1" style={{ borderColor: productSemanticColors.borderStrong }}>
-        {centerPanel}
+        {centerSearch}
       </div>
       <div className="min-h-0 min-w-0">{rightSelection}</div>
     </div>
@@ -724,7 +440,7 @@ export function PartPickerShell(props: PartPickerShellProps) {
               {title}
             </h2>
             <p className="mt-0.5 text-xs" style={{ color: productSemanticColors.textSecondary }}>
-              Подбор детали · {vehicleLabel}
+              Редактирование позиции · {vehicleLabel}
             </p>
           </div>
           <button
@@ -740,13 +456,6 @@ export function PartPickerShell(props: PartPickerShellProps) {
             Закрыть
           </button>
         </div>
-        {!isNarrow ? (
-          <div className="px-6 pt-3">
-            {tabRow}
-          </div>
-        ) : (
-          <div className="px-4 pt-2">{tabRow}</div>
-        )}
         {mainGrid}
         {stickyBar}
         {bottomActions}

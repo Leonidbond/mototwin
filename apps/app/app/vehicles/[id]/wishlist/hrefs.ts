@@ -1,10 +1,10 @@
 import type { PartWishlistItem } from "@mototwin/types";
 
-/** Deep link / router href for creating a wishlist item, optionally with a node preset. */
+/** Deep link / router href for the parts picker (create flow), optionally with a node / catalog hints. */
 export function buildVehicleWishlistNewHref(
   vehicleId: string,
   nodeId?: string,
-  options?: { skuId?: string; kitCode?: string }
+  options?: { skuId?: string; kitCode?: string; focusKits?: boolean }
 ): string {
   const q = new URLSearchParams();
   if (nodeId?.trim()) {
@@ -16,8 +16,11 @@ export function buildVehicleWishlistNewHref(
   if (options?.kitCode?.trim()) {
     q.set("kitCode", options.kitCode.trim());
   }
+  if (options?.focusKits) {
+    q.set("focus", "kits");
+  }
   const qs = q.toString();
-  return `/vehicles/${vehicleId}/wishlist/new${qs ? `?${qs}` : ""}`;
+  return `/vehicles/${vehicleId}/wishlist/picker${qs ? `?${qs}` : ""}`;
 }
 
 export function buildVehicleWishlistItemHighlightHref(

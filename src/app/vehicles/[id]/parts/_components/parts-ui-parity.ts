@@ -6,7 +6,6 @@
  * CartSearchAndFilters, CartGroupedList + row selection, CartItemDetailPanel (desktop 360px),
  * CartBottomActionsMobile, loading/empty/error/delete states §5.
  *
- * Picker: PartPickerShell wide layout, tabs Поиск / Рекомендации / Комплекты, grid 320|1fr|360,
- * bottom actions, mobile order §8 + sticky selection §11.
+ * Picker: `/parts/picker` single-page (PartPickerPage) + draft cart; edit existing rows via WishlistItemEditModal.
  */
 export const PARTS_UI_PARITY_VERSION = 1;

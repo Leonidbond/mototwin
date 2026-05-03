@@ -30,6 +30,8 @@ export type ServiceKitItemViewModel = {
   role: string;
   required: boolean;
   matchedSkuId: string | null;
+  /** Каталожные номера подобранного SKU (для UI; не путать с matchedSkuId). */
+  matchedPartNumbers: string[];
   matchedSkuTitle: string | null;
   matchedPriceAmount: number | null;
   matchedCurrency: string | null;

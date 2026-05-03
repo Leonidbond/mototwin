@@ -94,11 +94,11 @@ type PartsCartPageProps = {
   onOpenWishlistPurchaseExpense: (item: PartWishlistItem) => void;
   onOpenWishlistEdit: (item: PartWishlistItem) => void;
   onDeleteWishlistItem: (itemId: string, options?: { skipConfirm?: boolean }) => void | Promise<void>;
-  onOpenWishlistCreate: () => void;
-  onOpenWishlistAddKit: () => void;
   router: AppRouterInstance;
   hasNodeFilter: boolean;
   onClearNodeFilter: () => void;
+  /** Wishlist row ids to briefly highlight after return from parts picker (`?picked=`). */
+  pickedHighlightWishlistItemIds?: readonly string[];
 };
 
 function nodePathLabel(nodeTree: NodeTreeItem[], nodeId: string | null | undefined): string {
@@ -308,12 +308,16 @@ export function PartsCartPage(props: PartsCartPageProps) {
     onOpenWishlistPurchaseExpense,
     onOpenWishlistEdit,
     onDeleteWishlistItem,
-    onOpenWishlistCreate,
-    onOpenWishlistAddKit,
     router,
     hasNodeFilter,
     onClearNodeFilter,
+    pickedHighlightWishlistItemIds = [],
   } = props;
+
+  const pickedHighlightSet = useMemo(
+    () => new Set(pickedHighlightWishlistItemIds),
+    [pickedHighlightWishlistItemIds]
+  );
 
   const [deleteConfirmItemId, setDeleteConfirmItemId] = useState<string | null>(null);
   const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
@@ -573,11 +577,23 @@ export function PartsCartPage(props: PartsCartPageProps) {
             <p className={styles.subtitle}>Список запчастей и расходников для вашего мотоцикла.</p>
           </div>
           <div className={styles.headerActions}>
-            <button type="button" onClick={onOpenWishlistAddKit} className={styles.secondaryAction}>
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts/picker?focus=kits`)
+              }
+              className={styles.secondaryAction}
+            >
               <span aria-hidden>▣</span>
               <span>Добавить комплект</span>
             </button>
-            <button type="button" onClick={onOpenWishlistCreate} className={styles.primaryAction}>+ Добавить позицию</button>
+            <button
+              type="button"
+              onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts/picker`)}
+              className={styles.primaryAction}
+            >
+              + Добавить позицию
+            </button>
           </div>
         </header>
 
@@ -757,7 +773,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
                                 role="button"
                                 tabIndex={0}
                                 data-wishlist-item-id={item.id}
-                                className={`${styles.row} ${isSelected ? styles.rowSelected : ""}`}
+                                className={`${styles.row} ${pickedHighlightSet.has(item.id) ? styles.rowPickedFlash : ""} ${isSelected ? styles.rowSelected : ""}`}
                                 style={{ "--row-accent": st } as CSSProperties}
                                 onClick={() => selectWishlistItem(item.id)}
                                 onKeyDown={(e) => {

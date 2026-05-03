@@ -10,5 +10,5 @@ export default function EditWishlistItemScreen() {
     return typeof raw === "string" ? raw : "";
   }, [params.itemId]);
 
-  return <WishlistItemEditor mode="edit" vehicleId={vehicleId} itemId={itemId} />;
+  return <WishlistItemEditor vehicleId={vehicleId} itemId={itemId} />;
 }

@@ -319,6 +319,7 @@ export function buildServiceKitViewModel(
         role: item.role,
         required: item.required,
         matchedSkuId: picked?.skuId ?? null,
+        matchedPartNumbers: picked?.partNumbers?.map((n) => n.trim()).filter(Boolean) ?? [],
         matchedSkuTitle: picked?.canonicalName ?? null,
         matchedPriceAmount: picked?.priceAmount ?? null,
         matchedCurrency: picked?.currency?.trim() || null,

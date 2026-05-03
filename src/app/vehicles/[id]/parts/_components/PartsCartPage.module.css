@@ -397,6 +397,13 @@
   box-shadow: inset 0 0 0 1px rgba(255, 107, 0, 0.34);
 }
 
+.rowPickedFlash {
+  border-color: rgba(34, 197, 94, 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 197, 94, 0.28),
+    0 0 0 1px rgba(34, 197, 94, 0.12);
+}
+
 .thumb {
   width: 36px;
   height: 40px;

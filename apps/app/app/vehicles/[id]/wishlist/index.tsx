@@ -242,6 +242,7 @@ export default function VehicleWishlistScreen() {
     wishlistItemId?: string;
     partsStatus?: string;
     installWishlistItemId?: string;
+    picked?: string;
   }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
   const highlightedWishlistItemId =
@@ -249,6 +250,7 @@ export default function VehicleWishlistScreen() {
   const partsStatusParam = typeof params.partsStatus === "string" ? params.partsStatus : "";
   const installWishlistItemId =
     typeof params.installWishlistItemId === "string" ? params.installWishlistItemId : "";
+  const pickedParam = typeof params.picked === "string" ? params.picked : "";
   const apiBaseUrl = getApiBaseUrl();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -275,11 +277,11 @@ export default function VehicleWishlistScreen() {
   const scrollRef = useRef<ScrollView | null>(null);
   const itemYByIdRef = useRef<Record<string, number>>({});
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<PartWishlistItemViewModel[] | null> => {
     if (!vehicleId) {
       setError("Не удалось определить ID мотоцикла.");
       setIsLoading(false);
-      return;
+      return null;
     }
     try {
       setIsLoading(true);
@@ -294,7 +296,8 @@ export default function VehicleWishlistScreen() {
       ]);
       setVehicle(vehicleData.vehicle ?? null);
       setNodeTree(nodeTreeData.nodeTree ?? []);
-      setItems((wishlistData.items ?? []).map(buildPartWishlistItemViewModel));
+      const mappedItems = (wishlistData.items ?? []).map(buildPartWishlistItemViewModel);
+      setItems(mappedItems);
       const byWishlistItemId = new Map<string, string>();
       const newestEventsFirst = [...(serviceData.serviceEvents ?? [])].sort((left, right) => {
         const leftTime = new Date(left.eventDate || left.createdAt).getTime();
@@ -314,12 +317,14 @@ export default function VehicleWishlistScreen() {
         }
       }
       setServiceEventIdByWishlistItemId(byWishlistItemId);
+      return mappedItems;
     } catch (e) {
       console.error(e);
       setError("Не удалось загрузить список покупок.");
       setItems([]);
       setVehicle(null);
       setNodeTree([]);
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -437,6 +442,38 @@ export default function VehicleWishlistScreen() {
     setWishlistStatusMenuItemId(null);
   }, []);
 
+  /** Без смены URL: иначе useFocusEffect снова вызывает load() → isLoading и сброс модалки деталей. */
+  const applyWishlistRowFocus = useCallback(
+    (itemId: string, itemsSnapshot: PartWishlistItemViewModel[]) => {
+      const highlightedItem = itemsSnapshot.find((i) => i.id === itemId);
+      if (!highlightedItem) {
+        return;
+      }
+      const st = highlightedItem.status;
+      setStatusFilter(st);
+      setSearchQuery("");
+      setCollapsedGroups((prev) => ({ ...prev, [st]: false }));
+      const itemsInStatus = itemsSnapshot.filter((i) => i.status === st);
+      const highlightedIndex = itemsInStatus.findIndex((i) => i.id === itemId);
+      if (highlightedIndex >= 0) {
+        setVisibleCountByStatus((prev) => ({
+          ...prev,
+          [st]: Math.max(prev[st] ?? INITIAL_VISIBLE_COUNT, highlightedIndex + 1),
+        }));
+      }
+      setTimeout(() => {
+        const y = itemYByIdRef.current[itemId];
+        if (typeof y === "number") {
+          scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+        }
+      }, 120);
+      setTimeout(() => {
+        setDetailItemId(itemId);
+      }, 220);
+    },
+    []
+  );
+
   const vehicleCardVm = useMemo(
     () => (vehicle ? buildVehicleDetailViewModel(vehicle) : null),
     [vehicle]
@@ -506,6 +543,64 @@ export default function VehicleWishlistScreen() {
     router.replace(buildServiceEventNewFromWishlistHref(vehicleId, item));
   }, [installWishlistItemId, items, router, vehicleId]);
 
+  useEffect(() => {
+    if (!pickedParam.trim() || isLoading || items.length === 0 || !vehicleId) {
+      return;
+    }
+    const ids = pickedParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const found = ids.filter((id) => items.some((row) => row.id === id));
+    let scrollTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    if (found.length > 0) {
+      setStatusFilter("ALL");
+      setSearchQuery("");
+      setCollapsedGroups((prev) => {
+        const next = { ...prev };
+        for (const id of found) {
+          const row = items.find((i) => i.id === id);
+          if (row) {
+            next[row.status] = false;
+          }
+        }
+        return next;
+      });
+      const primaryId = found[0];
+      const primaryRow = items.find((i) => i.id === primaryId);
+      if (primaryRow) {
+        const itemsInStatus = items.filter((i) => i.status === primaryRow.status);
+        const highlightedIndex = itemsInStatus.findIndex((i) => i.id === primaryRow.id);
+        if (highlightedIndex >= 0) {
+          setVisibleCountByStatus((prev) => ({
+            ...prev,
+            [primaryRow.status]: Math.max(
+              prev[primaryRow.status] ?? INITIAL_VISIBLE_COUNT,
+              highlightedIndex + 1
+            ),
+          }));
+        }
+      }
+      setDetailItemId(primaryId);
+      scrollTimeoutId = setTimeout(() => {
+        const y = itemYByIdRef.current[primaryId];
+        if (typeof y === "number") {
+          scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+        }
+      }, 120);
+    }
+    Alert.alert(
+      "Готово",
+      found.length > 0 ? `Добавлено в список: ${found.length}` : "Список обновлён."
+    );
+    router.replace(`/vehicles/${vehicleId}/wishlist`);
+    return () => {
+      if (scrollTimeoutId != null) {
+        clearTimeout(scrollTimeoutId);
+      }
+    };
+  }, [pickedParam, isLoading, items, router, vehicleId]);
+
   async function patchStatus(
     item: PartWishlistItemViewModel,
     status: PartWishlistItemStatus,
@@ -529,7 +624,7 @@ export default function VehicleWishlistScreen() {
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
       const res = await endpoints.updateWishlistItem(vehicleId, item.id, { status, nodeId });
-      await load();
+      const nextItems = await load();
       if (isWishlistTransitionToInstalled(previousStatus, res.item.status)) {
         setDetailItemId(null);
         if (res.item.nodeId) {
@@ -537,6 +632,8 @@ export default function VehicleWishlistScreen() {
         } else {
           Alert.alert("Список покупок", WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT);
         }
+      } else if (nextItems) {
+        applyWishlistRowFocus(res.item.id, nextItems);
       }
     } catch (e) {
       console.error(e);
