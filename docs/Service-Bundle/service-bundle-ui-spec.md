@@ -13,6 +13,8 @@ The same bundle concept is used in two product areas:
 
 The UI must stay simple, service-centered, and MVP-safe.
 
+**Implementation note (2026-05):** waves 1–3 from the internal plan are reflected in code: Basic/Advanced bundle forms (web modal + Expo), bundle templates picker, multi-line wishlist install into one event, journal deep links for multiple wishlist ids, and node-tree “last service” derived from all `ServiceEventItem` rows. See `docs/Service-Bundle/service-bundle-concept.md` § «Статус реализации».
+
 ---
 
 ## 2. Product Definition

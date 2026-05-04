@@ -205,12 +205,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
         nodeId: created.nodeId,
         eventKind: created.eventKind,
         eventDate: created.eventDate,
+        mode: created.mode,
         title: created.title,
         totalCost: created.totalCost,
         currency: created.currency,
         comment: created.comment,
         installedPartsJson: created.installedPartsJson,
-        items: created.items?.map((item) => ({ partName: item.partName, sku: item.sku })),
+        items: created.items?.map((item) => ({
+          nodeId: item.nodeId,
+          partName: item.partName,
+          sku: item.sku,
+          quantity: item.quantity,
+          partCost: item.partCost,
+          laborCost: item.laborCost,
+          comment: item.comment,
+          node: item.node ? { name: item.node.name } : undefined,
+        })),
         createdAt: created.createdAt,
       });
       await linkInstalledExpenseItemsToServiceEvent(tx, {

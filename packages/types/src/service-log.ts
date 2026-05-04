@@ -97,6 +97,8 @@ export type ServiceLogBundleItemSummary = {
   quantity: number | null;
   partCost: number | null;
   laborCost: number | null;
+  /** Готовая строка для журнала: «запчасти … · работа …»; null если сумм нет. */
+  lineCostRu: string | null;
   comment: string | null;
 };
 

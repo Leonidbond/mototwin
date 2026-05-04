@@ -1,3 +1,4 @@
+import { getWishlistItemIdsFromInstalledPartsJson } from "@mototwin/domain";
 import type { ExpenseCategory, ExpenseInstallStatus } from "@mototwin/types";
 
 type ExpenseMutationClient = {
@@ -10,7 +11,19 @@ type ExpenseMutationClient = {
   };
   partWishlistItem?: {
     updateMany(args: unknown): Promise<unknown>;
+    findFirst?(args: unknown): Promise<{ nodeId: string | null } | null>;
   };
+};
+
+type ServiceExpenseItemExpenseSlice = {
+  nodeId?: string | null;
+  partName?: string | null;
+  sku?: string | null;
+  quantity?: number | null;
+  partCost?: number | { toString(): string } | null;
+  laborCost?: number | { toString(): string } | null;
+  comment?: string | null;
+  node?: { name?: string | null } | null;
 };
 
 type ServiceExpenseSource = {
@@ -20,6 +33,8 @@ type ServiceExpenseSource = {
   nodeId: string;
   eventKind?: string | null;
   eventDate: Date;
+  /** `BASIC` | `ADVANCED` (Prisma enum string). */
+  mode?: string | null;
   /** Bundle title (заменяет legacy serviceType). */
   title?: string | null;
   /** Bundle total (заменяет legacy costAmount). */
@@ -29,12 +44,9 @@ type ServiceExpenseSource = {
   installedPartsJson?: unknown | null;
   /**
    * Items bundle — для синтеза «PartSku/PartName» категории и установки.
-   * В BASIC обычно один item с anchor nodeId.
+   * В BASIC обычно один item с anchor nodeId; в ADVANCED — полные строки для per-item расходов.
    */
-  items?: Array<{
-    partName?: string | null;
-    sku?: string | null;
-  }>;
+  items?: ServiceExpenseItemExpenseSlice[];
   createdAt?: Date;
 };
 
@@ -47,6 +59,12 @@ function readTotalCostNumber(value: ServiceExpenseSource["totalCost"]): number |
   }
   const parsed = Number(value.toString());
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readItemLineTotal(item: ServiceExpenseItemExpenseSlice): number {
+  const p = readTotalCostNumber(item.partCost as ServiceExpenseSource["totalCost"]);
+  const l = readTotalCostNumber(item.laborCost as ServiceExpenseSource["totalCost"]);
+  return (p ?? 0) + (l ?? 0);
 }
 
 function readFirstItemPartSku(event: ServiceExpenseSource): string | null {
@@ -138,10 +156,7 @@ function classifyServiceExpense(event: ServiceExpenseSource): ExpenseCategory {
   }
   const hasItemPartInfo =
     Boolean(readFirstItemPartSku(event) || readFirstItemPartName(event));
-  if (
-    hasItemPartInfo ||
-    getWishlistItemIdFromExpenseSource(event.installedPartsJson)
-  ) {
+  if (hasItemPartInfo || getWishlistItemIdsFromInstalledPartsJson(event.installedPartsJson).length > 0) {
     return "PART";
   }
   if (text.includes("работ")) {
@@ -158,25 +173,6 @@ function getServiceExpenseInstallStatus(event: ServiceExpenseSource): ExpenseIns
   return "INSTALLED";
 }
 
-export function getWishlistItemIdFromExpenseSource(payload: unknown): string | null {
-  let parsed = payload;
-  if (typeof payload === "string") {
-    try {
-      parsed = JSON.parse(payload) as unknown;
-    } catch {
-      return null;
-    }
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return null;
-  }
-  const record = parsed as { source?: unknown; wishlistItemId?: unknown };
-  if (record.source !== "wishlist" || typeof record.wishlistItemId !== "string") {
-    return null;
-  }
-  return record.wishlistItemId.trim() || null;
-}
-
 export async function syncExpenseItemForServiceEvent(
   tx: unknown,
   event: ServiceExpenseSource
@@ -184,69 +180,145 @@ export async function syncExpenseItemForServiceEvent(
   const db = tx as ExpenseMutationClient;
   await db.expenseItem.deleteMany({ where: { serviceEventId: event.id } });
 
+  if (event.eventKind === "STATE_UPDATE") {
+    return;
+  }
+  if (!event.currency?.trim()) {
+    return;
+  }
+
   const totalCost = readTotalCostNumber(event.totalCost);
-  if (event.eventKind === "STATE_UPDATE" || !hasPositiveAmount(totalCost, event.currency)) {
+  const advLineItems = (event.items ?? []).filter(
+    (it) => readItemLineTotal(it) > 0 && Boolean(it.nodeId?.trim())
+  );
+  const wishlistIdsForEvent = getWishlistItemIdsFromInstalledPartsJson(event.installedPartsJson);
+  const doAdvancedPerItem =
+    event.mode === "ADVANCED" && advLineItems.length > 0 && wishlistIdsForEvent.length === 0;
+
+  if (!doAdvancedPerItem && !hasPositiveAmount(totalCost, event.currency)) {
     return;
   }
 
   const title = readEventTitleOrFallback(event);
   const headerPartSku = readFirstItemPartSku(event);
   const headerPartName = readFirstItemPartName(event);
+  const currency = normalizeCurrency(event.currency as string);
 
-  const shoppingListItemId = getWishlistItemIdFromExpenseSource(event.installedPartsJson);
-  if (shoppingListItemId) {
-    const existingStandalone = await db.expenseItem.findMany({
-      where: {
-        shoppingListItemId,
-        serviceEventId: null,
-      },
-      select: { id: true },
-    });
-    for (const expense of existingStandalone) {
-      await db.expenseItem.update({
-        where: { id: expense.id },
-        data: {
-          node: { connect: { id: event.nodeId } },
-          serviceEvent: { connect: { id: event.id } },
-          category: classifyServiceExpense(event),
-          installStatus: "INSTALLED",
-          installationStatus: "INSTALLED",
-          installedAt: event.eventDate,
-          expenseDate: event.eventDate,
-          title,
-          amount: totalCost,
-          currency: normalizeCurrency(event.currency as string),
-          quantity: 1,
-          comment: event.comment?.trim() || null,
-          partSku: headerPartSku,
-          partName: headerPartName,
+  const shoppingListItemIdForCreate =
+    wishlistIdsForEvent.length > 0 ? wishlistIdsForEvent[0] : null;
+
+  if (wishlistIdsForEvent.length > 0) {
+    let linkedAnyStandalone = false;
+    for (const shoppingListItemId of wishlistIdsForEvent) {
+      let linkNodeId = event.nodeId;
+      const wlRow = await db.partWishlistItem?.findFirst?.({
+        where: { id: shoppingListItemId, vehicleId: event.vehicleId },
+        select: { nodeId: true },
+      });
+      const wlNode = wlRow?.nodeId?.trim();
+      if (wlNode) {
+        linkNodeId = wlNode;
+      }
+
+      const existingStandalone = await db.expenseItem.findMany({
+        where: {
+          shoppingListItemId,
+          serviceEventId: null,
+          vehicleId: event.vehicleId,
         },
+        select: { id: true },
+      });
+      for (const expense of existingStandalone) {
+        await db.expenseItem.update({
+          where: { id: expense.id },
+          data: {
+            node: { connect: { id: linkNodeId } },
+            serviceEvent: { connect: { id: event.id } },
+            category: classifyServiceExpense({
+              ...event,
+              nodeId: linkNodeId,
+              installedPartsJson: { source: "wishlist", wishlistItemId: shoppingListItemId },
+            }),
+            installStatus: "INSTALLED",
+            installationStatus: "INSTALLED",
+            installedAt: event.eventDate,
+            expenseDate: event.eventDate,
+          },
+        });
+        linkedAnyStandalone = true;
+      }
+      await db.partWishlistItem?.updateMany({
+        where: { id: shoppingListItemId, vehicleId: event.vehicleId },
+        data: { status: "INSTALLED" },
       });
     }
-    await db.partWishlistItem?.updateMany({
-      where: { id: shoppingListItemId, vehicleId: event.vehicleId },
-      data: { status: "INSTALLED" },
-    });
-    if (existingStandalone.length > 0) {
+    if (linkedAnyStandalone) {
       return;
     }
   }
 
-  if (shoppingListItemId) {
-    await db.partWishlistItem?.updateMany({
-      where: { id: shoppingListItemId, vehicleId: event.vehicleId },
-      data: { status: "INSTALLED" },
-    });
+  if (doAdvancedPerItem) {
+    const baseTitle = readEventTitleOrFallback(event);
+    for (const item of advLineItems) {
+      const nodeId = item.nodeId!.trim();
+      const lineAmount = readItemLineTotal(item);
+      const rowSynthetic: ServiceExpenseSource = {
+        ...event,
+        nodeId,
+        items: [{ partName: item.partName, sku: item.sku }],
+        totalCost: lineAmount,
+      };
+      const rowTitle = item.partName?.trim()
+        ? `${baseTitle} · ${item.partName.trim()}`
+        : item.node?.name?.trim()
+          ? `${baseTitle} · ${item.node.name.trim()}`
+          : baseTitle;
+      const partSku = item.sku?.trim() || null;
+      const partName = item.partName?.trim() || null;
+      const qtyRaw = item.quantity;
+      const quantity =
+        typeof qtyRaw === "number" && Number.isInteger(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
+      const rowComment = [event.comment?.trim(), item.comment?.trim()].filter(Boolean).join("\n") || null;
+      const category = classifyServiceExpense(rowSynthetic);
+      const installStatus = getServiceExpenseInstallStatus(rowSynthetic);
+      await db.expenseItem.create({
+        data: {
+          vehicleId: event.vehicleId,
+          nodeId,
+          serviceEventId: event.id,
+          shoppingListItemId: null,
+          category,
+          installStatus,
+          purchaseStatus: "PURCHASED",
+          installationStatus: installStatus === "BOUGHT_NOT_INSTALLED" ? "NOT_INSTALLED" : "INSTALLED",
+          expenseDate: event.eventDate,
+          title: rowTitle,
+          amount: lineAmount,
+          currency,
+          quantity,
+          comment: rowComment,
+          partSku,
+          partName,
+          purchasedAt: event.eventDate,
+          installedAt: installStatus === "BOUGHT_NOT_INSTALLED" ? null : event.eventDate,
+          createdAt: event.createdAt,
+        },
+      });
+    }
+    return;
   }
 
   const category = classifyServiceExpense(event);
   const installStatus = getServiceExpenseInstallStatus(event);
+  if (totalCost == null || totalCost <= 0) {
+    return;
+  }
   await db.expenseItem.create({
     data: {
       vehicleId: event.vehicleId,
       nodeId: event.nodeId,
       serviceEventId: event.id,
-      shoppingListItemId,
+      shoppingListItemId: shoppingListItemIdForCreate,
       category,
       installStatus,
       purchaseStatus: "PURCHASED",
@@ -254,7 +326,7 @@ export async function syncExpenseItemForServiceEvent(
       expenseDate: event.eventDate,
       title,
       amount: totalCost,
-      currency: normalizeCurrency(event.currency as string),
+      currency,
       quantity: 1,
       comment: event.comment?.trim() || null,
       partSku: headerPartSku,

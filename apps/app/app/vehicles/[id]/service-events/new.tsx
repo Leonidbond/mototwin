@@ -15,6 +15,7 @@ import {
   getTodayDateYmdLocal,
   normalizeAddServiceEventPayload,
   normalizeEditServiceEventPayload,
+  parseExpenseAmountInputToNumberOrNull,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { AddServiceEventFormValues, NodeTreeItem, PartWishlistItem } from "@mototwin/types";
@@ -144,9 +145,9 @@ export default function NewServiceEventScreen() {
           v
         ) {
           const parsedWlCost =
-            wlCostStr !== "" ? Number.parseFloat(wlCostStr.replace(",", ".")) : Number.NaN;
+            wlCostStr !== "" ? parseExpenseAmountInputToNumberOrNull(wlCostStr) : null;
           const wishlistCostAmount =
-            wlCostStr !== "" && Number.isFinite(parsedWlCost) && parsedWlCost >= 0 ? parsedWlCost : null;
+            wlCostStr !== "" && parsedWlCost != null ? parsedWlCost : null;
           const wishlistCurrency = wishlistCostAmount != null ? wlCurrency || "RUB" : null;
           const synthetic: PartWishlistItem = {
             id: wlId,

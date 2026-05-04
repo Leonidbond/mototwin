@@ -10,6 +10,7 @@
 
 ## Текущий статус (кратко)
 
+- **Форма сервисного события (bundle, web + Expo, 2026-05):** одна и та же **семантика** bundle-формы `AddServiceEventFormValues` на web и в мобильном экране создания/редактирования: на Next.js — компонент **`src/app/vehicles/[id]/_components/BasicServiceEventModal.tsx`** (журнал `service-log/page.tsx`, карточка ТС `vehicle-detail-client.tsx` и прочие точки входа); в Expo — **`apps/app/app/vehicles/[id]/_components/basic-service-event-bundle-form.tsx`**, экран-обёртка **`service-events/new.tsx`**. Включает блок **«Готово к установке»** (`GET …/installable`), **ADVANCED**-суммы (строки + верх, остаток при edit), превью **«Итого»**, парсинг сумм `ru-RU`. Детали — [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md), [shared-form-contracts.md](./shared-form-contracts.md).
 - **Актуальный аудит (2026-04-18, вторая сверка):** [web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md) — подтверждены фиксы (RUB, даты, спеки гаража, токены журнала на web, `__DEV__` для API-строки на Expo); **критичных функциональных разрывов не найдено**; остаются low-only: локальный `VehicleDetail` на web, валидатор профиля не в UI, хвост Tailwind vs токены, устаревшие упоминания `fetch` в части docs.
 - По основным сценариям (гараж, карточка ТС, дерево узлов, журнал, новое сервисное событие, семантика статусов) в целом **practical / full parity** по смыслу данных и API; **намеренные** платформенные отличия — в repeat-2 **§4**.
 - Политики **дат**, **спеков гаража**, **токенов**: [cross-platform-parity.md](./cross-platform-parity.md), [web-expo-visual-parity-fixes.md](./web-expo-visual-parity-fixes.md), [shared-design-tokens.md](./shared-design-tokens.md).
@@ -40,8 +41,8 @@
 | Карточка ТС | `src/app/vehicles/[id]/page.tsx` | `apps/app/app/vehicles/[id]/index.tsx` |
 | Состояние (пробег / моточасы) | тот же `page.tsx` (инлайн) | `apps/app/app/vehicles/[id]/state.tsx` |
 | Профиль | модалка в `page.tsx` | `apps/app/app/vehicles/[id]/profile.tsx` |
-| Журнал | модалка в `page.tsx` | `apps/app/app/vehicles/[id]/service-log.tsx` |
-| Новое сервисное событие | модалка в `page.tsx` | `apps/app/app/vehicles/[id]/service-events/new.tsx` |
+| Журнал | `src/app/vehicles/[id]/service-log/page.tsx` | `apps/app/app/vehicles/[id]/service-log.tsx` |
+| Форма сервисного события (bundle) | `src/app/vehicles/[id]/_components/BasicServiceEventModal.tsx` (журнал, карточка ТС `vehicle-detail-client.tsx`, …) | `apps/app/app/vehicles/[id]/_components/basic-service-event-bundle-form.tsx` + экран `service-events/new.tsx` |
 | API-клиент | `createMotoTwinEndpoints` + `baseUrl: ""` | тот же клиент + `getApiBaseUrl()` |
 | Shared | `packages/types`, `packages/domain`, `packages/api-client`, `packages/design-tokens` | то же |
 

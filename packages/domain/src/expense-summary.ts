@@ -422,6 +422,33 @@ export function formatExpenseAmountRu(amount: number): string {
   }).format(amount);
 }
 
+/** Разделители групп разрядов, которые даёт `Intl` для `ru-RU` и которые часто вставляют вручную. */
+const LOCALE_MONEY_GROUPING_SEPARATORS = /[\s\u00A0\u202F\u2009\u2007]/g;
+
+/**
+ * Убирает пробелы/NBSP между разрядами перед разбором числа (см. {@link formatExpenseAmountRu}).
+ */
+export function stripLocaleMoneyGroupingSeparators(input: string): string {
+  return input.replace(LOCALE_MONEY_GROUPING_SEPARATORS, "");
+}
+
+/**
+ * Разбор суммы из поля ввода: допускает формат `ru-RU` (`1 234,56`), запятую как десятичный разделитель.
+ * Используется при нормализации формы и там, где в поле попадает вывод {@link formatExpenseAmountRu}.
+ */
+export function parseExpenseAmountInputToNumberOrNull(input: string): number | null {
+  const stripped = stripLocaleMoneyGroupingSeparators(input.trim());
+  if (!stripped) {
+    return null;
+  }
+  const withDotDecimal = stripped.replace(",", ".");
+  const parsed = Number.parseFloat(withDotDecimal);
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return null;
+  }
+  return parsed;
+}
+
 export function getCurrentExpenseMonthKey(now: Date = new Date()): string {
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");

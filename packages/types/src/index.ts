@@ -50,6 +50,10 @@ export type {
   UpdateServiceEventInput,
 } from "./service-event";
 export type {
+  ServiceBundleTemplateItemWire,
+  ServiceBundleTemplateWire,
+} from "./service-bundle-template";
+export type {
   RideUsageType,
   RideStyle,
   RideLoadType,
@@ -157,6 +161,7 @@ export type {
   UpdateVehicleStateResponse,
   UpdateVehicleProfileResponse,
   BrandsResponse,
+  ServiceBundleTemplatesResponse,
   ModelsResponse,
   ModelVariantsResponse,
   CreateVehicleResponse,
@@ -173,6 +178,9 @@ export type {
   VehicleTrashListResponse,
   VehicleTrashMutationResponse,
   VehicleTrashDeleteResponse,
+  InstallableEntrySource,
+  InstallableForServiceEventEntry,
+  InstallableForServiceEventResponse,
 } from "./api";
 export type {
   PartSkuSearchFilters,

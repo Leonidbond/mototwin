@@ -45,7 +45,7 @@ Node tree **data preparation** is centralized in `@mototwin/types` and `@mototwi
 
 - **Web:** `src/app/vehicles/[id]/page.tsx` — `buildNodeTreeViewModel(nodeTree)` drives the node tree section; modal selection still uses raw `nodeTree` with **`findNodePathById`** for path by id.
 - **Expo:** `apps/app/app/vehicles/[id]/index.tsx` — same builder for **`NodeRow`**; API still loads **`NodeTreeItem[]`**.
-- **Expo:** `apps/app/app/vehicles/[id]/service-events/new.tsx` — **`getNodePathById`**, **`isLeafNode`**, **`getNodeShortExplanationLabel`** for path init and leaf validation copy.
+- **Expo:** экран **`service-events/new.tsx`** (загрузка дерева и предзаполнение) + **`basic-service-event-bundle-form.tsx`** — выбор конечных узлов по плоскому списку листьев (`flattenNodeTreeToSelectOptions`), валидация **`validateAddServiceEventFormValuesMobile`**; для пояснений статуса в **журнале** и на **дереве** по-прежнему смотри `getNodeShortExplanationLabel` и VM дерева, не только экран события.
 
 ## Boundaries
 

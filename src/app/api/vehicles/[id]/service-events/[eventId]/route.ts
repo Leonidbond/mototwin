@@ -190,12 +190,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         nodeId: updated.nodeId,
         eventKind: updated.eventKind,
         eventDate: updated.eventDate,
+        mode: updated.mode,
         title: updated.title,
         totalCost: updated.totalCost,
         currency: updated.currency,
         comment: updated.comment,
         installedPartsJson: updated.installedPartsJson,
-        items: updated.items?.map((item) => ({ partName: item.partName, sku: item.sku })),
+        items: updated.items?.map((item) => ({
+          nodeId: item.nodeId,
+          partName: item.partName,
+          sku: item.sku,
+          quantity: item.quantity,
+          partCost: item.partCost,
+          laborCost: item.laborCost,
+          comment: item.comment,
+          node: item.node ? { name: item.node.name } : undefined,
+        })),
         createdAt: updated.createdAt,
       });
       await linkInstalledExpenseItemsToServiceEvent(tx, {

@@ -26,6 +26,7 @@ import {
   buildServiceLogTimelineProps,
   filterPaidServiceEvents,
   getServiceLogEventKindBadgeLabel,
+  getWishlistItemIdsFromInstalledPartsJson,
   isServiceLogTimelineQueryActive,
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
 } from "@mototwin/domain";
@@ -84,25 +85,6 @@ function parsePaidOnlyFromParams(
   return v === "1" || v === "true";
 }
 
-function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
-  let parsed = payload;
-  if (typeof payload === "string") {
-    try {
-      parsed = JSON.parse(payload) as unknown;
-    } catch {
-      return null;
-    }
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return null;
-  }
-  const record = parsed as { source?: unknown; wishlistItemId?: unknown };
-  if (record.source !== "wishlist" || typeof record.wishlistItemId !== "string") {
-    return null;
-  }
-  return record.wishlistItemId.trim() || null;
-}
-
 export function buildVehicleServiceLogHref(
   vehicleId: string,
   nodeFilter: ServiceLogNodeFilter | null,
@@ -151,7 +133,7 @@ export function buildVehicleServiceLogHref(
 function ServiceCard({
   entry,
   isHighlighted,
-  originWishlistItemId,
+  originWishlistItemIds,
   isCommentExpanded,
   onToggleComment,
   onOpenWishlistOrigin,
@@ -161,7 +143,7 @@ function ServiceCard({
 }: {
   entry: ServiceLogEntryViewModel;
   isHighlighted: boolean;
-  originWishlistItemId: string | null;
+  originWishlistItemIds: string[];
   isCommentExpanded: boolean;
   onToggleComment: () => void;
   onOpenWishlistOrigin: (wishlistItemId: string) => void;
@@ -204,12 +186,29 @@ function ServiceCard({
         </View>
       </View>
       {entry.wishlistOriginLabelRu ? (
-        originWishlistItemId ? (
-          <Pressable onPress={() => onOpenWishlistOrigin(originWishlistItemId)} hitSlop={8}>
-            <Text style={[styles.wishlistOriginLabel, styles.wishlistOriginLink]}>
-              {entry.wishlistOriginLabelRu}
-            </Text>
-          </Pressable>
+        originWishlistItemIds.length > 0 ? (
+          <View style={styles.wishlistOriginRow}>
+            {originWishlistItemIds.length === 1 ? (
+              <Pressable onPress={() => onOpenWishlistOrigin(originWishlistItemIds[0])} hitSlop={8}>
+                <Text style={[styles.wishlistOriginLabel, styles.wishlistOriginLink]}>
+                  {entry.wishlistOriginLabelRu}
+                </Text>
+              </Pressable>
+            ) : (
+              <>
+                <Text style={styles.wishlistOriginLabel}>{`${entry.wishlistOriginLabelRu}:`}</Text>
+                <View style={styles.wishlistOriginLinksRow}>
+                  {originWishlistItemIds.map((wlId, idx) => (
+                    <Pressable key={wlId} onPress={() => onOpenWishlistOrigin(wlId)} hitSlop={6}>
+                      <Text style={[styles.wishlistOriginLabel, styles.wishlistOriginLink]}>
+                        {idx + 1}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
         ) : (
           <Text style={styles.wishlistOriginLabel}>{entry.wishlistOriginLabelRu}</Text>
         )
@@ -244,6 +243,9 @@ function ServiceCard({
               {it.partName ? <Text> · {it.partName}</Text> : null}
               {it.sku ? <Text style={styles.bundleItemMuted}>{` · SKU ${it.sku}`}</Text> : null}
               {it.quantity != null ? <Text>{` · ×${it.quantity}`}</Text> : null}
+              {it.lineCostRu ? (
+                <Text style={styles.bundleItemMuted}>{` · ${it.lineCostRu}`}</Text>
+              ) : null}
             </Text>
           ))}
         </View>
@@ -355,7 +357,7 @@ function StateUpdateCard({
 function MonthGroup({
   group,
   highlightedServiceEventId,
-  wishlistItemIdByServiceEventId,
+  wishlistItemIdsByServiceEventId,
   expandedComments,
   onEventLayout,
   onToggleComment,
@@ -366,7 +368,7 @@ function MonthGroup({
 }: {
   group: ServiceLogMonthGroupViewModel;
   highlightedServiceEventId: string;
-  wishlistItemIdByServiceEventId: Map<string, string>;
+  wishlistItemIdsByServiceEventId: Map<string, string[]>;
   expandedComments: Record<string, boolean>;
   onEventLayout: (entryId: string, y: number) => void;
   onToggleComment: (entryId: string) => void;
@@ -421,7 +423,7 @@ function MonthGroup({
         {group.entries.map((entry) => {
           const isStateUpdate = entry.eventKind === "STATE_UPDATE";
           const isHighlighted = entry.id === highlightedServiceEventId;
-          const originWishlistItemId = wishlistItemIdByServiceEventId.get(entry.id) ?? null;
+          const originWishlistItemIds = wishlistItemIdsByServiceEventId.get(entry.id) ?? [];
           return (
             <View
               key={entry.id}
@@ -451,7 +453,7 @@ function MonthGroup({
                   <ServiceCard
                     entry={entry}
                     isHighlighted={isHighlighted}
-                    originWishlistItemId={originWishlistItemId}
+                    originWishlistItemIds={originWishlistItemIds}
                     isCommentExpanded={Boolean(expandedComments[entry.id])}
                     onToggleComment={() => onToggleComment(entry.id)}
                     onOpenWishlistOrigin={onOpenWishlistOrigin}
@@ -622,12 +624,12 @@ export default function ServiceLogScreen() {
       ).monthGroups,
     [events, effectiveFilters, sortField, sortDirection, nodeSubtreeFilter]
   );
-  const wishlistItemIdByServiceEventId = useMemo(() => {
-    const byServiceEventId = new Map<string, string>();
+  const wishlistItemIdsByServiceEventId = useMemo(() => {
+    const byServiceEventId = new Map<string, string[]>();
     for (const event of events) {
-      const wishlistItemId = getWishlistItemIdFromInstalledPartsJson(event.installedPartsJson);
-      if (wishlistItemId) {
-        byServiceEventId.set(event.id, wishlistItemId);
+      const ids = getWishlistItemIdsFromInstalledPartsJson(event.installedPartsJson);
+      if (ids.length > 0) {
+        byServiceEventId.set(event.id, ids);
       }
     }
     return byServiceEventId;
@@ -1050,7 +1052,7 @@ export default function ServiceLogScreen() {
             key={group.monthKey}
             group={group}
             highlightedServiceEventId={highlightedServiceEventId}
-            wishlistItemIdByServiceEventId={wishlistItemIdByServiceEventId}
+            wishlistItemIdsByServiceEventId={wishlistItemIdsByServiceEventId}
             expandedComments={expandedComments}
             onEventLayout={(entryId, y) => {
               eventYByIdRef.current[entryId] = y;
@@ -1656,6 +1658,19 @@ const styles = StyleSheet.create({
   wishlistOriginLink: {
     textDecorationLine: "underline",
     color: c.textSecondary,
+  },
+  wishlistOriginRow: {
+    marginTop: 2,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+  },
+  wishlistOriginLinksRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
   },
   partDetails: {
     marginTop: 6,

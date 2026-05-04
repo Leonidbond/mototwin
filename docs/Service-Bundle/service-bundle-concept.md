@@ -249,6 +249,18 @@ ServiceBundleTemplateItem
 
 ---
 
+# Статус реализации (2026-05)
+
+| Волна | Сделано в коде |
+|-------|------------------|
+| 3.1 Шаблоны | `ServiceBundleTemplate` + seed, `GET /api/service-bundle-templates`, merge в форму (web `BasicServiceEventModal`, Expo `basic-service-event-bundle-form`). |
+| 3.2 Multi wishlist | Выбор нескольких активных позиций в форме создания события; `installedPartsJson` — массив записей `{ source: \"wishlist\", wishlistItemId, ... }` с обратной совместимостью с одним объектом; `syncExpenseItemForServiceEvent` и журнал учитывают все id; ссылки «Из списка покупок» в журнале — несколько номеров при multi. |
+| 3.3 Downstream | `src/lib/vehicle-node-tree-internal.ts`: «последний сервис» по листу считается по **всем** `ServiceEventItem.nodeId` в bundle, не только по anchor `ServiceEvent.nodeId`; выборка событий — `OR` по anchor или по `items`. |
+
+Документы ниже и `docs/parts-wishlist-mvp.md` / `docs/web-expo-service-log-parity-fixes.md` синхронизированы с этим статусом.
+
+---
+
 # MVP-граница
 
 В первую реализацию я бы включил:

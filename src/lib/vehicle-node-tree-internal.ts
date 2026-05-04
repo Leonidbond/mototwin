@@ -352,6 +352,54 @@ function mapNodeStates(rows: { nodeId: string; status: string; note: string | nu
   );
 }
 
+type ServiceEventRowForLeafLatest = {
+  nodeId: string;
+  eventDate: Date;
+  odometer: number;
+  engineHours: number | null;
+  items: { nodeId: string }[];
+};
+
+/**
+ * One row per (event × leaf node) so maintenance can show last service on **every** bundle item node,
+ * not only the anchor `ServiceEvent.nodeId`.
+ */
+function expandBundleServiceEventsToLeafNodeRows(
+  events: ServiceEventRowForLeafLatest[],
+  leafNodeIds: ReadonlySet<string>
+): { nodeId: string; eventDate: Date; odometer: number; engineHours: number | null }[] {
+  const rows: { nodeId: string; eventDate: Date; odometer: number; engineHours: number | null }[] = [];
+  for (const ev of events) {
+    const itemNodeIds = (ev.items ?? []).map((i) => i.nodeId).filter((id) => leafNodeIds.has(id));
+    const unique = [...new Set(itemNodeIds)];
+    if (unique.length > 0) {
+      for (const nodeId of unique) {
+        rows.push({
+          nodeId,
+          eventDate: ev.eventDate,
+          odometer: ev.odometer,
+          engineHours: ev.engineHours,
+        });
+      }
+    } else if (leafNodeIds.has(ev.nodeId)) {
+      rows.push({
+        nodeId: ev.nodeId,
+        eventDate: ev.eventDate,
+        odometer: ev.odometer,
+        engineHours: ev.engineHours,
+      });
+    }
+  }
+  rows.sort((a, b) => {
+    const byNode = a.nodeId.localeCompare(b.nodeId);
+    if (byNode !== 0) {
+      return byNode;
+    }
+    return b.eventDate.getTime() - a.eventDate.getTime();
+  });
+  return rows;
+}
+
 function latestEventsByNodeFromRows(
   rows: {
     nodeId: string;
@@ -401,20 +449,26 @@ export async function loadVehicleNodeTreeJson(
     prisma.serviceEvent.findMany({
       where: {
         vehicleId,
-        nodeId: { in: [...ctx.leafNodeIds] },
+        OR: [
+          { nodeId: { in: [...ctx.leafNodeIds] } },
+          { items: { some: { nodeId: { in: [...ctx.leafNodeIds] } } } },
+        ],
       },
-      orderBy: [{ nodeId: "asc" }, { eventDate: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
       select: {
         nodeId: true,
         eventDate: true,
         odometer: true,
         engineHours: true,
+        items: { select: { nodeId: true } },
       },
     }),
   ]);
 
   const nodeStateByNodeId = mapNodeStates(nodeStates);
-  const latestServiceEventByNodeId = latestEventsByNodeFromRows(serviceEvents);
+  const latestServiceEventByNodeId = latestEventsByNodeFromRows(
+    expandBundleServiceEventsToLeafNodeRows(serviceEvents, ctx.leafNodeIds)
+  );
   const skeleton = buildSkeletonRoots(ctx);
   const now = new Date();
   const nodeTree = buildMaintainedTreeForVehicle(
@@ -455,20 +509,19 @@ export async function computeGarageAttentionByVehicleId(
     prisma.serviceEvent.findMany({
       where: {
         vehicleId: { in: vehicleIds },
-        nodeId: { in: [...ctx.leafNodeIds] },
+        OR: [
+          { nodeId: { in: [...ctx.leafNodeIds] } },
+          { items: { some: { nodeId: { in: [...ctx.leafNodeIds] } } } },
+        ],
       },
-      orderBy: [
-        { vehicleId: "asc" },
-        { nodeId: "asc" },
-        { eventDate: "desc" },
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ vehicleId: "asc" }, { eventDate: "desc" }, { createdAt: "desc" }],
       select: {
         vehicleId: true,
         nodeId: true,
         eventDate: true,
         odometer: true,
         engineHours: true,
+        items: { select: { nodeId: true } },
       },
     }),
   ]);
@@ -501,7 +554,9 @@ export async function computeGarageAttentionByVehicleId(
       }))
     );
     const eventRows = eventsByVehicle.get(vehicle.id) ?? [];
-    const latestServiceEventByNodeId = latestEventsByNodeFromRows(eventRows);
+    const latestServiceEventByNodeId = latestEventsByNodeFromRows(
+      expandBundleServiceEventsToLeafNodeRows(eventRows, ctx.leafNodeIds)
+    );
 
     const nodeTree = buildMaintainedTreeForVehicle(
       skeleton,

@@ -21,12 +21,19 @@ export async function linkInstalledExpenseItemsToServiceEvent(
       id: { in: ids },
       vehicleId: args.vehicleId,
       purchaseStatus: "PURCHASED",
-      installationStatus: "NOT_INSTALLED",
-      serviceEventId: null,
+      OR: [
+        {
+          AND: [{ serviceEventId: null }, { installationStatus: "NOT_INSTALLED" }],
+        },
+        /** Уже привязаны к этому событию (например, syncExpenseItemForServiceEvent в той же транзакции). */
+        { serviceEventId: args.serviceEventId },
+      ],
     },
     select: {
       id: true,
       shoppingListItemId: true,
+      serviceEventId: true,
+      installationStatus: true,
     },
   });
 
@@ -35,6 +42,12 @@ export async function linkInstalledExpenseItemsToServiceEvent(
   }
 
   for (const expense of expenses) {
+    if (
+      expense.serviceEventId === args.serviceEventId &&
+      expense.installationStatus === "INSTALLED"
+    ) {
+      continue;
+    }
     await tx.expenseItem.update({
       where: { id: expense.id },
       data: {

@@ -12,15 +12,20 @@ import type {
   PartWishlistItem,
   ServiceActionType,
   ServiceBundleItem,
+  ServiceBundleTemplateWire,
   ServiceEventItem,
   ServiceEventMode,
   UpdateVehicleStateFormValues,
   UpdateVehicleStatePayload,
   VehicleProfileFormValues,
 } from "@mototwin/types";
-import { formatExpenseAmountRu } from "./expense-summary";
+import {
+  formatExpenseAmountRu,
+  parseExpenseAmountInputToNumberOrNull,
+} from "./expense-summary";
 import { buildPartSkuLabel } from "./part-catalog";
 import {
+  filterActiveWishlistItems,
   WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU,
   WISHLIST_INSTALL_SERVICE_TYPE_RU,
 } from "./part-wishlist";
@@ -117,6 +122,54 @@ export function createEmptyBundleItemFormValues(
     partCost: overrides?.partCost ?? "",
     laborCost: overrides?.laborCost ?? "",
     comment: overrides?.comment ?? "",
+  };
+}
+
+export type MergeServiceBundleTemplateResult = {
+  form: AddServiceEventFormValues;
+  /** Строки шаблона, узел которых не является листом в текущем дереве (или не найден). */
+  skippedItems: Array<{ nodeId: string; label: string }>;
+};
+
+/**
+ * Подставляет в форму создания события строки из шаблона (режим BASIC, один общий action).
+ * Узлы не из `leafNodeIds` пропускаются — см. `skippedItems`.
+ */
+export function mergeServiceBundleTemplateIntoAddFormValues(
+  current: AddServiceEventFormValues,
+  template: Pick<ServiceBundleTemplateWire, "title" | "items">,
+  leafNodeIds: Set<string>
+): MergeServiceBundleTemplateResult {
+  const ordered = [...template.items].sort((a, b) => a.sortOrder - b.sortOrder);
+  const applicable = ordered.filter((row) => leafNodeIds.has(row.nodeId.trim()));
+  const skippedItems = ordered
+    .filter((row) => !leafNodeIds.has(row.nodeId.trim()))
+    .map((row) => ({
+      nodeId: row.nodeId,
+      label: (row.node?.name ?? row.node?.code ?? row.nodeId).trim(),
+    }));
+
+  if (applicable.length === 0) {
+    return { form: current, skippedItems };
+  }
+
+  const commonActionType = applicable[0]?.defaultActionType ?? "SERVICE";
+  const items = applicable.map((row) =>
+    createEmptyBundleItemFormValues({
+      nodeId: row.nodeId.trim(),
+      actionType: commonActionType,
+    })
+  );
+
+  return {
+    form: {
+      ...current,
+      title: template.title.trim() || current.title,
+      mode: "BASIC",
+      commonActionType,
+      items: items.map((it) => ({ ...it, actionType: commonActionType })),
+    },
+    skippedItems,
   };
 }
 
@@ -311,8 +364,31 @@ export function buildAddServiceEventCommentFromWishlistItem(item: PartWishlistIt
   return lines.join("\n");
 }
 
-export function buildWishlistInstalledPartsJsonString(item: PartWishlistItem): string {
-  return JSON.stringify({
+function stripWishlistInstallCommentFromFormComment(
+  comment: string,
+  item: PartWishlistItem
+): string {
+  const block = buildAddServiceEventCommentFromWishlistItem(item).trim();
+  if (!comment.trim() || !block) {
+    return comment;
+  }
+  const parts = comment.split(/\n\n+/);
+  const filtered = parts.filter((p) => p.trim() !== block);
+  if (filtered.length === parts.length) {
+    return comment;
+  }
+  return filtered.join("\n\n").trim();
+}
+
+function wishlistInstalledPartsRecordFromItem(item: PartWishlistItem): {
+  source: "wishlist";
+  wishlistItemId: string;
+  title: string;
+  quantity: number;
+  skuId: string | null;
+  skuLabel: string | null;
+} {
+  return {
     source: "wishlist",
     wishlistItemId: item.id,
     title: item.title,
@@ -324,7 +400,407 @@ export function buildWishlistInstalledPartsJsonString(item: PartWishlistItem): s
           canonicalName: item.sku.canonicalName,
         })
       : null,
+  };
+}
+
+export function buildWishlistInstalledPartsJsonString(item: PartWishlistItem): string {
+  return JSON.stringify(wishlistInstalledPartsRecordFromItem(item));
+}
+
+/** JSON for several wishlist lines (array); one item stays the legacy single-object shape. */
+export function buildWishlistInstalledPartsJsonFromItems(items: PartWishlistItem[]): string {
+  if (items.length === 0) {
+    return "";
+  }
+  if (items.length === 1) {
+    return buildWishlistInstalledPartsJsonString(items[0]);
+  }
+  return JSON.stringify(items.map((it) => wishlistInstalledPartsRecordFromItem(it)));
+}
+
+type WishlistInstalledPartsFormRecord = ReturnType<typeof wishlistInstalledPartsRecordFromItem>;
+
+function parseWishlistInstalledPartsRecordsFromFormString(raw: string): WishlistInstalledPartsFormRecord[] {
+  const t = raw?.trim() ?? "";
+  if (!t) {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(t);
+  } catch {
+    return [];
+  }
+  if (Array.isArray(parsed)) {
+    const out: WishlistInstalledPartsFormRecord[] = [];
+    for (const el of parsed) {
+      if (el && typeof el === "object" && !Array.isArray(el)) {
+        const o = el as Record<string, unknown>;
+        if (o.source === "wishlist" && typeof o.wishlistItemId === "string" && o.wishlistItemId.trim()) {
+          out.push({
+            source: "wishlist",
+            wishlistItemId: o.wishlistItemId.trim(),
+            title: typeof o.title === "string" ? o.title : "",
+            quantity: typeof o.quantity === "number" && Number.isFinite(o.quantity) ? o.quantity : 1,
+            skuId: typeof o.skuId === "string" ? o.skuId : null,
+            skuLabel: typeof o.skuLabel === "string" ? o.skuLabel : null,
+          });
+        }
+      }
+    }
+    return out;
+  }
+  if (parsed && typeof parsed === "object") {
+    const o = parsed as Record<string, unknown>;
+    if (o.source === "wishlist" && typeof o.wishlistItemId === "string" && o.wishlistItemId.trim()) {
+      return [
+        {
+          source: "wishlist",
+          wishlistItemId: o.wishlistItemId.trim(),
+          title: typeof o.title === "string" ? o.title : "",
+          quantity: typeof o.quantity === "number" && Number.isFinite(o.quantity) ? o.quantity : 1,
+          skuId: typeof o.skuId === "string" ? o.skuId : null,
+          skuLabel: typeof o.skuLabel === "string" ? o.skuLabel : null,
+        },
+      ];
+    }
+  }
+  return [];
+}
+
+function serializeWishlistInstalledPartsRecords(
+  records: ReadonlyArray<WishlistInstalledPartsFormRecord>
+): string {
+  if (records.length === 0) {
+    return "";
+  }
+  if (records.length === 1) {
+    return JSON.stringify(records[0]);
+  }
+  return JSON.stringify(records);
+}
+
+function isPlaceholderBundleRow(row: BundleItemFormValues): boolean {
+  return !row.nodeId.trim() && !row.partName.trim() && !row.sku.trim();
+}
+
+/** Удаляет одну строку `items[]` по `nodeId` (для отката пикера «Готово к установке»). */
+export function removeBundleRowByNodeId(
+  form: AddServiceEventFormValues,
+  nodeIdRaw: string | null | undefined
+): AddServiceEventFormValues {
+  const nid = nodeIdRaw?.trim() ?? "";
+  if (!nid) {
+    return form;
+  }
+  const idx = form.items.findIndex((it) => it.nodeId.trim() === nid);
+  if (idx < 0) {
+    return form;
+  }
+  if (form.items.length > 1) {
+    return { ...form, items: form.items.filter((_, i) => i !== idx) };
+  }
+  return {
+    ...form,
+    items: [
+      createEmptyBundleItemFormValues({
+        actionType: form.mode === "BASIC" ? form.commonActionType : "SERVICE",
+      }),
+    ],
+  };
+}
+
+const EXPENSE_INSTALL_COMMENT_PREFIX_RU = "Установлена ранее купленная деталь:";
+
+/**
+ * Откат строки bundle + строки комментария + верхнего `partsCost` (BASIC), которые
+ * добавили при выборе чистого `ExpenseItem` в пикере «Готово к установке».
+ */
+export function revertExpenseInstallFormPatch(
+  form: AddServiceEventFormValues,
+  patch: {
+    bundleNodeId: string | null | undefined;
+    expenseTitleForComment: string;
+    amount: number | null;
+    currency: string | null;
+  }
+): AddServiceEventFormValues {
+  const title = patch.expenseTitleForComment.trim();
+  const lineToRemove = `${EXPENSE_INSTALL_COMMENT_PREFIX_RU} ${title}`;
+  let comment = form.comment;
+  if (comment.trim()) {
+    const lines = comment.split("\n");
+    const filtered = lines.filter((l) => l.trim() !== lineToRemove.trim());
+    comment = filtered.join("\n").trim();
+  }
+  let next: AddServiceEventFormValues = { ...form, comment };
+  next = removeBundleRowByNodeId(next, patch.bundleNodeId);
+  if (
+    next.mode === "BASIC" &&
+    patch.amount != null &&
+    patch.amount > 0 &&
+    patch.currency?.trim()
+  ) {
+    const formCur = next.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+    if (patch.currency.trim().toUpperCase() === formCur) {
+      const base = parseDecimalOrNull(next.partsCost) ?? 0;
+      const nv = Math.max(0, base - patch.amount);
+      next = { ...next, partsCost: nv > 0 ? formatExpenseAmountRu(nv) : "" };
+    }
+  }
+  return next;
+}
+
+/**
+ * После выбора чистого расхода в «Готово к установке»: в ADVANCED — цена в строке,
+ * в BASIC — сумма в общем `partsCost`, количество в строке при наличии.
+ */
+export function applyExpenseInstallToAddFormRow(
+  form: AddServiceEventFormValues,
+  rowIndex: number,
+  patch: {
+    amount: number | null | undefined;
+    currency: string | null | undefined;
+    quantity: number | null | undefined;
+  }
+): AddServiceEventFormValues {
+  const items = [...form.items];
+  if (!items[rowIndex]) {
+    return form;
+  }
+  const formCur =
+    form.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+  const cur = patch.currency?.trim().toUpperCase();
+  const q =
+    patch.quantity != null &&
+    Number.isFinite(patch.quantity) &&
+    Number.isInteger(patch.quantity) &&
+    patch.quantity >= 1
+      ? String(patch.quantity)
+      : items[rowIndex].quantity;
+  const hasAmount =
+    patch.amount != null && Number.isFinite(patch.amount) && (patch.amount as number) > 0;
+  const currencyOk = Boolean(cur && cur === formCur);
+  if (!hasAmount || !currencyOk) {
+    items[rowIndex] = { ...items[rowIndex], quantity: q };
+    return { ...form, items };
+  }
+  const amt = patch.amount as number;
+  if (form.mode === "ADVANCED") {
+    items[rowIndex] = {
+      ...items[rowIndex],
+      quantity: q,
+      partCost: formatExpenseAmountRu(amt),
+    };
+    return { ...form, items };
+  }
+  const base = parseDecimalOrNull(form.partsCost) ?? 0;
+  items[rowIndex] = { ...items[rowIndex], quantity: q };
+  return {
+    ...form,
+    partsCost: formatExpenseAmountRu(base + amt),
+    items,
+  };
+}
+
+export type MergeWishlistItemIntoAddFormValuesOptions = {
+  /**
+   * Если `true`, не добавляем сумму wishlist в `partsCost` (например, когда у
+   * этой wishlist-позиции уже есть привязанный `ExpenseItem` — иначе цена
+   * учитывается дважды).
+   */
+  skipPartsCostBump: boolean;
+};
+
+/**
+ * Добавляет одну активную wishlist-позицию в форму нового события (новая строка bundle,
+ * комментарий, запись в `installedPartsJson`). Если узел не лист, дубликат уже
+ * есть в форме или wishlist-позиция уже отмечена — возвращает форму без
+ * изменений. `skipPartsCostBump=true` пропускает увеличение `partsCost`
+ * (используется для пары `wishlist+expense`, где сумма уже учтена расходом).
+ */
+export function mergeWishlistItemIntoAddFormValues(
+  form: AddServiceEventFormValues,
+  wishlistItem: PartWishlistItem,
+  leafNodeIds: Set<string>,
+  opts: MergeWishlistItemIntoAddFormValuesOptions
+): AddServiceEventFormValues {
+  const [active] = filterActiveWishlistItems([wishlistItem]);
+  if (!active) {
+    return form;
+  }
+  const nid = active.nodeId?.trim() ?? "";
+  if (!nid || !leafNodeIds.has(nid)) {
+    return form;
+  }
+  const usedNodeIds = new Set(form.items.map((i) => i.nodeId.trim()).filter(Boolean));
+  const existingRecords = parseWishlistInstalledPartsRecordsFromFormString(form.installedPartsJson);
+  const usedWishlistIds = new Set(existingRecords.map((r) => r.wishlistItemId));
+  if (usedNodeIds.has(nid) || usedWishlistIds.has(active.id)) {
+    return form;
+  }
+
+  const skuPartNumber = active.sku?.primaryPartNumber?.trim() ?? "";
+  let row = createEmptyBundleItemFormValues({
+    nodeId: nid,
+    actionType: "REPLACE",
+    partName: active.title.trim(),
+    sku: skuPartNumber,
   });
+  const formCurrency = form.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+  const itemCur = (active.currency?.trim() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY).toUpperCase();
+  const hasCost =
+    active.costAmount != null && Number.isFinite(active.costAmount) && active.costAmount > 0;
+  const wishlistQtyStr =
+    active.quantity != null &&
+    Number.isFinite(active.quantity) &&
+    Number.isInteger(active.quantity) &&
+    active.quantity >= 1
+      ? String(active.quantity)
+      : "";
+  if (form.mode === "ADVANCED") {
+    if (hasCost && itemCur === formCurrency) {
+      row = {
+        ...row,
+        partCost: formatExpenseAmountRu(active.costAmount as number),
+        ...(wishlistQtyStr ? { quantity: wishlistQtyStr } : {}),
+      };
+    } else if (wishlistQtyStr) {
+      row = { ...row, quantity: wishlistQtyStr };
+    }
+  } else if (form.mode === "BASIC" && wishlistQtyStr) {
+    row = { ...row, quantity: wishlistQtyStr };
+  }
+
+  const items =
+    form.items.length === 1 && isPlaceholderBundleRow(form.items[0])
+      ? [row]
+      : [...form.items, row];
+
+  const mergedRecords = [...existingRecords, wishlistInstalledPartsRecordFromItem(active)];
+  const installedPartsJson = serializeWishlistInstalledPartsRecords(mergedRecords);
+
+  const shouldBumpPartsCost =
+    form.mode === "BASIC" &&
+    !opts.skipPartsCostBump &&
+    hasCost &&
+    itemCur === formCurrency;
+  const baseParts = parseDecimalOrNull(form.partsCost) ?? 0;
+  const nextPartsCost = shouldBumpPartsCost
+    ? formatExpenseAmountRu(baseParts + (active.costAmount as number))
+    : form.partsCost;
+
+  const appendedComment = buildAddServiceEventCommentFromWishlistItem(active);
+  const nextComment =
+    form.comment.trim() === "" ? appendedComment : `${form.comment.trim()}\n\n${appendedComment}`;
+
+  return {
+    ...form,
+    title: form.title.trim() === "" ? WISHLIST_INSTALL_SERVICE_TYPE_RU : form.title,
+    commonActionType: form.mode === "BASIC" ? "REPLACE" : form.commonActionType,
+    comment: nextComment,
+    installedPartsJson,
+    partsCost: nextPartsCost,
+    items,
+  };
+}
+
+export type RemoveWishlistItemFromAddFormValuesOptions = {
+  /** Удалить строку bundle по узлу (пикер «Готово к установке»). */
+  removeBundleRowForNodeId?: string | null;
+  /** Откатить bump `partsCost` в BASIC после merge с ценой из wishlist. */
+  revertBumpedPartsCost?: { amount: number; currency: string } | null;
+  /** Убрать автодобавленный блок комментария из merge wishlist. */
+  stripWishlistCommentForItem?: PartWishlistItem | null;
+};
+
+/**
+ * Убирает wishlist-позицию из `installedPartsJson` и опционально строку bundle,
+ * комментарий и верхний `partsCost` (см. {@link RemoveWishlistItemFromAddFormValuesOptions}).
+ */
+export function removeWishlistItemFromAddFormValues(
+  form: AddServiceEventFormValues,
+  wishlistItemId: string,
+  opts?: RemoveWishlistItemFromAddFormValuesOptions
+): AddServiceEventFormValues {
+  const id = wishlistItemId.trim();
+  const nid = opts?.removeBundleRowForNodeId?.trim() ?? "";
+  const hasExtra =
+    Boolean(nid) ||
+    Boolean(opts?.revertBumpedPartsCost) ||
+    Boolean(opts?.stripWishlistCommentForItem);
+  if (!id && !hasExtra) {
+    return form;
+  }
+
+  let next = form;
+
+  if (opts?.stripWishlistCommentForItem) {
+    const nc = stripWishlistInstallCommentFromFormComment(
+      next.comment,
+      opts.stripWishlistCommentForItem
+    );
+    if (nc !== next.comment) {
+      next = { ...next, comment: nc };
+    }
+  }
+
+  if (id) {
+    const existing = parseWishlistInstalledPartsRecordsFromFormString(next.installedPartsJson);
+    const filtered = existing.filter((r) => r.wishlistItemId !== id);
+    if (filtered.length !== existing.length) {
+      next = {
+        ...next,
+        installedPartsJson: serializeWishlistInstalledPartsRecords(filtered),
+      };
+    }
+  }
+
+  if (nid) {
+    const after = removeBundleRowByNodeId(next, nid);
+    if (after !== next) {
+      next = after;
+    }
+  }
+
+  if (opts?.revertBumpedPartsCost && next.mode === "BASIC") {
+    const { amount, currency } = opts.revertBumpedPartsCost;
+    if (amount > 0 && currency.trim()) {
+      const formCur =
+        next.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+      if (currency.trim().toUpperCase() === formCur) {
+        const base = parseDecimalOrNull(next.partsCost) ?? 0;
+        const nv = Math.max(0, base - amount);
+        next = { ...next, partsCost: nv > 0 ? formatExpenseAmountRu(nv) : "" };
+      }
+    }
+  }
+
+  if (next === form) {
+    return form;
+  }
+  return next;
+}
+
+/**
+ * Appends bundle rows + `installedPartsJson` for active wishlist lines (leaf node, no duplicate node in form).
+ * Skips lines without a leaf node or already present in JSON / bundle node set.
+ * Реализация: по очереди вызывает {@link mergeWishlistItemIntoAddFormValues} с
+ * `skipPartsCostBump: false` для каждой позиции (для пикера «Готово к установке»
+ * предпочтительнее вызывать {@link mergeWishlistItemIntoAddFormValues} напрямую).
+ */
+export function mergeActiveWishlistItemsIntoAddFormValues(
+  form: AddServiceEventFormValues,
+  selectedItems: PartWishlistItem[],
+  leafNodeIds: Set<string>
+): AddServiceEventFormValues {
+  let next = form;
+  for (const item of selectedItems) {
+    next = mergeWishlistItemIntoAddFormValues(next, item, leafNodeIds, {
+      skipPartsCostBump: false,
+    });
+  }
+  return next;
 }
 
 /** Prefills {@link AddServiceEventFormValues} after marking a wishlist line as INSTALLED (client opens Add Service Event). */
@@ -377,6 +853,16 @@ function toIsoDateInputValue(isoDateLike: string): string {
   return isoDateLike.trim().slice(0, 10);
 }
 
+function sumFiniteBundleItemField(
+  bundleItems: ReadonlyArray<ServiceBundleItem>,
+  key: "partCost" | "laborCost"
+): number {
+  return bundleItems.reduce((acc, it) => {
+    const v = it[key];
+    return typeof v === "number" && Number.isFinite(v) ? acc + v : acc;
+  }, 0);
+}
+
 export function createInitialEditServiceEventValues(
   event: ServiceEventItem,
   options?: CreateInitialEditServiceEventValuesOptions
@@ -395,23 +881,47 @@ export function createInitialEditServiceEventValues(
         ];
   // Общий action type для BASIC: первый item.
   const commonActionType = items[0]?.actionType ?? "SERVICE";
-  const partsCostNumeric = event.partsCost ?? null;
-  const laborCostNumeric = event.laborCost ?? null;
-  const totalCostNumeric = event.totalCost ?? event.costAmount ?? null;
-  const partsCostString =
-    partsCostNumeric != null && Number.isFinite(partsCostNumeric)
-      ? formatExpenseAmountRu(partsCostNumeric)
-      : laborCostNumeric == null && totalCostNumeric != null && Number.isFinite(totalCostNumeric)
-        ? formatExpenseAmountRu(totalCostNumeric)
+  const mode = event.mode ?? "BASIC";
+  const srcItems: ReadonlyArray<ServiceBundleItem> =
+    event.items && event.items.length > 0 ? event.items : [];
+
+  let partsCostString = "";
+  let laborCostString = "";
+
+  if (mode === "ADVANCED" && srcItems.length > 0) {
+    const itemPartsAgg = sumFiniteBundleItemField(srcItems, "partCost");
+    const itemLaborAgg = sumFiniteBundleItemField(srcItems, "laborCost");
+    const partsCostNumeric = event.partsCost ?? null;
+    const laborCostNumeric = event.laborCost ?? null;
+    const partsRemainder =
+      partsCostNumeric != null && Number.isFinite(partsCostNumeric)
+        ? Math.max(0, partsCostNumeric - itemPartsAgg)
+        : 0;
+    const laborRemainder =
+      laborCostNumeric != null && Number.isFinite(laborCostNumeric)
+        ? Math.max(0, laborCostNumeric - itemLaborAgg)
+        : 0;
+    partsCostString = partsRemainder > 0 ? formatExpenseAmountRu(partsRemainder) : "";
+    laborCostString = laborRemainder > 0 ? formatExpenseAmountRu(laborRemainder) : "";
+  } else {
+    const partsCostNumeric = event.partsCost ?? null;
+    const laborCostNumeric = event.laborCost ?? null;
+    const totalCostNumeric = event.totalCost ?? event.costAmount ?? null;
+    partsCostString =
+      partsCostNumeric != null && Number.isFinite(partsCostNumeric)
+        ? formatExpenseAmountRu(partsCostNumeric)
+        : laborCostNumeric == null && totalCostNumeric != null && Number.isFinite(totalCostNumeric)
+          ? formatExpenseAmountRu(totalCostNumeric)
+          : "";
+    laborCostString =
+      laborCostNumeric != null && Number.isFinite(laborCostNumeric)
+        ? formatExpenseAmountRu(laborCostNumeric)
         : "";
-  const laborCostString =
-    laborCostNumeric != null && Number.isFinite(laborCostNumeric)
-      ? formatExpenseAmountRu(laborCostNumeric)
-      : "";
+  }
   return {
     ...base,
     title: event.title?.trim() ?? event.serviceType?.trim() ?? "",
-    mode: event.mode ?? "BASIC",
+    mode,
     commonActionType,
     eventDate: toIsoDateInputValue(event.eventDate),
     odometer: String(event.odometer),
@@ -464,15 +974,7 @@ export function createInitialRepeatServiceEventValues(
 }
 
 function parseDecimalOrNull(input: string): number | null {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const parsed = Number.parseFloat(trimmed.replace(",", "."));
-  if (Number.isNaN(parsed) || parsed < 0) {
-    return null;
-  }
-  return parsed;
+  return parseExpenseAmountInputToNumberOrNull(input);
 }
 
 function parsePositiveIntegerOrNull(input: string): number | null {
@@ -543,25 +1045,26 @@ export function normalizeAddServiceEventPayload(
     normalizeBundleItemPayload(item, values.mode, values.commonActionType)
   );
 
-  // ADVANCED: предпочитаем суммы из items, иначе используем верхний уровень.
+  // ADVANCED: суммы по строкам + поля «Запчасти»/«Работа» в «Данных события» (дополнение к строкам).
   let partsCost = parseDecimalOrNull(values.partsCost);
   let laborCost = parseDecimalOrNull(values.laborCost);
   if (values.mode === "ADVANCED") {
-    const itemsPartsCostSum = items.reduce(
-      (acc, it) => (it.partCost != null ? acc + it.partCost : acc),
-      0
-    );
-    const itemsLaborCostSum = items.reduce(
-      (acc, it) => (it.laborCost != null ? acc + it.laborCost : acc),
-      0
-    );
-    const anyPart = items.some((it) => it.partCost != null);
-    const anyLabor = items.some((it) => it.laborCost != null);
-    if (anyPart) {
-      partsCost = itemsPartsCostSum;
-    }
-    if (anyLabor) {
-      laborCost = itemsLaborCostSum;
+    const rowParts = items.reduce((acc, it) => acc + (it.partCost ?? 0), 0);
+    const rowLabor = items.reduce((acc, it) => acc + (it.laborCost ?? 0), 0);
+    const topParts = partsCost ?? 0;
+    const topLabor = laborCost ?? 0;
+    const combinedParts = rowParts + topParts;
+    const combinedLabor = rowLabor + topLabor;
+    const anyNumbers =
+      items.some((it) => it.partCost != null || it.laborCost != null) ||
+      partsCost != null ||
+      laborCost != null;
+    if (!anyNumbers) {
+      partsCost = null;
+      laborCost = null;
+    } else {
+      partsCost = combinedParts === 0 ? null : combinedParts;
+      laborCost = combinedLabor === 0 ? null : combinedLabor;
     }
   }
 
@@ -659,8 +1162,8 @@ export function validateAddServiceEventFormValues(
     if (trimmed === "") {
       continue;
     }
-    const parsed = Number.parseFloat(trimmed.replace(",", "."));
-    if (Number.isNaN(parsed) || parsed < 0) {
+    const parsed = parseDecimalOrNull(trimmed);
+    if (parsed == null) {
       return { errors: ["Суммы должны быть неотрицательными числами."] };
     }
   }
@@ -694,8 +1197,8 @@ export function validateAddServiceEventFormValues(
         if (trimmed === "") {
           continue;
         }
-        const parsed = Number.parseFloat(trimmed.replace(",", "."));
-        if (Number.isNaN(parsed) || parsed < 0) {
+        const parsed = parseDecimalOrNull(trimmed);
+        if (parsed == null) {
           return {
             errors: [`Суммы в строке №${index + 1} должны быть неотрицательными.`],
           };

@@ -13,6 +13,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
+    "qa:service-bundle-advanced-smoke": "tsx scripts/qa-service-bundle-advanced-smoke.ts",
     "mobile:dev": "npm run dev --workspace @mototwin/app",
     "mobile:dev:lan": "npm run dev:lan --workspace @mototwin/app",
     "mobile:dev:usb": "npm run dev:localhost --workspace @mototwin/app",

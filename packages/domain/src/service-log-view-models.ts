@@ -256,6 +256,32 @@ function getHistoryPreviousStateByEventId(
   return previousByEventId;
 }
 
+function formatBundleCostLabel(label: string, amount: number | null, currency: string | null): string | null {
+  if (amount == null || !Number.isFinite(amount) || amount <= 0 || !currency) {
+    return null;
+  }
+  return `${label} ${formatExpenseAmountRu(amount)} ${currency}`;
+}
+
+function formatBundleItemLineCostsRu(
+  partCost: number | null,
+  laborCost: number | null,
+  currency: string | null
+): string | null {
+  const cur = currency?.trim();
+  if (!cur) {
+    return null;
+  }
+  const bits: string[] = [];
+  if (partCost != null && Number.isFinite(partCost) && partCost > 0) {
+    bits.push(`запчасти ${formatExpenseAmountRu(partCost)} ${cur}`);
+  }
+  if (laborCost != null && Number.isFinite(laborCost) && laborCost > 0) {
+    bits.push(`работа ${formatExpenseAmountRu(laborCost)} ${cur}`);
+  }
+  return bits.length > 0 ? bits.join(" · ") : null;
+}
+
 function buildBundleItemSummaries(event: ServiceEventItem): ServiceLogBundleItemSummary[] {
   const items: ServiceBundleItem[] =
     event.items && event.items.length > 0
@@ -289,15 +315,13 @@ function buildBundleItemSummaries(event: ServiceEventItem): ServiceLogBundleItem
       quantity: item.quantity ?? null,
       partCost: item.partCost ?? null,
       laborCost: item.laborCost ?? null,
+      lineCostRu: formatBundleItemLineCostsRu(
+        item.partCost ?? null,
+        item.laborCost ?? null,
+        event.currency ?? null
+      ),
       comment: item.comment?.trim() ? item.comment.trim() : null,
     }));
-}
-
-function formatBundleCostLabel(label: string, amount: number | null, currency: string | null): string | null {
-  if (amount == null || !Number.isFinite(amount) || amount <= 0 || !currency) {
-    return null;
-  }
-  return `${label} ${formatExpenseAmountRu(amount)} ${currency}`;
 }
 
 export function buildServiceLogEntryViewModel(

@@ -34,7 +34,10 @@ Supported route/query params:
 Platform notes:
 
 - Web reads both `nodeId` and `nodeIds`; Expo currently uses `nodeIds` for subtree context.
-- Web performs add/edit inline in Service Log modal; Expo opens dedicated `service-events/new` screen for create/edit/repeat.
+- **Web:** добавление / редактирование / повтор — общая модалка **`BasicServiceEventModal`** (`src/app/vehicles/[id]/_components/BasicServiceEventModal.tsx`) на странице журнала и на карточке ТС (`vehicle-detail-client.tsx`), одна форма bundle `AddServiceEventFormValues`.
+- **Expo:** тот же смысл bundle-полей — компонент **`basic-service-event-bundle-form.tsx`** и экран **`service-events/new`** для create/edit/repeat.
+
+В карточке **`SERVICE`** с пакетом строк (режим **ADVANCED**) клиенты могут показывать **стоимость по каждой строке** (`lineCostRu` во view model из `packages/domain/src/service-log-view-models.ts`), если в данных есть суммы по строкам.
 
 ## Expenses integration
 

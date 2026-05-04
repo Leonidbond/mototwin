@@ -62,6 +62,7 @@ import {
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
   buildTopNodeOverviewCards,
   getPartRecommendationWarningLabel,
+  getWishlistItemIdsFromInstalledPartsJson,
   getWishlistItemSkuDisplayLines,
   isNodeSnoozed,
   normalizeUserLocalSettings,
@@ -1244,25 +1245,6 @@ function isIssueNodeStatus(status: NodeStatus | null): status is "OVERDUE" | "SO
   return status === "OVERDUE" || status === "SOON";
 }
 
-function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
-  let parsed = payload;
-  if (typeof payload === "string") {
-    try {
-      parsed = JSON.parse(payload) as unknown;
-    } catch {
-      return null;
-    }
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return null;
-  }
-  const record = parsed as { source?: unknown; wishlistItemId?: unknown };
-  if (record.source !== "wishlist" || typeof record.wishlistItemId !== "string") {
-    return null;
-  }
-  return record.wishlistItemId.trim() || null;
-}
-
 export function VehicleDetailClient({ params, pageView = "dashboard" }: VehiclePageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1868,9 +1850,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       if (event.eventKind === "STATE_UPDATE") {
         continue;
       }
-      const wishlistItemId = getWishlistItemIdFromInstalledPartsJson(event.installedPartsJson);
-      if (wishlistItemId && !byWishlistItemId.has(wishlistItemId)) {
-        byWishlistItemId.set(wishlistItemId, event.id);
+      const wlIds = getWishlistItemIdsFromInstalledPartsJson(event.installedPartsJson);
+      for (const wishlistItemId of wlIds) {
+        if (wishlistItemId && !byWishlistItemId.has(wishlistItemId)) {
+          byWishlistItemId.set(wishlistItemId, event.id);
+        }
       }
     }
     return byWishlistItemId;

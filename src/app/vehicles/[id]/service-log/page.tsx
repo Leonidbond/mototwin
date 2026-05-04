@@ -12,6 +12,7 @@ import {
   filterPaidServiceEvents,
   formatExpenseAmountRu,
   getServiceLogEventKindBadgeLabel,
+  getWishlistItemIdsFromInstalledPartsJson,
   isServiceLogTimelineQueryActive,
   normalizeAddServiceEventPayload,
   normalizeEditServiceEventPayload,
@@ -34,25 +35,6 @@ const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
 function parsePaidOnly(v: string | null): boolean {
   return v === "1" || v === "true";
-}
-
-function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
-  let parsed = payload;
-  if (typeof payload === "string") {
-    try {
-      parsed = JSON.parse(payload) as unknown;
-    } catch {
-      return null;
-    }
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return null;
-  }
-  const record = parsed as { source?: unknown; wishlistItemId?: unknown };
-  if (record.source !== "wishlist" || typeof record.wishlistItemId !== "string") {
-    return null;
-  }
-  return record.wishlistItemId.trim() || null;
 }
 
 export default function VehicleServiceLogPage() {
@@ -169,12 +151,12 @@ export default function VehicleServiceLogPage() {
     () => buildServiceLogTimelineProps(events, filters, sort, "default", effectiveNodeIds).monthGroups,
     [events, filters, sort, effectiveNodeIds]
   );
-  const wishlistItemIdByServiceEventId = useMemo(() => {
-    const byServiceEventId = new Map<string, string>();
+  const wishlistItemIdsByServiceEventId = useMemo(() => {
+    const byServiceEventId = new Map<string, string[]>();
     for (const event of events) {
-      const wishlistItemId = getWishlistItemIdFromInstalledPartsJson(event.installedPartsJson);
-      if (wishlistItemId) {
-        byServiceEventId.set(event.id, wishlistItemId);
+      const ids = getWishlistItemIdsFromInstalledPartsJson(event.installedPartsJson);
+      if (ids.length > 0) {
+        byServiceEventId.set(event.id, ids);
       }
     }
     return byServiceEventId;
@@ -763,7 +745,7 @@ export default function VehicleServiceLogPage() {
                     {group.entries.map((entry) => {
                       const isStateUpdate = entry.eventKind === "STATE_UPDATE";
                       const isHighlightedServiceEvent = entry.id === highlightedServiceEventId;
-                      const originWishlistItemId = wishlistItemIdByServiceEventId.get(entry.id);
+                      const originWishlistItemIds = wishlistItemIdsByServiceEventId.get(entry.id) ?? [];
                       const linkedExpenses = serviceEventById.get(entry.id)?.expenseItems ?? [];
                       const linkedExpenseTotals = new Map<string, number>();
                       const linkedExpenseCategoryTotals = new Map<string, number>();
@@ -916,19 +898,47 @@ export default function VehicleServiceLogPage() {
                                     {entry.mainTitle}
                                   </h3>
                                   {entry.wishlistOriginLabelRu ? (
-                                    originWishlistItemId ? (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          router.push(
-                                            `/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(originWishlistItemId)}`
-                                          )
-                                        }
-                                        className="mt-0.5 text-xs font-medium underline decoration-dotted underline-offset-2 transition hover:opacity-80"
-                                        style={{ color: productSemanticColors.textSecondary }}
-                                      >
-                                        {entry.wishlistOriginLabelRu}
-                                      </button>
+                                    originWishlistItemIds.length > 0 ? (
+                                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        {originWishlistItemIds.length === 1 ? (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              router.push(
+                                                `/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(originWishlistItemIds[0])}`
+                                              )
+                                            }
+                                            className="text-xs font-medium underline decoration-dotted underline-offset-2 transition hover:opacity-80"
+                                            style={{ color: productSemanticColors.textSecondary }}
+                                          >
+                                            {entry.wishlistOriginLabelRu}
+                                          </button>
+                                        ) : (
+                                          <>
+                                            <span
+                                              className="text-xs text-gray-500"
+                                              style={{ color: productSemanticColors.textSecondary }}
+                                            >
+                                              {entry.wishlistOriginLabelRu}:
+                                            </span>
+                                            {originWishlistItemIds.map((wlId, idx) => (
+                                              <button
+                                                key={wlId}
+                                                type="button"
+                                                onClick={() =>
+                                                  router.push(
+                                                    `/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(wlId)}`
+                                                  )
+                                                }
+                                                className="text-xs font-medium underline decoration-dotted underline-offset-2 transition hover:opacity-80"
+                                                style={{ color: productSemanticColors.textSecondary }}
+                                              >
+                                                {idx + 1}
+                                              </button>
+                                            ))}
+                                          </>
+                                        )}
+                                      </div>
                                     ) : (
                                       <p
                                         className="mt-0.5 text-xs text-gray-500"
@@ -1001,6 +1011,12 @@ export default function VehicleServiceLogPage() {
                                             </span>
                                           ) : null}
                                           {it.quantity != null ? <span> · ×{it.quantity}</span> : null}
+                                          {it.lineCostRu ? (
+                                            <span style={{ color: productSemanticColors.textMuted }}>
+                                              {" "}
+                                              · {it.lineCostRu}
+                                            </span>
+                                          ) : null}
                                         </li>
                                       ))}
                                     </ul>

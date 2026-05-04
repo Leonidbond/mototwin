@@ -1,12 +1,19 @@
 "use client";
 
-/* eslint-disable react-hooks/set-state-in-effect -- SKU search + uninstalled-expense loaders reset local UI state from async catalog APIs (same pattern as the journal page modal). */
+/* eslint-disable react-hooks/set-state-in-effect -- SKU search + installable picker loaders reset local UI state from async catalog APIs (same pattern as the journal page modal). */
 
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  applyExpenseInstallToAddFormRow,
   createEmptyBundleItemFormValues,
+  DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
   flattenNodeTreeToSelectOptions,
   formatExpenseAmountRu,
+  mergeServiceBundleTemplateIntoAddFormValues,
+  mergeWishlistItemIntoAddFormValues,
+  parseExpenseAmountInputToNumberOrNull,
+  removeWishlistItemFromAddFormValues,
+  revertExpenseInstallFormPatch,
   SERVICE_ACTION_TYPE_OPTIONS,
   validateAddServiceEventFormValues,
 } from "@mototwin/domain";
@@ -15,17 +22,17 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import type {
   AddServiceEventFormValues,
   BundleItemFormValues,
-  ExpenseItem,
+  InstallableForServiceEventEntry,
   NodeTreeItem,
   PartSkuViewModel,
+  PartWishlistItem,
+  PartWishlistItemStatus,
   ServiceActionType,
+  ServiceBundleTemplateWire,
 } from "@mototwin/types";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
-function getAnchorNodeId(form: AddServiceEventFormValues): string {
-  return form.items[0]?.nodeId ?? "";
-}
 function getAnchorPartName(form: AddServiceEventFormValues): string {
   return form.items[0]?.partName ?? "";
 }
@@ -78,9 +85,121 @@ function removeItemAt(form: AddServiceEventFormValues, index: number): AddServic
 
 function appendEmptyItem(form: AddServiceEventFormValues): AddServiceEventFormValues {
   const next = createEmptyBundleItemFormValues({
-    actionType: form.commonActionType,
+    actionType: form.mode === "BASIC" ? form.commonActionType : "SERVICE",
   });
   return { ...form, items: [...form.items, next] };
+}
+
+function switchFormToAdvanced(prev: AddServiceEventFormValues): AddServiceEventFormValues {
+  return {
+    ...prev,
+    mode: "ADVANCED",
+    items: prev.items.map((it) => ({
+      ...it,
+      actionType: it.actionType ?? prev.commonActionType,
+    })),
+  };
+}
+
+function switchFormToBasic(prev: AddServiceEventFormValues): AddServiceEventFormValues {
+  const ct = prev.items[0]?.actionType ?? prev.commonActionType;
+  return {
+    ...prev,
+    mode: "BASIC",
+    commonActionType: ct,
+    items: prev.items.map((it) => ({ ...it, actionType: ct })),
+  };
+}
+
+/**
+ * Строка для чистого расхода из «Готово к установке»: не затирать первую строку,
+ * если узел расхода ещё не совпал ни с одной — берём пустую по узлу или добавляем строку.
+ */
+function resolveInstallableExpenseTargetRow(
+  form: AddServiceEventFormValues,
+  entryNodeId: string | null | undefined
+): { form: AddServiceEventFormValues; rowIndex: number } {
+  const nid = entryNodeId?.trim() ?? "";
+  if (nid) {
+    const idx = form.items.findIndex((it) => it.nodeId.trim() === nid);
+    if (idx >= 0) {
+      return { form, rowIndex: idx };
+    }
+  }
+  const emptyIdx = form.items.findIndex((it) => !it.nodeId.trim());
+  if (emptyIdx >= 0) {
+    return { form, rowIndex: emptyIdx };
+  }
+  const appended = appendEmptyItem(form);
+  return { form: appended, rowIndex: appended.items.length - 1 };
+}
+
+/**
+ * Builds a synthetic {@link PartWishlistItem} from a unified picker entry so we
+ * can reuse {@link mergeWishlistItemIntoAddFormValues}. The endpoint contract
+ * intentionally omits SKU / comment metadata, so the bundle row gets only the
+ * fields exposed by the entry; the partSku is patched onto the row separately.
+ */
+function entryToSyntheticWishlistItem(
+  entry: InstallableForServiceEventEntry,
+  vehicleId: string
+): PartWishlistItem | null {
+  if (!entry.wishlistItemId || !entry.wishlistStatus) {
+    return null;
+  }
+  const nowIso = new Date().toISOString();
+  return {
+    id: entry.wishlistItemId,
+    vehicleId,
+    nodeId: entry.nodeId,
+    skuId: null,
+    title: entry.title,
+    quantity: entry.quantity ?? 1,
+    status: entry.wishlistStatus,
+    comment: null,
+    costAmount: entry.amount,
+    currency: entry.currency,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    node: entry.nodeId ? { id: entry.nodeId, name: entry.nodeName ?? "" } : null,
+    sku: null,
+  };
+}
+
+const INSTALLABLE_BADGE_BY_STATUS_RU: Record<PartWishlistItemStatus, string> = {
+  NEEDED: "Нужно купить",
+  ORDERED: "Заказано",
+  BOUGHT: "Куплено",
+  INSTALLED: "Установлено",
+};
+
+function getInstallableEntryBadgeRu(entry: InstallableForServiceEventEntry): string {
+  if (entry.source === "wishlist+expense") {
+    return "Куплено · из списка покупок";
+  }
+  if (entry.source === "expense") {
+    return "Куплено";
+  }
+  return entry.wishlistStatus ? INSTALLABLE_BADGE_BY_STATUS_RU[entry.wishlistStatus] : "В списке";
+}
+
+type InstallableFilter = "all" | "paid" | "wishlist";
+
+function entryMatchesInstallableFilter(
+  entry: InstallableForServiceEventEntry,
+  filter: InstallableFilter
+): boolean {
+  if (filter === "all") {
+    return true;
+  }
+  const isPaid =
+    entry.source === "expense" ||
+    entry.source === "wishlist+expense" ||
+    entry.wishlistStatus === "BOUGHT";
+  if (filter === "paid") {
+    return isPaid;
+  }
+  return entry.source === "wishlist" && !isPaid;
 }
 
 function cloneAddServiceEventForm(src: AddServiceEventFormValues): AddServiceEventFormValues {
@@ -164,15 +283,24 @@ function BasicServiceEventModalInner({
 }: BasicServiceEventModalInnerProps) {
   const [form, setForm] = useState<AddServiceEventFormValues>(() => cloneAddServiceEventForm(initialForm));
   const [localValidationError, setLocalValidationError] = useState("");
+  /** Row index whose SKU field drives catalog search (ADVANCED); BASIC uses 0. */
+  const [skuSearchRowIndex, setSkuSearchRowIndex] = useState(0);
 
   const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
   const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
   const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
   const [serviceEventSkuError, setServiceEventSkuError] = useState("");
   const serviceEventSkuSearchGen = useRef(0);
-  const [uninstalledExpenses, setUninstalledExpenses] = useState<ExpenseItem[]>([]);
-  const [uninstalledExpensesLoading, setUninstalledExpensesLoading] = useState(false);
-  const [uninstalledExpensesError, setUninstalledExpensesError] = useState("");
+  const [bundleTemplates, setBundleTemplates] = useState<ServiceBundleTemplateWire[]>([]);
+  const [bundleTemplatesLoadError, setBundleTemplatesLoadError] = useState("");
+  const [selectedBundleTemplateId, setSelectedBundleTemplateId] = useState("");
+  const [installableEntries, setInstallableEntries] = useState<InstallableForServiceEventEntry[]>([]);
+  const [installableLoading, setInstallableLoading] = useState(false);
+  const [installableError, setInstallableError] = useState("");
+  const [installableFilter, setInstallableFilter] = useState<InstallableFilter>("all");
+  const [selectedInstallableKeys, setSelectedInstallableKeys] = useState<Set<string>>(
+    () => new Set()
+  );
   const commentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const updateForm = useCallback(
@@ -193,81 +321,224 @@ function BasicServiceEventModalInner({
     [leafNodeOptions]
   );
 
+  const effectiveSkuRowIndex =
+    form.mode === "BASIC" ? 0 : Math.min(Math.max(0, skuSearchRowIndex), Math.max(0, form.items.length - 1));
+
+  useEffect(() => {
+    setSkuSearchRowIndex((idx) => Math.min(Math.max(0, idx), Math.max(0, form.items.length - 1)));
+  }, [form.items.length]);
+
   const serviceEventCostTotalPreview = useMemo(() => {
-    const partsRaw = form.partsCost.trim().replace(",", ".");
-    const laborRaw = form.laborCost.trim().replace(",", ".");
+    const cur = form.currency.trim().toUpperCase() || "RUB";
+    if (form.mode === "ADVANCED") {
+      let rowP = 0;
+      let rowL = 0;
+      for (const it of form.items) {
+        const pr = it.partCost.trim();
+        const lr = it.laborCost.trim();
+        if (pr !== "") {
+          const v = parseExpenseAmountInputToNumberOrNull(pr);
+          if (v != null) {
+            rowP += v;
+          }
+        }
+        if (lr !== "") {
+          const v = parseExpenseAmountInputToNumberOrNull(lr);
+          if (v != null) {
+            rowL += v;
+          }
+        }
+      }
+      const topP = parseExpenseAmountInputToNumberOrNull(form.partsCost.trim());
+      const topL = parseExpenseAmountInputToNumberOrNull(form.laborCost.trim());
+      const tp = topP ?? 0;
+      const tl = topL ?? 0;
+      const sum = rowP + rowL + tp + tl;
+      const hadCostInput =
+        form.items.some((it) => it.partCost.trim() !== "" || it.laborCost.trim() !== "") ||
+        form.partsCost.trim() !== "" ||
+        form.laborCost.trim() !== "";
+      if (!hadCostInput) {
+        return null;
+      }
+      return `${formatExpenseAmountRu(sum)} ${cur}`;
+    }
+    const partsRaw = form.partsCost.trim();
+    const laborRaw = form.laborCost.trim();
     if (partsRaw === "" && laborRaw === "") {
       return null;
     }
-    const p = partsRaw === "" ? 0 : Number.parseFloat(partsRaw);
-    const l = laborRaw === "" ? 0 : Number.parseFloat(laborRaw);
-    if (Number.isNaN(p) || Number.isNaN(l)) {
+    const p = partsRaw === "" ? 0 : parseExpenseAmountInputToNumberOrNull(partsRaw);
+    const l = laborRaw === "" ? 0 : parseExpenseAmountInputToNumberOrNull(laborRaw);
+    if (p == null || l == null) {
       return null;
     }
-    const cur = form.currency.trim().toUpperCase() || "RUB";
     return `${formatExpenseAmountRu(p + l)} ${cur}`;
-  }, [form.partsCost, form.laborCost, form.currency]);
+  }, [form.mode, form.items, form.partsCost, form.laborCost, form.currency]);
 
-  const orderedUninstalledExpenses = useMemo(() => {
-    const selectedIds = new Set(form.items.map((item) => item.nodeId.trim()).filter(Boolean));
-    return [...uninstalledExpenses].sort((left, right) => {
-      const leftMatches =
-        selectedIds.size > 0 && left.nodeId && selectedIds.has(left.nodeId) ? 0 : 1;
-      const rightMatches =
-        selectedIds.size > 0 && right.nodeId && selectedIds.has(right.nodeId) ? 0 : 1;
-      if (leftMatches !== rightMatches) {
-        return leftMatches - rightMatches;
+  const filteredInstallableEntries = useMemo(() => {
+    const used = new Set(form.items.map((it) => it.nodeId.trim()).filter(Boolean));
+    return installableEntries
+      .filter((entry) => entryMatchesInstallableFilter(entry, installableFilter))
+      .sort((left, right) => {
+        const leftMatches =
+          left.nodeId && used.has(left.nodeId) ? 0 : 1;
+        const rightMatches =
+          right.nodeId && used.has(right.nodeId) ? 0 : 1;
+        if (leftMatches !== rightMatches) {
+          return leftMatches - rightMatches;
+        }
+        return 0;
+      });
+  }, [form.items, installableEntries, installableFilter]);
+
+  const installableCounts = useMemo(() => {
+    let paid = 0;
+    let wishlist = 0;
+    for (const entry of installableEntries) {
+      if (entryMatchesInstallableFilter(entry, "paid")) {
+        paid += 1;
       }
-      return (
-        new Date(right.purchasedAt ?? right.expenseDate).getTime() -
-        new Date(left.purchasedAt ?? left.expenseDate).getTime()
-      );
-    });
-  }, [form, uninstalledExpenses]);
+      if (entryMatchesInstallableFilter(entry, "wishlist")) {
+        wishlist += 1;
+      }
+    }
+    return { all: installableEntries.length, paid, wishlist };
+  }, [installableEntries]);
 
-  const toggleInstalledExpenseSelection = (expense: ExpenseItem) => {
-    updateForm((prev) => {
-      const selected = new Set(prev.installedExpenseItemIds);
-      const isSelecting = !selected.has(expense.id);
-      if (isSelecting) {
-        selected.add(expense.id);
+  const mergeInstallableWishlistEntry = useCallback(
+    (
+      currentForm: AddServiceEventFormValues,
+      entry: InstallableForServiceEventEntry,
+      leafIds: Set<string>
+    ): AddServiceEventFormValues => {
+      const synth = entryToSyntheticWishlistItem(entry, vehicleId);
+      if (!synth) {
+        return currentForm;
+      }
+      let next = mergeWishlistItemIntoAddFormValues(currentForm, synth, leafIds, {
+        skipPartsCostBump: Boolean(entry.expenseItemId),
+      });
+      if (next === currentForm) {
+        return next;
+      }
+      const partSkuTrimmed = entry.partSku?.trim() ?? "";
+      if (partSkuTrimmed && entry.nodeId) {
+        const idx = next.items.findIndex((it) => it.nodeId.trim() === entry.nodeId);
+        if (idx >= 0 && !next.items[idx].sku.trim()) {
+          next = patchItemAt(next, idx, { sku: partSkuTrimmed });
+        }
+      }
+      return next;
+    },
+    [vehicleId]
+  );
+
+  const toggleInstallableEntry = (entry: InstallableForServiceEventEntry) => {
+    const wasSelected = selectedInstallableKeys.has(entry.key);
+    const willBeSelected = !wasSelected;
+    setSelectedInstallableKeys((prev) => {
+      const next = new Set(prev);
+      if (willBeSelected) {
+        next.add(entry.key);
       } else {
-        selected.delete(expense.id);
+        next.delete(entry.key);
+      }
+      return next;
+    });
+
+    updateForm((prev) => {
+      let next = prev;
+
+      if (entry.wishlistItemId) {
+        if (willBeSelected) {
+          next = mergeInstallableWishlistEntry(next, entry, leafNodeIdsSet);
+        } else {
+          const stripItem = entryToSyntheticWishlistItem(entry, vehicleId);
+          const formCur =
+            prev.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+          const entCur = entry.currency?.trim().toUpperCase();
+          const revertBump =
+            prev.mode === "BASIC" &&
+            !entry.expenseItemId &&
+            entry.amount != null &&
+            Number.isFinite(entry.amount) &&
+            entry.amount > 0 &&
+            entCur &&
+            entCur === formCur
+              ? { amount: entry.amount, currency: entry.currency ?? DEFAULT_ADD_SERVICE_EVENT_CURRENCY }
+              : null;
+          next = removeWishlistItemFromAddFormValues(next, entry.wishlistItemId, {
+            removeBundleRowForNodeId: entry.nodeId,
+            revertBumpedPartsCost: revertBump,
+            stripWishlistCommentForItem: stripItem ?? undefined,
+          });
+        }
       }
 
-      if (!isSelecting) {
-        return { ...prev, installedExpenseItemIds: Array.from(selected) };
+      if (entry.expenseItemId) {
+        const selectedExp = new Set(next.installedExpenseItemIds);
+        if (willBeSelected) {
+          selectedExp.add(entry.expenseItemId);
+        } else {
+          selectedExp.delete(entry.expenseItemId);
+        }
+        next = { ...next, installedExpenseItemIds: Array.from(selectedExp) };
+
+        if (!willBeSelected && !entry.wishlistItemId) {
+          const expenseTitle = entry.partName?.trim() || entry.title.trim();
+          next = revertExpenseInstallFormPatch(next, {
+            bundleNodeId: entry.nodeId,
+            expenseTitleForComment: expenseTitle,
+            amount: entry.amount ?? null,
+            currency: entry.currency ?? null,
+          });
+        }
+
+        // For pure-expense entries (no wishlist link) we mirror legacy behaviour:
+        // populate anchor row, defaults, and append a comment line. For
+        // `wishlist+expense` entries the wishlist merge already created a
+        // proper bundle row, so we skip this step to avoid clobbering it.
+        if (willBeSelected && !entry.wishlistItemId) {
+          const expenseTitle = entry.partName?.trim() || entry.title.trim();
+          const commentLine = `Установлена ранее купленная деталь: ${expenseTitle}`;
+          const titleSuggestion = `Установка: ${expenseTitle}`;
+          const nextComment = next.comment.trim()
+            ? next.comment.includes(commentLine)
+              ? next.comment
+              : `${next.comment.trim()}\n${commentLine}`
+            : commentLine;
+          const { form: nextWithRow, rowIndex: rowIdx } = resolveInstallableExpenseTargetRow(
+            next,
+            entry.nodeId
+          );
+          next = nextWithRow;
+          const row = next.items[rowIdx] ?? next.items[0];
+          const nodeId = row?.nodeId.trim() || entry.nodeId || "";
+          const partName =
+            row?.partName.trim() || entry.partName?.trim() || entry.title.trim();
+          const sku = row?.sku.trim() || entry.partSku?.trim() || "";
+          next = {
+            ...next,
+            eventDate: next.eventDate.trim() || new Date().toISOString().slice(0, 10),
+            title: next.title.trim() || titleSuggestion,
+            odometer:
+              next.odometer.trim() || (vehicleOdometer != null ? String(vehicleOdometer) : ""),
+            engineHours:
+              next.engineHours.trim() ||
+              (vehicleEngineHours != null ? String(vehicleEngineHours) : ""),
+            comment: nextComment,
+          };
+          next = patchItemAt(next, rowIdx, { nodeId, partName, sku });
+          next = applyExpenseInstallToAddFormRow(next, rowIdx, {
+            amount: entry.amount ?? null,
+            currency: entry.currency ?? null,
+            quantity: entry.quantity ?? null,
+          });
+        }
       }
 
-      const expenseTitle = expense.partName?.trim() || expense.title.trim();
-      const commentLine = `Установлена ранее купленная деталь: ${expenseTitle}`;
-      const titleSuggestion = `Установка: ${expenseTitle}`;
-      const nextComment = prev.comment.trim()
-        ? prev.comment.includes(commentLine)
-          ? prev.comment
-          : `${prev.comment.trim()}\n${commentLine}`
-        : commentLine;
-
-      const anchorNodeId = getAnchorNodeId(prev).trim() || expense.nodeId || "";
-      const anchorPartName =
-        getAnchorPartName(prev).trim() || expense.partName?.trim() || expense.title.trim();
-      const anchorSku = getAnchorSku(prev).trim() || expense.partSku?.trim() || "";
-
-      return patchAnchorItem(
-        {
-          ...prev,
-          installedExpenseItemIds: Array.from(selected),
-          eventDate: prev.eventDate.trim() || new Date().toISOString().slice(0, 10),
-          title: prev.title.trim() || titleSuggestion,
-          odometer:
-            prev.odometer.trim() || (vehicleOdometer != null ? String(vehicleOdometer) : ""),
-          engineHours:
-            prev.engineHours.trim() ||
-            (vehicleEngineHours != null ? String(vehicleEngineHours) : ""),
-          comment: nextComment,
-        },
-        { nodeId: anchorNodeId, partName: anchorPartName, sku: anchorSku }
-      );
+      return next;
     });
   };
 
@@ -281,11 +552,12 @@ function BasicServiceEventModalInner({
   }, [form.comment]);
 
   useEffect(() => {
+    const rowSku = (form.items[effectiveSkuRowIndex]?.sku ?? "").trim();
     const timer = window.setTimeout(() => {
-      setServiceEventSkuLookup(getAnchorSku(form).trim());
+      setServiceEventSkuLookup(rowSku);
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [form]);
+  }, [form.items, effectiveSkuRowIndex]);
 
   useEffect(() => {
     const query = serviceEventSkuLookup;
@@ -302,7 +574,7 @@ function BasicServiceEventModalInner({
     void api
       .getPartSkus({
         search: query,
-        nodeId: getAnchorNodeId(form).trim() || undefined,
+        nodeId: (form.items[effectiveSkuRowIndex]?.nodeId ?? "").trim() || undefined,
       })
       .then((res) => {
         if (serviceEventSkuSearchGen.current !== gen) {
@@ -331,46 +603,74 @@ function BasicServiceEventModalInner({
         }
         setServiceEventSkuLoading(false);
       });
-  }, [form, serviceEventSkuLookup]);
+  }, [form, effectiveSkuRowIndex, serviceEventSkuLookup]);
 
   useEffect(() => {
-    if (!vehicleId) {
-      setUninstalledExpenses([]);
-      return;
-    }
     let cancelled = false;
-    setUninstalledExpensesLoading(true);
-    setUninstalledExpensesError("");
+    setBundleTemplatesLoadError("");
     void api
-      .getUninstalledExpenses({ vehicleId })
+      .getServiceBundleTemplates()
       .then((res) => {
         if (!cancelled) {
-          setUninstalledExpenses(res.expenses ?? []);
+          setBundleTemplates(res.templates ?? []);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setUninstalledExpenses([]);
-          setUninstalledExpensesError("Не удалось загрузить купленные детали.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setUninstalledExpensesLoading(false);
+          setBundleTemplates([]);
+          setBundleTemplatesLoadError("Не удалось загрузить шаблоны.");
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [vehicleId]);
+  }, []);
+
+  useEffect(() => {
+    if (!vehicleId || form.mode !== "ADVANCED") {
+      setInstallableEntries([]);
+      setInstallableLoading(false);
+      setInstallableError("");
+      return;
+    }
+    let cancelled = false;
+    setInstallableLoading(true);
+    setInstallableError("");
+    void api
+      .getInstallableForServiceEvent(vehicleId)
+      .then((res) => {
+        if (!cancelled) {
+          setInstallableEntries(res.items ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInstallableEntries([]);
+          setInstallableError("Не удалось загрузить список «Готово к установке».");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setInstallableLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicleId, form.mode]);
 
   const applyServiceEventSkuSuggestion = (sku: PartSkuViewModel) => {
-    updateForm((prev) =>
-      patchAnchorItem(prev, {
-        sku: pickSkuPartNumberOrFallback(sku, getAnchorSku(prev).trim()),
-        partName: sku.canonicalName?.trim() || getAnchorPartName(prev),
-      })
-    );
+    updateForm((prev) => {
+      const idx =
+        prev.mode === "BASIC"
+          ? 0
+          : Math.min(Math.max(0, skuSearchRowIndex), Math.max(0, prev.items.length - 1));
+      const row = prev.items[idx];
+      return patchItemAt(prev, idx, {
+        sku: pickSkuPartNumberOrFallback(sku, row?.sku?.trim() ?? ""),
+        partName: sku.canonicalName?.trim() || row?.partName?.trim() || "",
+      });
+    });
   };
 
   const save = async () => {
@@ -434,9 +734,14 @@ function BasicServiceEventModalInner({
                 Режим ввода
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <span
-                  className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    form.mode === "BASIC" ? "" : "opacity-50"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSkuSearchRowIndex(0);
+                    updateForm((prev) => (prev.mode === "BASIC" ? prev : switchFormToBasic(prev)));
+                  }}
+                  className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:opacity-95 ${
+                    form.mode === "BASIC" ? "" : "opacity-80"
                   }`}
                   style={
                     form.mode === "BASIC"
@@ -453,10 +758,15 @@ function BasicServiceEventModalInner({
                   }
                 >
                   Быстро
-                </span>
-                <span
-                  className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    form.mode === "ADVANCED" ? "" : "cursor-not-allowed opacity-55"
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSkuSearchRowIndex(0);
+                    updateForm((prev) => (prev.mode === "ADVANCED" ? prev : switchFormToAdvanced(prev)));
+                  }}
+                  className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:opacity-95 ${
+                    form.mode === "ADVANCED" ? "" : "opacity-90"
                   }`}
                   style={
                     form.mode === "ADVANCED"
@@ -467,24 +777,251 @@ function BasicServiceEventModalInner({
                         }
                       : {
                           borderColor: productSemanticColors.border,
-                          color: productSemanticColors.textMuted,
+                          backgroundColor: productSemanticColors.cardMuted,
+                          color: productSemanticColors.textSecondary,
                         }
                   }
-                  title={
-                    form.mode === "ADVANCED"
-                      ? "Событие в подробном режиме"
-                      : "Режим «Подробно» для новых событий появится в следующей версии"
-                  }
+                  title="Отдельные детали, SKU и суммы по каждому узлу"
                 >
-                  {form.mode === "ADVANCED" ? "Подробно" : "Подробно · скоро"}
-                </span>
+                  Подробно
+                </button>
               </div>
               <p className="mt-2 text-xs leading-relaxed" style={{ color: productSemanticColors.textSecondary }}>
                 {form.mode === "BASIC"
                   ? "В режиме «Быстро» суммы по деталям и по работе относятся ко всем выбранным узлам; тип работы один для всех."
-                  : "Событие сохранено в режиме «Подробно»: у строк могут быть разные типы работ и детализация. Расширенный редактор формы — в следующей версии."}
+                  : "В режиме «Подробно» у каждой строки свой тип работы, запчасть, SKU и суммы. Итог по деньгам можно ввести по строкам или сверху, если по строкам пусто."}
               </p>
             </div>
+
+            {!editingServiceEventId ? (
+              <div
+                className="rounded-2xl border border-gray-200 p-4"
+                style={{
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                }}
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: productSemanticColors.textMeta }}>
+                  Шаблон
+                </p>
+                <p className="mt-1 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                  Подставить набор узлов и название (режим «Быстро»). Можно изменить вручную после выбора.
+                </p>
+                {bundleTemplatesLoadError ? (
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
+                    {bundleTemplatesLoadError}
+                  </p>
+                ) : null}
+                <label className="mt-2 block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                  Готовый набор
+                  <select
+                    value={selectedBundleTemplateId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setSelectedBundleTemplateId(id);
+                      if (!id) {
+                        return;
+                      }
+                      const tpl = bundleTemplates.find((t) => t.id === id);
+                      if (!tpl) {
+                        return;
+                      }
+                      updateForm((prev) => {
+                        const { form: merged, skippedItems } = mergeServiceBundleTemplateIntoAddFormValues(
+                          prev,
+                          tpl,
+                          leafNodeIdsSet
+                        );
+                        if (skippedItems.length > 0) {
+                          queueMicrotask(() =>
+                            setLocalValidationError(
+                              `Не все узлы шаблона доступны для этого ТС: ${skippedItems.map((s) => s.label).join(", ")}`
+                            )
+                          );
+                        } else {
+                          queueMicrotask(() => {
+                            setLocalValidationError("");
+                            onClearSubmitError();
+                          });
+                        }
+                        return merged;
+                      });
+                    }}
+                    style={{
+                      ...SERVICE_EVENT_MODAL_FIELD_BASE,
+                      colorScheme: "dark",
+                    }}
+                    className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                  >
+                    <option value="">— выберите шаблон —</option>
+                    {bundleTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+
+            {!editingServiceEventId && form.mode === "ADVANCED" ? (
+              <div
+                className="rounded-2xl border border-gray-200 p-4"
+                style={{
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  borderColor: productSemanticColors.borderStrong,
+                }}
+              >
+                <p
+                  className="text-xs font-semibold uppercase tracking-wide"
+                  style={{ color: productSemanticColors.textMeta }}
+                >
+                  Готово к установке
+                </p>
+                <p className="mt-1 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                  Отметьте позиции, которые установили в этом событии. Сюда сведены активный список покупок и
+                  купленные, но ещё не установленные детали — без дублей.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(["all", "paid", "wishlist"] as const).map((value) => {
+                    const isActive = installableFilter === value;
+                    const label =
+                      value === "all"
+                        ? `Все · ${installableCounts.all}`
+                        : value === "paid"
+                          ? `Куплено · ${installableCounts.paid}`
+                          : `В списке покупок · ${installableCounts.wishlist}`;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setInstallableFilter(value)}
+                        className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition hover:opacity-95"
+                        style={
+                          isActive
+                            ? {
+                                borderColor: productSemanticColors.primaryAction,
+                                backgroundColor: productSemanticColors.primaryAction,
+                                color: productSemanticColors.onPrimaryAction,
+                              }
+                            : {
+                                borderColor: productSemanticColors.border,
+                                backgroundColor: productSemanticColors.cardMuted,
+                                color: productSemanticColors.textSecondary,
+                              }
+                        }
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {installableError ? (
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
+                    {installableError}
+                  </p>
+                ) : null}
+                {installableLoading ? (
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                    Загрузка…
+                  </p>
+                ) : filteredInstallableEntries.length === 0 ? (
+                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                    {installableEntries.length === 0
+                      ? "Нет активных позиций — список покупок пуст и нет купленных деталей без установки."
+                      : "Нет позиций под этот фильтр."}
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {filteredInstallableEntries.map((entry) => {
+                      const nid = entry.nodeId?.trim() ?? "";
+                      const onLeaf = Boolean(nid && leafNodeIdsSet.has(nid));
+                      const isSelected = selectedInstallableKeys.has(entry.key);
+                      const usedNode =
+                        !isSelected && Boolean(nid) && form.items.some((it) => it.nodeId.trim() === nid);
+                      const disabled = !isSelected && (!onLeaf || usedNode);
+                      const badge = getInstallableEntryBadgeRu(entry);
+                      const metaParts: string[] = [];
+                      if (entry.amount != null && entry.currency) {
+                        metaParts.push(`${formatExpenseAmountRu(entry.amount)} ${entry.currency}`);
+                      }
+                      const dateIso = entry.purchasedAt ?? entry.expenseDate;
+                      if (dateIso) {
+                        metaParts.push(new Date(dateIso).toLocaleDateString("ru-RU"));
+                      }
+                      if (entry.nodeName) {
+                        metaParts.push(entry.nodeName);
+                      } else if (!nid) {
+                        metaParts.push("Без узла");
+                      }
+                      if (entry.vendor?.trim()) {
+                        metaParts.push(entry.vendor.trim());
+                      }
+                      if (entry.partSku?.trim()) {
+                        metaParts.push(`Арт. ${entry.partSku.trim()}`);
+                      }
+                      return (
+                        <label
+                          key={entry.key}
+                          className="flex gap-3 rounded-xl border px-3 py-2 text-sm"
+                          style={{
+                            backgroundColor: productSemanticColors.cardMuted,
+                            borderColor: isSelected
+                              ? productSemanticColors.primaryAction
+                              : productSemanticColors.border,
+                            color: productSemanticColors.textPrimary,
+                            opacity: disabled ? 0.55 : 1,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={isSelected}
+                            disabled={disabled}
+                            onChange={() => toggleInstallableEntry(entry)}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="font-semibold">{entry.title}</span>
+                              <span
+                                className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                style={{
+                                  borderColor: productSemanticColors.borderStrong,
+                                  backgroundColor: productSemanticColors.card,
+                                  color: productSemanticColors.textSecondary,
+                                }}
+                              >
+                                {badge}
+                              </span>
+                            </span>
+                            {metaParts.length > 0 ? (
+                              <span
+                                className="mt-1 block text-xs"
+                                style={{ color: productSemanticColors.textSecondary }}
+                              >
+                                {metaParts.join(" · ")}
+                              </span>
+                            ) : null}
+                            {!isSelected && (!onLeaf || usedNode) ? (
+                              <span
+                                className="mt-1 block text-[11px]"
+                                style={{ color: productSemanticColors.textMeta }}
+                              >
+                                {!nid
+                                  ? "Нет узла — установка через это событие недоступна."
+                                  : !onLeaf
+                                    ? "Узел не конечный для этого ТС."
+                                    : "Этот узел уже добавлен в событие."}
+                              </span>
+                            ) : null}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             <div
               className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4"
@@ -531,47 +1068,16 @@ function BasicServiceEventModalInner({
                 {form.items.map((row, rowIndex) => (
                   <div
                     key={row.key}
-                    className="flex flex-wrap items-end gap-2 rounded-xl border p-3"
+                    className="space-y-2 rounded-xl border p-3"
                     style={{ borderColor: productSemanticColors.border, backgroundColor: productSemanticColors.card }}
                   >
-                    <label className="min-w-[200px] flex-1 text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                      {`Узел ${rowIndex + 1}`}
-                      <select
-                        value={row.nodeId}
-                        onChange={(e) =>
-                          updateForm((prev) => patchItemAt(prev, rowIndex, { nodeId: e.target.value }))
-                        }
-                        style={{
-                          ...SERVICE_EVENT_MODAL_FIELD_BASE,
-                          colorScheme: "dark",
-                        }}
-                        className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
-                      >
-                        <option value="">Выберите узел</option>
-                        {leafNodeOptions
-                          .filter(
-                            (option) =>
-                              option.id === row.nodeId.trim() ||
-                              !form.items.some((it, i) => i !== rowIndex && it.nodeId.trim() === option.id)
-                          )
-                          .map((option) => (
-                            <option key={option.id} value={option.id}>
-                              {`${"— ".repeat(Math.max(0, option.level - 1))}${option.name}`}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                    {form.mode === "ADVANCED" ? (
-                      <label className="min-w-[160px] text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
-                        Тип работы
+                    <div className="flex flex-wrap items-end gap-2">
+                      <label className="min-w-[200px] flex-1 text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                        {`Узел ${rowIndex + 1}`}
                         <select
-                          value={row.actionType}
+                          value={row.nodeId}
                           onChange={(e) =>
-                            updateForm((prev) =>
-                              patchItemAt(prev, rowIndex, {
-                                actionType: e.target.value as ServiceActionType,
-                              })
-                            )
+                            updateForm((prev) => patchItemAt(prev, rowIndex, { nodeId: e.target.value }))
                           }
                           style={{
                             ...SERVICE_EVENT_MODAL_FIELD_BASE,
@@ -579,33 +1085,223 @@ function BasicServiceEventModalInner({
                           }}
                           className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
                         >
-                          {SERVICE_ACTION_TYPE_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
+                          <option value="">Выберите узел</option>
+                          {leafNodeOptions
+                            .filter(
+                              (option) =>
+                                option.id === row.nodeId.trim() ||
+                                !form.items.some((it, i) => i !== rowIndex && it.nodeId.trim() === option.id)
+                            )
+                            .map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {`${"— ".repeat(Math.max(0, option.level - 1))}${option.name}`}
+                              </option>
+                            ))}
                         </select>
                       </label>
-                    ) : null}
-                    {form.items.length > 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => updateForm((prev) => removeItemAt(prev, rowIndex))}
-                        className="mb-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:opacity-90"
-                        style={{
-                          borderColor: productSemanticColors.borderStrong,
-                          color: productSemanticColors.error,
-                          backgroundColor: productSemanticColors.cardSubtle,
-                        }}
+                      {form.mode === "ADVANCED" ? (
+                        <label className="min-w-[160px] text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                          Тип работы
+                          <select
+                            value={row.actionType}
+                            onChange={(e) =>
+                              updateForm((prev) =>
+                                patchItemAt(prev, rowIndex, {
+                                  actionType: e.target.value as ServiceActionType,
+                                })
+                              )
+                            }
+                            style={{
+                              ...SERVICE_EVENT_MODAL_FIELD_BASE,
+                              colorScheme: "dark",
+                            }}
+                            className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                          >
+                            {SERVICE_ACTION_TYPE_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : null}
+                      {form.items.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => updateForm((prev) => removeItemAt(prev, rowIndex))}
+                          className="mb-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:opacity-90"
+                          style={{
+                            borderColor: productSemanticColors.borderStrong,
+                            color: productSemanticColors.error,
+                            backgroundColor: productSemanticColors.cardSubtle,
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      ) : null}
+                    </div>
+                    {form.mode === "ADVANCED" ? (
+                      <div
+                        className="space-y-2 border-t pt-2"
+                        style={{ borderTopColor: productSemanticColors.border }}
                       >
-                        Удалить
-                      </button>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                            Наименование запчасти
+                            <input
+                              value={row.partName}
+                              onChange={(e) =>
+                                updateForm((prev) =>
+                                  patchItemAt(prev, rowIndex, { partName: e.target.value })
+                                )
+                              }
+                              maxLength={500}
+                              placeholder="Опционально"
+                              style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                              className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                            />
+                          </label>
+                          <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                            Артикул (SKU)
+                            <input
+                              value={row.sku}
+                              onFocus={() => setSkuSearchRowIndex(rowIndex)}
+                              onChange={(e) =>
+                                updateForm((prev) =>
+                                  patchItemAt(prev, rowIndex, { sku: e.target.value })
+                                )
+                              }
+                              maxLength={200}
+                              placeholder="Опционально"
+                              autoComplete="off"
+                              style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                              className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                            />
+                          </label>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                            Кол-во
+                            <input
+                              value={row.quantity}
+                              onChange={(e) =>
+                                updateForm((prev) =>
+                                  patchItemAt(prev, rowIndex, { quantity: e.target.value })
+                                )
+                              }
+                              inputMode="numeric"
+                              placeholder="1"
+                              style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                              className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                            />
+                          </label>
+                          <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                            Запчасти, ₽
+                            <input
+                              value={row.partCost}
+                              onChange={(e) =>
+                                updateForm((prev) =>
+                                  patchItemAt(prev, rowIndex, { partCost: e.target.value })
+                                )
+                              }
+                              inputMode="decimal"
+                              placeholder="0"
+                              style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                              className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                            />
+                          </label>
+                          <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                            Работа, ₽
+                            <input
+                              value={row.laborCost}
+                              onChange={(e) =>
+                                updateForm((prev) =>
+                                  patchItemAt(prev, rowIndex, { laborCost: e.target.value })
+                                )
+                              }
+                              inputMode="decimal"
+                              placeholder="0"
+                              style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                              className="focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                            />
+                          </label>
+                        </div>
+                        <label className="block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
+                          Комментарий к строке
+                          <input
+                            value={row.comment}
+                            onChange={(e) =>
+                              updateForm((prev) =>
+                                patchItemAt(prev, rowIndex, { comment: e.target.value })
+                              )
+                            }
+                            placeholder="Опционально"
+                            style={SERVICE_EVENT_MODAL_FIELD_BASE}
+                            className="[&::placeholder]:text-[#AAB4C0] focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#F97316]/40"
+                          />
+                        </label>
+                      </div>
                     ) : null}
                   </div>
                 ))}
               </div>
 
-              {form.mode === "BASIC" &&
+              {form.mode === "ADVANCED" &&
+              (form.items[effectiveSkuRowIndex]?.sku ?? "").trim().length >= 2 ? (
+                <div
+                  className="mt-3 rounded-xl border px-3 py-2"
+                  style={{
+                    borderColor: productSemanticColors.borderStrong,
+                    backgroundColor: productSemanticColors.cardSubtle,
+                  }}
+                >
+                  <p className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                    Поиск в каталоге по артикулу (строка {effectiveSkuRowIndex + 1})
+                  </p>
+                  {serviceEventSkuLoading ? (
+                    <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
+                      Ищем совпадения...
+                    </p>
+                  ) : null}
+                  {!serviceEventSkuLoading && serviceEventSkuError ? (
+                    <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
+                      {serviceEventSkuError}
+                    </p>
+                  ) : null}
+                  {!serviceEventSkuLoading && !serviceEventSkuError && serviceEventSkuResults.length === 0 ? (
+                    <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
+                      Ничего не найдено.
+                    </p>
+                  ) : null}
+                  {!serviceEventSkuLoading && serviceEventSkuResults.length > 0 ? (
+                    <div className="mt-2 space-y-1.5">
+                      {serviceEventSkuResults.map((sku) => {
+                        const partNumber = pickSkuPartNumberOrFallback(sku, "");
+                        return (
+                          <button
+                            key={sku.id}
+                            type="button"
+                            onClick={() => applyServiceEventSkuSuggestion(sku)}
+                            className="w-full rounded-lg border px-2.5 py-2 text-left text-xs transition hover:opacity-90"
+                            style={{
+                              borderColor: productSemanticColors.borderStrong,
+                              backgroundColor: productSemanticColors.cardMuted,
+                              color: productSemanticColors.textPrimary,
+                            }}
+                          >
+                            <div style={{ fontWeight: 600 }}>{partNumber || "Без артикула"}</div>
+                            <div style={{ color: productSemanticColors.textSecondary }}>
+                              {sku.brandName} · {sku.canonicalName}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {(form.mode === "BASIC" || form.mode === "ADVANCED") &&
               leafNodeOptions.filter((o) => !form.items.some((it) => it.nodeId.trim() === o.id)).length > 0 ? (
                 <button
                   type="button"
@@ -682,6 +1378,12 @@ function BasicServiceEventModalInner({
                   <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: productSemanticColors.textMeta }}>
                     Стоимость
                   </p>
+                  {form.mode === "ADVANCED" ? (
+                    <p className="mt-1 text-[11px] leading-snug" style={{ color: productSemanticColors.textMuted }}>
+                      Итог по запчастям и работе — сумма по всем строкам узлов плюс суммы в полях «Запчасти» и «Работа»
+                      ниже (можно задать только строки, только блок ниже или оба).
+                    </p>
+                  ) : null}
                 </div>
                 <label className="text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                   Запчасти
@@ -734,6 +1436,8 @@ function BasicServiceEventModalInner({
                 ) : null}
               </div>
 
+              {form.mode === "BASIC" ? (
+                <>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <p className="sm:col-span-2 text-xs font-semibold" style={{ color: productSemanticColors.textMeta }}>
                   Запчасть (опционально, для справки в журнале)
@@ -742,6 +1446,7 @@ function BasicServiceEventModalInner({
                   Артикул (SKU)
                   <input
                     value={getAnchorSku(form)}
+                    onFocus={() => setSkuSearchRowIndex(0)}
                     onChange={(e) => updateForm((prev) => patchAnchorItem(prev, { sku: e.target.value }))}
                     maxLength={200}
                     placeholder="Опционально"
@@ -816,79 +1521,8 @@ function BasicServiceEventModalInner({
                   ) : null}
                 </div>
               ) : null}
-
-              <div
-                className="mt-4 rounded-2xl border p-4"
-                style={{
-                  backgroundColor: productSemanticColors.cardSubtle,
-                  borderColor: productSemanticColors.borderStrong,
-                }}
-              >
-                <h3 className="text-sm font-semibold" style={{ color: productSemanticColors.textPrimary }}>
-                  Купленные, но не установленные детали
-                </h3>
-                {uninstalledExpensesLoading ? (
-                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                    Загружаю купленные детали...
-                  </p>
-                ) : null}
-                {uninstalledExpensesError ? (
-                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
-                    {uninstalledExpensesError}
-                  </p>
-                ) : null}
-                {!uninstalledExpensesLoading && !uninstalledExpensesError && orderedUninstalledExpenses.length === 0 ? (
-                  <p className="mt-2 text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                    Нет купленных деталей без установки.
-                  </p>
-                ) : null}
-                {orderedUninstalledExpenses.length > 0 ? (
-                  <div className="mt-3 grid gap-2">
-                    {orderedUninstalledExpenses.map((expense) => {
-                      const isSelected = form.installedExpenseItemIds.includes(expense.id);
-                      const isSameNode =
-                        Boolean(expense.nodeId) && form.items.some((it) => it.nodeId.trim() === expense.nodeId);
-                      return (
-                        <label
-                          key={expense.id}
-                          className="flex gap-3 rounded-xl border px-3 py-2 text-sm"
-                          style={{
-                            backgroundColor: productSemanticColors.cardMuted,
-                            borderColor: isSelected
-                              ? productSemanticColors.primaryAction
-                              : productSemanticColors.border,
-                            color: productSemanticColors.textPrimary,
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleInstalledExpenseSelection(expense)}
-                            className="mt-1"
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="block font-semibold">
-                              {expense.title}
-                              {isSameNode ? (
-                                <span className="ml-2 text-[11px]" style={{ color: productSemanticColors.textMeta }}>
-                                  этот узел
-                                </span>
-                              ) : null}
-                            </span>
-                            <span className="mt-1 block text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                              {formatExpenseAmountRu(expense.amount)} {expense.currency}
-                              {" · "}
-                              {new Date(expense.purchasedAt ?? expense.expenseDate).toLocaleDateString("ru-RU")}
-                              {expense.node?.name ? ` · ${expense.node.name}` : ""}
-                              {expense.vendor ? ` · ${expense.vendor}` : ""}
-                            </span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
+                </>
+              ) : null}
 
               <label className="mt-4 block text-xs font-medium" style={SERVICE_EVENT_MODAL_LABEL_STYLE}>
                 Комментарий

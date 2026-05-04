@@ -101,11 +101,11 @@ Defined in `apps/app/app/_layout.tsx`:
 - Distinguishes `SERVICE` vs `STATE_UPDATE`
 - Action to `vehicles/[id]/service-events/new`
 
-### 3.5 Add Service Event (`vehicles/[id]/service-events/new.tsx`)
-- Uses node tree and vehicle context for form defaults and constraints
-- Leaf-node-only selection
-- Submit to `/api/vehicles/[id]/service-events`
-- Supports return source (from log/tree)
+### 3.5 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `_components/basic-service-event-bundle-form.tsx`)
+- Screen loads node tree / vehicle / existing event (edit/repeat); builds initial **`AddServiceEventFormValues`** with shared domain helpers (same contract as web `BasicServiceEventModal`).
+- Bundle UI: multiple leaf rows in BASIC, parts + labor + total, SKU lookup, uninstalled expenses, JSON — see [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md).
+- Submit to `/api/vehicles/[id]/service-events` (create) or update route when editing.
+- Supports return `source` (service-log, tree, attention, wishlist, …).
 
 ### 3.6 Update Vehicle State (`vehicles/[id]/state.tsx`)
 - Prefills current state

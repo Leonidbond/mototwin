@@ -159,6 +159,23 @@ GET /api/service-bundle-templates/:templateId
 
 ---
 
+## Installable picker для окна сервисного события
+
+```text
+GET /api/vehicles/:vehicleId/installable?nodeId=…
+```
+
+Сводный пикер «Готово к установке» в окне создания / редактирования сервисного события. Собирает в один список:
+
+- активный `PartWishlistItem` (`status in NEEDED | ORDERED | BOUGHT`);
+- uninstalled `ExpenseItem` (`purchaseStatus=PURCHASED`, `installationStatus=NOT_INSTALLED`, `serviceEventId=null`).
+
+Пары дедуплицируются по `expense.shoppingListItemId == wishlist.id` и склеиваются в один entry с `source: "wishlist+expense"`. Чистая wishlist-позиция получает `source: "wishlist"`, чистый расход — `source: "expense"`. Внутри списка купленное (`expense | wishlist BOUGHT | wishlist+expense`) сортируется выше `ORDERED`, затем `NEEDED`; внутри группы — `purchasedAt desc`, fallback `expenseDate desc`. Тип ответа — `InstallableForServiceEventResponse` из `@mototwin/types`. UI при сохранении события линкует выбранные расходы к `serviceEventId` идемпотентно (в т.ч. если `syncExpenseItemForServiceEvent` уже проставил связь в той же транзакции — см. `linkInstalledExpenseItemsToServiceEvent` в репозитории).
+
+Старый `GET /api/expenses/uninstalled` оставлен как deprecated-helper в API client — UI окна сервисного события его больше не зовёт.
+
+---
+
 # 5. POST /api/vehicles/:vehicleId/service-events
 
 ## Basic mode payload
@@ -263,8 +280,8 @@ export const createServiceEventSchema = z.object({
 3. Обновляем статусы **только выбранных nodeId**.
 4. В `BASIC` режиме запрещаем `sku`, `partName`, `quantity`.
 5. В `ADVANCED` режиме разрешаем детализацию.
-6. `totalCost = partsCost + laborCost`.
-7. Если в `ADVANCED` режиме суммы по item заполнены, верхние суммы можно считать автоматически.
+6. `totalCost = partsCost + laborCost` (на уровне события после нормализации).
+7. В **`ADVANCED`** итоговые **`partsCost` / `laborCost`** на событии = **сумма по строкам** (`partCost` / `laborCost` у items) **+** значения из полей «Запчасти»/«Работа» в блоке данных события (верх формы). Верхние поля **дополняют** строки, а не заменяют их. При **редактировании** клиент показывает в верхних полях **остаток** (сохранённое минус сумма строк), чтобы повторный PATCH не задвоил суммы; при создании пользователь вводит строки и при необходимости доп. сумму сверху.
 
 ---
 
@@ -277,3 +294,12 @@ export const createServiceEventSchema = z.object({
 5. Сделать `POST /api/vehicles/:vehicleId/service-events`.
 6. Сделать список событий.
 7. Потом уже UI формы: Basic / Advanced.
+
+---
+
+# 9. Статус (волна 3, 2026-05)
+
+- **Шаблоны:** реализованы по п. 2 (модели, сид, `GET /api/service-bundle-templates`, UI выбора шаблона).
+- **Wishlist multi-install:** `installedPartsJson` поддерживает массив wishlist-записей; доменные парсеры `getWishlistItemIdsFromInstalledPartsJson` / `getWishlistItemIdFromInstalledPartsJson`; формы web/Expo — блок выбора нескольких активных позиций; синк расходов и wishlist-статусов по всем id.
+- **Downstream дерева узлов:** при расчёте «последнего сервиса» на leaf (`loadVehicleNodeTreeJson`, `computeGarageAttentionByVehicleId`) используются все узлы из `service_events` → `service_event_items`, а не только anchor на `service_events.node_id` (см. `expandBundleServiceEventsToLeafNodeRows` в `src/lib/vehicle-node-tree-internal.ts`).
+- **ADVANCED-деньги и журнал:** нормализация create/edit в `@mototwin/domain` (`normalizeAddServiceEventPayload` и правки) и превью «Итого» в форме совпадают с п. 7 выше; в журнале (web/Expo) у строк bundle отображаются подписи стоимости из `ServiceLogBundleItemSummary.lineCostRu` / `formatBundleItemLineCostsRu`.

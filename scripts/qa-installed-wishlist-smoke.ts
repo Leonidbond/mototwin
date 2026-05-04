@@ -1,5 +1,9 @@
 /**
  * QA smoke: wishlist SKU → INSTALLED → service event (API parity with checklist item 6).
+ *
+ * Дополнительный кейс: единый пикер «Готово к установке» — три строки в одном
+ * событии (чистый expense + wishlist BOUGHT с linked expense + wishlist NEEDED).
+ *
  * Requires: DATABASE_URL, dev server on BASE_URL, DB seeded with demo user + QA catalog.
  *
  *   BASE_URL=http://127.0.0.1:3000 npx tsx scripts/qa-installed-wishlist-smoke.ts
@@ -16,7 +20,11 @@ import {
   normalizeAddServiceEventPayload,
   WISHLIST_INSTALL_SERVICE_TYPE_RU,
 } from "@mototwin/domain";
-import type { PartWishlistItem } from "@mototwin/types";
+import type {
+  ExpenseItem,
+  InstallableForServiceEventResponse,
+  PartWishlistItem,
+} from "@mototwin/types";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3000";
 
@@ -176,6 +184,216 @@ async function main() {
     title: payload.title,
     totalCost: payload.totalCost,
     currency: payload.currency,
+  });
+
+  await runMultiInstallableSmoke(vid, v.odometer, v.engineHours);
+}
+
+/**
+ * Сценарий: пикер «Готово к установке» сводит активный wishlist и uninstalled
+ * расходы в один список и позволяет установить их одним сервисным событием.
+ *
+ * Готовим три позиции на трёх разных листовых узлах:
+ *   1. Чистый ExpenseItem (PURCHASED + NOT_INSTALLED, без `shoppingListItemId`).
+ *   2. Wishlist в статусе BOUGHT с `costAmount`/`currency` — backend в `POST
+ *      /wishlist` через `syncExpenseItemForWishlistItem` создаёт привязанный
+ *      `ExpenseItem` (`shoppingListItemId == wishlist.id`), endpoint должен
+ *      смержить их в `wishlist+expense`.
+ *   3. Wishlist в статусе NEEDED — чистый `wishlist`.
+ *
+ * Затем создаём одно сервисное событие, где `installedPartsJson` содержит две
+ * wishlist-записи, а `installedExpenseItemIds` — оба расхода. После сохранения
+ * проверяем: оба wishlist стали INSTALLED, оба expense получили
+ * `installationStatus=INSTALLED` + `serviceEventId == event.id`.
+ */
+async function runMultiInstallableSmoke(
+  vid: string,
+  vehicleOdometer: number,
+  vehicleEngineHours: number | null
+) {
+  const headers = { "Content-Type": "application/json" } as const;
+
+  const prismaPick = makePrisma();
+  const leaves = await prismaPick.node.findMany({
+    where: { children: { none: {} } },
+    select: { id: true, code: true },
+    take: 3,
+    orderBy: { code: "asc" },
+  });
+  await prismaPick.$disconnect();
+  assert(leaves.length >= 3, "need at least 3 distinct global leaf nodes for installable smoke");
+  const [nodeExpenseOnly, nodeWishlistBought, nodeWishlistNeeded] = leaves;
+
+  // 1. Standalone ExpenseItem (no wishlist link).
+  const standaloneExpenseRes = await fetch(`${BASE}/api/expenses`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      vehicleId: vid,
+      nodeId: nodeExpenseOnly.id,
+      category: "PART",
+      installStatus: "BOUGHT_NOT_INSTALLED",
+      purchaseStatus: "PURCHASED",
+      installationStatus: "NOT_INSTALLED",
+      expenseDate: new Date().toISOString(),
+      title: "[QA installable] standalone expense",
+      amount: 1230,
+      currency: "RUB",
+      partName: "Standalone smoke part",
+      partSku: "SMOKE-EXP-1",
+      vendor: "Acme",
+      purchasedAt: new Date().toISOString(),
+    }),
+  });
+  await assertResponseOk(standaloneExpenseRes, "POST standalone expense");
+  const standaloneExpenseBody = (await standaloneExpenseRes.json()) as { expense: ExpenseItem };
+  const standaloneExpenseId = standaloneExpenseBody.expense.id;
+
+  // 2. Wishlist BOUGHT — backend auto-creates linked ExpenseItem.
+  const boughtRes = await fetch(`${BASE}/api/vehicles/${vid}/wishlist`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      title: "[QA installable] wishlist BOUGHT",
+      nodeId: nodeWishlistBought.id,
+      quantity: 1,
+      status: "BOUGHT",
+      costAmount: 999,
+      currency: "RUB",
+    }),
+  });
+  await assertResponseOk(boughtRes, "POST wishlist BOUGHT");
+  const boughtBody = (await boughtRes.json()) as { item: PartWishlistItem };
+  const boughtWishlistId = boughtBody.item.id;
+
+  // 3. Wishlist NEEDED.
+  const neededRes = await fetch(`${BASE}/api/vehicles/${vid}/wishlist`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      title: "[QA installable] wishlist NEEDED",
+      nodeId: nodeWishlistNeeded.id,
+      quantity: 2,
+      status: "NEEDED",
+      costAmount: null,
+      currency: null,
+    }),
+  });
+  await assertResponseOk(neededRes, "POST wishlist NEEDED");
+  const neededBody = (await neededRes.json()) as { item: PartWishlistItem };
+  const neededWishlistId = neededBody.item.id;
+
+  // GET /installable should expose all 3 with proper sources + dedupe.
+  const installableRes = await fetch(`${BASE}/api/vehicles/${vid}/installable`);
+  await assertResponseOk(installableRes, "GET installable");
+  const installable = (await installableRes.json()) as InstallableForServiceEventResponse;
+
+  const expenseEntry = installable.items.find((e) => e.expenseItemId === standaloneExpenseId);
+  assert(expenseEntry, "installable: standalone expense entry");
+  assert(expenseEntry.source === "expense", `expense source got=${expenseEntry.source}`);
+  assert(expenseEntry.wishlistItemId == null, "expense entry has no wishlist link");
+
+  const boughtEntry = installable.items.find((e) => e.wishlistItemId === boughtWishlistId);
+  assert(boughtEntry, "installable: wishlist BOUGHT entry");
+  assert(
+    boughtEntry.source === "wishlist+expense",
+    `wishlist+expense source got=${boughtEntry.source}`
+  );
+  assert(boughtEntry.expenseItemId != null, "wishlist+expense should have linked expense id");
+
+  const neededEntry = installable.items.find((e) => e.wishlistItemId === neededWishlistId);
+  assert(neededEntry, "installable: wishlist NEEDED entry");
+  assert(neededEntry.source === "wishlist", `wishlist source got=${neededEntry.source}`);
+  assert(neededEntry.expenseItemId == null, "wishlist NEEDED has no expense link");
+
+  // Build a service event payload that includes all 3 lines.
+  const installedExpenseItemIds = [standaloneExpenseId, boughtEntry.expenseItemId!];
+  const installedPartsJson = JSON.stringify([
+    {
+      source: "wishlist",
+      wishlistItemId: boughtWishlistId,
+      title: boughtEntry.title,
+      quantity: boughtEntry.quantity ?? 1,
+      skuId: null,
+      skuLabel: null,
+    },
+    {
+      source: "wishlist",
+      wishlistItemId: neededWishlistId,
+      title: neededEntry.title,
+      quantity: neededEntry.quantity ?? 1,
+      skuId: null,
+      skuLabel: null,
+    },
+  ]);
+
+  const eventDateIso = new Date().toISOString();
+  const sePost = await fetch(`${BASE}/api/vehicles/${vid}/service-events`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      title: "[QA installable] 3-row install",
+      mode: "BASIC",
+      eventDate: eventDateIso,
+      odometer: vehicleOdometer,
+      engineHours: vehicleEngineHours,
+      partsCost: null,
+      laborCost: null,
+      totalCost: null,
+      currency: "RUB",
+      comment: "scripts/qa-installed-wishlist-smoke.ts (multi-installable)",
+      installedPartsJson: JSON.parse(installedPartsJson),
+      installedExpenseItemIds,
+      items: [
+        { nodeId: nodeExpenseOnly.id, actionType: "REPLACE", comment: null },
+        { nodeId: nodeWishlistBought.id, actionType: "REPLACE", comment: null },
+        { nodeId: nodeWishlistNeeded.id, actionType: "REPLACE", comment: null },
+      ],
+    }),
+  });
+  await assertResponseOk(sePost, "POST service-event (multi-installable)");
+  const seBody = (await sePost.json()) as { serviceEvent: { id: string } };
+  const eventId = seBody.serviceEvent.id;
+
+  const prismaCheck = makePrisma();
+  try {
+    const wishlistAfter = await prismaCheck.partWishlistItem.findMany({
+      where: { id: { in: [boughtWishlistId, neededWishlistId] } },
+      select: { id: true, status: true },
+    });
+    for (const w of wishlistAfter) {
+      assert(
+        w.status === "INSTALLED",
+        `wishlist ${w.id} should be INSTALLED, got ${w.status}`
+      );
+    }
+
+    const expensesAfter = await prismaCheck.expenseItem.findMany({
+      where: { id: { in: installedExpenseItemIds } },
+      select: { id: true, installationStatus: true, serviceEventId: true },
+    });
+    assert(expensesAfter.length === installedExpenseItemIds.length, "all expenses still present");
+    for (const exp of expensesAfter) {
+      assert(
+        exp.installationStatus === "INSTALLED",
+        `expense ${exp.id} installationStatus got ${exp.installationStatus}`
+      );
+      assert(
+        exp.serviceEventId === eventId,
+        `expense ${exp.id} serviceEventId got ${exp.serviceEventId} expected ${eventId}`
+      );
+    }
+  } finally {
+    await prismaCheck.$disconnect();
+  }
+
+  console.log("OK installable picker smoke", {
+    vehicleId: vid,
+    serviceEventId: eventId,
+    expenseEntryId: standaloneExpenseId,
+    boughtWishlistId,
+    neededWishlistId,
+    leafNodes: [nodeExpenseOnly.code, nodeWishlistBought.code, nodeWishlistNeeded.code],
   });
 }
 

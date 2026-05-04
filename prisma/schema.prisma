@@ -379,10 +379,41 @@ model Node {
   partWishlistItems PartWishlistItem[]
   expenseItems      ExpenseItem[]
   partSkusPrimary   PartSku[]            @relation("PartSkuPrimaryNode")
-  partSkuNodeLinks  PartSkuNodeLink[]
+  partSkuNodeLinks              PartSkuNodeLink[]
+  serviceBundleTemplateItems    ServiceBundleTemplateItem[]
 
   @@index([parentId])
   @@map("nodes")
+}
+
+model ServiceBundleTemplate {
+  id                String   @id @default(cuid())
+  title             String
+  description       String?
+  category          String?
+  isRegulationBased Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  items ServiceBundleTemplateItem[]
+
+  @@map("service_bundle_templates")
+}
+
+model ServiceBundleTemplateItem {
+  id                String            @id @default(cuid())
+  templateId        String
+  nodeId            String
+  defaultActionType ServiceActionType @default(SERVICE)
+  isRequired        Boolean           @default(true)
+  sortOrder         Int               @default(0)
+
+  template ServiceBundleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  node     Node                  @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+
+  @@index([templateId])
+  @@index([nodeId])
+  @@map("service_bundle_template_items")
 }
 
 model PartSku {

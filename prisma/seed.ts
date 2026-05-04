@@ -2206,6 +2206,9 @@ async function main() {
     )
   );
 
+  const { seedServiceBundleTemplates } = await import("./seed-service-bundle-templates");
+  const serviceBundleTemplateStats = await seedServiceBundleTemplates(prisma, nodeIdByCode);
+
   const partCatalogStats = await seedPartCatalogFromJson(nodeIdByCode);
   const partCatalogQaStats = await seedPartCatalogQaFromJson(nodeIdByCode);
   const expenseDemoStats = await seedExpenseDemoData({
@@ -2407,6 +2410,7 @@ async function main() {
     ...partCatalogQaStats,
     ...expenseDemoStats,
     ...treeExpenseDemoStats,
+    ...serviceBundleTemplateStats,
     qaDemoCatalogVehicles,
   });
 }

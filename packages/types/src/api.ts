@@ -1,4 +1,4 @@
-import type { PartWishlistItem } from "./part-wishlist";
+import type { PartWishlistItem, PartWishlistItemStatus } from "./part-wishlist";
 import type { PartSkuViewModel } from "./part-catalog";
 import type { PartRecommendationViewModel } from "./part-recommendation";
 import type { AddServiceKitToWishlistResult, ServiceKitViewModel } from "./service-kit";
@@ -24,6 +24,7 @@ import type {
 } from "./vehicle";
 import type { UserSettings } from "./user-settings";
 import type { NodeTreeItem, TopServiceNodeItem } from "./node";
+import type { ServiceBundleTemplateWire } from "./service-bundle-template";
 
 /** Backend often returns `{ error: string }` on 4xx/5xx. */
 export type MotoTwinApiErrorBody = {
@@ -79,6 +80,39 @@ export type {
   UpdateExpenseItemResponse,
 };
 
+/**
+ * Источник записи в едином пикере «Готово к установке» внутри окна сервисного
+ * события. `wishlist+expense` — wishlist-позиция, к которой уже привязан
+ * stand-alone `ExpenseItem` (через `shoppingListItemId`).
+ */
+export type InstallableEntrySource = "wishlist" | "expense" | "wishlist+expense";
+
+export type InstallableForServiceEventEntry = {
+  /** Уникальный ключ строки внутри списка (используется как React key и в Set выбора). */
+  key: string;
+  source: InstallableEntrySource;
+  wishlistItemId: string | null;
+  expenseItemId: string | null;
+  title: string;
+  partName: string | null;
+  partSku: string | null;
+  nodeId: string | null;
+  nodeName: string | null;
+  vendor: string | null;
+  quantity: number | null;
+  amount: number | null;
+  currency: string | null;
+  wishlistStatus: PartWishlistItemStatus | null;
+  /** True, если уже есть оплаченная сумма (`amount > 0` + `currency`). */
+  isPaid: boolean;
+  purchasedAt: string | null;
+  expenseDate: string | null;
+};
+
+export type InstallableForServiceEventResponse = {
+  items: InstallableForServiceEventEntry[];
+};
+
 export type UpdateVehicleStateResponse = {
   vehicle: {
     id: string;
@@ -92,6 +126,10 @@ export type UpdateVehicleProfileResponse = UpdateVehicleProfileResult;
 
 export type BrandsResponse = {
   brands: BrandItem[];
+};
+
+export type ServiceBundleTemplatesResponse = {
+  templates: ServiceBundleTemplateWire[];
 };
 
 export type ModelsResponse = {

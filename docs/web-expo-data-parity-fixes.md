@@ -42,8 +42,8 @@
 ### Дефолт валюты — новое сервисное событие (2026-04-18)
 
 - Каноническое значение по умолчанию: **RUB** (ISO 4217), константа **`DEFAULT_ADD_SERVICE_EVENT_CURRENCY`** и **`createInitialAddServiceEventFormValues`** в `packages/domain/src/forms.ts`.
-- **Web** (`src/app/vehicles/[id]/page.tsx`): поле валюты инициализируется из shared helper; сброс формы подставляет тот же дефолт.
-- **Expo** (`apps/app/app/vehicles/[id]/service-events/new.tsx`): то же; placeholder поля «Валюта» — `RUB`.
+- **Web** (`service-log/page.tsx`, `vehicle-detail-client.tsx` через **`BasicServiceEventModal`**): валюта и остальные bundle-поля из тех же `createInitial*` / `createInitialAddServiceEventFormValues` в `packages/domain`.
+- **Expo** (`service-events/new.tsx` + **`basic-service-event-bundle-form.tsx`**): то же; placeholder поля «Валюта» — `RUB`.
 - В API по-прежнему уходит строка кода валюты (нормализация без изменения контракта).
 
 ## Файлы
@@ -66,14 +66,18 @@
 | `docs/shared-form-contracts.md` |
 | `packages/types/src/forms.ts` |
 | `src/app/vehicles/[id]/page.tsx` |
+| `src/app/vehicles/[id]/service-log/page.tsx` |
+| `src/app/vehicles/[id]/vehicle-detail-client.tsx` |
+| `src/app/vehicles/[id]/_components/BasicServiceEventModal.tsx` |
 | `apps/app/app/vehicles/[id]/service-events/new.tsx` |
+| `apps/app/app/vehicles/[id]/_components/basic-service-event-bundle-form.tsx` |
 
 ## Impact
 
 | Слой | Изменения |
 |------|-----------|
-| **Web** | Onboarding: единый источник дефолтов ride profile; форма нового сервисного события — дефолт валюты **RUB** из domain. |
-| **Expo** | Гараж, журнал, профиль, новый мотоцикл — ближе к web по данным и подписям; форма нового сервисного события — тот же дефолт **RUB**. |
+| **Web** | Onboarding: единый источник дефолтов ride profile; **bundle** сервисного события — дефолт валюты **RUB** и общие `createInitial*` из domain в **`BasicServiceEventModal`**. |
+| **Expo** | Гараж, журнал, профиль, новый мотоцикл — ближе к web по данным и подписям; bundle события — тот же дефолт **RUB** и те же хелперы в **`basic-service-event-bundle-form`**. |
 | **Shared** | Фильтр спек гаража; журнал — `buildServiceLogTimelineProps`; **`DEFAULT_ADD_SERVICE_EVENT_CURRENCY`** / initial values для сервисного события. |
 | **Backend** | Нет. |
 

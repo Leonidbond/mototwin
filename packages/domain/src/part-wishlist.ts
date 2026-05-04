@@ -12,7 +12,10 @@ import type {
 } from "@mototwin/types";
 import { PART_WISHLIST_DEFAULT_CURRENCY } from "@mototwin/types";
 import { getSkuDisplayPrice } from "./part-catalog";
-import { formatExpenseAmountRu } from "./expense-summary";
+import {
+  formatExpenseAmountRu,
+  stripLocaleMoneyGroupingSeparators,
+} from "./expense-summary";
 
 export const PART_WISHLIST_STATUS_ORDER: PartWishlistItemStatus[] = [
   "NEEDED",
@@ -48,6 +51,54 @@ export const WISHLIST_INSTALL_SERVICE_TYPE_RU = "Установка запчас
 export const WISHLIST_INSTALL_SERVICE_COMMENT_PREFIX_RU =
   "Установлена позиция из списка покупок:";
 
+function parseInstalledPartsJsonPayload(payload: unknown): unknown {
+  if (typeof payload === "string") {
+    try {
+      return JSON.parse(payload) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  return payload;
+}
+
+/** All `wishlistItemId` values from legacy single-object or array `installedPartsJson`. */
+export function getWishlistItemIdsFromInstalledPartsJson(payload: unknown): string[] {
+  const parsed = parseInstalledPartsJsonPayload(payload);
+  if (!parsed) {
+    return [];
+  }
+  if (Array.isArray(parsed)) {
+    const ids: string[] = [];
+    for (const el of parsed) {
+      if (el && typeof el === "object" && !Array.isArray(el)) {
+        const o = el as Record<string, unknown>;
+        if (o.source === "wishlist" && typeof o.wishlistItemId === "string") {
+          const id = o.wishlistItemId.trim();
+          if (id) {
+            ids.push(id);
+          }
+        }
+      }
+    }
+    return [...new Set(ids)];
+  }
+  if (typeof parsed === "object") {
+    const o = parsed as Record<string, unknown>;
+    if (o.source === "wishlist" && typeof o.wishlistItemId === "string") {
+      const id = o.wishlistItemId.trim();
+      return id ? [id] : [];
+    }
+  }
+  return [];
+}
+
+/** Backward-compatible: first wishlist id from `installedPartsJson`, if any. */
+export function getWishlistItemIdFromInstalledPartsJson(payload: unknown): string | null {
+  const ids = getWishlistItemIdsFromInstalledPartsJson(payload);
+  return ids[0] ?? null;
+}
+
 /** Heuristic: SERVICE event with install type and wishlist comment prefix (no new `ServiceEvent` kind). */
 export function isLikelyWishlistInstallServiceEvent(event: {
   eventKind?: ServiceEventKind;
@@ -66,6 +117,16 @@ export function isLikelyWishlistInstallServiceEvent(event: {
     const o = json as Record<string, unknown>;
     if (o.source === "wishlist") {
       return true;
+    }
+  }
+  if (Array.isArray(json)) {
+    for (const el of json) {
+      if (el && typeof el === "object" && !Array.isArray(el)) {
+        const o = el as Record<string, unknown>;
+        if (o.source === "wishlist") {
+          return true;
+        }
+      }
     }
   }
   const c = event.comment?.trim() ?? "";
@@ -222,7 +283,7 @@ export function validatePartWishlistFormValues(values: PartWishlistFormValues): 
 
   const trimmedCost = values.costAmount.trim();
   if (trimmedCost !== "") {
-    const normalizedCost = trimmedCost.replace(/\s/g, "").replace(",", ".");
+    const normalizedCost = stripLocaleMoneyGroupingSeparators(trimmedCost).replace(",", ".");
     const parsedCost = Number.parseFloat(normalizedCost);
     if (Number.isNaN(parsedCost) || parsedCost < 0) {
       errors.push("Стоимость должна быть неотрицательным числом.");
@@ -258,7 +319,7 @@ function parsedCostAmountFromWishlistForm(raw: string): number | null {
   if (trimmed === "") {
     return null;
   }
-  const normalized = trimmed.replace(/\s/g, "").replace(",", ".");
+  const normalized = stripLocaleMoneyGroupingSeparators(trimmed).replace(",", ".");
   const parsed = Number.parseFloat(normalized);
   if (Number.isNaN(parsed) || parsed < 0) {
     return null;

@@ -26,8 +26,10 @@ import type {
   ExpenseNodeSummaryResponse,
   MarkExpenseInstalledInput,
   MarkExpenseInstalledResponse,
+  ServiceBundleTemplatesResponse,
   ServiceEventsResponse,
   ServiceKitsResponse,
+  InstallableForServiceEventResponse,
   UninstalledExpensesResponse,
   VehicleTrashDeleteResponse,
   VehicleTrashListResponse,
@@ -191,12 +193,34 @@ export function createMotoTwinEndpoints(client: ApiClient) {
       return client.request<ExpenseNodeSummaryResponse>(`/api/expenses/node-summary?${q.toString()}`);
     },
 
+    /**
+     * @deprecated UI окна сервисного события теперь использует
+     * {@link createMotoTwinEndpoints | getInstallableForServiceEvent}, который
+     * сводит wishlist + uninstalled expenses в один список. Endpoint оставлен
+     * только для обратной совместимости / прямых сценариев расходов.
+     */
     getUninstalledExpenses(params: { vehicleId: string; nodeId?: string }) {
       const q = new URLSearchParams({ vehicleId: params.vehicleId.trim() });
       if (params.nodeId?.trim()) {
         q.set("nodeId", params.nodeId.trim());
       }
       return client.request<UninstalledExpensesResponse>(`/api/expenses/uninstalled?${q.toString()}`);
+    },
+
+    /**
+     * Сводный пикер «Готово к установке» для окна создания/редактирования
+     * сервисного события: активный wishlist + uninstalled standalone расходы,
+     * с дедупликацией по `expense.shoppingListItemId == wishlist.id`.
+     */
+    getInstallableForServiceEvent(vehicleId: string, params: { nodeId?: string } = {}) {
+      const q = new URLSearchParams();
+      if (params.nodeId?.trim()) {
+        q.set("nodeId", params.nodeId.trim());
+      }
+      const qs = q.toString();
+      return client.request<InstallableForServiceEventResponse>(
+        `/api/vehicles/${encodeURIComponent(vehicleId)}/installable${qs ? `?${qs}` : ""}`
+      );
     },
 
     createExpense(input: CreateExpenseItemInput) {
@@ -332,6 +356,10 @@ export function createMotoTwinEndpoints(client: ApiClient) {
 
     getBrands() {
       return client.request<BrandsResponse>("/api/brands");
+    },
+
+    getServiceBundleTemplates() {
+      return client.request<ServiceBundleTemplatesResponse>("/api/service-bundle-templates");
     },
 
     getModels(brandId: string) {
