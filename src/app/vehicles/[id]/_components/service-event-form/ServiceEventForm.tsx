@@ -1,0 +1,1504 @@
+"use client";
+
+/* eslint-disable react-hooks/set-state-in-effect -- async catalog/picker loaders mirror state from network responses (same pattern as the journal page modal). */
+
+import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import {
+  applyExpenseInstallToAddFormRow,
+  buildAddServiceEventCostBreakdownLines,
+  createEmptyBundleItemFormValues,
+  DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
+  filterLeafOptionsUnderTopNodeAncestors,
+  flattenNodeTreeToSelectOptions,
+  formatExpenseAmountRu,
+  getServiceActionTypeLabelRu,
+  getOrderedTopNodeIdsPresentInNodeTree,
+  mergeServiceBundleTemplateIntoAddFormValues,
+  mergeWishlistItemIntoAddFormValues,
+  parseExpenseAmountInputToNumberOrNull,
+  removeWishlistItemFromAddFormValues,
+  revertExpenseInstallFormPatch,
+  SERVICE_ACTION_TYPE_OPTIONS,
+  validateAddServiceEventFormValues,
+} from "@mototwin/domain";
+import { productSemanticColors } from "@mototwin/design-tokens";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import partsCartPageStyles from "../../parts/_components/PartsCartPage.module.css";
+import { PARTS_CART_REF } from "../../parts/_components/parts-cart-reference-theme";
+import type {
+  AddServiceEventFormValues,
+  BundleItemFormValues,
+  InstallableForServiceEventEntry,
+  NodeTreeItem,
+  PartSkuViewModel,
+  PartWishlistItem,
+  ServiceActionType,
+  ServiceBundleTemplateWire,
+  TopServiceNodeItem,
+} from "@mototwin/types";
+
+import { ServiceEventModeControl } from "./ServiceEventModeControl";
+import { PostSaveExplainer } from "./PostSaveExplainer";
+import { BasicInfoCard } from "./cards/BasicInfoCard";
+import { CostCard } from "./cards/CostCard";
+import { AdditionalCardFast } from "./cards/AdditionalCardFast";
+import { AdditionalCardExtended } from "./cards/AdditionalCardExtended";
+import { PreliminarySummaryCard } from "./cards/PreliminarySummaryCard";
+import { BundleHeader } from "./bundle/BundleHeader";
+import { BundleNodeRowFast } from "./bundle/BundleNodeRowFast";
+import { BundleNodeCardExtended } from "./bundle/BundleNodeCardExtended";
+import { BundleTotals } from "./bundle/BundleTotals";
+import { ServiceEventModalBodyUnified } from "./body/ServiceEventModalBodyUnified";
+import { AddNodeSheet } from "./overlays/AddNodeSheet";
+import { PreviewOverlay } from "./overlays/PreviewOverlay";
+import { TemplateContentsOverlay } from "./overlays/TemplateContentsOverlay";
+import {
+  InstallablePickerOverlay,
+  type InstallableFilter,
+} from "./overlays/InstallablePickerOverlay";
+import {
+  cloneAddServiceEventForm,
+  currencySuffix,
+  nodeBreadcrumbRu,
+  normalizePartNumber,
+  parseDdMmYyyyToYmd,
+  ymdToDdMmYyyy,
+} from "./utils";
+
+const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+
+function patchItemAt(
+  form: AddServiceEventFormValues,
+  index: number,
+  patch: Partial<BundleItemFormValues>
+): AddServiceEventFormValues {
+  const items = [...form.items];
+  if (!items[index]) {
+    return form;
+  }
+  items[index] = { ...items[index], ...patch };
+  return { ...form, items };
+}
+
+function removeItemAt(form: AddServiceEventFormValues, index: number): AddServiceEventFormValues {
+  if (form.items.length <= 1) {
+    return form;
+  }
+  return { ...form, items: form.items.filter((_, i) => i !== index) };
+}
+
+function appendEmptyItem(form: AddServiceEventFormValues): AddServiceEventFormValues {
+  const next = createEmptyBundleItemFormValues({
+    actionType: form.mode === "BASIC" ? form.commonActionType : "SERVICE",
+  });
+  return { ...form, items: [...form.items, next] };
+}
+
+function switchFormToAdvanced(prev: AddServiceEventFormValues): AddServiceEventFormValues {
+  return {
+    ...prev,
+    mode: "ADVANCED",
+    items: prev.items.map((it) => ({
+      ...it,
+      actionType: it.actionType ?? prev.commonActionType,
+    })),
+  };
+}
+
+function switchFormToBasic(prev: AddServiceEventFormValues): AddServiceEventFormValues {
+  const ct = prev.items[0]?.actionType ?? prev.commonActionType;
+  return {
+    ...prev,
+    mode: "BASIC",
+    commonActionType: ct,
+    items: prev.items.map((it) => ({ ...it, actionType: ct })),
+  };
+}
+
+function resolveInstallableExpenseTargetRow(
+  form: AddServiceEventFormValues,
+  entryNodeId: string | null | undefined
+): { form: AddServiceEventFormValues; rowIndex: number } {
+  const nid = entryNodeId?.trim() ?? "";
+  if (nid) {
+    const idx = form.items.findIndex((it) => it.nodeId.trim() === nid);
+    if (idx >= 0) {
+      return { form, rowIndex: idx };
+    }
+  }
+  const emptyIdx = form.items.findIndex((it) => !it.nodeId.trim());
+  if (emptyIdx >= 0) {
+    return { form, rowIndex: emptyIdx };
+  }
+  const appended = appendEmptyItem(form);
+  return { form: appended, rowIndex: appended.items.length - 1 };
+}
+
+function entryToSyntheticWishlistItem(
+  entry: InstallableForServiceEventEntry,
+  vehicleId: string
+): PartWishlistItem | null {
+  if (!entry.wishlistItemId || !entry.wishlistStatus) {
+    return null;
+  }
+  const nowIso = new Date().toISOString();
+  return {
+    id: entry.wishlistItemId,
+    vehicleId,
+    nodeId: entry.nodeId,
+    skuId: null,
+    title: entry.title,
+    quantity: entry.quantity ?? 1,
+    status: entry.wishlistStatus,
+    comment: null,
+    costAmount: entry.amount,
+    currency: entry.currency,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    node: entry.nodeId ? { id: entry.nodeId, name: entry.nodeName ?? "" } : null,
+    sku: null,
+  };
+}
+
+function entryMatchesInstallableFilter(
+  entry: InstallableForServiceEventEntry,
+  filter: InstallableFilter
+): boolean {
+  if (filter === "all") {
+    return true;
+  }
+  const isPaid =
+    entry.source === "expense" ||
+    entry.source === "wishlist+expense" ||
+    entry.wishlistStatus === "BOUGHT";
+  if (filter === "paid") {
+    return isPaid;
+  }
+  return entry.source === "wishlist" && !isPaid;
+}
+
+function pickSkuPartNumberOrFallback(sku: PartSkuViewModel, fallback: string): string {
+  const first = sku.partNumbers[0]?.number?.trim() ?? "";
+  return first || fallback;
+}
+
+export type ServiceEventFormProps = {
+  /** Bump when `initialForm` should be re-applied (navigate / repeat / prefill). */
+  resetKey: number;
+  initialForm: AddServiceEventFormValues;
+  vehicleId: string;
+  nodeTree: NodeTreeItem[];
+  vehicleOdometer: number | null;
+  vehicleEngineHours: number | null;
+  todayDateYmd: string;
+  editingServiceEventId: string | null;
+  submitError: string;
+  onClearSubmitError: () => void;
+  isSubmitting: boolean;
+  onSubmit: (form: AddServiceEventFormValues) => Promise<void>;
+  onCancel: () => void;
+  /** Page title; defaults by edit vs create. */
+  title?: string;
+  contextHint?: ReactNode;
+  /** Optional `max` on date input (e.g. today). */
+  eventDateMaxYmd?: string;
+  /** Optional `max` on odometer field. */
+  odometerInputMax?: number | null;
+  /** Reuse the visual shell of «Корзина замен и расходников» without touching that page. */
+  pageChrome?: "default" | "partsCart";
+  /** Optional subtitle under the page title in `partsCart` chrome. */
+  pageSubtitle?: string;
+};
+
+type ServiceEventFormInnerProps = Omit<ServiceEventFormProps, "resetKey">;
+
+function ServiceEventFormInner({
+  onCancel,
+  initialForm,
+  vehicleId,
+  nodeTree,
+  vehicleOdometer,
+  vehicleEngineHours,
+  todayDateYmd,
+  editingServiceEventId,
+  submitError,
+  onClearSubmitError,
+  isSubmitting,
+  onSubmit,
+  eventDateMaxYmd,
+  odometerInputMax,
+  title,
+  contextHint,
+  pageChrome = "default",
+  pageSubtitle,
+}: ServiceEventFormInnerProps) {
+  const [form, setForm] = useState<AddServiceEventFormValues>(() => cloneAddServiceEventForm(initialForm));
+  const [localValidationError, setLocalValidationError] = useState("");
+  const [skuSearchRowIndex, setSkuSearchRowIndex] = useState(0);
+
+  const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
+  const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
+  const [serviceEventSkuLoading, setServiceEventSkuLoading] = useState(false);
+  const [serviceEventSkuError, setServiceEventSkuError] = useState("");
+  const serviceEventSkuSearchGen = useRef(0);
+
+  const [bundleTemplates, setBundleTemplates] = useState<ServiceBundleTemplateWire[]>([]);
+  const [bundleTemplatesLoadError, setBundleTemplatesLoadError] = useState("");
+  const [selectedBundleTemplateId, setSelectedBundleTemplateId] = useState("");
+  const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+
+  const [installableEntries, setInstallableEntries] = useState<InstallableForServiceEventEntry[]>([]);
+  const [installableLoading, setInstallableLoading] = useState(false);
+  const [installableError, setInstallableError] = useState("");
+  const [installableFilter, setInstallableFilter] = useState<InstallableFilter>("all");
+  const [selectedInstallableKeys, setSelectedInstallableKeys] = useState<Set<string>>(() => new Set());
+  const [installablePickerOpen, setInstallablePickerOpen] = useState(false);
+
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [templateContentsOpen, setTemplateContentsOpen] = useState(false);
+  const [editingUnitRowIndex, setEditingUnitRowIndex] = useState<number | null>(null);
+  const [addNodeSheetOpen, setAddNodeSheetOpen] = useState(false);
+  const [collapsedBundleKeys, setCollapsedBundleKeys] = useState<Set<string>>(() => new Set());
+
+  const commentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [eventDateDisplay, setEventDateDisplay] = useState(() => ymdToDdMmYyyy(initialForm.eventDate));
+
+  useEffect(() => {
+    setEventDateDisplay(ymdToDdMmYyyy(form.eventDate));
+  }, [form.eventDate]);
+
+  const updateForm = useCallback(
+    (updater: (prev: AddServiceEventFormValues) => AddServiceEventFormValues) => {
+      setLocalValidationError("");
+      onClearSubmitError();
+      setForm(updater);
+    },
+    [onClearSubmitError]
+  );
+
+  const onPatch = useCallback(
+    (patch: Partial<AddServiceEventFormValues>) => {
+      updateForm((prev) => ({ ...prev, ...patch }));
+    },
+    [updateForm]
+  );
+
+  const toggleCollapsedBundleRow = useCallback((rowKey: string) => {
+    setCollapsedBundleKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowKey)) next.delete(rowKey);
+      else next.add(rowKey);
+      return next;
+    });
+  }, []);
+
+  const leafNodeOptions = useMemo(
+    () => flattenNodeTreeToSelectOptions(nodeTree).filter((option) => !option.hasChildren),
+    [nodeTree]
+  );
+  const leafNodePickerOptions = useMemo(
+    () =>
+      leafNodeOptions.map((option) => ({
+        id: option.id,
+        name: option.name,
+        level: option.level,
+        pathLabel: nodeBreadcrumbRu(nodeTree, option.id),
+      })),
+    [leafNodeOptions, nodeTree]
+  );
+  const orderedTopNodeIdsForPicker = useMemo(
+    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
+    [nodeTree, topServiceNodes]
+  );
+  const topLeafNodePickerOptions = useMemo(
+    () =>
+      filterLeafOptionsUnderTopNodeAncestors(
+        nodeTree,
+        leafNodePickerOptions,
+        orderedTopNodeIdsForPicker
+      ),
+    [leafNodePickerOptions, nodeTree, orderedTopNodeIdsForPicker]
+  );
+  const leafNodeIdsSet = useMemo(
+    () => new Set(leafNodeOptions.map((option) => option.id)),
+    [leafNodeOptions]
+  );
+
+  const effectiveSkuRowIndex =
+    form.mode === "BASIC" ? 0 : Math.min(Math.max(0, skuSearchRowIndex), Math.max(0, form.items.length - 1));
+
+  useEffect(() => {
+    setSkuSearchRowIndex((idx) => Math.min(Math.max(0, idx), Math.max(0, form.items.length - 1)));
+  }, [form.items.length]);
+
+  const preliminaryCostBreakdown = useMemo(
+    () => buildAddServiceEventCostBreakdownLines(form),
+    [form]
+  );
+
+  const stickyCostLines = useMemo(() => {
+    const cur = form.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+    const zero = `${formatExpenseAmountRu(0)} ${cur}`;
+    return {
+      parts: preliminaryCostBreakdown.parts ?? zero,
+      labor: preliminaryCostBreakdown.labor ?? zero,
+      total: preliminaryCostBreakdown.total ?? zero,
+    };
+  }, [form.currency, preliminaryCostBreakdown]);
+
+  const serviceEventCostTotalPreview = useMemo(() => {
+    const cur = form.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+    if (form.mode === "ADVANCED") {
+      let rowP = 0;
+      let rowL = 0;
+      for (const it of form.items) {
+        const pr = it.partCost.trim();
+        const lr = it.laborCost.trim();
+        if (pr !== "") {
+          const v = parseExpenseAmountInputToNumberOrNull(pr);
+          if (v != null) rowP += v;
+        }
+        if (lr !== "") {
+          const v = parseExpenseAmountInputToNumberOrNull(lr);
+          if (v != null) rowL += v;
+        }
+      }
+      const topP = parseExpenseAmountInputToNumberOrNull(form.partsCost.trim());
+      const topL = parseExpenseAmountInputToNumberOrNull(form.laborCost.trim());
+      const tp = topP ?? 0;
+      const tl = topL ?? 0;
+      const sum = rowP + rowL + tp + tl;
+      const hadCostInput =
+        form.items.some((it) => it.partCost.trim() !== "" || it.laborCost.trim() !== "") ||
+        form.partsCost.trim() !== "" ||
+        form.laborCost.trim() !== "";
+      if (!hadCostInput) {
+        return null;
+      }
+      return `${formatExpenseAmountRu(sum)} ${cur}`;
+    }
+    const partsRaw = form.partsCost.trim();
+    const laborRaw = form.laborCost.trim();
+    if (partsRaw === "" && laborRaw === "") {
+      return null;
+    }
+    const p = partsRaw === "" ? 0 : parseExpenseAmountInputToNumberOrNull(partsRaw);
+    const l = laborRaw === "" ? 0 : parseExpenseAmountInputToNumberOrNull(laborRaw);
+    if (p == null || l == null) {
+      return null;
+    }
+    return `${formatExpenseAmountRu(p + l)} ${cur}`;
+  }, [form.mode, form.items, form.partsCost, form.laborCost, form.currency]);
+
+  const totalLabel = useMemo(() => {
+    if (serviceEventCostTotalPreview) return serviceEventCostTotalPreview;
+    const cur = form.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+    return `0 ${cur}`;
+  }, [serviceEventCostTotalPreview, form.currency]);
+
+  const selectedBundleTemplate = useMemo(
+    () => bundleTemplates.find((t) => t.id === selectedBundleTemplateId) ?? null,
+    [bundleTemplates, selectedBundleTemplateId]
+  );
+
+  const filteredInstallableEntries = useMemo(() => {
+    const used = new Set(form.items.map((it) => it.nodeId.trim()).filter(Boolean));
+    return installableEntries
+      .filter((entry) => entryMatchesInstallableFilter(entry, installableFilter))
+      .sort((left, right) => {
+        const leftMatches = left.nodeId && used.has(left.nodeId) ? 0 : 1;
+        const rightMatches = right.nodeId && used.has(right.nodeId) ? 0 : 1;
+        if (leftMatches !== rightMatches) {
+          return leftMatches - rightMatches;
+        }
+        return 0;
+      });
+  }, [form.items, installableEntries, installableFilter]);
+
+  const installableCounts = useMemo(() => {
+    let paid = 0;
+    let wishlist = 0;
+    for (const entry of installableEntries) {
+      if (entryMatchesInstallableFilter(entry, "paid")) paid += 1;
+      if (entryMatchesInstallableFilter(entry, "wishlist")) wishlist += 1;
+    }
+    return { all: installableEntries.length, paid, wishlist };
+  }, [installableEntries]);
+
+  const mergeInstallableWishlistEntry = useCallback(
+    (
+      currentForm: AddServiceEventFormValues,
+      entry: InstallableForServiceEventEntry,
+      leafIds: Set<string>
+    ): AddServiceEventFormValues => {
+      const synth = entryToSyntheticWishlistItem(entry, vehicleId);
+      if (!synth) return currentForm;
+      let next = mergeWishlistItemIntoAddFormValues(currentForm, synth, leafIds, {
+        skipPartsCostBump: Boolean(entry.expenseItemId),
+      });
+      if (next === currentForm) return next;
+      const partSkuTrimmed = entry.partSku?.trim() ?? "";
+      if (partSkuTrimmed && entry.nodeId) {
+        const idx = next.items.findIndex((it) => it.nodeId.trim() === entry.nodeId);
+        if (idx >= 0 && !next.items[idx].sku.trim()) {
+          next = patchItemAt(next, idx, { sku: partSkuTrimmed });
+        }
+      }
+      return next;
+    },
+    [vehicleId]
+  );
+
+  const toggleInstallableEntry = (entry: InstallableForServiceEventEntry) => {
+    const wasSelected = selectedInstallableKeys.has(entry.key);
+    const willBeSelected = !wasSelected;
+    setSelectedInstallableKeys((prev) => {
+      const next = new Set(prev);
+      if (willBeSelected) next.add(entry.key);
+      else next.delete(entry.key);
+      return next;
+    });
+
+    updateForm((prev) => {
+      let next = prev;
+
+      if (entry.wishlistItemId) {
+        if (willBeSelected) {
+          next = mergeInstallableWishlistEntry(next, entry, leafNodeIdsSet);
+        } else {
+          const stripItem = entryToSyntheticWishlistItem(entry, vehicleId);
+          const formCur = prev.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+          const entCur = entry.currency?.trim().toUpperCase();
+          const revertBump =
+            prev.mode === "BASIC" &&
+            !entry.expenseItemId &&
+            entry.amount != null &&
+            Number.isFinite(entry.amount) &&
+            entry.amount > 0 &&
+            entCur &&
+            entCur === formCur
+              ? { amount: entry.amount, currency: entry.currency ?? DEFAULT_ADD_SERVICE_EVENT_CURRENCY }
+              : null;
+          next = removeWishlistItemFromAddFormValues(next, entry.wishlistItemId, {
+            removeBundleRowForNodeId: entry.nodeId,
+            revertBumpedPartsCost: revertBump,
+            stripWishlistCommentForItem: stripItem ?? undefined,
+          });
+        }
+      }
+
+      if (entry.expenseItemId) {
+        const selectedExp = new Set(next.installedExpenseItemIds);
+        if (willBeSelected) selectedExp.add(entry.expenseItemId);
+        else selectedExp.delete(entry.expenseItemId);
+        next = { ...next, installedExpenseItemIds: Array.from(selectedExp) };
+
+        if (!willBeSelected && !entry.wishlistItemId) {
+          const expenseTitle = entry.partName?.trim() || entry.title.trim();
+          next = revertExpenseInstallFormPatch(next, {
+            bundleNodeId: entry.nodeId,
+            expenseTitleForComment: expenseTitle,
+            amount: entry.amount ?? null,
+            currency: entry.currency ?? null,
+          });
+        }
+
+        if (willBeSelected && !entry.wishlistItemId) {
+          const expenseTitle = entry.partName?.trim() || entry.title.trim();
+          const commentLine = `Установлена ранее купленная деталь: ${expenseTitle}`;
+          const titleSuggestion = `Установка: ${expenseTitle}`;
+          const nextComment = next.comment.trim()
+            ? next.comment.includes(commentLine)
+              ? next.comment
+              : `${next.comment.trim()}\n${commentLine}`
+            : commentLine;
+          const { form: nextWithRow, rowIndex: rowIdx } = resolveInstallableExpenseTargetRow(
+            next,
+            entry.nodeId
+          );
+          next = nextWithRow;
+          const row = next.items[rowIdx] ?? next.items[0];
+          const nodeId = row?.nodeId.trim() || entry.nodeId || "";
+          const partName = row?.partName.trim() || entry.partName?.trim() || entry.title.trim();
+          const sku = row?.sku.trim() || entry.partSku?.trim() || "";
+          next = {
+            ...next,
+            eventDate: next.eventDate.trim() || new Date().toISOString().slice(0, 10),
+            title: next.title.trim() || titleSuggestion,
+            odometer: next.odometer.trim() || (vehicleOdometer != null ? String(vehicleOdometer) : ""),
+            engineHours:
+              next.engineHours.trim() || (vehicleEngineHours != null ? String(vehicleEngineHours) : ""),
+            comment: nextComment,
+          };
+          next = patchItemAt(next, rowIdx, { nodeId, partName, sku });
+          next = applyExpenseInstallToAddFormRow(next, rowIdx, {
+            amount: entry.amount ?? null,
+            currency: entry.currency ?? null,
+            quantity: entry.quantity ?? null,
+          });
+        }
+      }
+
+      return next;
+    });
+  };
+
+  // Auto-resize comment textarea.
+  useEffect(() => {
+    if (!commentTextareaRef.current) return;
+    const ta = commentTextareaRef.current;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.max(ta.scrollHeight, 64)}px`;
+  }, [form.comment]);
+
+  // Debounce SKU lookup.
+  useEffect(() => {
+    const rowSku = (form.items[effectiveSkuRowIndex]?.sku ?? "").trim();
+    const timer = window.setTimeout(() => {
+      setServiceEventSkuLookup(rowSku);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [form.items, effectiveSkuRowIndex]);
+
+  // SKU search.
+  useEffect(() => {
+    const query = serviceEventSkuLookup;
+    if (query.length < 2) {
+      setServiceEventSkuResults([]);
+      setServiceEventSkuError("");
+      setServiceEventSkuLoading(false);
+      return;
+    }
+    const gen = serviceEventSkuSearchGen.current + 1;
+    serviceEventSkuSearchGen.current = gen;
+    setServiceEventSkuLoading(true);
+    setServiceEventSkuError("");
+    void api
+      .getPartSkus({
+        search: query,
+        nodeId: (form.items[effectiveSkuRowIndex]?.nodeId ?? "").trim() || undefined,
+      })
+      .then((res) => {
+        if (serviceEventSkuSearchGen.current !== gen) return;
+        const list = res.skus ?? [];
+        const normalizedQuery = normalizePartNumber(query);
+        const exact = list.find((sku) =>
+          sku.partNumbers.some((pn) => normalizePartNumber(pn.number) === normalizedQuery)
+        );
+        const ordered = exact ? [exact, ...list.filter((c) => c.id !== exact.id)] : list;
+        setServiceEventSkuResults(ordered.slice(0, 6));
+      })
+      .catch(() => {
+        if (serviceEventSkuSearchGen.current !== gen) return;
+        setServiceEventSkuResults([]);
+        setServiceEventSkuError("Не удалось выполнить поиск по каталогу.");
+      })
+      .finally(() => {
+        if (serviceEventSkuSearchGen.current !== gen) return;
+        setServiceEventSkuLoading(false);
+      });
+  }, [form, effectiveSkuRowIndex, serviceEventSkuLookup]);
+
+  // Bundle templates.
+  useEffect(() => {
+    let cancelled = false;
+    setBundleTemplatesLoadError("");
+    void api
+      .getServiceBundleTemplates()
+      .then((res) => {
+        if (!cancelled) setBundleTemplates(res.templates ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBundleTemplates([]);
+          setBundleTemplatesLoadError("Не удалось загрузить шаблоны.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getTopServiceNodes()
+      .then((res) => {
+        if (!cancelled) setTopServiceNodes(res.nodes ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setTopServiceNodes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Installable list — prefetch (used when overlay is opened or for badge counts).
+  useEffect(() => {
+    if (!vehicleId) {
+      setInstallableEntries([]);
+      setInstallableLoading(false);
+      setInstallableError("");
+      return;
+    }
+    let cancelled = false;
+    setInstallableLoading(true);
+    setInstallableError("");
+    void api
+      .getInstallableForServiceEvent(vehicleId)
+      .then((res) => {
+        if (!cancelled) setInstallableEntries(res.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInstallableEntries([]);
+          setInstallableError("Не удалось загрузить список «Готово к установке».");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setInstallableLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicleId]);
+
+  const applyServiceEventSkuSuggestion = useCallback(
+    (sku: PartSkuViewModel) => {
+      updateForm((prev) => {
+        const idx =
+          prev.mode === "BASIC"
+            ? 0
+            : Math.min(Math.max(0, skuSearchRowIndex), Math.max(0, prev.items.length - 1));
+        const row = prev.items[idx];
+        return patchItemAt(prev, idx, {
+          sku: pickSkuPartNumberOrFallback(sku, row?.sku?.trim() ?? ""),
+          partName: sku.canonicalName?.trim() || row?.partName?.trim() || "",
+        });
+      });
+    },
+    [skuSearchRowIndex, updateForm]
+  );
+
+  const confirmAddNodesFromSheet = useCallback(
+    (nodeIds: string[]) => {
+      if (nodeIds.length === 0) return;
+      updateForm((prev) => {
+        let next = prev;
+        for (const id of nodeIds) {
+          const emptyIdx = next.items.findIndex((it) => !it.nodeId.trim());
+          if (emptyIdx >= 0) {
+            next = patchItemAt(next, emptyIdx, {
+              nodeId: id,
+              actionType:
+                next.mode === "BASIC" ? next.commonActionType : next.items[emptyIdx]?.actionType ?? "SERVICE",
+            });
+          } else {
+            next = appendEmptyItem(next);
+            const idx = next.items.length - 1;
+            next = patchItemAt(next, idx, {
+              nodeId: id,
+              actionType: next.mode === "BASIC" ? next.commonActionType : "SERVICE",
+            });
+          }
+        }
+        if (next.mode === "BASIC") {
+          next = {
+            ...next,
+            items: next.items.map((it) => ({ ...it, actionType: next.commonActionType })),
+          };
+        }
+        return next;
+      });
+      setEditingUnitRowIndex(null);
+    },
+    [updateForm]
+  );
+
+  const onApplyTemplate = useCallback(
+    (templateId: string) => {
+      const tpl = bundleTemplates.find((t) => t.id === templateId);
+      if (!tpl) return;
+      updateForm((prev) => {
+        const { form: merged, skippedItems } = mergeServiceBundleTemplateIntoAddFormValues(
+          prev,
+          tpl,
+          leafNodeIdsSet
+        );
+        if (skippedItems.length > 0) {
+          queueMicrotask(() =>
+            setLocalValidationError(
+              `Не все узлы шаблона доступны для этого ТС: ${skippedItems
+                .map((s) => s.label)
+                .join(", ")}`
+            )
+          );
+        } else {
+          queueMicrotask(() => {
+            setLocalValidationError("");
+            onClearSubmitError();
+          });
+        }
+        return merged;
+      });
+    },
+    [bundleTemplates, leafNodeIdsSet, onClearSubmitError, updateForm]
+  );
+
+  const save = async () => {
+    const validation = validateAddServiceEventFormValues(form, {
+      todayDateYmd,
+      currentVehicleOdometer: vehicleOdometer,
+      leafNodeIds: leafNodeIdsSet,
+    });
+    if (validation.errors.length > 0) {
+      setLocalValidationError(validation.errors[0]);
+      return;
+    }
+    setLocalValidationError("");
+    await onSubmit(form);
+  };
+
+  const combinedError = localValidationError || submitError;
+  const selectedUnitsCount = form.items.filter((it) => it.nodeId.trim()).length;
+  const isBasic = form.mode === "BASIC";
+  const isAdvanced = !isBasic;
+  const hasFreeNodes =
+    leafNodeOptions.filter((o) => !form.items.some((it) => it.nodeId.trim() === o.id)).length > 0;
+
+  const onEventDateBlur = () => {
+    const parsed = parseDdMmYyyyToYmd(eventDateDisplay);
+    if (parsed === null) {
+      setEventDateDisplay(ymdToDdMmYyyy(form.eventDate));
+      setLocalValidationError("Введите дату в формате ДД.ММ.ГГГГ.");
+      return;
+    }
+    if (parsed !== "" && eventDateMaxYmd && parsed > eventDateMaxYmd) {
+      setEventDateDisplay(ymdToDdMmYyyy(form.eventDate));
+      setLocalValidationError("Дата не может быть позже допустимой.");
+      return;
+    }
+    setLocalValidationError("");
+    updateForm((prev) => ({ ...prev, eventDate: parsed === "" ? "" : parsed }));
+  };
+
+  // ----- Section numbering per references -----
+  const fastSectionNumbers = { basicInfo: 1, cost: 2, bundle: 3 };
+  const extendedSectionNumbers = { basicInfo: 1, cost: 2, additional: 3, bundle: 4 };
+
+  const basicInfoCard = (
+    <BasicInfoCard
+      sectionNumber={isBasic ? fastSectionNumbers.basicInfo : extendedSectionNumbers.basicInfo}
+      form={form}
+      isEditing={Boolean(editingServiceEventId)}
+      bundleTemplates={bundleTemplates}
+      bundleTemplatesLoadError={bundleTemplatesLoadError}
+      selectedBundleTemplateId={selectedBundleTemplateId}
+      onSelectBundleTemplate={setSelectedBundleTemplateId}
+      onOpenTemplateContents={() => setTemplateContentsOpen(true)}
+      eventDateDisplay={eventDateDisplay}
+      onEventDateDisplayChange={setEventDateDisplay}
+      onEventDateBlur={onEventDateBlur}
+      odometerInputMax={odometerInputMax}
+      onPatch={onPatch}
+      onApplyTemplate={onApplyTemplate}
+      commentTextareaRef={commentTextareaRef}
+    />
+  );
+
+  const costCard = (
+    <CostCard
+      sectionNumber={isBasic ? fastSectionNumbers.cost : extendedSectionNumbers.cost}
+      form={form}
+      isEditing={Boolean(editingServiceEventId)}
+      isAdvanced={isAdvanced}
+      totalLabel={totalLabel}
+      onPatch={onPatch}
+    />
+  );
+
+  const additionalCardExtended = (
+    <AdditionalCardExtended
+      sectionNumber={extendedSectionNumbers.additional}
+      form={form}
+      editingServiceEventId={editingServiceEventId}
+      onPatch={onPatch}
+    />
+  );
+
+  const additionalCardFast = (
+    <AdditionalCardFast
+      form={form}
+      editingServiceEventId={editingServiceEventId}
+      onPatch={onPatch}
+    />
+  );
+
+  const preliminarySummary = (
+    <PreliminarySummaryCard
+      partsLine={stickyCostLines.parts}
+      laborLine={stickyCostLines.labor}
+      totalLine={stickyCostLines.total}
+    />
+  );
+
+  const installableButtonVisible = !editingServiceEventId;
+
+  const bundleHeader = (
+    <BundleHeader
+      sectionNumber={isBasic ? fastSectionNumbers.bundle : extendedSectionNumbers.bundle}
+      selectedUnitsCount={selectedUnitsCount}
+      hasFreeNodes={hasFreeNodes}
+      showInstallableButton={!isBasic && installableButtonVisible}
+      installableCount={installableEntries.length}
+      onAddNode={() => setAddNodeSheetOpen(true)}
+      onOpenInstallable={() => setInstallablePickerOpen(true)}
+    />
+  );
+
+  // Fast-mode rows
+  const actionTypeSelect = isBasic ? (
+    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+      <label
+        className="shrink-0 text-[11px] font-semibold uppercase tracking-wide sm:min-w-[6.5rem]"
+        style={{ color: productSemanticColors.textMeta }}
+        htmlFor="service-event-common-action-type"
+      >
+        Тип работы
+      </label>
+      <select
+        id="service-event-common-action-type"
+        className="min-h-10 w-full flex-1 rounded-xl border px-3 py-2 text-sm outline-none transition focus:ring-2 sm:max-w-xs"
+        style={{
+          borderColor: productSemanticColors.border,
+          backgroundColor: productSemanticColors.card,
+          color: productSemanticColors.textPrimary,
+        }}
+        value={form.commonActionType}
+        onChange={(e) => {
+          const v = e.target.value as ServiceActionType;
+          updateForm((prev) => ({
+            ...prev,
+            commonActionType: v,
+            items: prev.items.map((it) => ({ ...it, actionType: v })),
+          }));
+        }}
+      >
+        {SERVICE_ACTION_TYPE_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  ) : null;
+
+  const bundleBanner = isBasic ? (
+    <div
+      className="flex items-start gap-3 rounded-xl border px-4 py-3"
+      style={{
+        borderColor: productSemanticColors.border,
+        backgroundColor: productSemanticColors.cardSubtle,
+      }}
+    >
+      <span
+        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+        style={{
+          color: productSemanticColors.primaryAction,
+          backgroundColor: productSemanticColors.cardMuted,
+        }}
+        aria-hidden
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z" />
+        </svg>
+      </span>
+      <div className="min-w-0 flex-1">
+        <p
+          className="text-[13px] font-semibold"
+          style={{ color: productSemanticColors.textPrimary }}
+        >
+          Быстрый режим
+        </p>
+        <p
+          className="mt-0.5 text-[11px] leading-snug"
+          style={{ color: productSemanticColors.textSecondary }}
+        >
+          Выбраны узлы и указана общая стоимость. Статусы узлов будут обновлены.
+        </p>
+      </div>
+    </div>
+  ) : null;
+
+  const bundleRowsFast = (
+    <div className="flex flex-col">
+      {form.items.map((row, rowIndex) => {
+        const nodeIdTrim = row.nodeId.trim();
+        const nodeOpt = leafNodeOptions.find((o) => o.id === nodeIdTrim);
+        const nodeTitle = nodeOpt?.name ?? `Узел ${rowIndex + 1}`;
+        const crumb = nodeIdTrim ? nodeBreadcrumbRu(nodeTree, row.nodeId) : "";
+        const rowActionLabel = getServiceActionTypeLabelRu(form.commonActionType);
+        return (
+          <BundleNodeRowFast
+            key={row.key}
+            index={rowIndex}
+            nodeTitle={nodeTitle}
+            crumb={crumb}
+            rowActionLabel={rowActionLabel}
+            hasNode={Boolean(nodeIdTrim)}
+            canRemove={form.items.length > 1}
+            onRemove={() => {
+              setEditingUnitRowIndex(null);
+              updateForm((prev) => removeItemAt(prev, rowIndex));
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+
+  const bundleTotalsFast = (
+    <BundleTotals
+      partsLine={stickyCostLines.parts}
+      laborLine={stickyCostLines.labor}
+      totalLine={stickyCostLines.total}
+      variant="fast"
+    />
+  );
+
+  // Extended-mode node cards
+  const bundleNodeCardsExtended = form.items.map((row, rowIndex) => {
+    const nodeIdTrim = row.nodeId.trim();
+    const nodeOpt = leafNodeOptions.find((o) => o.id === nodeIdTrim);
+    const nodeTitle = nodeOpt?.name ?? `Узел ${rowIndex + 1}`;
+    const crumb = nodeIdTrim ? nodeBreadcrumbRu(nodeTree, row.nodeId) : "";
+    const availableLeafNodePickerOptions = leafNodePickerOptions.filter(
+      (option) =>
+        option.id === row.nodeId.trim() ||
+        !form.items.some((it, i) => i !== rowIndex && it.nodeId.trim() === option.id)
+    );
+
+    const partsParsed = parseExpenseAmountInputToNumberOrNull(row.partCost.trim());
+    const laborParsed = parseExpenseAmountInputToNumberOrNull(row.laborCost.trim());
+    const partsCostFormatted =
+      partsParsed != null ? `${formatExpenseAmountRu(partsParsed)} ${currencySuffix(form.currency)}` : "—";
+    const laborCostFormatted =
+      laborParsed != null ? `${formatExpenseAmountRu(laborParsed)} ${currencySuffix(form.currency)}` : "—";
+
+    return (
+      <BundleNodeCardExtended
+        key={row.key}
+        index={rowIndex}
+        row={row}
+        nodeTitle={nodeTitle}
+        crumb={crumb}
+        hasNode={Boolean(nodeIdTrim)}
+        itemsCount={form.items.length}
+        collapsed={collapsedBundleKeys.has(row.key)}
+        currency={form.currency}
+        partsCostFormatted={partsCostFormatted}
+        laborCostFormatted={laborCostFormatted}
+        availableLeafNodePickerOptions={availableLeafNodePickerOptions}
+        onToggleCollapsed={() => toggleCollapsedBundleRow(row.key)}
+        onChangeNodeId={(nodeId) => updateForm((prev) => patchItemAt(prev, rowIndex, { nodeId }))}
+        onChangeActionType={(actionType) =>
+          updateForm((prev) => patchItemAt(prev, rowIndex, { actionType }))
+        }
+        onPatchRow={(patch) => updateForm((prev) => patchItemAt(prev, rowIndex, patch))}
+        onSetSkuRow={() => setSkuSearchRowIndex(rowIndex)}
+        onRemoveRow={() => {
+          setEditingUnitRowIndex(null);
+          updateForm((prev) => removeItemAt(prev, rowIndex));
+        }}
+        onClearPart={() =>
+          updateForm((prev) =>
+            patchItemAt(prev, rowIndex, { partName: "", sku: "", quantity: "", partCost: "" })
+          )
+        }
+      />
+    );
+  });
+
+  const bundleAddNodeFooter = hasFreeNodes ? (
+    <button
+      type="button"
+      onClick={() => setAddNodeSheetOpen(true)}
+      className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-3 text-sm font-semibold transition hover:opacity-95"
+      style={{
+        borderColor: productSemanticColors.border,
+        color: productSemanticColors.primaryAction,
+        backgroundColor: "transparent",
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      Добавить узел
+    </button>
+  ) : null;
+
+  const bundleSkuPanel =
+    isAdvanced && (form.items[effectiveSkuRowIndex]?.sku ?? "").trim().length >= 2 ? (
+      <div
+        className="rounded-xl border px-3 py-2"
+        style={{
+          borderColor: productSemanticColors.border,
+          backgroundColor: productSemanticColors.cardSubtle,
+        }}
+      >
+        <p className="text-xs font-semibold" style={{ color: productSemanticColors.textSecondary }}>
+          {`Поиск в каталоге по артикулу (узел ${effectiveSkuRowIndex + 1})`}
+        </p>
+        {serviceEventSkuLoading ? (
+          <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
+            Ищем совпадения…
+          </p>
+        ) : null}
+        {!serviceEventSkuLoading && serviceEventSkuError ? (
+          <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
+            {serviceEventSkuError}
+          </p>
+        ) : null}
+        {!serviceEventSkuLoading && !serviceEventSkuError && serviceEventSkuResults.length === 0 ? (
+          <p className="mt-1 text-xs" style={{ color: productSemanticColors.textMuted }}>
+            Ничего не найдено.
+          </p>
+        ) : null}
+        {!serviceEventSkuLoading && serviceEventSkuResults.length > 0 ? (
+          <div className="mt-2 space-y-1.5">
+            {serviceEventSkuResults.map((sku) => {
+              const partNumber = pickSkuPartNumberOrFallback(sku, "");
+              return (
+                <button
+                  key={sku.id}
+                  type="button"
+                  onClick={() => applyServiceEventSkuSuggestion(sku)}
+                  className="w-full rounded-lg border px-2.5 py-2 text-left text-xs transition hover:opacity-90"
+                  style={{
+                    borderColor: productSemanticColors.border,
+                    backgroundColor: productSemanticColors.cardMuted,
+                    color: productSemanticColors.textPrimary,
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{partNumber || "Без артикула"}</div>
+                  <div style={{ color: productSemanticColors.textSecondary }}>
+                    {sku.brandName} · {sku.canonicalName}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    ) : null;
+
+  const bundleTotalsExtended = (
+    <BundleTotals
+      partsLine={stickyCostLines.parts}
+      laborLine={stickyCostLines.labor}
+      totalLine={stickyCostLines.total}
+      variant="extended"
+    />
+  );
+
+  // `editingUnitRowIndex` is reserved for future basic-mode inline node editing UX; reset on add/remove.
+  void editingUnitRowIndex;
+
+  const resolvedTitle =
+    title ??
+    (editingServiceEventId ? "Редактировать сервисное событие" : "Добавить сервисное событие");
+  const resolvedSubtitle =
+    pageSubtitle ??
+    (editingServiceEventId
+      ? "Измените данные события и сохраните обновлённую запись в журнале."
+      : "Заполните дату, стоимость и узлы, затем сохраните запись в журнале обслуживания.");
+
+  if (pageChrome === "partsCart") {
+    return (
+      <div
+        className={partsCartPageStyles.root}
+        style={{
+          gridTemplateColumns: "minmax(0, 1fr)",
+          maxWidth: 1500,
+          width: "100%",
+          marginInline: "auto",
+          background: "#070b10",
+        }}
+      >
+        <main className={`${partsCartPageStyles.mainColumn} ${partsCartPageStyles.mainColumnServiceEvent}`}>
+          <header className={partsCartPageStyles.headerServiceEvent}>
+            <button
+              type="button"
+              onClick={onCancel}
+              className={partsCartPageStyles.backButton}
+              aria-label="Назад"
+            >
+              ←
+            </button>
+            <div className={partsCartPageStyles.headerServiceEventText}>
+              <h1 className={partsCartPageStyles.title}>{resolvedTitle}</h1>
+              <ServiceEventModeControl
+                variant="segmented"
+                isBasic={isBasic}
+                onSelectBasic={() => {
+                  setSkuSearchRowIndex(0);
+                  updateForm((prev) => (prev.mode === "BASIC" ? prev : switchFormToBasic(prev)));
+                }}
+                onSelectDetailed={() => {
+                  setSkuSearchRowIndex(0);
+                  updateForm((prev) => (prev.mode === "ADVANCED" ? prev : switchFormToAdvanced(prev)));
+                }}
+              />
+              <p className={partsCartPageStyles.subtitle}>{resolvedSubtitle}</p>
+            </div>
+          </header>
+
+          {contextHint ? (
+            <div className={partsCartPageStyles.historyBox}>
+              <div className="text-xs" style={{ color: PARTS_CART_REF.textMuted }}>
+                {contextHint}
+              </div>
+            </div>
+          ) : null}
+
+          <section
+            className={`${partsCartPageStyles.listPanel} flex min-h-0 flex-1 flex-col`}
+            aria-label="Форма сервисного события"
+            style={{
+              minHeight: "calc(100vh - 84px)",
+              borderColor: PARTS_CART_REF.border,
+              background: "rgba(9, 15, 22, 0.72)",
+            }}
+          >
+            <div
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-4"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              <ServiceEventModalBodyUnified
+                isBasic={isBasic}
+                basicInfoCard={basicInfoCard}
+                costCard={costCard}
+                additionalCardFast={additionalCardFast}
+                additionalCardExtended={additionalCardExtended}
+                preliminarySummary={preliminarySummary}
+                bundleHeader={bundleHeader}
+                bundleBanner={bundleBanner}
+                actionTypeSelect={actionTypeSelect}
+                bundleRowsFast={bundleRowsFast}
+                bundleTotalsFast={bundleTotalsFast}
+                bundleNodeCards={bundleNodeCardsExtended}
+                bundleAddNodeFooter={bundleAddNodeFooter}
+                bundleSkuPanel={bundleSkuPanel}
+                bundleTotalsExtended={bundleTotalsExtended}
+              />
+
+              {combinedError ? (
+                <p className="mt-2 pb-1 text-sm" style={{ color: productSemanticColors.error }}>
+                  {combinedError}
+                </p>
+              ) : null}
+            </div>
+
+            {!isBasic ? (
+              <div
+                className="shrink-0 border-t px-4 py-2.5 sm:px-5 sm:py-3"
+                style={{
+                  borderTopColor: PARTS_CART_REF.border,
+                  backgroundColor: PARTS_CART_REF.surface,
+                }}
+              >
+                <PostSaveExplainer />
+              </div>
+            ) : null}
+
+            <div
+              className="shrink-0 border-t px-4 py-2.5 sm:px-5 sm:py-3"
+              style={{
+                borderTopColor: PARTS_CART_REF.border,
+                backgroundColor: PARTS_CART_REF.surfaceElevated,
+              }}
+            >
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className={partsCartPageStyles.secondaryAction}
+                >
+                  Отмена
+                </button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewOpen(true)}
+                    className={partsCartPageStyles.secondaryAction}
+                  >
+                    <span aria-hidden>◉</span>
+                    <span>Предпросмотр</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void save()}
+                    disabled={isSubmitting}
+                    className={partsCartPageStyles.primaryAction}
+                    style={{
+                      minWidth: 168,
+                      opacity: isSubmitting ? 0.55 : 1,
+                      cursor: isSubmitting ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {isSubmitting
+                      ? "Сохранение…"
+                      : editingServiceEventId
+                        ? "Сохранить изменения"
+                        : "Сохранить событие"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <PreviewOverlay
+            open={isPreviewOpen}
+            form={form}
+            totalLabel={serviceEventCostTotalPreview}
+            onClose={() => setIsPreviewOpen(false)}
+          />
+
+          <TemplateContentsOverlay
+            open={templateContentsOpen}
+            template={selectedBundleTemplate}
+            onClose={() => setTemplateContentsOpen(false)}
+          />
+
+          <AddNodeSheet
+            open={addNodeSheetOpen}
+            onClose={() => setAddNodeSheetOpen(false)}
+            options={leafNodePickerOptions}
+            topOptions={topLeafNodePickerOptions.length > 0 ? topLeafNodePickerOptions : undefined}
+            usedNodeIds={new Set(form.items.map((it) => it.nodeId.trim()).filter(Boolean))}
+            onConfirm={confirmAddNodesFromSheet}
+          />
+
+          <InstallablePickerOverlay
+            open={installablePickerOpen}
+            onClose={() => setInstallablePickerOpen(false)}
+            loading={installableLoading}
+            error={installableError}
+            entries={filteredInstallableEntries}
+            filter={installableFilter}
+            setFilter={setInstallableFilter}
+            selectedKeys={selectedInstallableKeys}
+            isLeafNode={(id) => leafNodeIdsSet.has(id)}
+            isNodeUsed={(id) => form.items.some((it) => it.nodeId.trim() === id)}
+            counts={installableCounts}
+            onToggleEntry={toggleInstallableEntry}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative flex min-h-0 w-full max-w-[1500px] flex-1 flex-col overflow-hidden rounded-3xl border"
+      style={{
+        backgroundColor: productSemanticColors.card,
+        borderColor: productSemanticColors.border,
+        color: productSemanticColors.textPrimary,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+      }}
+    >
+      <div
+        className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:px-6"
+        style={{ borderBottomColor: productSemanticColors.border }}
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition hover:opacity-90"
+            style={{
+              borderColor: productSemanticColors.border,
+              backgroundColor: productSemanticColors.cardSubtle,
+              color: productSemanticColors.textPrimary,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            Назад
+          </button>
+          <div className="min-w-0 flex-1">
+            <h1
+              className="truncate text-xl font-bold tracking-tight sm:text-2xl"
+              style={{ color: productSemanticColors.textPrimary }}
+            >
+              {resolvedTitle}
+            </h1>
+          </div>
+        </div>
+        <ServiceEventModeControl
+          variant="segmented"
+          isBasic={isBasic}
+          onSelectBasic={() => {
+            setSkuSearchRowIndex(0);
+            updateForm((prev) => (prev.mode === "BASIC" ? prev : switchFormToBasic(prev)));
+          }}
+          onSelectDetailed={() => {
+            setSkuSearchRowIndex(0);
+            updateForm((prev) => (prev.mode === "ADVANCED" ? prev : switchFormToAdvanced(prev)));
+          }}
+        />
+        {contextHint ? (
+          <div className="text-sm" style={{ color: productSemanticColors.textSecondary }}>
+            {contextHint}
+          </div>
+        ) : null}
+      </div>
+
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-4"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        <ServiceEventModalBodyUnified
+          isBasic={isBasic}
+          basicInfoCard={basicInfoCard}
+          costCard={costCard}
+          additionalCardFast={additionalCardFast}
+          additionalCardExtended={additionalCardExtended}
+          preliminarySummary={preliminarySummary}
+          bundleHeader={bundleHeader}
+          bundleBanner={bundleBanner}
+          actionTypeSelect={actionTypeSelect}
+          bundleRowsFast={bundleRowsFast}
+          bundleTotalsFast={bundleTotalsFast}
+          bundleNodeCards={bundleNodeCardsExtended}
+          bundleAddNodeFooter={bundleAddNodeFooter}
+          bundleSkuPanel={bundleSkuPanel}
+          bundleTotalsExtended={bundleTotalsExtended}
+        />
+
+        {combinedError ? (
+          <p className="mt-2 pb-1 text-sm" style={{ color: productSemanticColors.error }}>
+            {combinedError}
+          </p>
+        ) : null}
+      </div>
+
+      {/* Post-save explainer (Extended only, per references) */}
+      {!isBasic ? (
+        <div
+          className="shrink-0 border-t px-5 py-2.5 sm:px-6 sm:py-3"
+          style={{
+            borderTopColor: productSemanticColors.border,
+            backgroundColor: productSemanticColors.cardSubtle,
+          }}
+        >
+          <PostSaveExplainer />
+        </div>
+      ) : null}
+
+      {/* Footer */}
+      <div
+        className="shrink-0 border-t px-5 py-3 sm:px-6"
+        style={{
+          borderTopColor: productSemanticColors.border,
+          backgroundColor: productSemanticColors.cardSubtle,
+        }}
+      >
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex h-11 min-w-[6rem] items-center justify-center rounded-xl border px-5 text-sm font-semibold transition hover:opacity-90 sm:justify-start"
+            style={{
+              borderColor: productSemanticColors.border,
+              backgroundColor: productSemanticColors.card,
+              color: productSemanticColors.textPrimary,
+            }}
+          >
+            Отмена
+          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsPreviewOpen(true)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-5 text-sm font-medium transition hover:opacity-90"
+              style={{
+                backgroundColor: productSemanticColors.card,
+                borderColor: productSemanticColors.border,
+                color: productSemanticColors.textPrimary,
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" stroke="currentColor" strokeWidth="1.75" />
+                <circle cx="12" cy="12" r="3" fill="currentColor" />
+              </svg>
+              Предпросмотр
+            </button>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={isSubmitting}
+              className="inline-flex h-11 min-w-[12rem] items-center justify-center rounded-xl px-6 text-sm font-semibold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{
+                backgroundColor: productSemanticColors.primaryAction,
+                color: productSemanticColors.onPrimaryAction,
+              }}
+            >
+              {isSubmitting
+                ? "Сохранение…"
+                : editingServiceEventId
+                  ? "Сохранить изменения"
+                  : "Сохранить событие"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Overlays */}
+      <PreviewOverlay
+        open={isPreviewOpen}
+        form={form}
+        totalLabel={serviceEventCostTotalPreview}
+        onClose={() => setIsPreviewOpen(false)}
+      />
+
+      <TemplateContentsOverlay
+        open={templateContentsOpen}
+        template={selectedBundleTemplate}
+        onClose={() => setTemplateContentsOpen(false)}
+      />
+
+      <AddNodeSheet
+        open={addNodeSheetOpen}
+        onClose={() => setAddNodeSheetOpen(false)}
+        options={leafNodePickerOptions}
+        topOptions={topLeafNodePickerOptions.length > 0 ? topLeafNodePickerOptions : undefined}
+        usedNodeIds={new Set(form.items.map((it) => it.nodeId.trim()).filter(Boolean))}
+        onConfirm={confirmAddNodesFromSheet}
+      />
+
+      <InstallablePickerOverlay
+        open={installablePickerOpen}
+        onClose={() => setInstallablePickerOpen(false)}
+        loading={installableLoading}
+        error={installableError}
+        entries={filteredInstallableEntries}
+        filter={installableFilter}
+        setFilter={setInstallableFilter}
+        selectedKeys={selectedInstallableKeys}
+        isLeafNode={(id) => leafNodeIdsSet.has(id)}
+        isNodeUsed={(id) => form.items.some((it) => it.nodeId.trim() === id)}
+        counts={installableCounts}
+        onToggleEntry={toggleInstallableEntry}
+      />
+    </div>
+  );
+}
+
+export function ServiceEventForm({ resetKey, ...innerProps }: ServiceEventFormProps) {
+  return <ServiceEventFormInner key={resetKey} {...innerProps} />;
+}

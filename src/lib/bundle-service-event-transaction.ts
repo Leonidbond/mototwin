@@ -1,4 +1,10 @@
-import { Prisma, ServiceActionType, ServiceEventMode, TopNodeStatus } from "@prisma/client";
+import {
+  Prisma,
+  ServiceActionType,
+  ServiceEventMode,
+  ServicePerformedBy,
+  TopNodeStatus,
+} from "@prisma/client";
 import {
   calculateAllRootEffectiveStatuses,
   type LatestServiceEventView,
@@ -31,6 +37,14 @@ export type CreateBundleServiceEventInTxInput = {
   currency: string | null;
   comment: string | null;
   installedPartsJson: Prisma.InputJsonValue | null;
+  performedBy?: ServicePerformedBy | null;
+  serviceProviderNote?: string | null;
+  attachReceiptRequested?: boolean;
+  attachFileRequested?: boolean;
+  nextReminderEnabled?: boolean;
+  nextReminderDate?: Date | null;
+  nextReminderOdometer?: number | null;
+  nextReminderEngineHours?: number | null;
   items: CreateServiceBundleItemInTxInput[];
 };
 
@@ -49,6 +63,14 @@ export type ServiceEventInclude = {
   totalCost: Prisma.Decimal | number | null;
   currency: string | null;
   comment: string | null;
+  performedBy?: ServicePerformedBy | string | null;
+  serviceProviderNote?: string | null;
+  attachReceiptRequested?: boolean;
+  attachFileRequested?: boolean;
+  nextReminderEnabled?: boolean;
+  nextReminderDate?: Date | null;
+  nextReminderOdometer?: number | null;
+  nextReminderEngineHours?: number | null;
   createdAt: Date;
   installedPartsJson?: Prisma.JsonValue | null;
   node?: {
@@ -401,6 +423,14 @@ export async function createBundleServiceEventInTransaction(
       totalCost: decimalToNumberOrNull(input.totalCost),
       currency: input.currency || null,
       comment: input.comment || null,
+      performedBy: input.performedBy ?? null,
+      serviceProviderNote: input.serviceProviderNote?.trim() || null,
+      attachReceiptRequested: input.attachReceiptRequested ?? false,
+      attachFileRequested: input.attachFileRequested ?? false,
+      nextReminderEnabled: input.nextReminderEnabled ?? false,
+      nextReminderDate: input.nextReminderDate ?? null,
+      nextReminderOdometer: input.nextReminderOdometer ?? null,
+      nextReminderEngineHours: input.nextReminderEngineHours ?? null,
       items: {
         create: input.items.map((item, index) => ({
           nodeId: item.nodeId,
@@ -478,6 +508,14 @@ export async function updateBundleServiceEventInTransaction(
       totalCost: decimalToNumberOrNull(input.totalCost),
       currency: input.currency || null,
       comment: input.comment || null,
+      performedBy: input.performedBy ?? null,
+      serviceProviderNote: input.serviceProviderNote?.trim() || null,
+      attachReceiptRequested: input.attachReceiptRequested ?? false,
+      attachFileRequested: input.attachFileRequested ?? false,
+      nextReminderEnabled: input.nextReminderEnabled ?? false,
+      nextReminderDate: input.nextReminderDate ?? null,
+      nextReminderOdometer: input.nextReminderOdometer ?? null,
+      nextReminderEngineHours: input.nextReminderEngineHours ?? null,
       items: {
         create: input.items.map((item, index) => ({
           nodeId: item.nodeId,
@@ -540,6 +578,14 @@ export async function createLeafServiceEventInTransaction(
     totalCost: input.costAmount,
     currency: input.currency,
     comment: input.comment,
+    performedBy: null,
+    serviceProviderNote: null,
+    attachReceiptRequested: false,
+    attachFileRequested: false,
+    nextReminderEnabled: false,
+    nextReminderDate: null,
+    nextReminderOdometer: null,
+    nextReminderEngineHours: null,
     installedPartsJson: input.installedPartsJson,
     items: [
       {

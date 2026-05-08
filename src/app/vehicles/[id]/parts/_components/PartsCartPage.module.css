@@ -15,11 +15,35 @@
   gap: 10px;
 }
 
+/** Сервисное событие (create/edit): плотнее по вертикали */
+.mainColumnServiceEvent {
+  gap: 8px;
+}
+
 .header {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: start;
   gap: 12px;
+}
+
+/** Шапка формы сервисного события: заголовок → режим одной строкой → подзаголовок */
+.headerServiceEvent {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 12px;
+}
+
+.headerServiceEventText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.headerServiceEventText .subtitle {
+  margin: 0;
 }
 
 .backButton {

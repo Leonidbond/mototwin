@@ -1,6 +1,6 @@
 # Выравнивание журнала обслуживания (Web + Expo)
 
-**Дата:** 2026-04-18 (обновление формы bundle: 2026-05-03; multi wishlist + ссылки журнала: 2026-05; блок «Готово к установке» + `GET …/installable`: 2026-05; ADVANCED-суммы, парсинг сумм, превью «Итого», строки журнала по bundle, линковка расходов: 2026-05-04)  
+**Дата:** 2026-04-18 (обновление формы bundle: 2026-05-03; multi wishlist + ссылки журнала: 2026-05; блок «Готово к установке» + `GET …/installable`: 2026-05; ADVANCED-суммы, парсинг сумм, превью «Итого», строки журнала по bundle, линковка расходов: 2026-05-04; **web UI:** страницы `service-events/*` + `ServiceEventForm` + каталог `service-event-form/`: 2026-05-06, 2026-05-08)  
 **Цель:** Одинаковый смысл данных и правил отображения журнала на Next.js и Expo при сохранении платформенной вёрстки; **одна модель формы** сервисного события (bundle) на web и в Expo.
 
 ## Общая модель данных
@@ -25,13 +25,13 @@
 
 ## Форма сервисного события (bundle): web + Expo
 
-- **Web:** общий компонент **`src/app/vehicles/[id]/_components/BasicServiceEventModal.tsx`** — состояние `AddServiceEventFormValues`, BASIC/ADVANCED, несколько узлов в пакете, запчасти/работа/итого, SKU, блок **«Готово к установке»** (чипы фильтра + единый список из **`getInstallableForServiceEvent`**), JSON, валидация `validateAddServiceEventFormValues`, сохранение через колбэк `onSubmit`. Подключён из **`service-log/page.tsx`** и из **`vehicle-detail-client.tsx`** (дерево, «Требует внимания», создание события, deep link `?openServiceEventModal=1` и т.д.), чтобы изменения UI применялись везде сразу.
+- **Web:** общий компонент **`ServiceEventForm`** в **`src/app/vehicles/[id]/_components/service-event-form/`** — те же `AddServiceEventFormValues`, BASIC/ADVANCED, bundle, SKU, **«Готово к установке»** (`getInstallableForServiceEvent`), валидация `validateAddServiceEventFormValues`, `onSubmit`. Страницы **`/vehicles/[id]/service-events/new`** и **`/vehicles/[id]/service-events/[eventId]/edit`**; переходы из **`service-log/page.tsx`** и **`vehicle-detail-client.tsx`** (`router.push` / query `returnTo` и др.). Поведение по шагам — [web-service-event-form.md](./web-service-event-form.md).
 - **Expo:** тот же смысл полей в **`apps/app/app/vehicles/[id]/_components/basic-service-event-bundle-form.tsx`** — та же модалка **«Готово к установке…»** с теми же чипами и **`getInstallableForServiceEvent`**; экран **`service-events/new.tsx`** только загружает дерево/машину/событие, собирает начальные значения доменными хелперами (`createInitialAddServiceEventFromNode`, `FromWishlistItem`, `Edit`, `Repeat`, …), сбрасывает форму через `key` и вызывает `validateAddServiceEventFormValuesMobile` + `normalizeAddServiceEventPayload` / `normalizeEditServiceEventPayload` при сохранении.
 
 ### ADVANCED: деньги, превью «Итого», редактирование
 
 - **Нормализация в payload (`normalizeAddServiceEventPayload` / edit):** в режиме **ADVANCED** поля события **`partsCost` / `laborCost`** на API — это **сумма по строкам bundle** (поля строки «Запчасти» / «Работа») **плюс** числа из блока **«Данные события»** («Запчасти» / «Работа» сверху). Так совпадает с подсказками в UI: верхние поля — дополнение к строкам, а не замена. **`totalCost`** = сумма этих двух итогов (если заданы). Парсинг ввода сумм — **`parseExpenseAmountInputToNumberOrNull`** (в т.ч. группировка `ru-RU`, неразрывный пробел).
-- **Превью «Итого»** в модалке web и в форме Expo считает ту же комбинацию (строки + верх), чтобы пользователь видел итог до сохранения.
+- **Превью «Итого»** в форме web и в форме Expo считает ту же комбинацию (строки + верх), чтобы пользователь видел итог до сохранения.
 - **Редактирование (`createInitialEditServiceEventValues`):** для **ADVANCED** в верхних строках формы показывается **остаток** относительно суммы по строкам (`event.partsCost` − сумма `partCost` по items, то же для работы), чтобы при повторном сохранении не произошло двойного учёта. В **BASIC** верхние поля по-прежнему отражают сохранённые **`partsCost` / `laborCost`** (или fallback к **`totalCost`** для legacy).
 
 ### Журнал: стоимости по строкам bundle
@@ -40,12 +40,12 @@
 
 ### «Готово к установке»: расходы и строки формы
 
-- **Несколько чистых расходов (`source: "expense"`):** выбор целей для строк bundle разрешается через **`resolveInstallableExpenseTargetRow`** (web `BasicServiceEventModal`, Expo `basic-service-event-bundle-form`) — второй и следующие расходы не затирают строку 0.
+- **Несколько чистых расходов (`source: "expense"`):** выбор целей для строк bundle разрешается через **`resolveInstallableExpenseTargetRow`** (web `ServiceEventForm`, Expo `basic-service-event-bundle-form`) — второй и следующие расходы не затирают строку 0.
 - **Связь `ExpenseItem` ↔ событие:** после сохранения события **`linkInstalledExpenseItemsToServiceEvent`** (`src/lib/service-event-expense-links.ts`) идемпотентна относительно расходов, уже привязанных к этому же `serviceEventId` внутри транзакции (после `syncExpenseItemForServiceEvent`), и не требует повторного `update`, если статус уже **INSTALLED**. Это устраняет ложную ошибку вида «Selected expense items are not available for this service event».
 
 ## Web (`src/app/vehicles/[id]/service-log/page.tsx`)
 
-Журнал — отдельная страница `/vehicles/[id]/service-log` (не модалка на карточке ТС). Добавление/редактирование/повтор сервисного события — **общая** модалка `BasicServiceEventModal` на этой странице.
+Журнал — отдельная страница `/vehicles/[id]/service-log` (не модалка на карточке ТС). Добавление/редактирование/повтор сервисного события — **та же** форма **`ServiceEventForm`** на отдельных маршрутах **`/vehicles/[id]/service-events/new`** и **`…/[eventId]/edit`**; переходы из журнала и из `vehicle-detail-client.tsx`.
 
 - **Фильтр по узлу:** строка «Фильтр по узлу: …» и кнопка «Сбросить фильтр» (только подмножество по дереву); полный «Сбросить» сбрасывает и ручные фильтры, и сортировку, и фильтр по узлу, и **`paidOnly`**.
 - **Только расходы:** баннер «Показаны события с расходами» и «Сбросить фильтр» при `paidOnly`; чекбокс в панели фильтров; query **`expandExpenses=1|true`** при открытии страницы включает режим «только расходы» (как handoff с блоков расходов).

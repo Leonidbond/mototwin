@@ -12,11 +12,12 @@ import {
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type { PartSkuViewModel, PartWishlistFormValues, PartWishlistItem, PartWishlistItemStatus } from "@mototwin/types";
+import { NodePickerModal } from "../../_components/node-picker/NodePickerModal";
 
 const RADIUS_MODAL = 24;
 const RADIUS_INNER = 14;
 
-export type WishlistNodeSelectOption = { id: string; name: string; level: number };
+export type WishlistNodeSelectOption = { id: string; name: string; level: number; pathLabel?: string };
 
 export type WishlistItemEditModalProps = {
   isOpen: boolean;
@@ -71,6 +72,7 @@ export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
   } = props;
 
   const [isNarrow, setIsNarrow] = useState(false);
+  const [nodePickerOpen, setNodePickerOpen] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1023px)");
@@ -92,6 +94,11 @@ export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
     }
     return "";
   }, [wishlistForm.skuId, wishlistSkuPickedPreview, wishlistEditingSourceItem]);
+
+  const selectedNodeLabel = useMemo(() => {
+    const selected = wishlistNodeOptions.find((option) => option.id === wishlistForm.nodeId);
+    return selected ? selected.name : "Выберите узел мотоцикла";
+  }, [wishlistForm.nodeId, wishlistNodeOptions]);
 
   if (!isOpen) {
     return null;
@@ -122,20 +129,20 @@ export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
         <label className="block text-xs font-medium" style={{ color: productSemanticColors.textSecondary }}>
           Узел мотоцикла <span style={{ color: productSemanticColors.error }}>*</span>
         </label>
-        <select
-          value={wishlistForm.nodeId}
-          onChange={(e) => setWishlistForm((f) => ({ ...f, nodeId: e.target.value }))}
+        <button
+          type="button"
+          onClick={() => setNodePickerOpen(true)}
           className="mt-1 w-full border px-3 py-2 text-sm outline-none"
-          style={{ ...control, borderRadius: RADIUS_INNER, borderWidth: 1, borderStyle: "solid" }}
+          style={{
+            ...control,
+            borderRadius: RADIUS_INNER,
+            borderWidth: 1,
+            borderStyle: "solid",
+            textAlign: "left",
+          }}
         >
-          <option value="">Выберите узел мотоцикла</option>
-          {wishlistNodeOptions.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {"\u00A0".repeat(Math.max(0, opt.level - 1) * 2)}
-              {opt.name}
-            </option>
-          ))}
-        </select>
+          {selectedNodeLabel}
+        </button>
         {wishlistNodeRequiredError ? (
           <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
             Выберите узел мотоцикла
@@ -460,6 +467,17 @@ export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
         {stickyBar}
         {bottomActions}
       </div>
+      <NodePickerModal
+        open={nodePickerOpen}
+        options={wishlistNodeOptions}
+        selectedIds={wishlistForm.nodeId ? new Set([wishlistForm.nodeId]) : undefined}
+        searchPlaceholder="Поиск по названию узла"
+        onClose={() => setNodePickerOpen(false)}
+        onSelect={(nodeId) => {
+          setWishlistForm((form) => ({ ...form, nodeId }));
+          setNodePickerOpen(false);
+        }}
+      />
     </div>
   );
 }

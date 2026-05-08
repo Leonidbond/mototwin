@@ -19,6 +19,14 @@ export type RawServiceEventRow = {
   totalCost: DecimalLike;
   currency: string | null;
   comment: string | null;
+  performedBy?: string | null;
+  serviceProviderNote?: string | null;
+  attachReceiptRequested?: boolean | null;
+  attachFileRequested?: boolean | null;
+  nextReminderEnabled?: boolean | null;
+  nextReminderDate?: Date | null;
+  nextReminderOdometer?: number | null;
+  nextReminderEngineHours?: number | null;
   createdAt: Date;
   installedPartsJson?: unknown | null;
   node?: {
@@ -142,6 +150,14 @@ export function serializeServiceEventRow(row: RawServiceEventRow): ServiceEventI
     totalCost,
     currency: row.currency,
     comment: row.comment,
+    performedBy: (row.performedBy as ServiceEventItem["performedBy"]) ?? null,
+    serviceProviderNote: row.serviceProviderNote ?? null,
+    attachReceiptRequested: Boolean(row.attachReceiptRequested),
+    attachFileRequested: Boolean(row.attachFileRequested),
+    nextReminderEnabled: Boolean(row.nextReminderEnabled),
+    nextReminderDate: row.nextReminderDate?.toISOString() ?? null,
+    nextReminderOdometer: row.nextReminderOdometer ?? null,
+    nextReminderEngineHours: row.nextReminderEngineHours ?? null,
     items,
     serviceType: legacyServiceType,
     costAmount: totalCost,

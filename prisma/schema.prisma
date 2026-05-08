@@ -74,6 +74,13 @@ enum ServiceEventMode {
   ADVANCED
 }
 
+/** Кто выполнил сервисное событие (форма «Исполнитель»). */
+enum ServicePerformedBy {
+  SELF
+  SERVICE
+  OTHER
+}
+
 enum ServiceActionType {
   REPLACE
   SERVICE
@@ -296,6 +303,14 @@ model ServiceEvent {
   totalCost          Decimal?         @db.Decimal(12, 2)
   currency           String?
   comment            String?
+  performedBy               ServicePerformedBy?
+  serviceProviderNote       String?
+  attachReceiptRequested    Boolean          @default(false)
+  attachFileRequested       Boolean          @default(false)
+  nextReminderEnabled       Boolean          @default(false)
+  nextReminderDate          DateTime?
+  nextReminderOdometer      Int?
+  nextReminderEngineHours   Int?
   createdAt          DateTime         @default(now())
 
   vehicle      Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)

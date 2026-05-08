@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect -- SKU + installable loaders (same pattern as web BasicServiceEventModal). */
+/* eslint-disable react-hooks/set-state-in-effect -- SKU + installable loaders (same pattern as web ServiceEventModal). */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -13,11 +13,16 @@ import {
 } from "react-native";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH,
+  ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH,
   applyExpenseInstallToAddFormRow,
+  buildAddServiceEventCostBreakdownLines,
   createEmptyBundleItemFormValues,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
   flattenNodeTreeToSelectOptions,
+  nodeAncestorPathLabelRu,
   formatExpenseAmountRu,
+  getServiceActionTypeLabelRu,
   mergeServiceBundleTemplateIntoAddFormValues,
   mergeWishlistItemIntoAddFormValues,
   parseExpenseAmountInputToNumberOrNull,
@@ -36,7 +41,9 @@ import type {
   PartWishlistItem,
   PartWishlistItemStatus,
   ServiceBundleTemplateWire,
+  ServicePerformedBy,
 } from "@mototwin/types";
+import { MobileNodePickerModal } from "./mobile-node-picker-modal";
 
 type FlatOption = ReturnType<typeof flattenNodeTreeToSelectOptions>[number];
 
@@ -46,6 +53,12 @@ function cloneForm(src: AddServiceEventFormValues): AddServiceEventFormValues {
     items: src.items.map((it) => ({ ...it })),
     installedExpenseItemIds: [...src.installedExpenseItemIds],
   };
+}
+
+function performedByLabelRu(value: ServicePerformedBy): string {
+  if (value === "SELF") return "Сам";
+  if (value === "SERVICE") return "Сервис";
+  return "Другое";
 }
 
 function getAnchorSku(form: AddServiceEventFormValues): string {
@@ -290,6 +303,7 @@ export function BasicServiceEventBundleForm({
   const [bundleTemplates, setBundleTemplates] = useState<ServiceBundleTemplateWire[]>([]);
   const [bundleTemplatesErr, setBundleTemplatesErr] = useState("");
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [templateInspect, setTemplateInspect] = useState<ServiceBundleTemplateWire | null>(null);
   const [installableModalOpen, setInstallableModalOpen] = useState(false);
   const [installableEntries, setInstallableEntries] = useState<InstallableForServiceEventEntry[]>([]);
   const [installableLoading, setInstallableLoading] = useState(false);
@@ -303,6 +317,16 @@ export function BasicServiceEventBundleForm({
     () => flattenNodeTreeToSelectOptions(nodeTree).filter((o) => !o.hasChildren),
     [nodeTree]
   );
+  const leafPickerRows = useMemo(
+    () =>
+      leafOptions.map((o) => ({
+        id: o.id,
+        name: o.name,
+        level: o.level,
+        pathLabel: nodeAncestorPathLabelRu(nodeTree, o.id),
+      })),
+    [leafOptions, nodeTree]
+  );
   const leafIds = useMemo(() => new Set(leafOptions.map((o) => o.id)), [leafOptions]);
 
   const effectiveSkuRowIndex =
@@ -311,6 +335,16 @@ export function BasicServiceEventBundleForm({
   useEffect(() => {
     setSkuSearchRowIndex((idx) => Math.min(Math.max(0, idx), Math.max(0, form.items.length - 1)));
   }, [form.items.length]);
+
+  const costBreakdownLines = useMemo(() => buildAddServiceEventCostBreakdownLines(form), [form]);
+
+  const costCurrencySuffix = useMemo(() => {
+    const cur = form.currency.trim().toUpperCase() || "RUB";
+    if (cur === "RUB") return "₽";
+    if (cur === "USD") return "$";
+    if (cur === "EUR") return "€";
+    return cur;
+  }, [form.currency]);
 
   const costTotalPreview = useMemo(() => {
     const cur = form.currency.trim().toUpperCase() || "RUB";
@@ -635,7 +669,7 @@ export function BasicServiceEventBundleForm({
 
   const nodePickerOptions =
     nodePicker != null
-      ? leafOptions.filter(
+      ? leafPickerRows.filter(
           (o) =>
             o.id === form.items[nodePicker.rowIndex]?.nodeId.trim() ||
             !form.items.some((it, i) => i !== nodePicker.rowIndex && it.nodeId.trim() === o.id)
@@ -677,8 +711,8 @@ export function BasicServiceEventBundleForm({
       </View>
       <Text style={styles.hintMuted}>
         {form.mode === "BASIC"
-          ? "Суммы по деталям и работе относятся ко всем выбранным узлам; тип работы один для всех."
-          : "У каждой строки свой тип работы, запчасть, SKU и суммы. Итог — по строкам или сверху, если в строках пусто."}
+          ? "Просто отметить обслуживание: один тип работы, суммы по всем узлам."
+          : "С деталями по узлам: свой тип работы, запчасть, SKU и суммы в каждой строке."}
       </Text>
 
       {!isEditMode ? (
@@ -701,7 +735,161 @@ export function BasicServiceEventBundleForm({
         </View>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Узлы и работы</Text>
+      <Text style={styles.sectionTitle}>1. Основное</Text>
+      <Field label="Название события">
+        <TextInput
+          value={form.title}
+          onChangeText={(t) => updateForm((p) => ({ ...p, title: t }))}
+          style={styles.input}
+          placeholder="Например: ТО 10 000 км"
+        />
+      </Field>
+      <Field label="Дата (YYYY-MM-DD)">
+        <TextInput
+          value={form.eventDate}
+          onChangeText={(t) => updateForm((p) => ({ ...p, eventDate: t }))}
+          style={styles.input}
+          autoCapitalize="none"
+          placeholder="2026-05-03"
+        />
+      </Field>
+      <Field label="Пробег, км">
+        <TextInput
+          value={form.odometer}
+          onChangeText={(t) => updateForm((p) => ({ ...p, odometer: t }))}
+          style={styles.input}
+          keyboardType="number-pad"
+        />
+      </Field>
+      <Field label="Моточасы">
+        <TextInput
+          value={form.engineHours}
+          onChangeText={(t) => updateForm((p) => ({ ...p, engineHours: t }))}
+          style={styles.input}
+          keyboardType="number-pad"
+        />
+      </Field>
+
+      <Text style={styles.label}>Исполнитель</Text>
+      <View style={styles.performerRow}>
+        {(["SELF", "SERVICE", "OTHER"] as const).map((v) => {
+          const active = form.performedBy === v;
+          return (
+            <Pressable
+              key={v}
+              onPress={() => updateForm((p) => ({ ...p, performedBy: v }))}
+              style={({ pressed }) => [
+                styles.performerChip,
+                active && styles.performerChipActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.performerChipText, active && styles.performerChipTextActive]}>
+                {performedByLabelRu(v)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Field label="Сервис (необязательно)">
+        <TextInput
+          value={form.serviceProviderNote}
+          onChangeText={(t) => updateForm((p) => ({ ...p, serviceProviderNote: t }))}
+          style={styles.input}
+          multiline
+          maxLength={ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH}
+          placeholder="Например: MotoService"
+        />
+      </Field>
+      <Field label="Комментарий">
+        <TextInput
+          value={form.comment}
+          onChangeText={(t) => updateForm((p) => ({ ...p, comment: t }))}
+          style={[styles.input, styles.multiline]}
+          multiline
+          maxLength={ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH}
+          placeholder="Любые заметки об этом обслуживании…"
+        />
+        <Text style={styles.charCounter}>
+          {form.comment.length}/{ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH}
+        </Text>
+      </Field>
+
+      <Text style={styles.sectionTitle}>2. Стоимость</Text>
+      {form.mode === "ADVANCED" ? (
+        <Text style={styles.hintMuted}>
+          Итог — сумма по строкам узлов плюс поля «Запчасти» и «Работа» ниже (можно только строки, только блок или
+          оба).
+        </Text>
+      ) : null}
+      <View style={styles.row2}>
+        <View style={{ flex: 1 }}>
+          <Field label={`Детали, ${costCurrencySuffix}`}>
+            <TextInput
+              value={form.partsCost}
+              onChangeText={(t) => updateForm((p) => ({ ...p, partsCost: t }))}
+              style={styles.input}
+              keyboardType="decimal-pad"
+              placeholder="0"
+            />
+          </Field>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field label={`Работа, ${costCurrencySuffix}`}>
+            <TextInput
+              value={form.laborCost}
+              onChangeText={(t) => updateForm((p) => ({ ...p, laborCost: t }))}
+              style={styles.input}
+              keyboardType="decimal-pad"
+              placeholder="0"
+            />
+          </Field>
+        </View>
+      </View>
+      <Field label="Валюта">
+        <TextInput
+          value={form.currency}
+          onChangeText={(t) => updateForm((p) => ({ ...p, currency: t.toUpperCase() }))}
+          style={styles.input}
+          autoCapitalize="characters"
+        />
+      </Field>
+      {costTotalPreview ? (
+        <View style={styles.totalBadge}>
+          <Text style={styles.totalBadgeText}>Итого: {costTotalPreview}</Text>
+        </View>
+      ) : null}
+
+      <Text style={styles.sectionTitle}>3. Дополнительно</Text>
+      <Text style={[styles.muted, { marginBottom: 10 }]}>
+        Вложения и напоминания — как в макете; загрузка и напоминания подключатся позже.
+      </Text>
+      {isEditMode &&
+      (form.attachReceiptRequested || form.attachFileRequested || form.nextReminderEnabled) ? (
+        <Text style={[styles.muted, { marginBottom: 10, padding: 10, borderWidth: 1, borderColor: c.border, borderRadius: 10 }]}>
+          В записи уже есть отметки о вложениях или напоминании — изменение из формы будет доступно позже.
+        </Text>
+      ) : null}
+      <View style={styles.ghostActionsRow}>
+        <View style={styles.ghostActionBtn}>
+          <Text style={styles.ghostActionTitle}>Добавить фото / чек</Text>
+          <Text style={styles.ghostActionMeta}>Скоро</Text>
+        </View>
+        <View style={styles.ghostActionBtn}>
+          <Text style={styles.ghostActionTitle}>Прикрепить файл</Text>
+          <Text style={styles.ghostActionMeta}>Скоро</Text>
+        </View>
+        <View style={styles.ghostActionBtn}>
+          <Text style={styles.ghostActionTitle}>Повторить событие</Text>
+          <Text style={styles.ghostActionMeta}>Скоро</Text>
+        </View>
+      </View>
+      <View style={styles.reminderSoonRow}>
+        <Text style={{ fontSize: 14, color: c.textSecondary }}>Напомнить о следующем обслуживании</Text>
+        <Text style={{ fontSize: 12, fontWeight: "800", color: c.textMeta }}>Скоро</Text>
+      </View>
+
+      <Text style={styles.sectionTitle}>4. Узлы и работы</Text>
       {form.mode === "BASIC" ? (
         <View style={styles.block}>
           <Text style={styles.label}>Тип работы для всех узлов</Text>
@@ -714,6 +902,23 @@ export function BasicServiceEventBundleForm({
                 form.commonActionType}
             </Text>
           </Pressable>
+        </View>
+      ) : null}
+      {form.mode === "BASIC" ? (
+        <View
+          style={{
+            marginBottom: 10,
+            borderLeftWidth: 4,
+            borderLeftColor: c.primaryAction,
+            paddingLeft: 10,
+            paddingVertical: 8,
+            backgroundColor: c.cardSubtle,
+            borderRadius: 8,
+          }}
+        >
+          <Text style={[styles.muted, { lineHeight: 18 }]}>
+            Режим «Быстро»: один тип работы на все узлы, суммы по деталям и работе — в разделе «2. Стоимость» выше.
+          </Text>
         </View>
       ) : null}
 
@@ -784,7 +989,7 @@ export function BasicServiceEventBundleForm({
                   </Field>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Field label="Запчасти, ₽">
+                  <Field label={`Детали, ${costCurrencySuffix}`}>
                     <TextInput
                       value={row.partCost}
                       onChangeText={(t) => updateForm((p) => patchItemAt(p, rowIndex, { partCost: t }))}
@@ -795,7 +1000,7 @@ export function BasicServiceEventBundleForm({
                   </Field>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Field label="Работа, ₽">
+                  <Field label={`Работа, ${costCurrencySuffix}`}>
                     <TextInput
                       value={row.laborCost}
                       onChangeText={(t) => updateForm((p) => patchItemAt(p, rowIndex, { laborCost: t }))}
@@ -874,83 +1079,24 @@ export function BasicServiceEventBundleForm({
         </Pressable>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Данные события</Text>
-      <Field label="Дата (YYYY-MM-DD)">
-        <TextInput
-          value={form.eventDate}
-          onChangeText={(t) => updateForm((p) => ({ ...p, eventDate: t }))}
-          style={styles.input}
-          autoCapitalize="none"
-          placeholder="2026-05-03"
-        />
-      </Field>
-      <Field label="Название события">
-        <TextInput
-          value={form.title}
-          onChangeText={(t) => updateForm((p) => ({ ...p, title: t }))}
-          style={styles.input}
-          placeholder="Например: ТО 10 000 км"
-        />
-      </Field>
-      <Field label="Пробег, км">
-        <TextInput
-          value={form.odometer}
-          onChangeText={(t) => updateForm((p) => ({ ...p, odometer: t }))}
-          style={styles.input}
-          keyboardType="number-pad"
-        />
-      </Field>
-      <Field label="Моточасы">
-        <TextInput
-          value={form.engineHours}
-          onChangeText={(t) => updateForm((p) => ({ ...p, engineHours: t }))}
-          style={styles.input}
-          keyboardType="number-pad"
-        />
-      </Field>
-
-      <Text style={styles.sectionTitle}>Стоимость</Text>
-      {form.mode === "ADVANCED" ? (
-        <Text style={styles.hintMuted}>
-          Итог — сумма по строкам узлов плюс поля «Запчасти» и «Работа» ниже (можно только строки, только блок или
-          оба).
-        </Text>
-      ) : null}
-      <View style={styles.row2}>
-        <View style={{ flex: 1 }}>
-          <Field label="Запчасти">
-            <TextInput
-              value={form.partsCost}
-              onChangeText={(t) => updateForm((p) => ({ ...p, partsCost: t }))}
-              style={styles.input}
-              keyboardType="decimal-pad"
-              placeholder="0"
-            />
-          </Field>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Field label="Работа">
-            <TextInput
-              value={form.laborCost}
-              onChangeText={(t) => updateForm((p) => ({ ...p, laborCost: t }))}
-              style={styles.input}
-              keyboardType="decimal-pad"
-              placeholder="0"
-            />
-          </Field>
-        </View>
-      </View>
-      <Field label="Валюта">
-        <TextInput
-          value={form.currency}
-          onChangeText={(t) => updateForm((p) => ({ ...p, currency: t.toUpperCase() }))}
-          style={styles.input}
-          autoCapitalize="characters"
-        />
-      </Field>
-      {costTotalPreview ? (
-        <View style={styles.totalBadge}>
-          <Text style={styles.totalBadgeText}>Итого: {costTotalPreview}</Text>
+      {costBreakdownLines.parts || costBreakdownLines.labor || costBreakdownLines.total ? (
+        <View style={styles.unitsTotalsBar}>
+          <Text style={styles.unitsTotalsTitle}>Итого по узлам</Text>
+          <View style={styles.unitsTotalsRow}>
+            {costBreakdownLines.parts ? (
+              <Text style={styles.unitsTotalsLine}>
+                Детали: <Text style={styles.unitsTotalsEm}>{costBreakdownLines.parts}</Text>
+              </Text>
+            ) : null}
+            {costBreakdownLines.labor ? (
+              <Text style={styles.unitsTotalsLine}>
+                Работа: <Text style={styles.unitsTotalsEm}>{costBreakdownLines.labor}</Text>
+              </Text>
+            ) : null}
+            {costBreakdownLines.total ? (
+              <Text style={styles.unitsTotalsTotal}>Всего: {costBreakdownLines.total}</Text>
+            ) : null}
+          </View>
         </View>
       ) : null}
 
@@ -1010,23 +1156,6 @@ export function BasicServiceEventBundleForm({
         </>
       ) : null}
 
-      <Field label="Комментарий">
-        <TextInput
-          value={form.comment}
-          onChangeText={(t) => updateForm((p) => ({ ...p, comment: t }))}
-          style={[styles.input, styles.multiline]}
-          multiline
-        />
-      </Field>
-      <Field label="Установленные запчасти (JSON)">
-        <TextInput
-          value={form.installedPartsJson}
-          onChangeText={(t) => updateForm((p) => ({ ...p, installedPartsJson: t }))}
-          style={[styles.input, styles.multiline, styles.mono]}
-          multiline
-        />
-      </Field>
-
       {combinedError ? <Text style={styles.err}>{combinedError}</Text> : null}
 
       <Pressable
@@ -1052,41 +1181,85 @@ export function BasicServiceEventBundleForm({
             <Text style={styles.modalTitle}>Шаблон комплекса</Text>
             <ScrollView style={{ maxHeight: 420 }}>
               {bundleTemplates.map((tpl) => (
-                <Pressable
-                  key={tpl.id}
-                  onPress={() => {
-                    updateForm((prev) => {
-                      const { form: merged, skippedItems } = mergeServiceBundleTemplateIntoAddFormValues(
-                        prev,
-                        tpl,
-                        leafIds
-                      );
-                      if (skippedItems.length > 0) {
-                        queueMicrotask(() =>
-                          setLocalError(
-                            `Не все узлы шаблона доступны: ${skippedItems.map((s) => s.label).join(", ")}`
-                          )
+                <View key={tpl.id} style={styles.modalRow}>
+                  <Pressable
+                    onPress={() => {
+                      updateForm((prev) => {
+                        const { form: merged, skippedItems } = mergeServiceBundleTemplateIntoAddFormValues(
+                          prev,
+                          tpl,
+                          leafIds
                         );
-                      } else {
-                        queueMicrotask(() => {
-                          setLocalError("");
-                          onClearSubmitError();
-                        });
-                      }
-                      return merged;
-                    });
-                    setTemplateModalOpen(false);
-                  }}
-                  style={({ pressed }) => [styles.modalRow, pressed && styles.pressed]}
-                >
-                  <Text style={styles.modalRowText}>{tpl.title}</Text>
-                  {tpl.description ? (
-                    <Text style={[styles.muted, { marginTop: 4 }]}>{tpl.description}</Text>
-                  ) : null}
-                </Pressable>
+                        if (skippedItems.length > 0) {
+                          queueMicrotask(() =>
+                            setLocalError(
+                              `Не все узлы шаблона доступны: ${skippedItems.map((s) => s.label).join(", ")}`
+                            )
+                          );
+                        } else {
+                          queueMicrotask(() => {
+                            setLocalError("");
+                            onClearSubmitError();
+                          });
+                        }
+                        return merged;
+                      });
+                      setTemplateModalOpen(false);
+                    }}
+                    style={({ pressed }) => [pressed && styles.pressed]}
+                  >
+                    <Text style={styles.modalRowText}>{tpl.title}</Text>
+                    {tpl.description ? (
+                      <Text style={[styles.muted, { marginTop: 4 }]}>{tpl.description}</Text>
+                    ) : null}
+                  </Pressable>
+                  <Pressable onPress={() => setTemplateInspect(tpl)} style={styles.templateComposeLink}>
+                    <Text style={styles.templateComposeLinkTxt}>Состав</Text>
+                  </Pressable>
+                </View>
               ))}
             </ScrollView>
             <Pressable onPress={() => setTemplateModalOpen(false)} style={styles.modalClose}>
+              <Text style={styles.modalCloseTxt}>Закрыть</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={templateInspect != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTemplateInspect(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setTemplateInspect(null)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Состав шаблона</Text>
+            {templateInspect ? (
+              <>
+                <Text style={[styles.modalRowText, { marginBottom: 8 }]}>{templateInspect.title}</Text>
+                <ScrollView style={{ maxHeight: 360 }}>
+                  {[...templateInspect.items]
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((it) => {
+                      const nodeLabel =
+                        it.node?.name?.trim() ||
+                        [it.node?.code, it.nodeId].filter(Boolean).join(" · ") ||
+                        it.nodeId;
+                      return (
+                        <View key={it.id} style={styles.templateInspectItem}>
+                          <Text style={styles.templateInspectItemTitle}>{nodeLabel}</Text>
+                          <Text style={styles.muted}>
+                            {getServiceActionTypeLabelRu(it.defaultActionType)}
+                            {it.isRequired ? " · обязательный узел" : ""}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                </ScrollView>
+              </>
+            ) : null}
+            <Pressable onPress={() => setTemplateInspect(null)} style={styles.modalClose}>
               <Text style={styles.modalCloseTxt}>Закрыть</Text>
             </Pressable>
           </Pressable>
@@ -1203,31 +1376,18 @@ export function BasicServiceEventBundleForm({
         </Pressable>
       </Modal>
 
-      <Modal visible={nodePicker != null} transparent animationType="fade" onRequestClose={() => setNodePicker(null)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setNodePicker(null)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Выберите узел</Text>
-            <ScrollView style={{ maxHeight: 420 }}>
-              {nodePickerOptions.map((opt) => (
-                <Pressable
-                  key={opt.id}
-                  onPress={() => {
-                    const idx = nodePicker!.rowIndex;
-                    updateForm((prev) => patchItemAt(prev, idx, { nodeId: opt.id }));
-                    setNodePicker(null);
-                  }}
-                  style={({ pressed }) => [styles.modalRow, pressed && styles.pressed]}
-                >
-                  <Text style={styles.modalRowText}>{optionLabel(opt)}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <Pressable onPress={() => setNodePicker(null)} style={styles.modalClose}>
-              <Text style={styles.modalCloseTxt}>Отмена</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <MobileNodePickerModal
+        visible={nodePicker != null}
+        options={nodePickerOptions}
+        selectedId={nodePicker != null ? form.items[nodePicker.rowIndex]?.nodeId : null}
+        onClose={() => setNodePicker(null)}
+        onSelect={(nodeId) => {
+          if (nodePicker == null) return;
+          const idx = nodePicker.rowIndex;
+          updateForm((prev) => patchItemAt(prev, idx, { nodeId }));
+          setNodePicker(null);
+        }}
+      />
 
       <Modal visible={actionPickerOpen} transparent animationType="fade" onRequestClose={() => setActionPickerOpen(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setActionPickerOpen(false)}>
@@ -1368,6 +1528,72 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   addNodeBtnText: { color: c.primaryAction, fontWeight: "800", fontSize: 13 },
+  unitsTotalsBar: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+  },
+  unitsTotalsTitle: { fontSize: 12, fontWeight: "800", color: c.textMeta },
+  unitsTotalsRow: { marginTop: 6, gap: 6 },
+  unitsTotalsLine: { fontSize: 12, color: c.textSecondary },
+  unitsTotalsEm: { fontWeight: "700", color: c.textPrimary },
+  unitsTotalsTotal: { fontSize: 12, fontWeight: "800", color: c.primaryAction, marginTop: 4 },
+  performerRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  performerChip: {
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: c.cardMuted,
+  },
+  performerChipActive: {
+    borderColor: c.primaryAction,
+    backgroundColor: c.primaryAction,
+  },
+  performerChipText: { fontSize: 12, fontWeight: "700", color: c.textSecondary },
+  performerChipTextActive: { color: c.onPrimaryAction },
+  charCounter: { fontSize: 11, color: c.textMuted, marginTop: 4, textAlign: "right" },
+  templateComposeLink: { marginTop: 8, alignSelf: "flex-start" },
+  templateComposeLinkTxt: { fontSize: 12, fontWeight: "800", color: c.primaryAction },
+  ghostActionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  ghostActionBtn: {
+    flexGrow: 1,
+    minWidth: "28%",
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: c.card,
+    opacity: 0.72,
+  },
+  ghostActionTitle: { fontSize: 12, fontWeight: "700", color: c.textSecondary },
+  ghostActionMeta: { marginTop: 4, fontSize: 10, fontWeight: "800", color: c.textMeta, textTransform: "uppercase" },
+  reminderSoonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    backgroundColor: c.cardSubtle,
+  },
+  templateInspectItem: {
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    backgroundColor: c.cardMuted,
+  },
+  templateInspectItemTitle: { fontSize: 14, fontWeight: "700", color: c.textPrimary },
   templatePickBtn: {
     alignSelf: "flex-start",
     borderWidth: 1,

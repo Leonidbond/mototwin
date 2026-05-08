@@ -2,6 +2,7 @@ import type {
   CreateServiceEventInput,
   ServiceActionType,
   ServiceEventMode,
+  ServicePerformedBy,
 } from "./service-event";
 import type {
   CreateVehicleInput,
@@ -57,6 +58,17 @@ export type AddServiceEventFormValues = {
    */
   installedPartsJson: string;
   installedExpenseItemIds: string[];
+  /** Исполнитель: сам / сервис / другое. */
+  performedBy: ServicePerformedBy;
+  /** Название, телефон или адрес сервиса (опционально). */
+  serviceProviderNote: string;
+  attachReceiptRequested: boolean;
+  attachFileRequested: boolean;
+  nextReminderEnabled: boolean;
+  /** `YYYY-MM-DD` для следующего ТО (если включено напоминание). */
+  nextReminderDate: string;
+  nextReminderOdometer: string;
+  nextReminderEngineHours: string;
   /** Items bundle (>= 1 строка). */
   items: BundleItemFormValues[];
 };

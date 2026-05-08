@@ -42,7 +42,7 @@
 ### Дефолт валюты — новое сервисное событие (2026-04-18)
 
 - Каноническое значение по умолчанию: **RUB** (ISO 4217), константа **`DEFAULT_ADD_SERVICE_EVENT_CURRENCY`** и **`createInitialAddServiceEventFormValues`** в `packages/domain/src/forms.ts`.
-- **Web** (`service-log/page.tsx`, `vehicle-detail-client.tsx` через **`BasicServiceEventModal`**): валюта и остальные bundle-поля из тех же `createInitial*` / `createInitialAddServiceEventFormValues` в `packages/domain`.
+- **Web** (`service-log/page.tsx`, `vehicle-detail-client.tsx` → страницы с **`ServiceEventForm`**): валюта и остальные bundle-поля из тех же `createInitial*` / `createInitialAddServiceEventFormValues` в `packages/domain`.
 - **Expo** (`service-events/new.tsx` + **`basic-service-event-bundle-form.tsx`**): то же; placeholder поля «Валюта» — `RUB`.
 - В API по-прежнему уходит строка кода валюты (нормализация без изменения контракта).
 
@@ -68,7 +68,7 @@
 | `src/app/vehicles/[id]/page.tsx` |
 | `src/app/vehicles/[id]/service-log/page.tsx` |
 | `src/app/vehicles/[id]/vehicle-detail-client.tsx` |
-| `src/app/vehicles/[id]/_components/BasicServiceEventModal.tsx` |
+| `src/app/vehicles/[id]/_components/service-event-form/ServiceEventForm.tsx` |
 | `apps/app/app/vehicles/[id]/service-events/new.tsx` |
 | `apps/app/app/vehicles/[id]/_components/basic-service-event-bundle-form.tsx` |
 
@@ -76,7 +76,7 @@
 
 | Слой | Изменения |
 |------|-----------|
-| **Web** | Onboarding: единый источник дефолтов ride profile; **bundle** сервисного события — дефолт валюты **RUB** и общие `createInitial*` из domain в **`BasicServiceEventModal`**. |
+| **Web** | Onboarding: единый источник дефолтов ride profile; **bundle** сервисного события — дефолт валюты **RUB** и общие `createInitial*` из domain в **`ServiceEventForm`**. |
 | **Expo** | Гараж, журнал, профиль, новый мотоцикл — ближе к web по данным и подписям; bundle события — тот же дефолт **RUB** и те же хелперы в **`basic-service-event-bundle-form`**. |
 | **Shared** | Фильтр спек гаража; журнал — `buildServiceLogTimelineProps`; **`DEFAULT_ADD_SERVICE_EVENT_CURRENCY`** / initial values для сервисного события. |
 | **Backend** | Нет. |

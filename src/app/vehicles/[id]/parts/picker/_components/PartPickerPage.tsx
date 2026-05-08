@@ -30,6 +30,7 @@ import {
   getLeafNodeOptions,
   getNodePathItemViewModelsByNodeId,
   getOrderedTopNodeIdsPresentInNodeTree,
+  nodeAncestorPathLabelRu,
   removeFromDraft,
   vehicleDetailFromApiRecord,
 } from "@mototwin/domain";
@@ -413,11 +414,11 @@ export function PartPickerPage({
 
   const leafPickerOptions: NodePickerOption[] = useMemo(() => {
     const leaves = getLeafNodeOptions(nodeTree);
-    return leaves.map((opt) => {
-      const vm = getNodePathItemViewModelsByNodeId(nodeTree, opt.id);
-      const pathLabel = vm ? vm.map((p) => p.name).join(" / ") : "";
-      return { id: opt.id, name: opt.name, pathLabel };
-    });
+    return leaves.map((opt) => ({
+      id: opt.id,
+      name: opt.name,
+      pathLabel: nodeAncestorPathLabelRu(nodeTree, opt.id),
+    }));
   }, [nodeTree]);
 
   const orderedTopNodeIdsForPicker = useMemo(

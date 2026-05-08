@@ -31,12 +31,12 @@ Stable **`value`** enums plus **Russian labels** (aligned with web onboarding / 
 - **State**: expanded modals, `useState`, navigation, loading flags.
 - **Layout**: Tailwind vs React Native `StyleSheet`, select vs chips.
 - **Validation context:** service event **дата не в будущем**, **пробег** и сопоставление с текущим пробегом ТС — через **`AddServiceEventValidationContext`** (`todayDateYmd`, `currentVehicleOdometer`, **`leafNodeIds`**) и на web, и в Expo bundle-форме.
-- **Layout / навигация:** на web форма — модалка (`BasicServiceEventModal`); на Expo — полноэкранный блок (`basic-service-event-bundle-form`) внутри `service-events/new.tsx`.
+- **Layout / навигация:** на web — полноэкранные страницы **`ServiceEventForm`** (`service-event-form/`, маршруты `service-events/new` и `service-events/[eventId]/edit`); на Expo — полноэкранный блок (`basic-service-event-bundle-form`) внутри `service-events/new.tsx`.
 - **Defaults**: e.g. Expo «новый мотоцикл» still initializes **`ridingStyle`** with **`CALM`** locally; shared `createInitialAddMotorcycleFormValues` defaults match **web** (`ACTIVE`) for onboarding-style flows.
 
 ## Where it is wired
 
-- **Web:** `src/app/vehicles/[id]/page.tsx` (state, profile и обёртка карточки), `src/app/onboarding/page.tsx` (create vehicle + shared ride selects). **Сервисное событие (bundle):** `src/app/vehicles/[id]/_components/BasicServiceEventModal.tsx` — из `service-log/page.tsx`, `vehicle-detail-client.tsx` и других точек входа с тем же UI.
+- **Web:** `src/app/vehicles/[id]/page.tsx` (state, profile и обёртка карточки), `src/app/onboarding/page.tsx` (create vehicle + shared ride selects). **Сервисное событие (bundle):** `src/app/vehicles/[id]/_components/service-event-form/` — **`ServiceEventForm`** на маршрутах `service-events/new` и `service-events/[eventId]/edit`, навигация из `service-log/page.tsx` и `vehicle-detail-client.tsx`. Подробное поведение UI — [web-service-event-form.md](./web-service-event-form.md).
 - **Expo:** `apps/app/app/vehicles/new.tsx`, `vehicles/[id]/state.tsx`, `vehicles/[id]/profile.tsx`. **Сервисное событие (bundle):** `vehicles/[id]/_components/basic-service-event-bundle-form.tsx` + экран `vehicles/[id]/service-events/new.tsx`.
 
 ## Parity notes

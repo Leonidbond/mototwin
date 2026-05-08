@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -21,6 +20,7 @@ import {
   clearPartWishlistFormSkuSelection,
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
+  nodeAncestorPathLabelRu,
   buildPartRecommendationGroupsForDisplay,
   formatExpenseAmountRu,
   formatPartSkuSearchResultMetaLineRu,
@@ -48,6 +48,7 @@ import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { ScreenHeader } from "../../../components/screen-header";
 import { buildServiceEventNewFromWishlistHref } from "./hrefs";
+import { MobileNodePickerModal } from "../_components/mobile-node-picker-modal";
 
 type WishlistItemEditorProps = {
   vehicleId: string;
@@ -125,7 +126,12 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
         endpoints.getVehicleWishlist(vehicleId),
       ]);
       const nodes = tree.nodeTree ?? [];
-      setNodeTreeOptions(flattenNodeTreeToSelectOptions(nodes));
+      setNodeTreeOptions(
+        flattenNodeTreeToSelectOptions(nodes).map((option) => ({
+          ...option,
+          pathLabel: nodeAncestorPathLabelRu(nodes, option.id),
+        }))
+      );
       const row = wishlist.items.find((i) => i.id === itemIdSafe);
       if (!row) {
         setLoadError("Позиция не найдена.");
@@ -620,44 +626,16 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal
+      <MobileNodePickerModal
         visible={nodePickerOpen}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setNodePickerOpen(false)}
-      >
-        <SafeAreaView style={styles.modalSafe}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Выберите узел</Text>
-            <Pressable
-              onPress={() => setNodePickerOpen(false)}
-              hitSlop={10}
-              style={({ pressed }) => pressed && styles.modalClosePressed}
-            >
-              <Text style={styles.modalClose}>Готово</Text>
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalScroll}>
-            {nodeTreeOptions.map((opt) => (
-              <Pressable
-                key={opt.id}
-                onPress={() => {
-                  setForm((f) => ({ ...f, nodeId: opt.id }));
-                  setNodePickerOpen(false);
-                }}
-                style={({ pressed }) => [styles.modalRow, pressed && styles.modalRowPressed]}
-              >
-                <Text
-                  style={[styles.modalRowText, { paddingLeft: 8 + opt.level * 12 }]}
-                  numberOfLines={2}
-                >
-                  {opt.name}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+        options={nodeTreeOptions}
+        selectedId={form.nodeId}
+        onClose={() => setNodePickerOpen(false)}
+        onSelect={(nodeId) => {
+          setForm((current) => ({ ...current, nodeId }));
+          setNodePickerOpen(false);
+        }}
+      />
     </SafeAreaView>
   );
 }

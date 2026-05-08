@@ -9,6 +9,9 @@ export type ServiceEventKind = "SERVICE" | "STATE_UPDATE";
  */
 export type ServiceEventMode = "BASIC" | "ADVANCED";
 
+/** Кто выполнил обслуживание (форма «Исполнитель»). */
+export type ServicePerformedBy = "SELF" | "SERVICE" | "OTHER";
+
 /** Тип сервисного действия по узлу. */
 export type ServiceActionType =
   | "REPLACE"
@@ -72,6 +75,15 @@ export type ServiceEventItem = {
   totalCost: number | null;
   currency: string | null;
   comment: string | null;
+  performedBy?: ServicePerformedBy | null;
+  serviceProviderNote?: string | null;
+  attachReceiptRequested?: boolean;
+  attachFileRequested?: boolean;
+  nextReminderEnabled?: boolean;
+  /** ISO datetime for next planned service (when reminder enabled). */
+  nextReminderDate?: string | null;
+  nextReminderOdometer?: number | null;
+  nextReminderEngineHours?: number | null;
   /** Дочерние строки bundle (>= 1). */
   items: ServiceBundleItem[];
 
@@ -127,6 +139,15 @@ export type CreateServiceEventInput = {
   comment?: string | null;
   installedPartsJson?: unknown | null;
   installedExpenseItemIds?: string[];
+  performedBy?: ServicePerformedBy | null;
+  serviceProviderNote?: string | null;
+  attachReceiptRequested?: boolean;
+  attachFileRequested?: boolean;
+  nextReminderEnabled?: boolean;
+  /** ISO date string `YYYY-MM-DD` or full ISO; server stores as start-of-day UTC where applicable. */
+  nextReminderDate?: string | null;
+  nextReminderOdometer?: number | null;
+  nextReminderEngineHours?: number | null;
   items: CreateServiceBundleItemInput[];
 };
 

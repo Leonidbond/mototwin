@@ -20,7 +20,7 @@
 | Состояние ТС | инлайн в `page.tsx` | `apps/app/app/vehicles/[id]/state.tsx` |
 | Профиль | модалка в `page.tsx` | `apps/app/app/vehicles/[id]/profile.tsx` |
 | Журнал | `src/app/vehicles/[id]/service-log/page.tsx` | `apps/app/app/vehicles/[id]/service-log.tsx` |
-| Форма сервисного события (bundle) | `src/app/vehicles/[id]/_components/BasicServiceEventModal.tsx` | `apps/app/.../basic-service-event-bundle-form.tsx` + `service-events/new.tsx` |
+| Форма сервисного события (bundle) | `src/app/vehicles/[id]/_components/service-event-form/` (`ServiceEventForm` + `service-events/new` / `…/edit`) | `apps/app/.../basic-service-event-bundle-form.tsx` + `service-events/new.tsx` |
 
 ---
 

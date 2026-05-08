@@ -34,8 +34,19 @@ Supported route/query params:
 Platform notes:
 
 - Web reads both `nodeId` and `nodeIds`; Expo currently uses `nodeIds` for subtree context.
-- **Web:** добавление / редактирование / повтор — общая модалка **`BasicServiceEventModal`** (`src/app/vehicles/[id]/_components/BasicServiceEventModal.tsx`) на странице журнала и на карточке ТС (`vehicle-detail-client.tsx`), одна форма bundle `AddServiceEventFormValues`.
+- **Web:** добавление / редактирование / повтор — общая форма **`ServiceEventForm`** (`src/app/vehicles/[id]/_components/service-event-form/`) на страницах **`/vehicles/[id]/service-events/new`** и **`/vehicles/[id]/service-events/[eventId]/edit`**; переходы с журнала и карточки ТС (`service-log/page.tsx`, `vehicle-detail-client.tsx`), одна модель **`AddServiceEventFormValues`**.
 - **Expo:** тот же смысл bundle-полей — компонент **`basic-service-event-bundle-form.tsx`** и экран **`service-events/new`** для create/edit/repeat.
+
+### Web: реализация формы сервисного события (bundle)
+
+**Полное описание:** [web-service-event-form.md](./web-service-event-form.md). Выбор узла (общие модалки): [node-picker-reuse.md](./node-picker-reuse.md).
+
+- **Корень:** **`ServiceEventForm`** + тип **`ServiceEventFormProps`** — каталог **`src/app/vehicles/[id]/_components/service-event-form/`**, баррель **`index.ts`**.
+- **Страницы:** **`service-events/new/ServiceEventCreateClient.tsx`**, **`service-events/[eventId]/edit/ServiceEventEditClient.tsx`** — загрузка дерева/ТС, сбор `initialForm`, **`router.push` / `returnTo`** после сохранения или отмены.
+- **Сброс контекста:** родитель держит `initialForm`, **`resetKey`**; при смене сценария увеличивает `resetKey`, чтобы внутренний слой формы пересоздался.
+- **Домен и API:** тот же контракт **`AddServiceEventFormValues`**, **`validateAddServiceEventFormValues`**, **`normalizeAddServiceEventPayload`** / **`normalizeEditServiceEventPayload`**; шаблоны bundle, **`getInstallableForServiceEvent`**, SKU в **ADVANCED** — внутри **`ServiceEventForm`**.
+- **Ключевые модули каталога:** `ServiceEventForm.tsx`, `ServiceEventModeControl.tsx` (segmented на страницах), `body/ServiceEventModalBodyUnified.tsx`, **`cards/basic-info-primary-fields.tsx`** (единый блок «Основная информация» для BASIC/ADVANCED), остальные карточки и `bundle/`, оверлеи в `overlays/` (в т.ч. `InstallablePickerOverlay`, `PreviewOverlay`).
+- **Визуальный ориентир:** `images/examples/Service-event-fast.png` / `Service-event-extended.png` (UI, не контракт API).
 
 В карточке **`SERVICE`** с пакетом строк (режим **ADVANCED**) клиенты могут показывать **стоимость по каждой строке** (`lineCostRu` во view model из `packages/domain/src/service-log-view-models.ts`), если в данных есть суммы по строкам.
 

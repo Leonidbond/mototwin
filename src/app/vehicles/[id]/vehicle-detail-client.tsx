@@ -12,10 +12,6 @@ import {
   buildVehicleStateViewModel,
   buildVehicleTechnicalInfoViewModel,
   vehicleDetailFromApiRecord,
-  createInitialAddServiceEventFormValues,
-  createInitialAddServiceEventFromNode,
-  createInitialAddServiceEventFromWishlistItem,
-  createInitialEditServiceEventValues,
   buildInitialVehicleProfileFormValues,
   createInitialVehicleStateFormValues,
   createServiceLogNodeFilter,
@@ -29,8 +25,6 @@ import {
   formatIsoCalendarDateRu,
   getRecentServiceEventsForNode,
   getStatusExplanationTriggeredByLabel,
-  normalizeAddServiceEventPayload,
-  normalizeEditServiceEventPayload,
   normalizeVehicleProfileFormValues,
   normalizeVehicleStatePayload,
   RIDE_LOAD_TYPE_OPTIONS,
@@ -50,6 +44,7 @@ import {
   buildPartWishlistItemViewModel,
   createInitialPartWishlistFormValues,
   flattenNodeTreeToSelectOptions,
+  nodeAncestorPathLabelRu,
   groupPartWishlistItemsByStatus,
   filterActiveWishlistItems,
   normalizeCreatePartWishlistPayload,
@@ -75,7 +70,6 @@ import { ACTION_SVG_BODIES, type ActionIconKey } from "@mototwin/icons";
 import { TopNodeIcon } from "@/components/icons/top-nodes";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
-import { BasicServiceEventModal } from "./_components/BasicServiceEventModal";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
 import { PartsCartPage, type PartsAdvancedFilterState } from "./parts/_components/PartsCartPage";
 import { WishlistItemEditModal } from "./parts/_components/WishlistItemEditModal";
@@ -94,7 +88,6 @@ import type {
   ServiceEventItem,
   VehicleDetail,
   VehicleDetailApiRecord,
-  AddServiceEventFormValues,
   PartRecommendationViewModel,
   ServiceKitViewModel,
   PartWishlistItemStatus,
@@ -1273,10 +1266,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [topServiceNodesError, setTopServiceNodesError] = useState("");
   const [isFullNodeTreeOpen, setIsFullNodeTreeOpen] = useState(false);
   const [isExpenseDetailsModalOpen, setIsExpenseDetailsModalOpen] = useState(false);
-  const [isAddServiceEventModalOpen, setIsAddServiceEventModalOpen] = useState(false);
-  const [isCreatingServiceEvent, setIsCreatingServiceEvent] = useState(false);
-  const [editingServiceEventId, setEditingServiceEventId] = useState<string | null>(null);
-  const [serviceEventFormError, setServiceEventFormError] = useState("");
   const [serviceLogActionNotice, setServiceLogActionNotice] =
     useState<ServiceLogActionNotice | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
@@ -1328,9 +1317,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   });
   const [wishlistPurchaseExpenseError, setWishlistPurchaseExpenseError] = useState("");
   const [wishlistDeletingId, setWishlistDeletingId] = useState("");
-  const [pendingWishlistInstallItemId, setPendingWishlistInstallItemId] = useState<string | null>(
-    null
-  );
   const [partsStatusFilter, setPartsStatusFilter] = useState<PartsStatusFilter>("ALL");
   const [selectedPartsWishlistItemId, setSelectedPartsWishlistItemId] = useState<string | null>(null);
   const [pickedReturnHighlightIds, setPickedReturnHighlightIds] = useState<string[]>([]);
@@ -1381,10 +1367,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [vehicleStateError, setVehicleStateError] = useState("");
   const [isSavingVehicleState, setIsSavingVehicleState] = useState(false);
   const [isAdvancedDetailsOpen, setIsAdvancedDetailsOpen] = useState(false);
-  const [serviceEventModalResetKey, setServiceEventModalResetKey] = useState(0);
-  const [serviceEventModalInitialForm, setServiceEventModalInitialForm] = useState<AddServiceEventFormValues>(() =>
-    createInitialAddServiceEventFormValues()
-  );
   useEffect(() => {
     try {
       if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
@@ -1414,7 +1396,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     const timer = window.setTimeout(() => setProfileFormSuccess(""), 2200);
     return () => window.clearTimeout(timer);
   }, [profileFormSuccess]);
-  const todayDate = getTodayDateString();
 
   const { roots: nodeTreeViewModel } = useMemo(
     () => buildNodeTreeSectionProps(nodeTree),
@@ -1860,7 +1841,13 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     return byWishlistItemId;
   }, [serviceEvents]);
   const wishlistNodeOptions = useMemo(
-    () => flattenNodeTreeToSelectOptions(nodeTree),
+    () =>
+      flattenNodeTreeToSelectOptions(nodeTree).map((option) => ({
+        id: option.id,
+        name: option.name,
+        level: option.level,
+        pathLabel: nodeAncestorPathLabelRu(nodeTree, option.id),
+      })),
     [nodeTree]
   );
 
@@ -2132,38 +2119,22 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   }, [params]);
 
   useEffect(() => {
-    const shouldOpen = searchParams.get("openServiceEventModal");
-    if (shouldOpen !== "1") {
+    if (!vehicleId) {
+      return;
+    }
+    if (searchParams.get("openServiceEventModal") !== "1") {
       return;
     }
     const editServiceEventId = searchParams.get("editServiceEventId");
+    const returnTo = encodeURIComponent(`/vehicles/${vehicleId}`);
     if (editServiceEventId) {
-      const serviceEvent = serviceEvents.find((candidate) => candidate.id === editServiceEventId);
-      if (!serviceEvent || serviceEvent.eventKind === "STATE_UPDATE") {
-        return;
-      }
-      const nodePath = findNodePathById(nodeTree, serviceEvent.nodeId);
-      if (!nodePath) {
-        setServiceEventFormError("Не удалось определить путь узла.");
-        return;
-      }
-      setServiceEventFormError("");
-      setEditingServiceEventId(serviceEvent.id);
-      setPendingWishlistInstallItemId(null);
-      bumpServiceEventModalInitial(createInitialEditServiceEventValues(serviceEvent));
-      setIsAddServiceEventModalOpen(true);
+      router.replace(
+        `/vehicles/${vehicleId}/service-events/${encodeURIComponent(editServiceEventId)}/edit?returnTo=${returnTo}`
+      );
       return;
     }
-    setEditingServiceEventId(null);
-    setPendingWishlistInstallItemId(null);
-    const empty = createInitialAddServiceEventFormValues();
-    empty.currency = readDefaultCurrencySetting();
-    bumpServiceEventModalInitial(empty);
-    setServiceEventFormError("");
-    setIsAddServiceEventModalOpen(true);
-    // bumpServiceEventModalInitial is stable; listing it would require defining it above this effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, serviceEvents, nodeTree]);
+    router.replace(`/vehicles/${vehicleId}/service-events/new?returnTo=${returnTo}`);
+  }, [router, searchParams, vehicleId]);
 
   useEffect(() => {
     if (
@@ -2353,22 +2324,23 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       return;
     }
     const item = wishlistItems.find((candidate) => candidate.id === installWishlistItemIdFromSearchParams);
-    if (!item || item.status !== "BOUGHT") {
+    if (!item || item.status !== "BOUGHT" || !item.nodeId) {
       return;
     }
-    const didOpenServiceEventModal = openAddServiceEventPrefilledFromWishlist(item, {
-      pendingInstall: true,
-    });
-    if (didOpenServiceEventModal) {
-      const q = new URLSearchParams(searchParams.toString());
-      q.delete("installWishlistItemId");
-      router.replace(`/vehicles/${vehicleId}/parts${q.toString() ? `?${q.toString()}` : ""}`, { scroll: false });
+    if (!findNodePathById(nodeTree, item.nodeId)) {
+      return;
     }
-    // `openAddServiceEventPrefilledFromWishlist` is declared later in this component and
-    // reads the latest loaded vehicle/node state when the deep link is handled.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const q = new URLSearchParams(searchParams.toString());
+    q.delete("installWishlistItemId");
+    const qs = q.toString();
+    const returnParts = `/vehicles/${vehicleId}/parts${qs ? `?${qs}` : ""}`;
+    const rt = encodeURIComponent(returnParts);
+    router.replace(
+      `/vehicles/${vehicleId}/service-events/new?wishlistItemId=${encodeURIComponent(item.id)}&pendingInstall=1&returnTo=${rt}`
+    );
   }, [
     installWishlistItemIdFromSearchParams,
+    nodeTree,
     pageView,
     router,
     searchParams,
@@ -2538,13 +2510,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     });
   };
 
-  const bumpServiceEventModalInitial = useCallback((values: AddServiceEventFormValues) => {
-    setServiceEventModalInitialForm(values);
-    setServiceEventModalResetKey((key) => key + 1);
-  }, []);
-
-  const clearServiceEventSubmitError = useCallback(() => setServiceEventFormError(""), []);
-
   const readDefaultCurrencySetting = () => {
     try {
       const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
@@ -2574,42 +2539,38 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
   const openAddServiceEventFromLeafNode = (leafNodeId: string) => {
     if (!vehicle) {
-      setServiceEventFormError("Не удалось загрузить данные мотоцикла.");
+      setServiceLogActionNotice({
+        tone: "error",
+        title: "Не удалось загрузить данные мотоцикла.",
+      });
       return;
     }
     const nodePath = findNodePathById(nodeTree, leafNodeId);
     const leafNode = findNodeTreeItemById(nodeTree, leafNodeId);
 
     if (!nodePath || !leafNode) {
-      setServiceEventFormError("Не удалось определить путь узла.");
+      setServiceLogActionNotice({
+        tone: "error",
+        title: "Не удалось определить путь узла.",
+      });
       return;
     }
 
-    const values = createInitialAddServiceEventFromNode({
-      nodeId: leafNode.id,
-      nodeCode: leafNode.code,
-      nodeName: leafNode.name,
-      vehicle: {
-        odometer: vehicle.odometer,
-        engineHours: vehicle.engineHours,
-      },
-      currentDateYmd: todayDate,
-    });
-    values.currency = readDefaultCurrencySetting();
-
-    setServiceEventFormError("");
-    setEditingServiceEventId(null);
-    setPendingWishlistInstallItemId(null);
-    bumpServiceEventModalInitial(values);
-    setIsAddServiceEventModalOpen(true);
+    const rt = encodeURIComponent(`/vehicles/${vehicleId}`);
+    router.push(
+      `/vehicles/${vehicleId}/service-events/new?fromNodeId=${encodeURIComponent(leafNodeId)}&returnTo=${rt}`
+    );
   };
 
   const openAddServiceEventPrefilledFromWishlist = (
     item: PartWishlistItem,
     options: { pendingInstall?: boolean } = {}
-  ) => {
+  ): boolean => {
     if (!vehicle) {
-      setServiceEventFormError("Не удалось загрузить данные мотоцикла.");
+      setServiceLogActionNotice({
+        tone: "error",
+        title: "Не удалось загрузить данные мотоцикла.",
+      });
       return false;
     }
     if (!item.nodeId) {
@@ -2617,19 +2578,17 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     const nodePath = findNodePathById(nodeTree, item.nodeId);
     if (!nodePath) {
-      setServiceEventFormError("Не удалось определить путь узла для позиции списка.");
+      setServiceLogActionNotice({
+        tone: "error",
+        title: "Не удалось определить путь узла для позиции списка.",
+      });
       return false;
     }
-    setServiceEventFormError("");
-    setEditingServiceEventId(null);
-    const values = createInitialAddServiceEventFromWishlistItem(
-      item,
-      { odometer: vehicle.odometer, engineHours: vehicle.engineHours },
-      { todayDateYmd: todayDate }
+    const rt = encodeURIComponent(`/vehicles/${vehicleId}`);
+    const pending = options.pendingInstall ? "&pendingInstall=1" : "";
+    router.push(
+      `/vehicles/${vehicleId}/service-events/new?wishlistItemId=${encodeURIComponent(item.id)}${pending}&returnTo=${rt}`
     );
-    bumpServiceEventModalInitial(values);
-    setPendingWishlistInstallItemId(options.pendingInstall ? item.id : null);
-    setIsAddServiceEventModalOpen(true);
     return true;
   };
 
@@ -4058,93 +4017,10 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
   };
 
-  const resetServiceEventForm = () => {
-    setEditingServiceEventId(null);
-    setPendingWishlistInstallItemId(null);
-    const empty = createInitialAddServiceEventFormValues();
-    empty.currency = readDefaultCurrencySetting();
-    bumpServiceEventModalInitial(empty);
-  };
-
   const openCreateServiceEventModal = () => {
     overlayReturnStackRef.current = [];
-    resetServiceEventForm();
-    setServiceEventFormError("");
-    setIsAddServiceEventModalOpen(true);
-  };
-  const closeAddServiceEventModal = (options: { restorePrevious?: boolean } = {}) => {
-    setIsAddServiceEventModalOpen(false);
-    setPendingWishlistInstallItemId(null);
-    if (options.restorePrevious ?? true) {
-      restorePreviousOverlay();
-    }
-  };
-
-  const handleSubmitServiceEvent = async (form: AddServiceEventFormValues) => {
-    try {
-      setServiceEventFormError("");
-
-      if (!vehicleId) {
-        setServiceEventFormError("Не удалось определить мотоцикл.");
-        return;
-      }
-
-      const anchorNodeId = form.items[0]?.nodeId?.trim() ?? "";
-
-      setIsCreatingServiceEvent(true);
-      if (editingServiceEventId) {
-        await vehicleDetailApi.updateServiceEvent(
-          vehicleId,
-          editingServiceEventId,
-          normalizeEditServiceEventPayload(form)
-        );
-      } else {
-        await vehicleDetailApi.createServiceEvent(
-          vehicleId,
-          normalizeAddServiceEventPayload(form)
-        );
-      }
-
-      if (!editingServiceEventId && pendingWishlistInstallItemId) {
-        const sourceWishlistItem = wishlistItems.find((item) => item.id === pendingWishlistInstallItemId);
-        await vehicleDetailApi.updateWishlistItem(vehicleId, pendingWishlistInstallItemId, {
-          status: "INSTALLED",
-          nodeId: anchorNodeId,
-        });
-        if (sourceWishlistItem && sourceWishlistItem.status !== "INSTALLED") {
-          setWishlistStatusTransitionHistoryByItemId((prev) => ({
-            ...prev,
-            [pendingWishlistInstallItemId]: {
-              changedAt: new Date().toISOString(),
-              previousStatus: sourceWishlistItem.status,
-              nextStatus: "INSTALLED",
-            },
-          }));
-        }
-        setWishlistNotice("Позиция отмечена как установленная после добавления события.");
-      }
-
-      setServiceLogActionNotice({
-        tone: "success",
-        title: editingServiceEventId
-          ? "Сервисное событие обновлено"
-          : "Сервисное событие добавлено",
-        details: "Статусы и расходы обновлены",
-      });
-      setPendingWishlistInstallItemId(null);
-      resetServiceEventForm();
-      await Promise.all([loadServiceEvents(), loadDashboardExpenses(), loadNodeTree(), loadWishlist(), loadTopServiceNodes()]);
-      closeAddServiceEventModal({ restorePrevious: false });
-    } catch (createError) {
-      console.error(createError);
-      setServiceEventFormError("Не удалось сохранить сервисное событие.");
-      setServiceLogActionNotice({
-        tone: "error",
-        title: "Не удалось сохранить сервисное событие",
-      });
-    } finally {
-      setIsCreatingServiceEvent(false);
-    }
+    const rt = encodeURIComponent(`/vehicles/${vehicleId}`);
+    router.push(`/vehicles/${vehicleId}/service-events/new?returnTo=${rt}`);
   };
 
   const title =
@@ -5859,27 +5735,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         </div>
       ) : null}
 
-      <BasicServiceEventModal
-        open={isAddServiceEventModalOpen}
-        onClose={() => closeAddServiceEventModal()}
-        resetKey={serviceEventModalResetKey}
-        initialForm={serviceEventModalInitialForm}
-        vehicleId={vehicleId}
-        nodeTree={nodeTree}
-        vehicleOdometer={vehicle?.odometer ?? null}
-        vehicleEngineHours={vehicle?.engineHours ?? null}
-        todayDateYmd={todayDate}
-        editingServiceEventId={editingServiceEventId}
-        submitError={serviceEventFormError}
-        onClearSubmitError={clearServiceEventSubmitError}
-        isSubmitting={isCreatingServiceEvent}
-        onSubmit={handleSubmitServiceEvent}
-        eventDateMaxYmd={todayDate}
-        odometerInputMax={vehicle?.odometer ?? null}
-        overlayClassName="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto px-2 py-2"
-        overlayStyle={{ backgroundColor: productSemanticColors.overlayModal }}
-      />
-
       <WishlistItemEditModal
         key={wishlistEditingId ?? "wishlist-edit"}
         isOpen={isWishlistModalOpen && Boolean(wishlistEditingId)}
@@ -6492,13 +6347,4 @@ function getStatusBadgeStyle(status: NodeStatus | null) {
     backgroundColor: tokens.background,
     color: tokens.foreground,
   };
-}
-
-function getTodayDateString() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
 }

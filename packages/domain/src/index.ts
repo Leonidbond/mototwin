@@ -19,6 +19,7 @@ export {
   flattenNodeTreeForSelection,
   findNodeTreeItemById,
   findNodePathById,
+  nodeAncestorPathLabelRu,
   getNodePathById,
   getNodeSelectLevels,
   getAvailableChildrenForSelectedPath,
@@ -53,6 +54,13 @@ export {
   getTopLevelAncestorForNode,
   searchNodeTree,
 } from "./node-tree-search";
+export {
+  NODE_PICKER_OTHER_GROUP_KEY,
+  groupNodePickerOptionsByTopLevel,
+  nodePickerGroupHeadingRu,
+  nodePickerTopGroupKeyFromPathLabel,
+  type NodePickerGroupableOption,
+} from "./node-picker-grouping";
 export {
   buildNodeMaintenancePlanSummary,
   buildNodeMaintenancePlanViewModel,
@@ -145,10 +153,14 @@ export type {
   MergeServiceBundleTemplateResult,
   MergeWishlistItemIntoAddFormValuesOptions,
   RemoveWishlistItemFromAddFormValuesOptions,
+  AddServiceEventCostBreakdownLines,
 } from "./forms";
 export {
   getTodayDateYmdLocal,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
+  buildAddServiceEventCostBreakdownLines,
+  ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH,
+  ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH,
   SERVICE_ACTION_TYPE_OPTIONS,
   SERVICE_EVENT_MODE_LABELS_RU,
   getServiceActionTypeLabelRu,

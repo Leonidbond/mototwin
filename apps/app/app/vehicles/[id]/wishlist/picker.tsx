@@ -34,6 +34,7 @@ import {
   getLeafNodeOptions,
   getNodePathItemViewModelsByNodeId,
   getOrderedTopNodeIdsPresentInNodeTree,
+  nodeAncestorPathLabelRu,
   removeFromDraft,
   vehicleDetailFromApiRecord,
 } from "@mototwin/domain";
@@ -63,6 +64,7 @@ import {
   PickerDraftCartSheet,
 } from "./picker-draft-cart-bar";
 import { PickerWhyMatchesPanel } from "./picker-why-matches-panel";
+import { MobileNodePickerModal } from "../_components/mobile-node-picker-modal";
 
 function skuFromRecommendation(rec: PartRecommendationViewModel): PartSkuViewModel {
   const now = new Date().toISOString();
@@ -199,8 +201,6 @@ export default function WishlistPickerScreen() {
   const [recAlternativesVisible, setRecAlternativesVisible] = useState(false);
 
   const [nodeModalOpen, setNodeModalOpen] = useState(false);
-  const [nodeModalQuery, setNodeModalQuery] = useState("");
-  const [nodeModalTopOnly, setNodeModalTopOnly] = useState(false);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
 
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -292,21 +292,14 @@ export default function WishlistPickerScreen() {
     };
   }, [apiBaseUrl, vehicleId]);
 
-  useEffect(() => {
-    if (!nodeModalOpen) return;
-    setNodeModalTopOnly(false);
-    setNodeModalQuery("");
-  }, [nodeModalOpen]);
-
   const leafOptions = useMemo(() => getLeafNodeOptions(nodeTree), [nodeTree]);
 
   const leafRowsForModal = useMemo(
     () =>
-      leafOptions.map((leaf) => {
-        const vm = getNodePathItemViewModelsByNodeId(nodeTree, leaf.id);
-        const pathLabel = vm ? vm.map((p) => p.name).join(" / ") : "";
-        return { ...leaf, pathLabel };
-      }),
+      leafOptions.map((leaf) => ({
+        ...leaf,
+        pathLabel: nodeAncestorPathLabelRu(nodeTree, leaf.id),
+      })),
     [leafOptions, nodeTree]
   );
 
@@ -324,21 +317,6 @@ export default function WishlistPickerScreen() {
       ),
     [nodeTree, leafRowsForModal, orderedTopNodeIdsForPicker]
   );
-
-  const nodeModalDisplayLeaves = useMemo(() => {
-    const base =
-      nodeModalTopOnly && topLeafRowsForModal.length > 0
-        ? topLeafRowsForModal
-        : leafRowsForModal;
-    const q = nodeModalQuery.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter((leaf) => {
-      const label = `${leaf.name} ${leaf.pathLabel}`.toLowerCase();
-      return label.includes(q);
-    });
-  }, [nodeModalTopOnly, topLeafRowsForModal, leafRowsForModal, nodeModalQuery]);
-
-  const showNodeModalTopToggle = topLeafRowsForModal.length > 0;
 
   useEffect(() => {
     if (leafOptions.length === 0) return;
@@ -782,63 +760,15 @@ export default function WishlistPickerScreen() {
         />
       </View>
 
-      <Modal visible={nodeModalOpen} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Конечный узел</Text>
-            <TextInput
-              value={nodeModalQuery}
-              onChangeText={setNodeModalQuery}
-              placeholder="Поиск по названию узла"
-              placeholderTextColor={c.textMuted}
-              style={styles.modalSearch}
-            />
-            {showNodeModalTopToggle ? (
-              <Pressable
-                onPress={() => setNodeModalTopOnly((v) => !v)}
-                style={[styles.modalTopToggle, nodeModalTopOnly && styles.modalTopToggleOn]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: nodeModalTopOnly }}
-              >
-                <Text
-                  style={[
-                    styles.modalTopToggleText,
-                    nodeModalTopOnly && styles.modalTopToggleTextOn,
-                  ]}
-                >
-                  Топ-узлы
-                </Text>
-              </Pressable>
-            ) : null}
-            <ScrollView style={{ maxHeight: 360 }}>
-              {nodeModalDisplayLeaves.length === 0 ? (
-                <Text style={styles.muted}>Узлы не найдены</Text>
-              ) : (
-                nodeModalDisplayLeaves.map((leaf) => (
-                  <Pressable
-                    key={leaf.id}
-                    style={styles.modalRow}
-                    onPress={() => {
-                      setSelectedNodeId(leaf.id);
-                      setNodeModalOpen(false);
-                    }}
-                  >
-                    <Text style={leaf.id === selectedNodeId ? styles.rowTitle : styles.muted}>
-                      {leaf.name}
-                    </Text>
-                    {leaf.pathLabel ? (
-                      <Text style={styles.modalPath}>{leaf.pathLabel}</Text>
-                    ) : null}
-                  </Pressable>
-                ))
-              )}
-            </ScrollView>
-            <Pressable style={styles.modalClose} onPress={() => setNodeModalOpen(false)}>
-              <Text style={styles.link}>Закрыть</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <MobileNodePickerModal
+        visible={nodeModalOpen}
+        title="Конечный узел"
+        options={leafRowsForModal}
+        topOptions={topLeafRowsForModal.length > 0 ? topLeafRowsForModal : undefined}
+        selectedId={selectedNodeId}
+        onClose={() => setNodeModalOpen(false)}
+        onSelect={setSelectedNodeId}
+      />
 
       <Modal visible={filtersOpen} animationType="slide" transparent>
         <View style={styles.modalOverlay}>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ServiceEventMode } from "@prisma/client";
+import { ServiceEventMode, ServicePerformedBy } from "@prisma/client";
 import { z } from "zod";
 import {
   recomputeTopNodeStates,
@@ -41,6 +41,14 @@ const updateServiceEventSchema = z
     nodeId: z.string().trim().min(1).optional(),
     title: z.string().trim().min(1),
     mode: z.enum(["BASIC", "ADVANCED"]),
+    performedBy: z.enum(["SELF", "SERVICE", "OTHER"]).optional(),
+    serviceProviderNote: z.string().trim().max(500).nullable().optional(),
+    attachReceiptRequested: z.boolean().optional(),
+    attachFileRequested: z.boolean().optional(),
+    nextReminderEnabled: z.boolean().optional(),
+    nextReminderDate: z.string().trim().optional(),
+    nextReminderOdometer: z.number().int().min(0).nullable().optional(),
+    nextReminderEngineHours: z.number().int().min(0).nullable().optional(),
     eventDate: z
       .string()
       .trim()
@@ -88,6 +96,25 @@ const updateServiceEventSchema = z
         path: ["currency"],
         message: "currency is required when totalCost is provided",
       });
+    }
+    if (value.nextReminderEnabled) {
+      const d = (value.nextReminderDate ?? "").trim();
+      const hasOdo = value.nextReminderOdometer != null;
+      const hasHours = value.nextReminderEngineHours != null;
+      if (!d && !hasOdo && !hasHours) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["nextReminderDate"],
+          message: "When next reminder is enabled, provide date and/or odometer and/or engine hours",
+        });
+      }
+      if (d && Number.isNaN(Date.parse(d))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["nextReminderDate"],
+          message: "nextReminderDate must be a valid date string",
+        });
+      }
     }
   });
 
@@ -151,6 +178,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       partsCost != null || laborCost != null ? (partsCost ?? 0) + (laborCost ?? 0) : null;
     const totalCost = explicitTotal ?? computedTotal;
 
+    const nextReminderRaw = payload.nextReminderDate?.trim();
+    const nextReminderDate =
+      payload.nextReminderEnabled && nextReminderRaw
+        ? new Date(nextReminderRaw)
+        : null;
+
     const updatedServiceEvent = await prisma.$transaction(async (tx) => {
       const updated = await updateBundleServiceEventInTransaction(tx, eventId, {
         vehicleId,
@@ -168,6 +201,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             ? (payload.currency?.trim().toUpperCase() ?? null)
             : payload.currency?.trim().toUpperCase() ?? null,
         comment: payload.comment || null,
+        performedBy: (payload.performedBy as ServicePerformedBy | undefined) ?? null,
+        serviceProviderNote: payload.serviceProviderNote?.trim() || null,
+        attachReceiptRequested: payload.attachReceiptRequested ?? false,
+        attachFileRequested: payload.attachFileRequested ?? false,
+        nextReminderEnabled: payload.nextReminderEnabled ?? false,
+        nextReminderDate: payload.nextReminderEnabled ? nextReminderDate : null,
+        nextReminderOdometer: payload.nextReminderEnabled ? (payload.nextReminderOdometer ?? null) : null,
+        nextReminderEngineHours: payload.nextReminderEnabled ? (payload.nextReminderEngineHours ?? null) : null,
         installedPartsJson:
           payload.installedPartsJson === null || payload.installedPartsJson === undefined
             ? null

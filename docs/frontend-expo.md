@@ -102,7 +102,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - Action to `vehicles/[id]/service-events/new`
 
 ### 3.5 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `_components/basic-service-event-bundle-form.tsx`)
-- Screen loads node tree / vehicle / existing event (edit/repeat); builds initial **`AddServiceEventFormValues`** with shared domain helpers (same contract as web `BasicServiceEventModal`).
+- Screen loads node tree / vehicle / existing event (edit/repeat); builds initial **`AddServiceEventFormValues`** with shared domain helpers (same contract as web **`ServiceEventForm`**).
 - Bundle UI: multiple leaf rows in BASIC, parts + labor + total, SKU lookup, uninstalled expenses, JSON — see [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md).
 - Submit to `/api/vehicles/[id]/service-events` (create) or update route when editing.
 - Supports return `source` (service-log, tree, attention, wishlist, …).
@@ -147,6 +147,7 @@ Detailed parity matrix: `cross-platform-parity.md`.
 
 ## 6. Related docs
 
+- `node-picker-reuse.md` — **`MobileNodePickerModal`** и паритет с web
 - `frontend-web.md`
 - `shared-packages.md`
 - `cross-platform-parity.md`

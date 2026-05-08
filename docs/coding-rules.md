@@ -302,6 +302,7 @@ return NextResponse.json(
 8. Error states must be understandable.
 9. Buttons must say what they do.
 10. UI text must be concise and clear.
+11. **Выбор узла дерева ТС:** если пользователю нужно выбрать узел (один или несколько листьев) из дерева мотоцикла, используйте общие компоненты и контракты из **[`docs/node-picker-reuse.md`](./node-picker-reuse.md)** — на web **`NodePickerModal`** (и обёртки вроде **`NodePickerPopover`**, **`AddNodeSheet`** для multi), на Expo **`MobileNodePickerModal`**. Стройте `options` с **`pathLabel`** через **`nodeAncestorPathLabelRu`** в `@mototwin/domain`, чтобы подписи и группировка совпадали с остальным продуктом. Не добавляйте отдельную самодельную модалку со списком узлов для того же сценария без явного согласования в ревью.
 
 MotoTwin visual tone:
 - serious

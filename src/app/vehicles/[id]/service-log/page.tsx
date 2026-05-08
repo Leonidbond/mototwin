@@ -5,25 +5,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildServiceLogTimelineProps,
-  createInitialAddServiceEventFormValues,
-  createInitialEditServiceEventValues,
-  createInitialRepeatServiceEventValues,
   expenseCategoryLabelsRu,
   filterPaidServiceEvents,
   formatExpenseAmountRu,
   getServiceLogEventKindBadgeLabel,
   getWishlistItemIdsFromInstalledPartsJson,
   isServiceLogTimelineQueryActive,
-  normalizeAddServiceEventPayload,
-  normalizeEditServiceEventPayload,
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import { BackButton } from "@/components/navigation/BackButton";
-import { BasicServiceEventModal } from "../_components/BasicServiceEventModal";
 import type {
-  AddServiceEventFormValues,
-  NodeTreeItem,
   ServiceEventItem,
   ServiceEventsFilters,
   ServiceEventsSortDirection,
@@ -52,23 +44,12 @@ export default function VehicleServiceLogPage() {
     searchParams.get("serviceEventId") ?? searchParams.get("highlightServiceEventId");
 
   const [vehicleTitle, setVehicleTitle] = useState("Мотоцикл");
-  const [vehicleOdometer, setVehicleOdometer] = useState<number | null>(null);
-  const [vehicleEngineHours, setVehicleEngineHours] = useState<number | null>(null);
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
-  const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
-  const [isServiceEventModalOpen, setIsServiceEventModalOpen] = useState(false);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
-  const [editingServiceEventId, setEditingServiceEventId] = useState<string | null>(null);
-  const [serviceEventModalResetKey, setServiceEventModalResetKey] = useState(0);
-  const [serviceEventModalInitialForm, setServiceEventModalInitialForm] = useState<AddServiceEventFormValues>(() =>
-    createInitialAddServiceEventFormValues()
-  );
-  const [serviceEventFormError, setServiceEventFormError] = useState("");
-  const [isSavingServiceEvent, setIsSavingServiceEvent] = useState(false);
   const [filters, setFilters] = useState<ServiceEventsFilters>({
     dateFrom: "",
     dateTo: "",
@@ -107,21 +88,13 @@ export default function VehicleServiceLogPage() {
     }
   }, [expandExpensesFromQuery]);
 
-  const bumpServiceEventModalInitial = useCallback((values: AddServiceEventFormValues) => {
-    setServiceEventModalInitialForm(values);
-    setServiceEventModalResetKey((key) => key + 1);
-  }, []);
-
-  const clearServiceEventSubmitError = useCallback(() => setServiceEventFormError(""), []);
-
   const load = useCallback(async () => {
     try {
       setIsLoading(true);
       setError("");
-      const [detail, service, tree] = await Promise.all([
+      const [detail, service] = await Promise.all([
         api.getVehicleDetail(vehicleId),
         api.getServiceEvents(vehicleId),
-        api.getNodeTree(vehicleId),
       ]);
       const vehicle = detail.vehicle;
       const title =
@@ -129,10 +102,7 @@ export default function VehicleServiceLogPage() {
         `${vehicle?.brandName || ""} ${vehicle?.modelName || ""}`.trim() ||
         "Мотоцикл";
       setVehicleTitle(title);
-      setVehicleOdometer(vehicle?.odometer ?? null);
-      setVehicleEngineHours(vehicle?.engineHours ?? null);
       setEvents(service.serviceEvents ?? []);
-      setNodeTree(tree.nodeTree ?? []);
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : "Не удалось загрузить журнал обслуживания.");
@@ -211,68 +181,30 @@ export default function VehicleServiceLogPage() {
     router.replace(`/vehicles/${vehicleId}/service-log${q.toString() ? `?${q.toString()}` : ""}`);
   };
 
+  const serviceLogReturnTo = encodeURIComponent(`/vehicles/${vehicleId}/service-log`);
+
   const openCreate = () => {
-    setEditingServiceEventId(null);
-    bumpServiceEventModalInitial(createInitialAddServiceEventFormValues());
-    setServiceEventFormError("");
-    setIsServiceEventModalOpen(true);
+    router.push(`/vehicles/${vehicleId}/service-events/new?returnTo=${serviceLogReturnTo}`);
   };
 
-  const openRepeat = (eventId: string) => {
-    const event = events.find((item) => item.id === eventId);
+  const openRepeat = (repeatSourceId: string) => {
+    const event = events.find((item) => item.id === repeatSourceId);
     if (!event || event.eventKind === "STATE_UPDATE") {
       return;
     }
-    const odometerForForm = vehicleOdometer ?? event.odometer;
-    setEditingServiceEventId(null);
-    bumpServiceEventModalInitial(
-      createInitialRepeatServiceEventValues(
-        event,
-        { odometer: odometerForForm, engineHours: vehicleEngineHours ?? null },
-        { todayDateYmd: new Date().toISOString().slice(0, 10) }
-      )
+    router.push(
+      `/vehicles/${vehicleId}/service-events/new?repeatOf=${encodeURIComponent(repeatSourceId)}&returnTo=${serviceLogReturnTo}`
     );
-    setServiceEventFormError("");
-    setIsServiceEventModalOpen(true);
   };
 
-  const openEdit = (eventId: string) => {
-    const event = events.find((item) => item.id === eventId);
+  const openEdit = (editEventId: string) => {
+    const event = events.find((item) => item.id === editEventId);
     if (!event || event.eventKind === "STATE_UPDATE") {
       return;
     }
-    setEditingServiceEventId(eventId);
-    bumpServiceEventModalInitial(createInitialEditServiceEventValues(event));
-    setServiceEventFormError("");
-    setIsServiceEventModalOpen(true);
-  };
-
-  const saveServiceEvent = async (form: AddServiceEventFormValues) => {
-    try {
-      setIsSavingServiceEvent(true);
-      setServiceEventFormError("");
-      if (editingServiceEventId) {
-        await api.updateServiceEvent(
-          vehicleId,
-          editingServiceEventId,
-          normalizeEditServiceEventPayload(form)
-        );
-        setActionMessage("Сервисное событие обновлено. Статусы и расходы обновлены.");
-      } else {
-        await api.createServiceEvent(vehicleId, normalizeAddServiceEventPayload(form));
-        setActionMessage("Сервисное событие добавлено. Статусы и расходы обновлены.");
-      }
-      setIsServiceEventModalOpen(false);
-      setEditingServiceEventId(null);
-      await load();
-    } catch (e) {
-      console.error(e);
-      setServiceEventFormError(
-        e instanceof Error ? e.message : "Не удалось сохранить сервисное событие."
-      );
-    } finally {
-      setIsSavingServiceEvent(false);
-    }
+    router.push(
+      `/vehicles/${vehicleId}/service-events/${encodeURIComponent(editEventId)}/edit?returnTo=${serviceLogReturnTo}`
+    );
   };
 
   const deleteEvent = async (eventId: string) => {
@@ -1154,23 +1086,6 @@ export default function VehicleServiceLogPage() {
           </div>
         ) : null}
       </div>
-
-      <BasicServiceEventModal
-        open={isServiceEventModalOpen}
-        onClose={() => setIsServiceEventModalOpen(false)}
-        resetKey={serviceEventModalResetKey}
-        initialForm={serviceEventModalInitialForm}
-        vehicleId={vehicleId}
-        nodeTree={nodeTree}
-        vehicleOdometer={vehicleOdometer}
-        vehicleEngineHours={vehicleEngineHours}
-        todayDateYmd={new Date().toISOString().slice(0, 10)}
-        editingServiceEventId={editingServiceEventId}
-        submitError={serviceEventFormError}
-        onClearSubmitError={clearServiceEventSubmitError}
-        isSubmitting={isSavingServiceEvent}
-        onSubmit={saveServiceEvent}
-      />
 
     </main>
   );

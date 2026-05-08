@@ -15,6 +15,7 @@ import type {
   ServiceBundleTemplateWire,
   ServiceEventItem,
   ServiceEventMode,
+  ServicePerformedBy,
   UpdateVehicleStateFormValues,
   UpdateVehicleStatePayload,
   VehicleProfileFormValues,
@@ -30,6 +31,11 @@ import {
   WISHLIST_INSTALL_SERVICE_TYPE_RU,
 } from "./part-wishlist";
 
+/** Max length for bundle-level comment in add/edit service event forms. */
+export const ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH = 500;
+
+export const ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH = 500;
+
 /** Local calendar `YYYY-MM-DD` (same semantics as web `getTodayDateString` in vehicle page). */
 export function getTodayDateYmdLocal(): string {
   const now = new Date();
@@ -41,6 +47,71 @@ export function getTodayDateYmdLocal(): string {
 
 /** Canonical ISO 4217 code for new service events (web + Expo). */
 export const DEFAULT_ADD_SERVICE_EVENT_CURRENCY = "RUB";
+
+/** Formatted parts / labor / total lines for add-service-event cost preview (web + Expo). */
+export type AddServiceEventCostBreakdownLines = {
+  parts: string | null;
+  labor: string | null;
+  total: string | null;
+};
+
+/**
+ * Builds human-readable cost lines from the same rules as the modal «предварительный итог».
+ * Row-level ADVANCED sums include top-level parts/labor fields.
+ */
+export function buildAddServiceEventCostBreakdownLines(
+  values: AddServiceEventFormValues
+): AddServiceEventCostBreakdownLines {
+  const cur = values.currency.trim().toUpperCase() || "RUB";
+  if (values.mode === "ADVANCED") {
+    let rowP = 0;
+    let rowL = 0;
+    for (const it of values.items) {
+      const pr = parseExpenseAmountInputToNumberOrNull(it.partCost.trim());
+      const lr = parseExpenseAmountInputToNumberOrNull(it.laborCost.trim());
+      if (pr != null) {
+        rowP += pr;
+      }
+      if (lr != null) {
+        rowL += lr;
+      }
+    }
+    const topP = parseExpenseAmountInputToNumberOrNull(values.partsCost.trim());
+    const topL = parseExpenseAmountInputToNumberOrNull(values.laborCost.trim());
+    const partsSum = rowP + (topP ?? 0);
+    const laborSum = rowL + (topL ?? 0);
+    const had =
+      values.items.some((it) => it.partCost.trim() !== "" || it.laborCost.trim() !== "") ||
+      values.partsCost.trim() !== "" ||
+      values.laborCost.trim() !== "";
+    if (!had) {
+      return { parts: null, labor: null, total: null };
+    }
+    const total = partsSum + laborSum;
+    return {
+      parts: `${formatExpenseAmountRu(partsSum)} ${cur}`,
+      labor: `${formatExpenseAmountRu(laborSum)} ${cur}`,
+      total: `${formatExpenseAmountRu(total)} ${cur}`,
+    };
+  }
+  const partsRaw = values.partsCost.trim();
+  const laborRaw = values.laborCost.trim();
+  if (partsRaw === "" && laborRaw === "") {
+    return { parts: null, labor: null, total: null };
+  }
+  const p = partsRaw === "" ? null : parseExpenseAmountInputToNumberOrNull(partsRaw);
+  const l = laborRaw === "" ? null : parseExpenseAmountInputToNumberOrNull(laborRaw);
+  if (p == null && l == null) {
+    return { parts: null, labor: null, total: null };
+  }
+  const pNum = p ?? 0;
+  const lNum = l ?? 0;
+  return {
+    parts: p != null ? `${formatExpenseAmountRu(pNum)} ${cur}` : null,
+    labor: l != null ? `${formatExpenseAmountRu(lNum)} ${cur}` : null,
+    total: `${formatExpenseAmountRu(pNum + lNum)} ${cur}`,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Service action types — labels + heuristics
@@ -200,6 +271,14 @@ export function createInitialAddServiceEventFormValues(): AddServiceEventFormVal
     comment: "",
     installedPartsJson: "",
     installedExpenseItemIds: [],
+    performedBy: "SELF",
+    serviceProviderNote: "",
+    attachReceiptRequested: false,
+    attachFileRequested: false,
+    nextReminderEnabled: false,
+    nextReminderDate: "",
+    nextReminderOdometer: "",
+    nextReminderEngineHours: "",
     items: [createEmptyBundleItemFormValues()],
   };
 }
@@ -936,6 +1015,22 @@ export function createInitialEditServiceEventValues(
     installedPartsJson:
       event.installedPartsJson == null ? "" : JSON.stringify(event.installedPartsJson, null, 2),
     installedExpenseItemIds: [],
+    performedBy: (event.performedBy as ServicePerformedBy | undefined) ?? "SELF",
+    serviceProviderNote: event.serviceProviderNote?.trim() ?? "",
+    attachReceiptRequested: Boolean(event.attachReceiptRequested),
+    attachFileRequested: Boolean(event.attachFileRequested),
+    nextReminderEnabled: Boolean(event.nextReminderEnabled),
+    nextReminderDate: event.nextReminderDate
+      ? toIsoDateInputValue(event.nextReminderDate)
+      : "",
+    nextReminderOdometer:
+      event.nextReminderOdometer != null && Number.isFinite(event.nextReminderOdometer)
+        ? String(event.nextReminderOdometer)
+        : "",
+    nextReminderEngineHours:
+      event.nextReminderEngineHours != null && Number.isFinite(event.nextReminderEngineHours)
+        ? String(event.nextReminderEngineHours)
+        : "",
     items,
   };
 }
@@ -1073,6 +1168,36 @@ export function normalizeAddServiceEventPayload(
 
   const trimmedCurrency = values.currency.trim();
 
+  const performedBy: ServicePerformedBy = values.performedBy;
+  const serviceNote = values.serviceProviderNote.trim();
+  const nextReminderEnabled = values.nextReminderEnabled;
+  let nextReminderDateIso: string | null = null;
+  let nextReminderOdometer: number | null = null;
+  let nextReminderEngineHours: number | null = null;
+  if (nextReminderEnabled) {
+    const nd = values.nextReminderDate.trim();
+    if (nd !== "") {
+      const parsed = new Date(nd);
+      if (!Number.isNaN(parsed.getTime())) {
+        nextReminderDateIso = parsed.toISOString();
+      }
+    }
+    const no = values.nextReminderOdometer.trim();
+    if (no !== "") {
+      const parsedO = Number(no);
+      if (Number.isInteger(parsedO) && parsedO >= 0) {
+        nextReminderOdometer = parsedO;
+      }
+    }
+    const nh = values.nextReminderEngineHours.trim();
+    if (nh !== "") {
+      const parsedH = Number(nh);
+      if (Number.isInteger(parsedH) && parsedH >= 0) {
+        nextReminderEngineHours = parsedH;
+      }
+    }
+  }
+
   return {
     nodeId: items[0]?.nodeId ?? "",
     title: values.title.trim(),
@@ -1087,6 +1212,14 @@ export function normalizeAddServiceEventPayload(
     comment: values.comment.trim() || null,
     installedPartsJson,
     installedExpenseItemIds: values.installedExpenseItemIds,
+    performedBy,
+    serviceProviderNote: serviceNote ? serviceNote : null,
+    attachReceiptRequested: values.attachReceiptRequested,
+    attachFileRequested: values.attachFileRequested,
+    nextReminderEnabled,
+    nextReminderDate: nextReminderEnabled ? nextReminderDateIso : null,
+    nextReminderOdometer: nextReminderEnabled ? nextReminderOdometer : null,
+    nextReminderEngineHours: nextReminderEnabled ? nextReminderEngineHours : null,
     items,
   };
 }
@@ -1106,6 +1239,45 @@ export function validateAddServiceEventFormValues(
   }
   if (!values.title.trim()) {
     return { errors: ["Укажите название события."] };
+  }
+  if (values.comment.length > ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH) {
+    return {
+      errors: [`Комментарий не длиннее ${ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH} символов.`],
+    };
+  }
+  if (values.serviceProviderNote.length > ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH) {
+    return {
+      errors: [
+        `Поле сервиса не длиннее ${ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH} символов.`,
+      ],
+    };
+  }
+  if (values.nextReminderEnabled) {
+    const hasDate = values.nextReminderDate.trim() !== "";
+    const hasOdo = values.nextReminderOdometer.trim() !== "";
+    const hasHours = values.nextReminderEngineHours.trim() !== "";
+    if (!hasDate && !hasOdo && !hasHours) {
+      return {
+        errors: [
+          "Включено напоминание о следующем ТО: укажите дату и/или пробег и/или моточасы.",
+        ],
+      };
+    }
+    if (hasDate && Number.isNaN(new Date(values.nextReminderDate.trim()).getTime())) {
+      return { errors: ["Некорректная дата следующего ТО."] };
+    }
+    if (hasOdo) {
+      const parsed = Number(values.nextReminderOdometer.trim());
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        return { errors: ["Пробег для напоминания — целое число не меньше 0."] };
+      }
+    }
+    if (hasHours) {
+      const parsed = Number(values.nextReminderEngineHours.trim());
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        return { errors: ["Моточасы для напоминания — целое число не меньше 0."] };
+      }
+    }
   }
   if (!values.eventDate.trim()) {
     return { errors: ["Заполните дату события."] };

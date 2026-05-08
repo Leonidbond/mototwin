@@ -49,8 +49,8 @@ The page consolidates multiple operational blocks and modal flows:
 - vehicle identity/profile
 - current state with inline update (`PATCH /state`)
 - node tree with expand/collapse and status badges
-- service log modal with filters/sorting
-- add service event modal (leaf-node-only)
+- link to **Service Log** page `/vehicles/[id]/service-log` (filters/sorting; primary journal UX)
+- **`ServiceEventForm`** (`src/app/vehicles/[id]/_components/service-event-form/`) — создание / редактирование / повтор (bundle, только **листовые** узлы); страницы **`/vehicles/[id]/service-events/new`** и **`…/edit`**; навигация из **`vehicle-detail-client.tsx`** и **`service-log/page.tsx`** (см. [service-log-mvp.md](./service-log-mvp.md), [web-service-event-form.md](./web-service-event-form.md))
 - status explanation modal
 - edit profile modal (`PATCH /profile`)
 
@@ -68,14 +68,17 @@ After successful mutation, page reloads relevant datasets to reflect updated sta
 
 ## 5. Current web-specific notes
 
-- Web currently uses modal-heavy orchestration for operational flows.
+- Выбор узла дерева в модалках (сервисное событие, wishlist, каталог запчастей): общий **`NodePickerModal`** / обёртки — см. [node-picker-reuse.md](./node-picker-reuse.md).
+- Часть операционных сценариев (профиль, пояснения статуса) по-прежнему через модалки; сервисное событие — отдельные full-page маршруты (`service-events/new`, `…/edit`).
 - This differs from Expo route-based decomposition, but backend outcome remains aligned.
 - Web does not currently use shared `@mototwin/api-client` as primary data layer for page fetches.
 
 ## 6. Related docs
 
+- `node-picker-reuse.md`
 - `frontend-expo.md`
 - `cross-platform-parity.md`
 - `api-backend.md`
 - `functional-logic.md`
 - `garage-dashboard-mvp.md`
+- `web-service-event-form.md` — форма сервисного события и страницы new/edit (Next.js); `web-service-event-modal.md` — редирект на него

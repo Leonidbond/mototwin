@@ -86,6 +86,28 @@ export function findNodePathById(
   return null;
 }
 
+/**
+ * Ancestor names for a node, joined with ` › ` (same semantics as the service-event web breadcrumb).
+ */
+export function nodeAncestorPathLabelRu(nodes: NodeTreeItem[], nodeId: string): string {
+  const id = nodeId.trim();
+  if (!id) {
+    return "";
+  }
+  const pathIds = findNodePathById(nodes, id);
+  if (!pathIds || pathIds.length === 0) {
+    return "";
+  }
+  const ancestorIds = pathIds.length > 1 ? pathIds.slice(0, -1) : [];
+  if (ancestorIds.length === 0) {
+    return "";
+  }
+  return ancestorIds
+    .map((pid) => findNodeTreeItemById(nodes, pid)?.name ?? pid)
+    .filter(Boolean)
+    .join(" › ");
+}
+
 export function getNodeSelectLevels(
   nodes: NodeTreeItem[],
   selectedPath: SelectedNodePath
