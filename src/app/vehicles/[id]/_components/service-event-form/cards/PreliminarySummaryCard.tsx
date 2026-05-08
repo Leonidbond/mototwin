@@ -1,6 +1,6 @@
 "use client";
 
-import { productSemanticColors } from "@mototwin/design-tokens";
+import { SERVICE_EVENT_PARTS_UI } from "../styles";
 
 export type PreliminarySummaryCardProps = {
   partsLine: string;
@@ -13,52 +13,52 @@ export function PreliminarySummaryCard({ partsLine, laborLine, totalLine }: Prel
     <div
       className="rounded-2xl border px-5 py-4"
       style={{
-        backgroundColor: productSemanticColors.cardMuted,
-        borderColor: productSemanticColors.border,
+        backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
+        borderColor: SERVICE_EVENT_PARTS_UI.border,
       }}
     >
       <p
         className="text-[13px] font-semibold tracking-tight"
-        style={{ color: productSemanticColors.textPrimary }}
+        style={{ color: SERVICE_EVENT_PARTS_UI.text }}
       >
         Предварительный итог
       </p>
       <dl className="mt-3 space-y-1.5">
         <div className="flex items-baseline justify-between">
-          <dt className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
+          <dt className="text-xs" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
             Детали
           </dt>
           <dd
             className="text-[13px] font-semibold tabular-nums"
-            style={{ color: productSemanticColors.textPrimary }}
+            style={{ color: SERVICE_EVENT_PARTS_UI.text }}
           >
             {partsLine}
           </dd>
         </div>
         <div className="flex items-baseline justify-between">
-          <dt className="text-xs" style={{ color: productSemanticColors.textSecondary }}>
+          <dt className="text-xs" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
             Работа
           </dt>
           <dd
             className="text-[13px] font-semibold tabular-nums"
-            style={{ color: productSemanticColors.textPrimary }}
+            style={{ color: SERVICE_EVENT_PARTS_UI.text }}
           >
             {laborLine}
           </dd>
         </div>
         <div
           className="mt-2 flex items-baseline justify-between border-t pt-2"
-          style={{ borderTopColor: productSemanticColors.border }}
+          style={{ borderTopColor: SERVICE_EVENT_PARTS_UI.borderSubtle }}
         >
           <dt
             className="text-[13px] font-semibold"
-            style={{ color: productSemanticColors.textPrimary }}
+            style={{ color: SERVICE_EVENT_PARTS_UI.text }}
           >
             Итого
           </dt>
           <dd
             className="text-lg font-bold tabular-nums tracking-tight"
-            style={{ color: productSemanticColors.primaryAction }}
+            style={{ color: SERVICE_EVENT_PARTS_UI.orange }}
           >
             {totalLine}
           </dd>

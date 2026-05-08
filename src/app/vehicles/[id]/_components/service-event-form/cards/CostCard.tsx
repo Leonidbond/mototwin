@@ -2,8 +2,14 @@
 
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type { AddServiceEventFormValues } from "@mototwin/types";
-import { FIELD_IN_STACK, FOCUS_RING, LABEL_STYLE, SECTION_CARD_STYLE, sectionTitleStyle } from "../styles";
-import { currencySuffix } from "../utils";
+import {
+  FIELD_IN_STACK,
+  FOCUS_RING,
+  LABEL_STYLE,
+  SECTION_CARD_STYLE,
+  SERVICE_EVENT_PARTS_UI,
+  sectionTitleStyle,
+} from "../styles";
 
 export type CostCardProps = {
   sectionNumber: number;
@@ -24,23 +30,42 @@ export function CostCard({
   onPatch,
   showAdvancedHint = true,
 }: CostCardProps) {
-  const suffix = currencySuffix(form.currency);
   const costInfoTitle =
     "В быстром режиме укажите общую стоимость деталей и работы; в подробном режиме итог по узлам складывается отдельно.";
 
   return (
     <div style={SECTION_CARD_STYLE}>
-      <div className="flex items-start gap-2">
+      <div className="flex flex-wrap items-start gap-3">
         <h3 className="min-w-0 flex-1" style={sectionTitleStyle()}>
           {`${sectionNumber}. Стоимость`}
         </h3>
+        <label className="flex shrink-0 items-center gap-2 text-[11px] font-medium" style={LABEL_STYLE}>
+          Валюта
+          <select
+            value={form.currency.trim().toUpperCase() || "RUB"}
+            onChange={(e) => onPatch({ currency: e.target.value })}
+            className={FOCUS_RING}
+            style={{
+              ...FIELD_IN_STACK,
+              width: "8rem",
+              minHeight: 28,
+              padding: "5px 9px",
+              fontSize: "0.75rem",
+              colorScheme: "dark",
+            }}
+          >
+            <option value="RUB">Рубли</option>
+            <option value="USD">Доллары</option>
+            <option value="EUR">Евро</option>
+          </select>
+        </label>
         <button
           type="button"
           className="inline-flex h-6 w-6 shrink-0 cursor-help items-center justify-center rounded-full border text-[11px] font-bold leading-none outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-1"
           style={{
-            borderColor: productSemanticColors.border,
-            color: productSemanticColors.textMuted,
-            backgroundColor: productSemanticColors.cardMuted,
+            borderColor: SERVICE_EVENT_PARTS_UI.border,
+            color: SERVICE_EVENT_PARTS_UI.textMuted,
+            backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
           }}
           title={costInfoTitle}
           aria-label={costInfoTitle}
@@ -62,7 +87,7 @@ export function CostCard({
       >
         <label className="flex min-w-0 flex-col gap-1.5">
           <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
-            {`Детали, ${suffix}`}
+            Детали
           </span>
           <input
             value={form.partsCost}
@@ -75,7 +100,7 @@ export function CostCard({
         </label>
         <label className="flex min-w-0 flex-col gap-1.5">
           <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
-            {`Работа, ${suffix}`}
+            Работа
           </span>
           <input
             value={form.laborCost}
@@ -88,21 +113,21 @@ export function CostCard({
         </label>
       </div>
       <div
-        className="mt-3 flex items-center justify-between gap-4 rounded-xl px-4 py-2.5"
+        className="mt-3 flex items-center justify-between gap-4 rounded-xl px-4 py-3"
         style={{
-          backgroundColor: productSemanticColors.cardSubtle,
-          borderTop: `2px solid ${productSemanticColors.primaryAction}`,
+          backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+          border: `1px solid ${SERVICE_EVENT_PARTS_UI.orange}`,
         }}
       >
         <span
           className="text-sm font-semibold"
-          style={{ color: productSemanticColors.textPrimary }}
+          style={{ color: SERVICE_EVENT_PARTS_UI.text }}
         >
           Итого
         </span>
         <span
-          className="text-2xl font-bold tabular-nums tracking-tight"
-          style={{ color: productSemanticColors.primaryAction }}
+          className="text-lg font-bold tabular-nums tracking-tight"
+          style={{ color: SERVICE_EVENT_PARTS_UI.orange }}
         >
           {totalLabel}
         </span>

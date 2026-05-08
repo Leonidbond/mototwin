@@ -505,6 +505,8 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
             <Image
               src={silhouetteSrc}
               alt={detailViewModel?.displayName || "Изображение мотоцикла"}
+              width={silhouetteSrc.width}
+              height={silhouetteSrc.height}
               priority
               sizes="(min-width: 1280px) 820px, 100vw"
               style={{

@@ -1,8 +1,8 @@
 "use client";
 
-import { productSemanticColors } from "@mototwin/design-tokens";
 import type { AddServiceEventFormValues } from "@mototwin/types";
 import type { CSSProperties, ReactNode } from "react";
+import { SERVICE_EVENT_PARTS_UI } from "../styles";
 
 export type AdditionalCardFastProps = {
   form: AddServiceEventFormValues;
@@ -13,23 +13,23 @@ export type AdditionalCardFastProps = {
 function buttonStyle(active: boolean, disabled?: boolean): CSSProperties {
   if (disabled) {
     return {
-      borderColor: productSemanticColors.border,
-      backgroundColor: productSemanticColors.cardMuted,
-      color: productSemanticColors.textMuted,
+      borderColor: SERVICE_EVENT_PARTS_UI.border,
+      backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+      color: SERVICE_EVENT_PARTS_UI.textSubtle,
       cursor: "not-allowed",
     };
   }
   if (active) {
     return {
-      borderColor: productSemanticColors.primaryAction,
-      backgroundColor: "rgba(249, 115, 22, 0.10)",
-      color: productSemanticColors.textPrimary,
+      borderColor: SERVICE_EVENT_PARTS_UI.orange,
+      backgroundColor: "rgba(255, 107, 0, 0.10)",
+      color: SERVICE_EVENT_PARTS_UI.text,
     };
   }
   return {
-    borderColor: productSemanticColors.border,
-    backgroundColor: productSemanticColors.cardMuted,
-    color: productSemanticColors.textSecondary,
+    borderColor: SERVICE_EVENT_PARTS_UI.border,
+    backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+    color: SERVICE_EVENT_PARTS_UI.textMuted,
   };
 }
 
@@ -51,13 +51,13 @@ function ActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition hover:opacity-95 disabled:hover:opacity-100 sm:min-h-[42px] sm:gap-2 sm:px-3.5 sm:text-[13px]"
+      className="flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold transition hover:opacity-95 disabled:hover:opacity-100 sm:min-h-[42px] sm:gap-2 sm:px-3 sm:text-[13px]"
       style={buttonStyle(active, disabled)}
     >
-      <span style={{ color: active ? productSemanticColors.primaryAction : productSemanticColors.textMuted }}>
+      <span className="shrink-0" style={{ color: active ? SERVICE_EVENT_PARTS_UI.orange : SERVICE_EVENT_PARTS_UI.textSubtle }}>
         {icon}
       </span>
-      <span>{label}</span>
+      <span className="min-w-0 text-center leading-tight">{label}</span>
     </button>
   );
 }
@@ -71,17 +71,20 @@ export function AdditionalCardFast({ form, editingServiceEventId, onPatch }: Add
     <div
       className="w-full rounded-xl border px-4 py-2.5 sm:px-4"
       style={{
-        borderColor: productSemanticColors.border,
-        backgroundColor: productSemanticColors.cardMuted,
+        backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
+        borderColor: SERVICE_EVENT_PARTS_UI.border,
       }}
     >
       <p
-        className="text-[11px] font-semibold uppercase tracking-wide"
-        style={{ color: productSemanticColors.textMeta }}
+        className="text-xs font-medium"
+        style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
       >
         Дополнительно
       </p>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div
+        className="mt-2"
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.5rem" }}
+      >
         <ActionButton
           active={form.attachReceiptRequested}
           disabled={locked}

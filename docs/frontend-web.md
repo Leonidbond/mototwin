@@ -32,8 +32,7 @@
 - Loads `/api/garage`
 - States: loading / error / empty / list
 - Shows vehicle cards with summary and navigation to `/vehicles/[id]`
-- Left-side navigation is a collapsible sidebar; collapsed state is persisted
-  in `localStorage` (`garage.sidebar.collapsed`)
+- Left-side navigation is a collapsible **`GarageSidebar`** (`src/app/garage/_components/GarageSidebar.tsx`); collapsed state is persisted in `localStorage` (`garage.sidebar.collapsed`). Контекст мотоцикла для ссылок меню, плашка с выбором байка и поведение пунктов описаны в [garage-dashboard-mvp.md](./garage-dashboard-mvp.md) (раздел «Web: левый сайдбар»).
 - Empty state shows illustration `images/empty_garage.png` with caption
   `В вашем гараже пока нет мотоциклов`; primary action `Добавить мотоцикл`
   lives in garage header

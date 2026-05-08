@@ -1,8 +1,8 @@
 "use client";
 
-import { productSemanticColors } from "@mototwin/design-tokens";
 import { useLayoutEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { SERVICE_EVENT_PARTS_UI } from "../styles";
 
 export type ServiceEventModalBodyUnifiedProps = {
   /** BASIC: «Быстро»; ADVANCED: «Подробно» — extended-блоки на той же сетке. */
@@ -16,7 +16,6 @@ export type ServiceEventModalBodyUnifiedProps = {
   bundleBanner: ReactNode;
   actionTypeSelect?: ReactNode;
   bundleRowsFast: ReactNode;
-  bundleTotalsFast: ReactNode;
   bundleNodeCards: ReactNode;
   bundleAddNodeFooter: ReactNode;
   bundleSkuPanel: ReactNode;
@@ -34,14 +33,11 @@ export function ServiceEventModalBodyUnified({
   costCard,
   additionalCardFast,
   additionalCardExtended,
-  preliminarySummary,
   bundleHeader,
   bundleBanner,
   actionTypeSelect,
   bundleRowsFast,
-  bundleTotalsFast,
   bundleNodeCards,
-  bundleAddNodeFooter,
   bundleSkuPanel,
   bundleTotalsExtended,
 }: ServiceEventModalBodyUnifiedProps) {
@@ -78,7 +74,7 @@ export function ServiceEventModalBodyUnified({
   return (
     <div suppressHydrationWarning className="min-h-0 flex-1" style={rootStyle}>
       <aside
-        className="relative flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto lg:max-h-none lg:pr-1"
+        className="relative flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto lg:max-h-none lg:pr-1"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         {basicInfoCard}
@@ -86,27 +82,19 @@ export function ServiceEventModalBodyUnified({
         {!isBasic ? (
           <>
             {additionalCardExtended}
-            <div
-              className="sticky bottom-0 z-[2] mt-auto -mx-1 shrink-0 px-1 pb-1 pt-2 lg:mx-0 lg:px-0 lg:pb-0 lg:pt-1.5"
-              style={{
-                backgroundColor: productSemanticColors.card,
-              }}
-            >
-              {preliminarySummary}
-            </div>
           </>
         ) : null}
       </aside>
 
       <section
-        className="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto lg:max-h-none"
+        className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto lg:max-h-none"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         <div
           className="flex min-h-0 w-full flex-col gap-2.5 rounded-xl border p-4"
           style={{
-            backgroundColor: productSemanticColors.cardMuted,
-            borderColor: productSemanticColors.border,
+            backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
+            borderColor: SERVICE_EVENT_PARTS_UI.border,
           }}
         >
           {bundleHeader}
@@ -115,13 +103,11 @@ export function ServiceEventModalBodyUnified({
               {bundleBanner}
               {actionTypeSelect}
               <div className="min-h-0">{bundleRowsFast}</div>
-              {bundleTotalsFast}
             </>
           ) : (
             <>
               <div className="space-y-2.5">{bundleNodeCards}</div>
               {bundleSkuPanel}
-              {bundleAddNodeFooter}
             </>
           )}
         </div>

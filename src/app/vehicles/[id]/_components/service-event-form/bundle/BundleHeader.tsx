@@ -1,7 +1,7 @@
 "use client";
 
 import { productSemanticColors } from "@mototwin/design-tokens";
-import { PRIMARY_ACTION_BG_TINT, sectionTitleStyle } from "../styles";
+import { SERVICE_EVENT_PARTS_UI, sectionTitleStyle } from "../styles";
 
 export type BundleHeaderProps = {
   sectionNumber: number;
@@ -29,10 +29,9 @@ export function BundleHeader({
           {`${sectionNumber}. Узлы и работы`}
         </h3>
         <p
-          className="mt-1 inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold leading-none"
+          className="mt-1 text-[11px] font-medium leading-none"
           style={{
-            color: productSemanticColors.textSecondary,
-            backgroundColor: productSemanticColors.chipBackground,
+            color: SERVICE_EVENT_PARTS_UI.textMuted,
           }}
         >
           {`Выбрано узлов: ${selectedUnitsCount}`}
@@ -46,8 +45,8 @@ export function BundleHeader({
             className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition hover:opacity-90"
             style={{
               borderColor: productSemanticColors.border,
-              backgroundColor: productSemanticColors.cardSubtle,
-              color: productSemanticColors.textPrimary,
+              backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+              color: SERVICE_EVENT_PARTS_UI.text,
             }}
             aria-label="Готово к установке"
           >
@@ -64,7 +63,7 @@ export function BundleHeader({
               <span
                 className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
                 style={{
-                  backgroundColor: productSemanticColors.primaryAction,
+                  backgroundColor: SERVICE_EVENT_PARTS_UI.orange,
                   color: productSemanticColors.onPrimaryAction,
                 }}
               >
@@ -79,9 +78,9 @@ export function BundleHeader({
             onClick={onAddNode}
             className="inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition hover:opacity-90"
             style={{
-              borderColor: productSemanticColors.primaryAction,
-              color: productSemanticColors.primaryAction,
-              backgroundColor: PRIMARY_ACTION_BG_TINT,
+              borderColor: SERVICE_EVENT_PARTS_UI.orange,
+              color: SERVICE_EVENT_PARTS_UI.orange,
+              backgroundColor: "transparent",
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>

@@ -1201,7 +1201,7 @@ All POST/PATCH input must be validated with Zod.
 3. **Web данные**: подключить `getRecommendedSkusForNode`, `getServiceKits`, `getPartSkus`.
 4. **Web draft cart**: реализовать `PickerDraftCartPanel`, `DraftCartItemRow`, кнопки `+` и `Добавить комплект`.
 5. **Web submit flow**: `submitPickerDraft` в `@mototwin/api-client` (`picker-submit-draft.ts`) + `PickerSubmitPreviewModal`, batch POST, redirect с подсветкой.
-6. **Web cleanup**: переименовать sidebar `«Детали»` → `«Подбор деталей»`, переключить точки входа на новый маршрут, выделить `WishlistItemEditModal` (для edit-only), удалить `PartPickerShell`.
+6. **Web cleanup**: пункт сайдбара `«Подбор деталей»` и общий `GarageSidebar` обновлены (см. `garage-dashboard-mvp.md`); дальше: переключить оставшиеся точки входа при необходимости, выделить `WishlistItemEditModal` (для edit-only), удалить `PartPickerShell`.
 7. **Web polish**: skeletons, empty/error состояния, `?focus=kits`, стили под референс.
 8. **Mobile (Expo) экран**: `wishlist/picker.tsx` с тем же flow, `MobileDraftCartBar`, submit sheet.
 9. **Mobile cleanup**: переключить точки входа (`wishlist/index`, `wishlist/new` redirect, дашборд, дерево, attention), упростить `wishlist-item-editor` до edit-only.
@@ -1225,7 +1225,8 @@ src/app/vehicles/[id]/parts/page.tsx
 src/app/vehicles/[id]/parts/_components/PartsCartPage.tsx
 src/app/vehicles/[id]/parts/_components/PartsCartPage.module.css
 src/app/vehicles/[id]/_components/VehicleDashboard.tsx
-src/app/garage/_components/GarageSidebar.tsx        # переименовать «Детали» → «Подбор деталей»
+src/app/garage/_components/GarageSidebar.tsx        # общий левый сайдбар; пункт «Подбор деталей» → /vehicles/[id]/parts
+src/app/garage/_components/SidebarVehiclePlaque.tsx  # плашка мотоцикла + выбор из гаража
 ```
 
 Picker (Часть B v2.0 — новый маршрут):
@@ -1233,10 +1234,7 @@ Picker (Часть B v2.0 — новый маршрут):
 ```txt
 src/app/vehicles/[id]/parts/picker/page.tsx
 src/app/vehicles/[id]/parts/picker/_components/PartPickerPage.tsx
-src/app/vehicles/[id]/parts/picker/_components/PickerHeader.tsx
-src/app/vehicles/[id]/parts/picker/_components/VehicleChip.tsx
-src/app/vehicles/[id]/parts/picker/_components/NodeChip.tsx
-src/app/vehicles/[id]/parts/picker/_components/ResetSelectionChip.tsx
+src/app/vehicles/[id]/parts/picker/_components/PickerChips.tsx   # NodeChip, ResetSelectionChip, VehicleChip
 src/app/vehicles/[id]/parts/picker/_components/PickerSearchBar.tsx
 src/app/vehicles/[id]/parts/picker/_components/RecommendationsSection.tsx
 src/app/vehicles/[id]/parts/picker/_components/RecommendationCard.tsx

@@ -26,7 +26,6 @@ import {
   createEmptyDraftCart,
   filterActiveWishlistItems,
   filterLeafOptionsUnderTopNodeAncestors,
-  formatRideStyleChipRu,
   getLeafNodeOptions,
   getNodePathItemViewModelsByNodeId,
   getOrderedTopNodeIdsPresentInNodeTree,
@@ -49,7 +48,7 @@ import type {
   VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { buildPartSkuViewModelFromRecommendation } from "../../_components/part-picker-utils";
-import { VehicleChip, NodeChip, ResetSelectionChip } from "./PickerChips";
+import { NodeChip, ResetSelectionChip } from "./PickerChips";
 import { PickerSearchBar } from "./PickerSearchBar";
 import { RecommendationsSection } from "./RecommendationsSection";
 import { SearchResultsSection } from "./SearchResultsSection";
@@ -505,19 +504,6 @@ export function PartPickerPage({
     );
   }, [skuResults, catalogMaxPriceRub]);
 
-  const vehicleLabel = vehicle
-    ? vehicle.nickname?.trim() ||
-      `${vehicle.brandName} ${vehicle.modelName}`.trim()
-    : "…";
-
-  const vehicleSubtitle = vehicle
-    ? `${vehicle.year} · ${formatKm(vehicle.odometer)} км${
-        formatRideStyleChipRu(vehicle.rideProfile)
-          ? ` · ${formatRideStyleChipRu(vehicle.rideProfile)}`
-          : ""
-      }`
-    : "";
-
   const whyMatches = useMemo(() => {
     if (!vehicle) return [];
     const modelLabel = `${vehicle.brandName} ${vehicle.modelName}`.trim();
@@ -750,10 +736,6 @@ export function PartPickerPage({
                           minWidth: 0,
                         }}
                       >
-                        <VehicleChip
-                          vehicleLabel={vehicleLabel}
-                          vehicleSubtitle={vehicleSubtitle}
-                        />
                         <NodeChip
                           nodeName={nodeNameForUi}
                           nodePath={nodePathLabel}
@@ -937,10 +919,6 @@ export function PartPickerPage({
       </div>
     </main>
   );
-}
-
-function formatKm(n: number): string {
-  return new Intl.NumberFormat("ru-RU").format(n);
 }
 
 const bannerBaseStyle: CSSProperties = {

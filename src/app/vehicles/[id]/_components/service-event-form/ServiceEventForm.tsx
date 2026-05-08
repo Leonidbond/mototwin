@@ -25,7 +25,6 @@ import { productSemanticColors } from "@mototwin/design-tokens";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import partsCartPageStyles from "../../parts/_components/PartsCartPage.module.css";
-import { PARTS_CART_REF } from "../../parts/_components/parts-cart-reference-theme";
 import type {
   AddServiceEventFormValues,
   BundleItemFormValues,
@@ -51,7 +50,6 @@ import { BundleNodeCardExtended } from "./bundle/BundleNodeCardExtended";
 import { BundleTotals } from "./bundle/BundleTotals";
 import { ServiceEventModalBodyUnified } from "./body/ServiceEventModalBodyUnified";
 import { AddNodeSheet } from "./overlays/AddNodeSheet";
-import { PreviewOverlay } from "./overlays/PreviewOverlay";
 import { TemplateContentsOverlay } from "./overlays/TemplateContentsOverlay";
 import {
   InstallablePickerOverlay,
@@ -65,8 +63,26 @@ import {
   parseDdMmYyyyToYmd,
   ymdToDdMmYyyy,
 } from "./utils";
+import { SERVICE_EVENT_PARTS_UI } from "./styles";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+
+function normalizeCostLineCurrency(line: string | null | undefined, currency: string): string | null {
+  if (!line) return null;
+  const code = currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+  const suffix = currencySuffix(currency);
+  if (suffix === code || !line.endsWith(` ${code}`)) {
+    return line;
+  }
+  return `${line.slice(0, -code.length)}${suffix}`;
+}
+
+function bundleItemQuantityMultiplier(item: Pick<BundleItemFormValues, "quantity">): number {
+  const trimmed = item.quantity.trim();
+  if (!trimmed) return 1;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
 
 function patchItemAt(
   form: AddServiceEventFormValues,
@@ -90,7 +106,7 @@ function removeItemAt(form: AddServiceEventFormValues, index: number): AddServic
 
 function appendEmptyItem(form: AddServiceEventFormValues): AddServiceEventFormValues {
   const next = createEmptyBundleItemFormValues({
-    actionType: form.mode === "BASIC" ? form.commonActionType : "SERVICE",
+    actionType: form.mode === "BASIC" ? form.commonActionType : "REPLACE",
   });
   return { ...form, items: [...form.items, next] };
 }
@@ -255,7 +271,6 @@ function ServiceEventFormInner({
   const [selectedInstallableKeys, setSelectedInstallableKeys] = useState<Set<string>>(() => new Set());
   const [installablePickerOpen, setInstallablePickerOpen] = useState(false);
 
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [templateContentsOpen, setTemplateContentsOpen] = useState(false);
   const [editingUnitRowIndex, setEditingUnitRowIndex] = useState<number | null>(null);
   const [addNodeSheetOpen, setAddNodeSheetOpen] = useState(false);
@@ -338,17 +353,17 @@ function ServiceEventFormInner({
   );
 
   const stickyCostLines = useMemo(() => {
-    const cur = form.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
-    const zero = `${formatExpenseAmountRu(0)} ${cur}`;
+    const suffix = currencySuffix(form.currency);
+    const zero = `${formatExpenseAmountRu(0)} ${suffix}`;
     return {
-      parts: preliminaryCostBreakdown.parts ?? zero,
-      labor: preliminaryCostBreakdown.labor ?? zero,
-      total: preliminaryCostBreakdown.total ?? zero,
+      parts: normalizeCostLineCurrency(preliminaryCostBreakdown.parts, form.currency) ?? zero,
+      labor: normalizeCostLineCurrency(preliminaryCostBreakdown.labor, form.currency) ?? zero,
+      total: normalizeCostLineCurrency(preliminaryCostBreakdown.total, form.currency) ?? zero,
     };
   }, [form.currency, preliminaryCostBreakdown]);
 
   const serviceEventCostTotalPreview = useMemo(() => {
-    const cur = form.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
+    const suffix = currencySuffix(form.currency);
     if (form.mode === "ADVANCED") {
       let rowP = 0;
       let rowL = 0;
@@ -357,7 +372,7 @@ function ServiceEventFormInner({
         const lr = it.laborCost.trim();
         if (pr !== "") {
           const v = parseExpenseAmountInputToNumberOrNull(pr);
-          if (v != null) rowP += v;
+          if (v != null) rowP += v * bundleItemQuantityMultiplier(it);
         }
         if (lr !== "") {
           const v = parseExpenseAmountInputToNumberOrNull(lr);
@@ -376,7 +391,7 @@ function ServiceEventFormInner({
       if (!hadCostInput) {
         return null;
       }
-      return `${formatExpenseAmountRu(sum)} ${cur}`;
+      return `${formatExpenseAmountRu(sum)} ${suffix}`;
     }
     const partsRaw = form.partsCost.trim();
     const laborRaw = form.laborCost.trim();
@@ -388,13 +403,12 @@ function ServiceEventFormInner({
     if (p == null || l == null) {
       return null;
     }
-    return `${formatExpenseAmountRu(p + l)} ${cur}`;
+    return `${formatExpenseAmountRu(p + l)} ${suffix}`;
   }, [form.mode, form.items, form.partsCost, form.laborCost, form.currency]);
 
   const totalLabel = useMemo(() => {
     if (serviceEventCostTotalPreview) return serviceEventCostTotalPreview;
-    const cur = form.currency.trim().toUpperCase() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
-    return `0 ${cur}`;
+    return `0 ${currencySuffix(form.currency)}`;
   }, [serviceEventCostTotalPreview, form.currency]);
 
   const selectedBundleTemplate = useMemo(
@@ -863,7 +877,7 @@ function ServiceEventFormInner({
     <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
       <label
         className="shrink-0 text-[11px] font-semibold uppercase tracking-wide sm:min-w-[6.5rem]"
-        style={{ color: productSemanticColors.textMeta }}
+        style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
         htmlFor="service-event-common-action-type"
       >
         Тип работы
@@ -872,9 +886,9 @@ function ServiceEventFormInner({
         id="service-event-common-action-type"
         className="min-h-10 w-full flex-1 rounded-xl border px-3 py-2 text-sm outline-none transition focus:ring-2 sm:max-w-xs"
         style={{
-          borderColor: productSemanticColors.border,
-          backgroundColor: productSemanticColors.card,
-          color: productSemanticColors.textPrimary,
+          borderColor: SERVICE_EVENT_PARTS_UI.border,
+          backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceControl,
+          color: SERVICE_EVENT_PARTS_UI.text,
         }}
         value={form.commonActionType}
         onChange={(e) => {
@@ -897,17 +911,16 @@ function ServiceEventFormInner({
 
   const bundleBanner = isBasic ? (
     <div
-      className="flex items-start gap-3 rounded-xl border px-4 py-3"
+      className="flex items-start gap-3 rounded-xl px-4 py-3"
       style={{
-        borderColor: productSemanticColors.border,
-        backgroundColor: productSemanticColors.cardSubtle,
+        backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
       }}
     >
       <span
         className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
         style={{
-          color: productSemanticColors.primaryAction,
-          backgroundColor: productSemanticColors.cardMuted,
+          color: SERVICE_EVENT_PARTS_UI.orange,
+          backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
         }}
         aria-hidden
       >
@@ -918,13 +931,13 @@ function ServiceEventFormInner({
       <div className="min-w-0 flex-1">
         <p
           className="text-[13px] font-semibold"
-          style={{ color: productSemanticColors.textPrimary }}
+          style={{ color: SERVICE_EVENT_PARTS_UI.text }}
         >
           Быстрый режим
         </p>
         <p
           className="mt-0.5 text-[11px] leading-snug"
-          style={{ color: productSemanticColors.textSecondary }}
+          style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
         >
           Выбраны узлы и указана общая стоимость. Статусы узлов будут обновлены.
         </p>
@@ -949,6 +962,11 @@ function ServiceEventFormInner({
             rowActionLabel={rowActionLabel}
             hasNode={Boolean(nodeIdTrim)}
             canRemove={form.items.length > 1}
+            onPickNode={() => {
+              setEditingUnitRowIndex(rowIndex);
+              setAddNodeSheetOpen(true);
+            }}
+            onClearNode={() => updateForm((prev) => patchItemAt(prev, rowIndex, { nodeId: "" }))}
             onRemove={() => {
               setEditingUnitRowIndex(null);
               updateForm((prev) => removeItemAt(prev, rowIndex));
@@ -957,15 +975,6 @@ function ServiceEventFormInner({
         );
       })}
     </div>
-  );
-
-  const bundleTotalsFast = (
-    <BundleTotals
-      partsLine={stickyCostLines.parts}
-      laborLine={stickyCostLines.labor}
-      totalLine={stickyCostLines.total}
-      variant="fast"
-    />
   );
 
   // Extended-mode node cards
@@ -983,7 +992,9 @@ function ServiceEventFormInner({
     const partsParsed = parseExpenseAmountInputToNumberOrNull(row.partCost.trim());
     const laborParsed = parseExpenseAmountInputToNumberOrNull(row.laborCost.trim());
     const partsCostFormatted =
-      partsParsed != null ? `${formatExpenseAmountRu(partsParsed)} ${currencySuffix(form.currency)}` : "—";
+      partsParsed != null
+        ? `${formatExpenseAmountRu(partsParsed * bundleItemQuantityMultiplier(row))} ${currencySuffix(form.currency)}`
+        : "—";
     const laborCostFormatted =
       laborParsed != null ? `${formatExpenseAmountRu(laborParsed)} ${currencySuffix(form.currency)}` : "—";
 
@@ -1114,6 +1125,11 @@ function ServiceEventFormInner({
     (editingServiceEventId
       ? "Измените данные события и сохраните обновлённую запись в журнале."
       : "Заполните дату, стоимость и узлы, затем сохраните запись в журнале обслуживания.");
+  const saveButtonLabel = isSubmitting
+    ? "Сохранение…"
+    : editingServiceEventId
+      ? "Сохранить изменения"
+      : "Сохранить событие";
 
   if (pageChrome === "partsCart") {
     return (
@@ -1124,11 +1140,14 @@ function ServiceEventFormInner({
           maxWidth: 1500,
           width: "100%",
           marginInline: "auto",
-          background: "#070b10",
+          background: SERVICE_EVENT_PARTS_UI.canvas,
         }}
       >
         <main className={`${partsCartPageStyles.mainColumn} ${partsCartPageStyles.mainColumnServiceEvent}`}>
-          <header className={partsCartPageStyles.headerServiceEvent}>
+          <header
+            className={partsCartPageStyles.headerServiceEvent}
+            style={{ gridTemplateColumns: "28px minmax(0, 1fr) auto", alignItems: "start" }}
+          >
             <button
               type="button"
               onClick={onCancel}
@@ -1153,11 +1172,24 @@ function ServiceEventFormInner({
               />
               <p className={partsCartPageStyles.subtitle}>{resolvedSubtitle}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={isSubmitting}
+              className={partsCartPageStyles.primaryAction}
+              style={{
+                minWidth: 168,
+                opacity: isSubmitting ? 0.55 : 1,
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+              }}
+            >
+              {saveButtonLabel}
+            </button>
           </header>
 
           {contextHint ? (
             <div className={partsCartPageStyles.historyBox}>
-              <div className="text-xs" style={{ color: PARTS_CART_REF.textMuted }}>
+              <div className="text-xs" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
                 {contextHint}
               </div>
             </div>
@@ -1168,8 +1200,9 @@ function ServiceEventFormInner({
             aria-label="Форма сервисного события"
             style={{
               minHeight: "calc(100vh - 84px)",
-              borderColor: PARTS_CART_REF.border,
-              background: "rgba(9, 15, 22, 0.72)",
+              border: 0,
+              borderRadius: 0,
+              background: "transparent",
             }}
           >
             <div
@@ -1187,7 +1220,6 @@ function ServiceEventFormInner({
                 bundleBanner={bundleBanner}
                 actionTypeSelect={actionTypeSelect}
                 bundleRowsFast={bundleRowsFast}
-                bundleTotalsFast={bundleTotalsFast}
                 bundleNodeCards={bundleNodeCardsExtended}
                 bundleAddNodeFooter={bundleAddNodeFooter}
                 bundleSkuPanel={bundleSkuPanel}
@@ -1205,66 +1237,14 @@ function ServiceEventFormInner({
               <div
                 className="shrink-0 border-t px-4 py-2.5 sm:px-5 sm:py-3"
                 style={{
-                  borderTopColor: PARTS_CART_REF.border,
-                  backgroundColor: PARTS_CART_REF.surface,
+                  borderTopColor: SERVICE_EVENT_PARTS_UI.border,
+                  backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
                 }}
               >
                 <PostSaveExplainer />
               </div>
             ) : null}
-
-            <div
-              className="shrink-0 border-t px-4 py-2.5 sm:px-5 sm:py-3"
-              style={{
-                borderTopColor: PARTS_CART_REF.border,
-                backgroundColor: PARTS_CART_REF.surfaceElevated,
-              }}
-            >
-              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  className={partsCartPageStyles.secondaryAction}
-                >
-                  Отмена
-                </button>
-                <div className="flex flex-wrap justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsPreviewOpen(true)}
-                    className={partsCartPageStyles.secondaryAction}
-                  >
-                    <span aria-hidden>◉</span>
-                    <span>Предпросмотр</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void save()}
-                    disabled={isSubmitting}
-                    className={partsCartPageStyles.primaryAction}
-                    style={{
-                      minWidth: 168,
-                      opacity: isSubmitting ? 0.55 : 1,
-                      cursor: isSubmitting ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {isSubmitting
-                      ? "Сохранение…"
-                      : editingServiceEventId
-                        ? "Сохранить изменения"
-                        : "Сохранить событие"}
-                  </button>
-                </div>
-              </div>
-            </div>
           </section>
-
-          <PreviewOverlay
-            open={isPreviewOpen}
-            form={form}
-            totalLabel={serviceEventCostTotalPreview}
-            onClose={() => setIsPreviewOpen(false)}
-          />
 
           <TemplateContentsOverlay
             open={templateContentsOpen}
@@ -1373,7 +1353,6 @@ function ServiceEventFormInner({
           bundleBanner={bundleBanner}
           actionTypeSelect={actionTypeSelect}
           bundleRowsFast={bundleRowsFast}
-          bundleTotalsFast={bundleTotalsFast}
           bundleNodeCards={bundleNodeCardsExtended}
           bundleAddNodeFooter={bundleAddNodeFooter}
           bundleSkuPanel={bundleSkuPanel}
@@ -1399,73 +1378,7 @@ function ServiceEventFormInner({
           <PostSaveExplainer />
         </div>
       ) : null}
-
-      {/* Footer */}
-      <div
-        className="shrink-0 border-t px-5 py-3 sm:px-6"
-        style={{
-          borderTopColor: productSemanticColors.border,
-          backgroundColor: productSemanticColors.cardSubtle,
-        }}
-      >
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex h-11 min-w-[6rem] items-center justify-center rounded-xl border px-5 text-sm font-semibold transition hover:opacity-90 sm:justify-start"
-            style={{
-              borderColor: productSemanticColors.border,
-              backgroundColor: productSemanticColors.card,
-              color: productSemanticColors.textPrimary,
-            }}
-          >
-            Отмена
-          </button>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setIsPreviewOpen(true)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-5 text-sm font-medium transition hover:opacity-90"
-              style={{
-                backgroundColor: productSemanticColors.card,
-                borderColor: productSemanticColors.border,
-                color: productSemanticColors.textPrimary,
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" stroke="currentColor" strokeWidth="1.75" />
-                <circle cx="12" cy="12" r="3" fill="currentColor" />
-              </svg>
-              Предпросмотр
-            </button>
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={isSubmitting}
-              className="inline-flex h-11 min-w-[12rem] items-center justify-center rounded-xl px-6 text-sm font-semibold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-              style={{
-                backgroundColor: productSemanticColors.primaryAction,
-                color: productSemanticColors.onPrimaryAction,
-              }}
-            >
-              {isSubmitting
-                ? "Сохранение…"
-                : editingServiceEventId
-                  ? "Сохранить изменения"
-                  : "Сохранить событие"}
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Overlays */}
-      <PreviewOverlay
-        open={isPreviewOpen}
-        form={form}
-        totalLabel={serviceEventCostTotalPreview}
-        onClose={() => setIsPreviewOpen(false)}
-      />
-
       <TemplateContentsOverlay
         open={templateContentsOpen}
         template={selectedBundleTemplate}

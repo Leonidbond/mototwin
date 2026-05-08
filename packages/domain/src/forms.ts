@@ -70,7 +70,7 @@ export function buildAddServiceEventCostBreakdownLines(
       const pr = parseExpenseAmountInputToNumberOrNull(it.partCost.trim());
       const lr = parseExpenseAmountInputToNumberOrNull(it.laborCost.trim());
       if (pr != null) {
-        rowP += pr;
+        rowP += pr * getBundleItemQuantityMultiplier(it);
       }
       if (lr != null) {
         rowL += lr;
@@ -111,6 +111,15 @@ export function buildAddServiceEventCostBreakdownLines(
     labor: l != null ? `${formatExpenseAmountRu(lNum)} ${cur}` : null,
     total: `${formatExpenseAmountRu(pNum + lNum)} ${cur}`,
   };
+}
+
+function getBundleItemQuantityMultiplier(item: Pick<BundleItemFormValues, "quantity">): number {
+  const trimmed = item.quantity.trim();
+  if (!trimmed) {
+    return 1;
+  }
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +195,7 @@ export function createEmptyBundleItemFormValues(
   return {
     key: overrides?.key ?? nextBundleItemKey(),
     nodeId: overrides?.nodeId ?? "",
-    actionType: overrides?.actionType ?? "SERVICE",
+    actionType: overrides?.actionType ?? "REPLACE",
     partName: overrides?.partName ?? "",
     sku: overrides?.sku ?? "",
     quantity: overrides?.quantity ?? "",
@@ -261,7 +270,7 @@ export function createInitialAddServiceEventFormValues(): AddServiceEventFormVal
   return {
     title: "",
     mode: "BASIC",
-    commonActionType: "SERVICE",
+    commonActionType: "REPLACE",
     eventDate: "",
     odometer: "",
     engineHours: "",
@@ -583,7 +592,7 @@ export function removeBundleRowByNodeId(
     ...form,
     items: [
       createEmptyBundleItemFormValues({
-        actionType: form.mode === "BASIC" ? form.commonActionType : "SERVICE",
+        actionType: form.mode === "BASIC" ? form.commonActionType : "REPLACE",
       }),
     ],
   };
@@ -1100,13 +1109,15 @@ function normalizeBundleItemPayload(
   const partName = item.partName.trim();
   const sku = item.sku.trim();
   const comment = item.comment.trim();
+  const quantity = parsePositiveIntegerOrNull(item.quantity);
+  const unitPartCost = parseDecimalOrNull(item.partCost);
   return {
     nodeId,
     actionType: item.actionType,
     partName: partName ? partName.slice(0, 500) : null,
     sku: sku ? sku.slice(0, 200) : null,
-    quantity: parsePositiveIntegerOrNull(item.quantity),
-    partCost: parseDecimalOrNull(item.partCost),
+    quantity,
+    partCost: unitPartCost != null ? unitPartCost * (quantity ?? 1) : null,
     laborCost: parseDecimalOrNull(item.laborCost),
     comment: comment ? comment : null,
   };

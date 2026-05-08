@@ -6,13 +6,10 @@ import {
   createInitialAddServiceEventFromNode,
   createInitialAddServiceEventFromWishlistItem,
   createInitialRepeatServiceEventValues,
-  DEFAULT_USER_LOCAL_SETTINGS,
+  DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
   findNodePathById,
   findNodeTreeItemById,
-  getDefaultCurrencyFromSettings,
   normalizeAddServiceEventPayload,
-  normalizeUserLocalSettings,
-  USER_LOCAL_SETTINGS_STORAGE_KEY,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
@@ -22,19 +19,6 @@ import type { AddServiceEventFormValues, NodeTreeItem, ServiceEventItem } from "
 import { ServiceEventForm } from "../../_components/service-event-form";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
-
-function readDefaultCurrencySetting(): string {
-  try {
-    const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
-    if (!raw) {
-      return DEFAULT_USER_LOCAL_SETTINGS.defaultCurrency;
-    }
-    const settings = normalizeUserLocalSettings(JSON.parse(raw));
-    return getDefaultCurrencyFromSettings(settings);
-  } catch {
-    return DEFAULT_USER_LOCAL_SETTINGS.defaultCurrency;
-  }
-}
 
 function withHighlightReturnTo(returnToDecoded: string, eventId: string): string {
   const [path, query = ""] = returnToDecoded.split("?");
@@ -98,7 +82,7 @@ export function ServiceEventCreateClient() {
 
         const odo = vehicle?.odometer ?? null;
         const eng = vehicle?.engineHours ?? null;
-        const currencyDefault = readDefaultCurrencySetting();
+        const currencyDefault = DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
 
         if (repeatOf) {
           const ev = events.find((e: ServiceEventItem) => e.id === repeatOf);

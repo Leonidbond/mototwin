@@ -52,7 +52,7 @@
 | `submitError`, `onClearSubmitError` | Ошибка API после submit. |
 | `isSubmitting` | Блокировка CTA. |
 | `onSubmit` | `async (form) => void`. |
-| `onCancel` | Выход со страницы (кнопка «Назад» в шапке формы и «Отмена» в футере). |
+| `onCancel` | Выход со страницы через кнопку «Назад» в шапке формы. Нижнего футера с «Отмена» нет. |
 | `title`, `pageSubtitle`, `contextHint` | Заголовок, подзаголовок под шапкой, опциональная подсказка (например wishlist). |
 | `pageChrome` | `"partsCart"` — разметка как у страницы каталога (`PartsCartPage.module.css`: `headerServiceEvent`, `mainColumnServiceEvent`); иначе внутренний «карточный» chrome. |
 | `eventDateMaxYmd`, `odometerInputMax` | Опциональные ограничения полей. |
@@ -78,12 +78,12 @@
 |---------|------|
 | Заголовок и режим | `title`, `mode` (`BASIC` \| `ADVANCED`), `commonActionType` (в **BASIC** общий тип работ для всех строк). |
 | Когда / пробег | `eventDate`, `odometer`, `engineHours`. |
-| Деньги (верх «Стоимость») | `partsCost`, `laborCost`, `currency`. |
-| Текст | `comment`, **`serviceProviderNote`** (в **BASIC** опциональное «название сервиса» всегда в UI; в **ADVANCED** — расширенная подпись при исполнителе **Сервис**). |
+| Деньги (верх «Стоимость») | `partsCost`, `laborCost`, `currency`; валюта выбирается в заголовке карточки «Стоимость». |
+| Текст | `comment`, **`serviceProviderNote`** (поле названия сервиса показывается только при исполнителе **Сервис**). |
 | Исполнитель | `performedBy` (`SELF` \| `SERVICE` \| `OTHER`). |
 | Вложения | `attachReceiptRequested`, `attachFileRequested`. |
 | Напоминание | `nextReminderEnabled`, даты/пробег/моточасы напоминания. |
-| Bundle | `items[]` — `key`, `nodeId`, `actionType`, деталь, SKU, суммы по строке, комментарий узла. |
+| Bundle | `items[]` — `key`, `nodeId`, `actionType`, деталь, SKU, количество, цена детали за единицу, работа, комментарий узла. |
 | Установки | `installedPartsJson`, `installedExpenseItemIds`. |
 
 ---
@@ -101,25 +101,29 @@
 
 ### BASIC («Быстро»)
 
-- **Слева:** «Основная информация» (**`BasicInfoCard`** → **`BasicInfoPrimaryFields`**, тот же порядок полей, что в ADVANCED) + «Стоимость».
-- **Справа:** карточка «Узлы и работы» — баннер быстрого режима, компактный выбор **типа работы**, строки **`BundleNodeRowFast`**, **`BundleTotals`** с `variant="fast"`, блок **«Дополнительно»** (`AdditionalCardFast`).
+- **Слева:** «Основная информация» (**`BasicInfoCard`** → **`BasicInfoPrimaryFields`**) + «Стоимость».
+- **Справа:** карточка «Узлы и работы» — баннер быстрого режима, компактный выбор **типа работы**, строки **`BundleNodeRowFast`**, блок **«Дополнительно»** (`AdditionalCardFast`).
+- В пустой строке узла клик по строке открывает **`AddNodeSheet`**; у выбранного узла справа показывается крестик очистки узла.
+- В блоке «Узлы и работы» быстрого режима нет локального подвала стоимости: общие суммы вводятся только в карточке «Стоимость».
 - **Нет** sticky «Предварительный итог» слева, **нет** `PostSaveExplainer`.
 - Кнопка **«Готово к установке»** в шапке бандла **не показывается** (только в ADVANCED при создании).
 
 ### ADVANCED («Подробно»)
 
-- **Слева:** та же карточка основной информации (**`BasicInfoPrimaryFields`**), стоимость, **`AdditionalCardExtended`**, липкий **`PreliminarySummaryCard`** внизу колонки.
-- **Справа:** **`BundleNodeCardExtended`**, панель SKU, «Добавить узел», **`BundleTotals`** `variant="extended"`.
-- **`PostSaveExplainer`** — полоса между телом и футером на всю ширину карточки формы.
+- **Слева:** та же карточка основной информации (**`BasicInfoPrimaryFields`**), стоимость, **`AdditionalCardExtended`**.
+- **Справа:** **`BundleNodeCardExtended`**, панель SKU, **`BundleTotals`** `variant="extended"`.
+- В карточке узла подробного режима строка детали содержит название/SKU, количество и цену детали за единицу. Отображаемая «Стоимость деталей» считается как **количество × цена**; при сохранении в payload уходит рассчитанная сумма.
+- Нижняя кнопка «Добавить узел» в подробном режиме не показывается; добавление узлов выполняется через кнопку в шапке `BundleHeader`.
+- **`PostSaveExplainer`** — полоса под основным телом формы на всю ширину карточки.
 - **`BundleHeader`**: кнопки «Готово к установке» (только при создании) и «Добавить узел».
 
 ---
 
-## 7. Шапка и футер страницы формы
+## 7. Шапка страницы формы
 
-- **`pageChrome="partsCart"`** (экраны `service-events/new` и `…/edit`): корневая сетка и **`mainColumnServiceEvent`** — плотнее по вертикали. **Шапка** (`headerServiceEvent`): слева круг «Назад», справа колонка **заголовок → `ServiceEventModeControl` (segmented) → подзаголовок** (`pageSubtitle`).
+- **`pageChrome="partsCart"`** (экраны `service-events/new` и `…/edit`): корневая сетка и **`mainColumnServiceEvent`** — плотнее по вертикали. **Шапка** (`headerServiceEvent`): слева круг «Назад», справа колонка **заголовок → `ServiceEventModeControl` (segmented) → подзаголовок** (`pageSubtitle`), а справа в той же строке — CTA **«Сохранить событие» / «Сохранить изменения»**.
 - **Встроенный chrome** (без `partsCart`): верхняя полоса с «Назад», заголовком, под ним **segmented**-режим и при необходимости **`contextHint`**; тело с `max-w-[1500px]`, скругление, тень.
-- **Футер:** «Отмена», «Предпросмотр», CTA «Сохранить событие» / «Сохранить изменения»; в ADVANCED над футером при необходимости **`PostSaveExplainer`**.
+- Нижний футер формы удалён: нет кнопок **«Отмена»** и **«Предпросмотр»**. Сохранение выполняется верхним CTA.
 
 Адаптив: ниже 1024px колонки **`ServiceEventModalBodyUnified`** складываются в одну (aside → section).
 
@@ -130,7 +134,7 @@
 ## 8. Шаблоны пакета
 
 - Запрос шаблонов при монтировании; ошибка под селектом.
-- **Один блок для BASIC и ADVANCED** (компонент **`BasicInfoPrimaryFields`**, порядок как в подробном режиме): при создании сверху **«Шаблон сервисного события»** (селект + «Смотреть состав»), затем **«Название события»** и остальные поля карточки. В **BASIC** под селектом показывается короткая подсказка про подстановку узлов и сумм; в **ADVANCED** подсказка под шаблоном не дублируется.
+- **Один блок для BASIC и ADVANCED** (компонент **`BasicInfoPrimaryFields`**): сверху в одну строку **«Название события»** и **«Шаблон (опционально)»**. Состав шаблона открывается круглой кнопкой **`?`** рядом с подписью шаблона.
 - Применение: **`mergeServiceBundleTemplateIntoAddFormValues`**; **`TemplateContentsOverlay`** для просмотра состава.
 - При **редактировании** блок шаблона скрыт (`showTemplate === false`).
 
@@ -143,25 +147,26 @@
 
 ---
 
-## 10. Bundle, SKU, предпросмотр
+## 10. Bundle и SKU
 
 - Минимум одна строка; уникальный листовой **`nodeId`**.
 - **`AddNodeSheet`** — мультивыбор узлов (внутри общий **`NodePickerModal`**). Переиспользование UI выбора узла: **[`node-picker-reuse.md`](./node-picker-reuse.md)**.
-- **BASIC:** `BundleNodeRowFast`; **ADVANCED:** `BundleNodeCardExtended` + `BundleNodePartRow`, поиск SKU с debounce к **`getPartSkus`**.
-- **`PreviewOverlay`** — сводка перед сохранением.
+- **BASIC:** `BundleNodeRowFast`; пустая строка открывает **`AddNodeSheet`**, выбранная строка очищается крестиком справа.
+- **ADVANCED:** `BundleNodeCardExtended` + `BundleNodePartRow`, поиск SKU с debounce к **`getPartSkus`**. Цена детали в строке — цена за единицу; итоговая стоимость деталей строки — `quantity × partCost`.
+- **`PreviewOverlay`** больше не используется на странице формы.
 
 ---
 
 ## 11. Оверлеи (z-index)
 
-Пикеры и предпросмотр рендерятся с **`position: fixed`**, **`z-index: 60`**, на весь viewport (корректно поверх полноэкранной страницы).
+Пикеры узлов, состава шаблона и «Готово к установке» рендерятся с **`position: fixed`**, **`z-index: 60`**, на весь viewport (корректно поверх полноэкранной страницы).
 
 ---
 
 ## 12. Валидация и отправка
 
 - **`validateAddServiceEventFormValues(form, { todayDateYmd, currentVehicleOdometer, leafNodeIds })`**.
-- Первая ошибка — текст над футером / контентом.
+- Первая ошибка — текст под основным телом формы.
 - Успех → **`onSubmit(form)`**; родитель вызывает API и при ошибке выставляет **`submitError`**.
 
 ---
@@ -180,21 +185,21 @@
 | `ServiceEventForm.tsx` | Состояние формы, загрузки, submit, сбор дочерних блоков; ветки `pageChrome` (partsCart / default). |
 | `ServiceEventModeControl.tsx` | Режим BASIC/ADVANCED: **`segmented`** или плитки **`tiles`**. |
 | `PostSaveExplainer.tsx` | Полоса после сохранения (ADVANCED). |
-| `styles.ts`, `utils.ts` | Поля (**`FIELD_IN_STACK`** — колонка «подпись + поле» без лишнего `marginTop`), дата, breadcrumb, клон формы. |
+| `styles.ts`, `utils.ts` | Локальная холодная палитра формы, поля (**`FIELD_IN_STACK`** — колонка «подпись + поле» без лишнего `marginTop`), дата, breadcrumb, клон формы. |
 | `body/ServiceEventModalBodyUnified.tsx` | Двухколоночный layout (matchMedia + grid), плотные отступы в карточке узлов. |
 | `cards/BasicInfoCard.tsx` | Заголовок секции «1. Основная информация» + **`BasicInfoPrimaryFields`**. |
 | `cards/basic-info-primary-fields.tsx` | **Общие** поля основной информации для обоих режимов (шаблон → название → дата/пробег/моточасы → …). |
-| `cards/*` (остальные) | Cost, Additional fast/extended, PreliminarySummary. |
+| `cards/*` (остальные) | Cost, Additional fast/extended. `PreliminarySummaryCard` сохранён в каталоге, но не выводится в текущем layout. |
 | `bundle/*` | Header, строки fast, карточки extended, totals. |
 | `node-picker/NodePickerModal.tsx` | Общая модалка выбора узла (single/multi); см. [node-picker-reuse.md](./node-picker-reuse.md). |
-| `overlays/*` | AddNode, Preview, TemplateContents, InstallablePicker. |
+| `overlays/*` | AddNode, TemplateContents, InstallablePicker. `PreviewOverlay` сохранён в каталоге, но не используется текущей страницей формы. |
 | `index.ts` | Экспорт `ServiceEventForm`, тип пропсов. |
 
 ---
 
 ## 15. Смоук (ручной чеклист)
 
-1. **`/vehicles/{id}/service-events/new`** — форма открывается, BASIC по умолчанию, переключение ADVANCED, «Назад» / «Отмена» возвращают с учётом `returnTo`.
+1. **`/vehicles/{id}/service-events/new`** — форма открывается, BASIC по умолчанию, переключение ADVANCED, «Назад» возвращает с учётом `returnTo`, верхний CTA сохраняет событие.
 2. **Создание** — валидация пустых полей; успешный submit и редирект по логике клиента.
 3. **`/vehicles/{id}/service-events/{eventId}/edit`** — загрузка события, шаблон скрыт, CTA «Сохранить изменения».
 4. Из **service-log** — переходы new / repeat / edit с **`returnTo`**.

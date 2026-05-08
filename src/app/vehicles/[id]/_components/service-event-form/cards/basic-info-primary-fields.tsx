@@ -9,6 +9,7 @@ import {
   FOCUS_RING,
   LABEL_STYLE,
   PRIMARY_ACTION_BG_TINT,
+  SERVICE_EVENT_PARTS_UI,
 } from "../styles";
 
 const PERFORMER_OPTIONS: Array<{
@@ -57,14 +58,14 @@ const PERFORMER_OPTIONS: Array<{
 function performerStyle(active: boolean): CSSProperties {
   return active
     ? {
-        borderColor: productSemanticColors.primaryAction,
+        borderColor: SERVICE_EVENT_PARTS_UI.orange,
         backgroundColor: PRIMARY_ACTION_BG_TINT,
-        color: productSemanticColors.textPrimary,
+        color: SERVICE_EVENT_PARTS_UI.text,
       }
     : {
-        borderColor: productSemanticColors.border,
-        backgroundColor: productSemanticColors.cardSubtle,
-        color: productSemanticColors.textSecondary,
+        borderColor: SERVICE_EVENT_PARTS_UI.border,
+        backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+        color: SERVICE_EVENT_PARTS_UI.textMuted,
       };
 }
 
@@ -76,7 +77,6 @@ function TemplateSelectField({
   onOpenTemplateContents,
   onApplyTemplate,
   templateLabel,
-  hintBelow,
 }: {
   bundleTemplates: ServiceBundleTemplateWire[];
   bundleTemplatesLoadError: string;
@@ -84,8 +84,7 @@ function TemplateSelectField({
   onSelectBundleTemplate: (id: string) => void;
   onOpenTemplateContents: () => void;
   onApplyTemplate: (templateId: string) => void;
-  templateLabel: string;
-  hintBelow?: string;
+  templateLabel: ReactNode;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
@@ -97,10 +96,16 @@ function TemplateSelectField({
           type="button"
           disabled={!selectedBundleTemplateId}
           onClick={onOpenTemplateContents}
-          className="inline-flex shrink-0 items-center text-xs font-semibold leading-none underline-offset-2 transition hover:underline disabled:cursor-not-allowed disabled:opacity-40"
-          style={{ color: productSemanticColors.primaryAction }}
+          className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[11px] font-bold leading-none outline-none transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          style={{
+            borderColor: SERVICE_EVENT_PARTS_UI.border,
+            backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+            color: SERVICE_EVENT_PARTS_UI.textMuted,
+          }}
+          aria-label="Смотреть состав шаблона"
+          title="Смотреть состав шаблона"
         >
-          Смотреть состав
+          ?
         </button>
       </div>
       <div className="relative">
@@ -130,7 +135,7 @@ function TemplateSelectField({
         </select>
         <span
           className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
-          style={{ color: productSemanticColors.textMuted }}
+          style={{ color: SERVICE_EVENT_PARTS_UI.textSubtle }}
           aria-hidden
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -138,11 +143,6 @@ function TemplateSelectField({
           </svg>
         </span>
       </div>
-      {hintBelow ? (
-        <p className="mt-1 text-[11px] leading-snug" style={{ color: productSemanticColors.textMuted }}>
-          {hintBelow}
-        </p>
-      ) : null}
       {bundleTemplatesLoadError ? (
         <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
           {bundleTemplatesLoadError}
@@ -194,8 +194,31 @@ export function BasicInfoPrimaryFields({
 
   return (
     <>
-      {showTemplate ? (
-        <div className="mt-3">
+      <div
+        className="mt-3"
+        style={{
+          display: "grid",
+          gridTemplateColumns: showTemplate ? "repeat(auto-fit, minmax(180px, 1fr))" : "minmax(0, 1fr)",
+          gap: "0.75rem",
+        }}
+      >
+        <label
+          className="flex min-w-0 flex-col gap-1.5"
+          style={showTemplate ? undefined : { gridColumn: "1 / -1" }}
+        >
+          <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
+            Название события
+          </span>
+          <input
+            value={form.title}
+            onChange={(e) => onPatch({ title: e.target.value })}
+            placeholder="ТО 10 000 км"
+            style={FIELD_IN_STACK}
+            className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
+          />
+        </label>
+
+        {showTemplate ? (
           <TemplateSelectField
             bundleTemplates={bundleTemplates}
             bundleTemplatesLoadError={bundleTemplatesLoadError}
@@ -203,32 +226,22 @@ export function BasicInfoPrimaryFields({
             onSelectBundleTemplate={onSelectBundleTemplate}
             onOpenTemplateContents={onOpenTemplateContents}
             onApplyTemplate={onApplyTemplate}
-            templateLabel="Шаблон сервисного события"
-            hintBelow={
-              isBasicMode
-                ? "Подставит узлы и примерные суммы — всё можно изменить."
-                : undefined
+            templateLabel={
+              <>
+                Шаблон <span style={{ color: SERVICE_EVENT_PARTS_UI.textSubtle, fontWeight: 400 }}>(опционально)</span>
+              </>
             }
           />
-        </div>
-      ) : null}
-
-      <label className="mt-3 flex min-w-0 flex-col gap-1.5">
-        <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
-          Название события
-        </span>
-        <input
-          value={form.title}
-          onChange={(e) => onPatch({ title: e.target.value })}
-          placeholder="ТО 10 000 км"
-          style={FIELD_IN_STACK}
-          className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
-        />
-      </label>
+        ) : null}
+      </div>
 
       <div
         className="mt-3"
-        style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.5rem" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+          gap: "0.5rem",
+        }}
       >
         <label className="flex min-w-0 flex-col gap-1.5">
           <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
@@ -243,20 +256,9 @@ export function BasicInfoPrimaryFields({
               onChange={(e) => onEventDateDisplayChange(e.target.value)}
               onBlur={onEventDateBlur}
               placeholder="ДД.ММ.ГГГГ"
-              style={{ ...FIELD_IN_STACK, paddingLeft: "2.25rem" }}
+              style={FIELD_IN_STACK}
               className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
             />
-            <span
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
-              style={{ color: productSemanticColors.textMuted }}
-              aria-hidden
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M3 9h18" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </span>
           </div>
         </label>
         <label className="flex min-w-0 flex-col gap-1.5">
@@ -290,7 +292,10 @@ export function BasicInfoPrimaryFields({
       <p className="mt-3 text-xs font-medium leading-none" style={LABEL_STYLE}>
         Исполнитель
       </p>
-      <div className="mt-1.5 flex flex-wrap gap-2">
+      <div
+        className="mt-1.5"
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: "0.5rem" }}
+      >
         {PERFORMER_OPTIONS.map(({ key, label, icon }) => {
           const active = form.performedBy === key;
           return (
@@ -298,22 +303,36 @@ export function BasicInfoPrimaryFields({
               key={key}
               type="button"
               onClick={() => onPatch({ performedBy: key })}
-              className="flex min-w-[6rem] flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition hover:opacity-95"
+              className="flex min-w-0 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition hover:opacity-95"
               style={performerStyle(active)}
             >
-              <span style={{ color: active ? productSemanticColors.primaryAction : productSemanticColors.textMuted }}>
+              <span style={{ color: active ? SERVICE_EVENT_PARTS_UI.orange : SERVICE_EVENT_PARTS_UI.textSubtle }}>
                 {icon}
               </span>
-              <span>{label}</span>
+              <span className="min-w-0 truncate">{label}</span>
             </button>
           );
         })}
       </div>
 
-      {isBasicMode || form.performedBy === "SERVICE" ? (
+      {form.performedBy === "SERVICE" ? (
         <label className="mt-3 flex flex-col gap-1.5">
           <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
-            {isBasicMode ? "Название сервиса (опционально)" : "Сервис (необязательно)"}
+            {isBasicMode ? (
+              <>
+                Название сервиса{" "}
+                <span style={{ color: SERVICE_EVENT_PARTS_UI.textSubtle, fontWeight: 400 }}>
+                  (опционально)
+                </span>
+              </>
+            ) : (
+              <>
+                Сервис{" "}
+                <span style={{ color: SERVICE_EVENT_PARTS_UI.textSubtle, fontWeight: 400 }}>
+                  (необязательно)
+                </span>
+              </>
+            )}
           </span>
           <input
             value={form.serviceProviderNote}
@@ -329,13 +348,8 @@ export function BasicInfoPrimaryFields({
       ) : null}
 
       <label className="mt-3 flex flex-col gap-1.5">
-        <span className="flex min-h-[18px] items-center justify-between gap-2 leading-none">
-          <span className="text-xs font-medium" style={LABEL_STYLE}>
-            Комментарий
-          </span>
-          <span className="shrink-0 text-[10px] font-medium tabular-nums" style={{ color: productSemanticColors.textMuted }}>
-            {`${form.comment.length}/${ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH}`}
-          </span>
+        <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
+          Комментарий
         </span>
         <textarea
           ref={commentTextareaRef}
@@ -343,7 +357,7 @@ export function BasicInfoPrimaryFields({
           maxLength={ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH}
           onChange={(e) => onPatch({ comment: e.target.value })}
           placeholder="Любые заметки об этом обслуживании…"
-          style={{ ...FIELD_IN_STACK, minHeight: "4rem" }}
+          style={{ ...FIELD_IN_STACK, minHeight: "5rem" }}
           className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING} resize-none`}
         />
       </label>

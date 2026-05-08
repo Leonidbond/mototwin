@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { Button } from "@/components/ui";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { formatRideStyleChipRu, vehicleDetailFromApiRecord } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
+import type { GarageVehicleItem, VehicleDetail, VehicleDetailApiRecord } from "@mototwin/types";
+import { Button } from "@/components/ui";
+import { SidebarVehiclePlaque } from "./SidebarVehiclePlaque";
 
 type NavIconKind =
   | "home"
   | "nodes"
   | "journal"
   | "expenses"
-  | "details"
-  | "profile"
-  | "logout";
+  | "details";
 
 type NavItem = {
   href: string;
@@ -23,6 +25,15 @@ type NavItem = {
 };
 
 const LAST_VIEWED_VEHICLE_ID_STORAGE_KEY = "mototwin.lastViewedVehicleId";
+
+/** Если мотоцикл ещё не выбран — ведём в гараж (страниц `/vehicles`, `/service-log`, `/details` нет). */
+const NAV_FALLBACK_HREF = "/garage";
+
+const sidebarVehicleApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+
+function formatKmRu(n: number): string {
+  return new Intl.NumberFormat("ru-RU").format(n);
+}
 
 function getVehicleIdFromPathname(pathname: string): string | null {
   const matched = /^\/vehicles\/([^/]+)/.exec(pathname);
@@ -36,20 +47,25 @@ function getVehicleIdFromPathname(pathname: string): string | null {
   }
 }
 
-export function GarageSidebar({
-  collapsed,
-  onToggle,
-}: {
-  collapsed: boolean;
-  onToggle: () => void;
-}) {
-  const pathname = usePathname();
-  const pathVehicleId = useMemo(() => getVehicleIdFromPathname(pathname), [pathname]);
-  const [lastViewedVehicleId, setLastViewedVehicleId] = useState<string | null>(pathVehicleId);
+/** Хвост пути после `/vehicles/:id` (например `/nodes`), пустая строка — дашборд мотоцикла. */
+function getVehicleRelativePath(pathname: string): string {
+  const m = /^\/vehicles\/[^/]+(\/.*)?$/.exec(pathname);
+  if (!m) {
+    return "";
+  }
+  return m[1] ?? "";
+}
 
-  useEffect(() => {
+export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const pathVehicleId = useMemo(() => getVehicleIdFromPathname(pathname), [pathname]);
+  const [contextVehicleId, setContextVehicleId] = useState<string | null>(null);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- контекст ТС из URL и localStorage для href навигации */
+  useLayoutEffect(() => {
     if (pathVehicleId) {
-      setLastViewedVehicleId(pathVehicleId);
+      setContextVehicleId(pathVehicleId);
       try {
         localStorage.setItem(LAST_VIEWED_VEHICLE_ID_STORAGE_KEY, pathVehicleId);
       } catch {
@@ -58,17 +74,97 @@ export function GarageSidebar({
       return;
     }
     try {
-      const stored = localStorage.getItem(LAST_VIEWED_VEHICLE_ID_STORAGE_KEY);
-      if (stored) {
-        setLastViewedVehicleId(stored);
-      }
+      const stored = localStorage.getItem(LAST_VIEWED_VEHICLE_ID_STORAGE_KEY)?.trim();
+      setContextVehicleId(stored || null);
     } catch {
-      // Ignore local storage read failures.
+      setContextVehicleId(null);
     }
   }, [pathVehicleId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  const resolvedVehicleId = pathVehicleId ?? lastViewedVehicleId;
-  const vehicleBaseHref = resolvedVehicleId ? `/vehicles/${encodeURIComponent(resolvedVehicleId)}` : null;
+  const vehicleBaseHref = contextVehicleId ? `/vehicles/${encodeURIComponent(contextVehicleId)}` : null;
+  const pathBaseHref = pathVehicleId ? `/vehicles/${encodeURIComponent(pathVehicleId)}` : null;
+
+  const [garageVehicles, setGarageVehicles] = useState<GarageVehicleItem[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void sidebarVehicleApi.getGarageVehicles().then((res) => {
+      if (!cancelled) {
+        setGarageVehicles(res.vehicles ?? []);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setGarageVehicles([]);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSelectVehicle = useCallback(
+    (newId: string) => {
+      if (!newId.trim() || newId === contextVehicleId) {
+        return;
+      }
+      try {
+        localStorage.setItem(LAST_VIEWED_VEHICLE_ID_STORAGE_KEY, newId);
+      } catch {
+        // Ignore local storage write failures.
+      }
+      setContextVehicleId(newId);
+      const tail = getVehicleRelativePath(pathname);
+      router.push(`/vehicles/${encodeURIComponent(newId)}${tail}`);
+    },
+    [contextVehicleId, pathname, router]
+  );
+
+  const [sidebarVehicle, setSidebarVehicle] = useState<VehicleDetail | null>(null);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- загрузка карточки ТС для плашки сайдбара */
+  useEffect(() => {
+    if (!contextVehicleId) {
+      setSidebarVehicle(null);
+      return;
+    }
+    let cancelled = false;
+    void sidebarVehicleApi.getVehicleDetail(contextVehicleId).then((data) => {
+      if (cancelled) {
+        return;
+      }
+      const raw = data.vehicle as unknown as VehicleDetailApiRecord | null;
+      setSidebarVehicle(raw ? vehicleDetailFromApiRecord(raw) : null);
+    }).catch(() => {
+      if (!cancelled) {
+        setSidebarVehicle(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [contextVehicleId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const sidebarVehicleLabel = useMemo(
+    () =>
+      sidebarVehicle
+        ? sidebarVehicle.nickname?.trim() ||
+          `${sidebarVehicle.brandName} ${sidebarVehicle.modelName}`.trim()
+        : "",
+    [sidebarVehicle]
+  );
+
+  const sidebarVehicleSubtitle = useMemo(
+    () =>
+      sidebarVehicle
+        ? `${sidebarVehicle.year} · ${formatKmRu(sidebarVehicle.odometer)} км${
+            formatRideStyleChipRu(sidebarVehicle.rideProfile)
+              ? ` · ${formatRideStyleChipRu(sidebarVehicle.rideProfile)}`
+              : ""
+          }`
+        : "",
+    [sidebarVehicle]
+  );
 
   const navItems: NavItem[] = useMemo(
     () => [
@@ -79,39 +175,31 @@ export function GarageSidebar({
         isActive: pathname === "/garage",
       },
       {
-        href: vehicleBaseHref ? `${vehicleBaseHref}/nodes` : "/vehicles",
+        href: vehicleBaseHref ? `${vehicleBaseHref}/nodes` : NAV_FALLBACK_HREF,
         label: "Узлы",
         icon: "nodes",
-        isActive: Boolean(vehicleBaseHref) && pathname.startsWith(`${vehicleBaseHref}/nodes`),
+        isActive: Boolean(pathBaseHref) && pathname.startsWith(`${pathBaseHref}/nodes`),
       },
       {
-        href: vehicleBaseHref ? `${vehicleBaseHref}/service-log` : "/service-log",
+        href: vehicleBaseHref ? `${vehicleBaseHref}/service-log` : NAV_FALLBACK_HREF,
         label: "Журнал",
         icon: "journal",
-        isActive: Boolean(vehicleBaseHref) && pathname.startsWith(`${vehicleBaseHref}/service-log`),
+        isActive: Boolean(pathBaseHref) && pathname.startsWith(`${pathBaseHref}/service-log`),
       },
       {
-        href: vehicleBaseHref ? `${vehicleBaseHref}/expenses` : "/expenses",
+        href: vehicleBaseHref ? `${vehicleBaseHref}/expenses` : NAV_FALLBACK_HREF,
         label: "Расходы",
         icon: "expenses",
-        isActive:
-          pathname === "/expenses" ||
-          (Boolean(vehicleBaseHref) && pathname.startsWith(`${vehicleBaseHref}/expenses`)),
+        isActive: Boolean(pathBaseHref) && pathname.startsWith(`${pathBaseHref}/expenses`),
       },
       {
-        href: vehicleBaseHref ? `${vehicleBaseHref}/parts` : "/details",
+        href: vehicleBaseHref ? `${vehicleBaseHref}/parts` : NAV_FALLBACK_HREF,
         label: "Подбор деталей",
         icon: "details",
-        isActive: Boolean(vehicleBaseHref) && pathname.startsWith(`${vehicleBaseHref}/parts`),
-      },
-      {
-        href: "/profile",
-        label: "Профиль",
-        icon: "profile",
-        isActive: pathname === "/profile",
+        isActive: Boolean(pathBaseHref) && pathname.startsWith(`${pathBaseHref}/parts`),
       },
     ],
-    [pathname, vehicleBaseHref]
+    [pathname, vehicleBaseHref, pathBaseHref]
   );
 
   return (
@@ -154,6 +242,20 @@ export function GarageSidebar({
             <ChevronIcon direction={collapsed ? "right" : "left"} />
           </button>
         </div>
+        {sidebarVehicle && vehicleBaseHref && contextVehicleId ? (
+          <div style={{ marginBottom: collapsed ? 10 : 14, marginTop: collapsed ? 4 : 0 }}>
+            <SidebarVehiclePlaque
+              vehicle={sidebarVehicle}
+              collapsed={collapsed}
+              title={sidebarVehicleLabel}
+              subtitle={sidebarVehicleSubtitle}
+              href={vehicleBaseHref}
+              vehicles={garageVehicles}
+              currentVehicleId={contextVehicleId}
+              onSelectVehicle={handleSelectVehicle}
+            />
+          </div>
+        ) : null}
         <nav style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {navItems.map((item) => (
             <NavLink key={item.label} item={item} collapsed={collapsed} />
@@ -199,22 +301,6 @@ export function GarageSidebar({
             </div>
           ) : null}
         </Link>
-
-        <button
-          type="button"
-          style={{
-            ...logoutLinkStyle,
-            justifyContent: collapsed ? "center" : "flex-start",
-            padding: collapsed ? "9px 0" : "10px 12px",
-          }}
-          title={collapsed ? "Выйти" : undefined}
-          aria-label={collapsed ? "Выйти" : undefined}
-        >
-          <IconBox>
-            <NavIcon kind="logout" color={productSemanticColors.textMuted} />
-          </IconBox>
-          {!collapsed ? <span>Выйти</span> : null}
-        </button>
       </div>
     </aside>
   );
@@ -340,21 +426,6 @@ function NavIcon({ kind, color }: { kind: NavIconKind; color: string }) {
           <path d="M19 12a7 7 0 0 0-.2-1.7l2-1.5-2-3.4-2.3.9a7 7 0 0 0-3-1.7L13 2h-2l-.5 2.6a7 7 0 0 0-3 1.7l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .6.1 1.2.2 1.7l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 3 1.7L11 22h2l.5-2.6a7 7 0 0 0 3-1.7l2.3.9 2-3.4-2-1.5c.1-.5.2-1.1.2-1.7z" />
         </svg>
       );
-    case "logout":
-      return (
-        <svg viewBox="0 0 24 24" {...common}>
-          <path d="M10 17l5-5-5-5" />
-          <path d="M15 12H3" />
-          <path d="M13 5h6v14h-6" />
-        </svg>
-      );
-    case "profile":
-      return (
-        <svg viewBox="0 0 24 24" {...common}>
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-        </svg>
-      );
   }
 }
 
@@ -450,20 +521,6 @@ const userCardStyle: CSSProperties = {
   backgroundColor: productSemanticColors.cardSubtle,
   border: `1px solid ${productSemanticColors.border}`,
   color: productSemanticColors.textPrimary,
-};
-
-const logoutLinkStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  width: "100%",
-  borderRadius: 12,
-  border: "none",
-  background: "transparent",
-  color: productSemanticColors.textMuted,
-  fontSize: 13,
-  fontWeight: 500,
-  cursor: "pointer",
 };
 
 const avatarStyle: CSSProperties = {

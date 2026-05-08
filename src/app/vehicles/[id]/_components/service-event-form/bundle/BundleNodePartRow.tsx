@@ -1,9 +1,7 @@
 "use client";
 
-import { productSemanticColors } from "@mototwin/design-tokens";
 import type { BundleItemFormValues } from "@mototwin/types";
-import { FIELD_BASE, FOCUS_RING, LABEL_STYLE } from "../styles";
-import { currencySuffix } from "../utils";
+import { FIELD_BASE, FOCUS_RING, LABEL_STYLE, SERVICE_EVENT_PARTS_UI } from "../styles";
 
 export type BundleNodePartRowProps = {
   row: BundleItemFormValues;
@@ -13,22 +11,24 @@ export type BundleNodePartRowProps = {
   onClear: () => void;
 };
 
-export function BundleNodePartRow({ row, currency, onPatch, onSetSkuRow, onClear }: BundleNodePartRowProps) {
-  const suffix = currencySuffix(currency);
+export function BundleNodePartRow({ row, onPatch, onSetSkuRow, onClear }: BundleNodePartRowProps) {
   return (
     <div
-      className="flex items-center gap-3 rounded-xl border px-3 py-2.5"
+      className="items-center rounded-xl border px-3 py-2.5"
       style={{
-        borderColor: productSemanticColors.border,
-        backgroundColor: productSemanticColors.cardSubtle,
+        display: "grid",
+        gridTemplateColumns: "44px minmax(0, 1fr) minmax(76px, 92px) minmax(86px, 110px) 32px",
+        gap: "0.75rem",
+        borderColor: SERVICE_EVENT_PARTS_UI.border,
+        backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
       }}
     >
       <span
-        className="inline-flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg"
         style={{
-          backgroundColor: productSemanticColors.cardMuted,
-          color: productSemanticColors.textMuted,
-          border: `1px solid ${productSemanticColors.border}`,
+          backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
+          color: SERVICE_EVENT_PARTS_UI.textSubtle,
+          border: `1px solid ${SERVICE_EVENT_PARTS_UI.border}`,
         }}
         aria-hidden
       >
@@ -69,13 +69,13 @@ export function BundleNodePartRow({ row, currency, onPatch, onSetSkuRow, onClear
             backgroundColor: "transparent",
             padding: "0",
             fontSize: "0.75rem",
-            color: productSemanticColors.textMuted,
+            color: SERVICE_EVENT_PARTS_UI.textMuted,
           }}
           className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
         />
       </div>
 
-      <label className="text-[11px] font-medium" style={{ ...LABEL_STYLE, width: "5rem" }}>
+      <label className="min-w-0 text-[11px] font-medium" style={LABEL_STYLE}>
         Количество
         <input
           value={row.quantity}
@@ -87,8 +87,8 @@ export function BundleNodePartRow({ row, currency, onPatch, onSetSkuRow, onClear
         />
       </label>
 
-      <label className="text-[11px] font-medium" style={{ ...LABEL_STYLE, width: "6.5rem" }}>
-        {`Цена, ${suffix}`}
+      <label className="min-w-0 text-[11px] font-medium" style={LABEL_STYLE}>
+        Цена
         <input
           value={row.partCost}
           onChange={(e) => onPatch({ partCost: e.target.value })}
@@ -105,9 +105,9 @@ export function BundleNodePartRow({ row, currency, onPatch, onSetSkuRow, onClear
         aria-label="Очистить деталь"
         className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition hover:opacity-90"
         style={{
-          borderColor: productSemanticColors.border,
-          color: productSemanticColors.textMuted,
-          backgroundColor: productSemanticColors.cardMuted,
+          borderColor: SERVICE_EVENT_PARTS_UI.border,
+          color: SERVICE_EVENT_PARTS_UI.textMuted,
+          backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
         }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>

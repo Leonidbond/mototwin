@@ -5,7 +5,7 @@ import { productSemanticColors } from "@mototwin/design-tokens";
 import type { BundleItemFormValues, ServiceActionType } from "@mototwin/types";
 import { useState } from "react";
 import { NodePickerModal, type SharedNodePickerOption } from "../../node-picker/NodePickerModal";
-import { FIELD_BASE, FOCUS_RING, LABEL_STYLE } from "../styles";
+import { FIELD_BASE, FOCUS_RING, LABEL_STYLE, SERVICE_EVENT_PARTS_UI } from "../styles";
 import { BundleNodePartRow } from "./BundleNodePartRow";
 
 export type BundleNodeCardExtendedProps = {
@@ -40,7 +40,6 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
     collapsed,
     currency,
     partsCostFormatted,
-    laborCostFormatted,
     availableLeafNodePickerOptions,
     onToggleCollapsed,
     onChangeNodeId,
@@ -56,19 +55,24 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
     <div
       className="rounded-2xl border"
       style={{
-        backgroundColor: productSemanticColors.cardSubtle,
-        borderColor: productSemanticColors.border,
+        backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
+        borderColor: SERVICE_EVENT_PARTS_UI.border,
       }}
     >
       <div
-        className="flex flex-wrap items-center gap-3 px-4 py-3"
-        style={collapsed ? undefined : { borderBottom: `1px solid ${productSemanticColors.border}` }}
+        className="items-end px-4 py-3"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "32px minmax(180px, 1fr) minmax(150px, 190px) auto",
+          gap: "0.75rem",
+          ...(collapsed ? {} : { borderBottom: `1px solid ${SERVICE_EVENT_PARTS_UI.border}` }),
+        }}
       >
         <span
           className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
           style={{
-            backgroundColor: productSemanticColors.cardMuted,
-            color: productSemanticColors.primaryAction,
+            backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+            color: SERVICE_EVENT_PARTS_UI.orange,
           }}
           aria-hidden
         >
@@ -78,7 +82,7 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
           {hasNode ? (
             <p
               className="truncate text-[14px] font-semibold leading-tight"
-              style={{ color: productSemanticColors.textPrimary }}
+              style={{ color: SERVICE_EVENT_PARTS_UI.text }}
             >
               {nodeTitle}
             </p>
@@ -113,14 +117,14 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
           {hasNode && crumb ? (
             <p
               className="mt-0.5 truncate text-[11px]"
-              style={{ color: productSemanticColors.textMuted }}
+              style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
             >
               {crumb}
             </p>
           ) : null}
         </div>
 
-        <label className="text-[11px] font-medium" style={LABEL_STYLE}>
+        <label className="min-w-0 text-[11px] font-medium" style={LABEL_STYLE}>
           Тип работы
           <select
             value={row.actionType}
@@ -129,7 +133,7 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
               ...FIELD_BASE,
               marginTop: 4,
               colorScheme: "dark",
-              minWidth: "8rem",
+              width: "100%",
             }}
             className={FOCUS_RING}
           >
@@ -141,7 +145,7 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
           </select>
         </label>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-end gap-1.5">
           {itemsCount > 1 ? (
             <button
               type="button"
@@ -149,9 +153,9 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
               aria-label="Удалить узел"
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border transition hover:opacity-90"
               style={{
-                borderColor: productSemanticColors.border,
+                borderColor: SERVICE_EVENT_PARTS_UI.border,
                 color: productSemanticColors.error,
-                backgroundColor: productSemanticColors.cardMuted,
+                backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -172,9 +176,9 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
             aria-expanded={!collapsed}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border transition hover:opacity-90"
             style={{
-              borderColor: productSemanticColors.border,
-              color: productSemanticColors.textMuted,
-              backgroundColor: productSemanticColors.cardMuted,
+              borderColor: SERVICE_EVENT_PARTS_UI.border,
+              color: SERVICE_EVENT_PARTS_UI.textMuted,
+              backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
             }}
           >
             <svg
@@ -202,13 +206,13 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
           <div className="flex items-center justify-between">
             <p
               className="text-xs font-semibold tracking-tight"
-              style={{ color: productSemanticColors.textPrimary }}
+              style={{ color: SERVICE_EVENT_PARTS_UI.text }}
             >
               Детали
             </p>
             <span
               className="text-[11px] font-medium"
-              style={{ color: productSemanticColors.textMuted }}
+              style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
             >
               {/* Placeholder for parity with reference; multi-part not implemented per plan §0. */}
             </span>
@@ -225,24 +229,29 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
           </div>
 
           <div
-            className="mt-3 grid grid-cols-2 gap-4 border-t pt-3"
-            style={{ borderTopColor: productSemanticColors.border }}
+            className="mt-3 border-t pt-3"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(120px, 1fr) minmax(160px, 1fr) minmax(180px, 1.35fr)",
+              gap: "0.75rem",
+              borderTopColor: SERVICE_EVENT_PARTS_UI.border,
+            }}
           >
             <div>
               <p
                 className="text-[11px] font-medium"
-                style={{ color: productSemanticColors.textMuted }}
+                style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
               >
                 Стоимость деталей
               </p>
               <p
                 className="mt-0.5 text-[15px] font-semibold tabular-nums"
-                style={{ color: productSemanticColors.textPrimary }}
+                style={{ color: SERVICE_EVENT_PARTS_UI.text }}
               >
                 {partsCostFormatted}
               </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-[11px] font-medium" style={LABEL_STYLE}>
                 Стоимость работы
                 <input
@@ -254,26 +263,18 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
                   className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
                 />
               </label>
-              {/* Read-only formatted value next to input. */}
-              <p
-                className="mt-1 text-[11px]"
-                style={{ color: productSemanticColors.textMuted }}
-              >
-                {`≈ ${laborCostFormatted}`}
-              </p>
             </div>
+            <label className="block min-w-0 text-[11px] font-medium" style={LABEL_STYLE}>
+              Комментарий к узлу
+              <input
+                value={row.comment}
+                onChange={(e) => onPatchRow({ comment: e.target.value })}
+                placeholder="Опционально"
+                style={FIELD_BASE}
+                className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
+              />
+            </label>
           </div>
-
-          <label className="mt-3 block text-[11px] font-medium" style={LABEL_STYLE}>
-            Комментарий к узлу
-            <input
-              value={row.comment}
-              onChange={(e) => onPatchRow({ comment: e.target.value })}
-              placeholder="Опционально"
-              style={FIELD_BASE}
-              className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
-            />
-          </label>
         </div>
       ) : null}
     </div>
