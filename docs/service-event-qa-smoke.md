@@ -29,3 +29,17 @@ BASE_URL=http://127.0.0.1:3000 npm run qa:service-event-full-smoke
 - Линковка выбранных расходов: **`linkInstalledExpenseItemsToServiceEvent`** — `installationStatus`, `serviceEventId`, wishlist по `shoppingListItemId` из расходов.
 
 При изменении этих путей прогоните **`qa:service-event-full-smoke`** перед релизом.
+
+## Ручной mobile parity checklist
+
+Проверяется в Expo simulator/device после изменений mobile формы:
+
+1. Preview: кнопка **«Предпросмотр»** в нижнем footer открывает read-only sheet, значения совпадают с текущей формой, закрытие по фону/кнопке работает.
+2. Дата: ввод `YYYY-M-D`, `YYYY.MM.DD` или `YYYY/MM/DD` нормализуется в `YYYY-MM-DD`; дата позже сегодня показывает ошибку рядом с полем и не даёт сохранить.
+3. Метрики: пробег/моточасы выше текущих открывают prompt обновления состояния; без подтверждения submit не проходит.
+4. Узлы: single picker и multi-add показывают фильтр **«Топ-узлы»** в одной строке с поиском; крестик удаления/очистки находится напротив выбранного узла.
+5. ADVANCED: `Готово к установке` находится в header карточки узлов и скрыто в BASIC/edit; поиск SKU появляется сразу после SKU-поля текущего узла.
+6. Currency: `RUB` по умолчанию, быстрый выбор `RUB / USD / EUR`, `Другая валюта` принимает uppercase код вроде `KZT`.
+7. Service-log return: после create/update из журнала есть `feedback`, журнал скроллит к сохранённому событию и подсвечивает его через `serviceEventId`.
+8. Wishlist flow: create из корзины возвращает в wishlist с `wishlistItemId`; установка детали и статусы проверяются серверным smoke.
+9. Edit route: mobile edit остаётся query-route `service-events/new?eventId=...`; отдельный Expo route пока не нужен.

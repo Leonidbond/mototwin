@@ -51,6 +51,7 @@ export function buildServiceEventNewFromWishlistHref(
   const q = new URLSearchParams({
     source: "wishlist",
     nodeId,
+    wishlistItemId: item.id,
     wlTitle: item.title,
     wlQty: String(item.quantity),
     wlId: item.id,

@@ -16,10 +16,12 @@ type MobileNodePickerModalProps = {
   options: MobileNodePickerOption[];
   topOptions?: MobileNodePickerOption[];
   selectedId?: string | null;
+  selectedIds?: string[];
   searchPlaceholder?: string;
   emptyLabel?: string;
   onClose: () => void;
   onSelect: (nodeId: string) => void;
+  onConfirmSelection?: (nodeIds: string[]) => void;
 };
 
 export function MobileNodePickerModal({
@@ -28,16 +30,21 @@ export function MobileNodePickerModal({
   options,
   topOptions,
   selectedId,
+  selectedIds,
   searchPlaceholder = "Поиск по названию узла",
   emptyLabel = "Узлы не найдены",
   onClose,
   onSelect,
+  onConfirmSelection,
 }: MobileNodePickerModalProps) {
   const [query, setQuery] = useState("");
   const [topOnly, setTopOnly] = useState(false);
+  const [multiSelected, setMultiSelected] = useState<Set<string>>(() => new Set(selectedIds ?? []));
 
   const showTopToggle = Boolean(topOptions && topOptions.length > 0);
+  const multi = Boolean(onConfirmSelection);
   const baseOptions = topOnly && topOptions?.length ? topOptions : options;
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return baseOptions;
@@ -51,6 +58,7 @@ export function MobileNodePickerModal({
   const resetAndClose = () => {
     setQuery("");
     setTopOnly(false);
+    setMultiSelected(new Set(selectedIds ?? []));
     onClose();
   };
 
@@ -60,25 +68,27 @@ export function MobileNodePickerModal({
         <Pressable style={StyleSheet.absoluteFill} onPress={resetAndClose} />
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={searchPlaceholder}
-            placeholderTextColor={c.textMuted}
-            style={styles.search}
-          />
-          {showTopToggle ? (
-            <Pressable
-              onPress={() => setTopOnly((value) => !value)}
-              style={[styles.topToggle, topOnly && styles.topToggleOn]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: topOnly }}
-            >
-              <Text style={[styles.topToggleText, topOnly && styles.topToggleTextOn]}>
-                Топ-узлы
-              </Text>
-            </Pressable>
-          ) : null}
+          <View style={styles.searchRow}>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={searchPlaceholder}
+              placeholderTextColor={c.textMuted}
+              style={styles.search}
+            />
+            {showTopToggle ? (
+              <Pressable
+                onPress={() => setTopOnly((value) => !value)}
+                style={[styles.topToggle, topOnly && styles.topToggleOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: topOnly }}
+              >
+                <Text style={[styles.topToggleText, topOnly && styles.topToggleTextOn]}>
+                  Топ-узлы
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
           <ScrollView style={styles.list}>
             {filtered.length === 0 ? (
               <Text style={styles.empty}>{emptyLabel}</Text>
@@ -88,22 +98,36 @@ export function MobileNodePickerModal({
                   {groupIndex > 0 ? <View style={styles.groupSpacer} /> : null}
                   <Text style={styles.groupHeading}>{nodePickerGroupHeadingRu(groupKey)}</Text>
                   {items.map((option) => {
-                    const active = selectedId === option.id;
+                    const active = multi ? multiSelected.has(option.id) : selectedId === option.id;
                     return (
                       <Pressable
                         key={option.id}
                         style={[styles.row, active && styles.rowActive]}
                         onPress={() => {
+                          if (multi) {
+                            setMultiSelected((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(option.id)) next.delete(option.id);
+                              else next.add(option.id);
+                              return next;
+                            });
+                            return;
+                          }
                           onSelect(option.id);
                           resetAndClose();
                         }}
                       >
-                        <Text style={[styles.rowTitle, active && styles.rowTitleActive]}>
-                          {option.name}
-                        </Text>
-                        {option.pathLabel ? (
-                          <Text style={styles.path}>{option.pathLabel}</Text>
-                        ) : null}
+                        <View style={styles.rowHeader}>
+                          <Text style={[styles.rowTitle, active && styles.rowTitleActive]}>
+                            {option.name}
+                          </Text>
+                          {multi ? (
+                            <Text style={[styles.check, active && styles.checkActive]}>
+                              {active ? "✓" : ""}
+                            </Text>
+                          ) : null}
+                        </View>
+                        {option.pathLabel ? <Text style={styles.path}>{option.pathLabel}</Text> : null}
                       </Pressable>
                     );
                   })}
@@ -111,9 +135,26 @@ export function MobileNodePickerModal({
               ))
             )}
           </ScrollView>
-          <Pressable style={styles.close} onPress={resetAndClose}>
-            <Text style={styles.closeText}>Закрыть</Text>
-          </Pressable>
+          {multi ? (
+            <View style={styles.footerRow}>
+              <Pressable style={styles.close} onPress={resetAndClose}>
+                <Text style={styles.closeText}>Закрыть</Text>
+              </Pressable>
+              <Pressable
+                style={styles.confirm}
+                onPress={() => {
+                  onConfirmSelection?.(Array.from(multiSelected));
+                  resetAndClose();
+                }}
+              >
+                <Text style={styles.confirmText}>Добавить выбранные</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.close} onPress={resetAndClose}>
+              <Text style={styles.closeText}>Закрыть</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </Modal>
@@ -140,7 +181,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
   },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 8,
+  },
   search: {
+    flex: 1,
     borderWidth: 1,
     borderColor: c.border,
     borderRadius: 12,
@@ -150,11 +197,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   topToggle: {
-    alignSelf: "flex-start",
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: c.border,
     borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
   },
   topToggleOn: {
@@ -192,6 +240,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     backgroundColor: c.cardSubtle,
   },
+  rowHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   rowActive: {
     borderColor: c.primaryAction,
     backgroundColor: "rgba(249, 115, 22, 0.10)",
@@ -209,6 +262,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 3,
   },
+  check: {
+    minWidth: 20,
+    textAlign: "right",
+    color: c.textMuted,
+    fontWeight: "900",
+  },
+  checkActive: {
+    color: c.primaryAction,
+  },
   empty: {
     color: c.textMuted,
     textAlign: "center",
@@ -220,6 +282,24 @@ const styles = StyleSheet.create({
   },
   closeText: {
     color: c.primaryAction,
+    fontWeight: "800",
+  },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  confirm: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: c.primaryAction,
+  },
+  confirmText: {
+    color: c.onPrimaryAction,
     fontWeight: "800",
   },
 });

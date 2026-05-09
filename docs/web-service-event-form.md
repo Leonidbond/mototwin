@@ -185,6 +185,20 @@
 - Нет выбора шаблона; нет кнопки installable в шапке.
 - Lock вложений в **Extended** при уже выставленных флагах в записи; в **Fast** — disabled у соответствующих кнопок.
 
+### Mobile route strategy
+
+Expo/mobile намеренно оставляет один экран **`apps/app/app/vehicles/[id]/service-events/new.tsx`** для create / edit / repeat. Редактирование включается query-параметром **`eventId`** (`service-events/new?eventId=...`), а не отдельным route shape как на web. Это platform-specific решение: экран переиспользует один loader/form, не ломает существующие deep links и сохраняет общий form contract. Отдельный Expo route `service-events/[eventId]/edit.tsx` стоит добавлять только если появятся внешние deep links или требования к chrome URL.
+
+## 13.1. Mobile parity notes
+
+- Mobile использует тот же `AddServiceEventFormValues`, domain validation/normalization и backend side effects, что web.
+- Mobile теперь имеет read-only preview sheet из нижнего футера: название, режим, дата, пробег/моточасы, исполнитель, сервис, флаги вложений, число узлов, итог, напоминание и комментарий.
+- Date/metric UX на mobile: дата нормализуется к `YYYY-MM-DD` на blur и блокируется, если позже сегодняшней; пробег/моточасы выше текущих вызывают prompt обновления состояния до submit.
+- После create/update из service-log mobile возвращает `serviceEventId` вместе с `feedback`, поэтому журнал скроллит и подсвечивает сохранённое событие.
+- Шаблоны остаются в блоке «Основная информация», а `Готово к установке` находится в header карточки узлов только в ADVANCED/create, как на web. Крестик удаления/очистки узла расположен в той же строке, что и выбранный узел.
+- Mobile node picker держит `Топ-узлы` в одной строке с поиском; в ADVANCED поиск SKU показывается сразу после SKU текущей строки узла.
+- Mobile currency UX: `RUB` по умолчанию, быстрый список `RUB / USD / EUR` и пункт «Другая валюта» с uppercase ISO-like code.
+
 ---
 
 ## 14. Каталог `service-event-form/`

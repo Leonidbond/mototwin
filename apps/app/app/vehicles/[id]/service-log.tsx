@@ -552,8 +552,19 @@ export default function ServiceLogScreen() {
         details: "Статусы и расходы обновлены",
       });
     }
-    router.replace(buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, paidOnlyActive));
-  }, [params.feedback, paidOnlyActive, nodeSubtreeFilter, router, vehicleId]);
+    router.replace(
+      buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, paidOnlyActive, {
+        serviceEventId: highlightedServiceEventId || undefined,
+      })
+    );
+  }, [
+    params.feedback,
+    paidOnlyActive,
+    nodeSubtreeFilter,
+    router,
+    vehicleId,
+    highlightedServiceEventId,
+  ]);
 
   useEffect(() => {
     if (!actionMessage) {

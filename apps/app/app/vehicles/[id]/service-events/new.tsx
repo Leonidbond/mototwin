@@ -9,7 +9,7 @@ import {
   createInitialAddServiceEventFromWishlistItem,
   createInitialEditServiceEventValues,
   createInitialRepeatServiceEventValues,
-  getDefaultCurrencyFromSettings,
+  DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
   getNodePathById,
   getSelectedNodeFromPath,
   getTodayDateYmdLocal,
@@ -22,7 +22,6 @@ import type { AddServiceEventFormValues, NodeTreeItem, PartWishlistItem } from "
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../../components/keyboard-aware-scroll-screen";
 import { ScreenHeader } from "../../../components/screen-header";
-import { readUserLocalSettings } from "../../../../src/ui-user-local-settings";
 import { BasicServiceEventBundleForm } from "../_components/basic-service-event-bundle-form";
 
 export default function NewServiceEventScreen() {
@@ -33,6 +32,7 @@ export default function NewServiceEventScreen() {
     eventId?: string;
     repeatFrom?: string;
     source?: string;
+    wishlistItemId?: string;
     wlTitle?: string;
     wlQty?: string;
     wlId?: string;
@@ -47,7 +47,10 @@ export default function NewServiceEventScreen() {
   const source = typeof params.source === "string" ? params.source : "service-log";
   const wlTitle = typeof params.wlTitle === "string" ? params.wlTitle.trim() : "";
   const wlQty = typeof params.wlQty === "string" ? params.wlQty : "";
-  const wlId = typeof params.wlId === "string" ? params.wlId : "";
+  const wlIdFromQuery = typeof params.wlId === "string" ? params.wlId : "";
+  const wishlistItemIdParam =
+    typeof params.wishlistItemId === "string" ? params.wishlistItemId : "";
+  const wlId = wishlistItemIdParam || wlIdFromQuery;
   const wlComment =
     typeof params.wlComment === "string" && params.wlComment.trim()
       ? params.wlComment.trim()
@@ -86,8 +89,7 @@ export default function NewServiceEventScreen() {
       try {
         setIsLoading(true);
         setError("");
-        const localSettings = await readUserLocalSettings();
-        const defaultCurrency = getDefaultCurrencyFromSettings(localSettings);
+        const defaultCurrency = DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
         const needsServiceEventsForForm = isEditMode || isRepeatMode;
@@ -134,6 +136,19 @@ export default function NewServiceEventScreen() {
           }
           nextForm = createInitialRepeatServiceEventValues(
             sourceEvent,
+            { odometer: v.odometer, engineHours: v.engineHours ?? null },
+            { todayDateYmd: getTodayDateYmdLocal() }
+          );
+        } else if (!isEditMode && !isRepeatMode && source === "wishlist" && wlId.trim() && v) {
+          const wish = await endpoints.getVehicleWishlist(vehicleId);
+          const item = (wish.items ?? []).find((w) => w.id === wlId.trim());
+          if (!item?.nodeId) {
+            setError("Позиция корзины не найдена или без узла.");
+            setIsLoading(false);
+            return;
+          }
+          nextForm = createInitialAddServiceEventFromWishlistItem(
+            item,
             { odometer: v.odometer, engineHours: v.engineHours ?? null },
             { todayDateYmd: getTodayDateYmdLocal() }
           );
@@ -228,6 +243,7 @@ export default function NewServiceEventScreen() {
     wlTitle,
     wlQty,
     wlId,
+    wishlistItemIdParam,
     wlComment,
     wlCostStr,
     wlCurrency,
@@ -244,18 +260,21 @@ export default function NewServiceEventScreen() {
     const client = createApiClient({ baseUrl: apiBaseUrl });
     const endpoints = createMotoTwinEndpoints(client);
     const input = normalizeAddServiceEventPayload(form);
+    let savedServiceEventId = editingEventId;
 
     try {
       setIsSaving(true);
       setError("");
       if (isEditMode) {
-        await endpoints.updateServiceEvent(
+        const response = await endpoints.updateServiceEvent(
           vehicleId,
           editingEventId,
           normalizeEditServiceEventPayload(form)
         );
+        savedServiceEventId = response.serviceEvent.id;
       } else {
-        await endpoints.createServiceEvent(vehicleId, input);
+        const response = await endpoints.createServiceEvent(vehicleId, input);
+        savedServiceEventId = response.serviceEvent.id;
         if (source === "wishlist" && wlId.trim()) {
           await endpoints.updateWishlistItem(vehicleId, wlId.trim(), {
             status: "INSTALLED",
@@ -277,11 +296,19 @@ export default function NewServiceEventScreen() {
             : `/vehicles/${vehicleId}/wishlist`
         );
       } else {
-        router.replace(`/vehicles/${vehicleId}/service-log?feedback=${feedback}&refreshed=1`);
+        const q = new URLSearchParams({ feedback, refreshed: "1" });
+        if (savedServiceEventId) {
+          q.set("serviceEventId", savedServiceEventId);
+        }
+        router.replace(`/vehicles/${vehicleId}/service-log?${q.toString()}`);
       }
     } catch (requestError) {
       console.error(requestError);
-      setError("Не удалось сохранить сервисное событие.");
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Не удалось сохранить сервисное событие."
+      );
     } finally {
       setIsSaving(false);
     }
@@ -300,7 +327,7 @@ export default function NewServiceEventScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScreenHeader title={isEditMode ? "Редактировать обслуживание" : "Новое обслуживание"} />
+      <ScreenHeader title={isEditMode ? "Редактировать обслуживание" : "Новое сервисное событие"} />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <BasicServiceEventBundleForm
           key={bundleSessionKey}
