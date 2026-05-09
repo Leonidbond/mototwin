@@ -25,6 +25,20 @@ type RouteContext = {
 
 const ACTION_TYPE_VALUES = ["REPLACE", "SERVICE", "INSPECT", "CLEAN", "ADJUST"] as const;
 
+/** Matches client payload: `null` when reminder is off or only odo/hours are set. */
+const nextReminderDateInputSchema = z
+  .union([
+    z.null(),
+    z
+      .string()
+      .trim()
+      .min(1)
+      .refine((value) => !Number.isNaN(Date.parse(value)), {
+        message: "nextReminderDate must be a valid date string",
+      }),
+  ])
+  .optional();
+
 const updateServiceBundleItemSchema = z.object({
   nodeId: z.string().trim().min(1),
   actionType: z.enum(ACTION_TYPE_VALUES),
@@ -46,7 +60,7 @@ const updateServiceEventSchema = z
     attachReceiptRequested: z.boolean().optional(),
     attachFileRequested: z.boolean().optional(),
     nextReminderEnabled: z.boolean().optional(),
-    nextReminderDate: z.string().trim().optional(),
+    nextReminderDate: nextReminderDateInputSchema,
     nextReminderOdometer: z.number().int().min(0).nullable().optional(),
     nextReminderEngineHours: z.number().int().min(0).nullable().optional(),
     eventDate: z

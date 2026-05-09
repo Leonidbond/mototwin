@@ -5,6 +5,7 @@ import { z } from "zod";
 import { buildWishlistItemSkuInfo, normalizePartWishlistCostMutationArgs } from "@mototwin/domain";
 import { syncExpenseItemForWishlistItem } from "@/lib/expense-items";
 import { prisma } from "@/lib/prisma";
+import { appendPartsCartRemovalNoteForWishlistItem } from "@/lib/wishlist-delete-service-log-note";
 import type { PartWishlistItem } from "@mototwin/types";
 import { isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
@@ -306,7 +307,7 @@ export async function DELETE(_: NextRequest, context: RouteContext) {
 
     const existing = await prisma.partWishlistItem.findFirst({
       where: { id: itemId, vehicleId },
-      select: { id: true },
+      select: { id: true, title: true, status: true },
     });
 
     if (!existing) {
@@ -314,6 +315,13 @@ export async function DELETE(_: NextRequest, context: RouteContext) {
     }
 
     await prisma.$transaction(async (tx) => {
+      if (existing.status === PartWishlistItemStatus.INSTALLED) {
+        await appendPartsCartRemovalNoteForWishlistItem(tx, {
+          vehicleId,
+          itemId,
+          title: existing.title,
+        });
+      }
       const expenseDb = tx as unknown as {
         expenseItem: { deleteMany(args: unknown): Promise<unknown> };
       };

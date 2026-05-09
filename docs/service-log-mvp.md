@@ -139,6 +139,10 @@ Web and Expo behavior:
 - the parts/wishlist screen expands/filters to the matching status group, highlights that part card, and scrolls it into view
 - the reverse link exists on installed part cards: **«В журнал»** opens the service log with `serviceEventId=...`, and the journal scrolls/highlights the corresponding event
 
+### Удаление установленной позиции из корзины
+
+Если пользователь удаляет из **«Корзины замен и расходников»** строку со статусом **«Установлено»**, UI предупреждает, что запись журнала не удаляется. Сервер при **`DELETE .../wishlist/[itemId]`** дополнительно **дописывает в `comment`** соответствующих **`SERVICE`** событий** текст о том, что позиция снята с корзины (см. `docs/api-backend.md`, `src/lib/wishlist-delete-service-log-note.ts`).
+
 ## STATE_UPDATE in this flow
 
 `STATE_UPDATE` stays read-only in Service Log lifecycle flows:

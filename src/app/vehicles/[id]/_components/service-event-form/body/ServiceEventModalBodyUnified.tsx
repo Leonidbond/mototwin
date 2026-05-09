@@ -9,8 +9,8 @@ export type ServiceEventModalBodyUnifiedProps = {
   isBasic: boolean;
   basicInfoCard: ReactNode;
   costCard: ReactNode;
-  additionalCardFast: ReactNode;
-  additionalCardExtended: ReactNode;
+  /** «Дополнительно» — один блок для BASIC и ADVANCED (`AdditionalCardFast`). */
+  additionalCard: ReactNode;
   preliminarySummary: ReactNode;
   bundleHeader: ReactNode;
   bundleBanner: ReactNode;
@@ -31,8 +31,7 @@ export function ServiceEventModalBodyUnified({
   isBasic,
   basicInfoCard,
   costCard,
-  additionalCardFast,
-  additionalCardExtended,
+  additionalCard,
   bundleHeader,
   bundleBanner,
   actionTypeSelect,
@@ -79,11 +78,6 @@ export function ServiceEventModalBodyUnified({
       >
         {basicInfoCard}
         {costCard}
-        {!isBasic ? (
-          <>
-            {additionalCardExtended}
-          </>
-        ) : null}
       </aside>
 
       <section
@@ -106,13 +100,13 @@ export function ServiceEventModalBodyUnified({
             </>
           ) : (
             <>
-              <div className="space-y-2.5">{bundleNodeCards}</div>
+              <div className="flex min-h-0 flex-col">{bundleNodeCards}</div>
               {bundleSkuPanel}
               {bundleTotalsExtended}
             </>
           )}
         </div>
-        {isBasic ? additionalCardFast : null}
+        {additionalCard}
       </section>
     </div>
   );

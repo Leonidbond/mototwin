@@ -57,7 +57,7 @@ export function BundleNodeRowFast({
         }}
         aria-hidden
       >
-        <BundleIconForIndex index={index} />
+        <BundleNodeIndexIcon index={index} />
       </span>
       <div className="min-w-0 flex-1">
         <p
@@ -131,7 +131,8 @@ export function BundleNodeRowFast({
   );
 }
 
-function BundleIconForIndex({ index }: { index: number }) {
+/** Общая иконка индекса строки узла (BASIC / ADVANCED). */
+export function BundleNodeIndexIcon({ index }: { index: number }) {
   const icons = [
     <svg key="0" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M12 2C8 2 5 5 5 9c0 3.5 3 5 3 9h8c0-4 3-5.5 3-9 0-4-3-7-7-7z" />

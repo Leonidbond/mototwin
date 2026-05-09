@@ -261,7 +261,6 @@ export function ServiceEventCreateClient() {
               odometerInputMax={vehicleOdometer}
               contextHint={contextHint}
               pageChrome="partsCart"
-              pageSubtitle="Заполните дату, стоимость и узлы, затем сохраните запись в журнале обслуживания."
             />
           </div>
         ) : null}

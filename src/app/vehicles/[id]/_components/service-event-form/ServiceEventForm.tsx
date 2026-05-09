@@ -106,6 +106,14 @@ function removeItemAt(form: AddServiceEventFormValues, index: number): AddServic
   return { ...form, items: form.items.filter((_, i) => i !== index) };
 }
 
+/** Очистка узла: при нескольких строках убираем слот целиком, при одной — только `nodeId`. */
+function clearNodeOrRemoveRowAt(form: AddServiceEventFormValues, index: number): AddServiceEventFormValues {
+  if (form.items.length > 1) {
+    return removeItemAt(form, index);
+  }
+  return patchItemAt(form, index, { nodeId: "" });
+}
+
 function appendEmptyItem(form: AddServiceEventFormValues): AddServiceEventFormValues {
   const next = createEmptyBundleItemFormValues({
     actionType: form.mode === "BASIC" ? form.commonActionType : "REPLACE",
@@ -225,7 +233,7 @@ export type ServiceEventFormProps = {
   odometerInputMax?: number | null;
   /** Reuse the visual shell of «Корзина замен и расходников» without touching that page. */
   pageChrome?: "default" | "partsCart";
-  /** Optional subtitle under the page title in `partsCart` chrome. */
+  /** Подзаголовок под заголовком в chrome `partsCart`. Для создания по умолчанию пусто. */
   pageSubtitle?: string;
 };
 
@@ -800,9 +808,30 @@ function ServiceEventFormInner({
   const confirmAddNodesFromSheet = useCallback(
     (nodeIds: string[]) => {
       if (nodeIds.length === 0) return;
+      const anchoredRow = editingUnitRowIndex;
       updateForm((prev) => {
         let next = prev;
+        let anchorUsed = false;
+
         for (const id of nodeIds) {
+          if (
+            !anchorUsed &&
+            anchoredRow != null &&
+            anchoredRow >= 0 &&
+            anchoredRow < next.items.length &&
+            !next.items[anchoredRow]?.nodeId.trim()
+          ) {
+            next = patchItemAt(next, anchoredRow, {
+              nodeId: id,
+              actionType:
+                next.mode === "BASIC"
+                  ? next.commonActionType
+                  : next.items[anchoredRow]?.actionType ?? "SERVICE",
+            });
+            anchorUsed = true;
+            continue;
+          }
+
           const emptyIdx = next.items.findIndex((it) => !it.nodeId.trim());
           if (emptyIdx >= 0) {
             next = patchItemAt(next, emptyIdx, {
@@ -829,7 +858,7 @@ function ServiceEventFormInner({
       });
       setEditingUnitRowIndex(null);
     },
-    [updateForm]
+    [editingUnitRowIndex, updateForm]
   );
 
   const onApplyTemplate = useCallback(
@@ -922,14 +951,13 @@ function ServiceEventFormInner({
     />
   );
 
-  const additionalCardFast = (
+  const additionalCard = (
     <AdditionalCardFast
       form={form}
       editingServiceEventId={editingServiceEventId}
       onPatch={onPatch}
     />
   );
-  const additionalCardExtended = additionalCardFast;
 
   const preliminarySummary = (
     <PreliminarySummaryCard
@@ -948,7 +976,10 @@ function ServiceEventFormInner({
       hasFreeNodes={hasFreeNodes}
       showInstallableButton={!isBasic && installableButtonVisible}
       installableCount={installableEntries.length}
-      onAddNode={() => setAddNodeSheetOpen(true)}
+      onAddNode={() => {
+        setEditingUnitRowIndex(null);
+        setAddNodeSheetOpen(true);
+      }}
       onOpenInstallable={() => setInstallablePickerOpen(true)}
     />
   );
@@ -1047,7 +1078,10 @@ function ServiceEventFormInner({
               setEditingUnitRowIndex(rowIndex);
               setAddNodeSheetOpen(true);
             }}
-            onClearNode={() => updateForm((prev) => patchItemAt(prev, rowIndex, { nodeId: "" }))}
+            onClearNode={() => {
+              setEditingUnitRowIndex(null);
+              updateForm((prev) => clearNodeOrRemoveRowAt(prev, rowIndex));
+            }}
             onRemove={() => {
               setEditingUnitRowIndex(null);
               updateForm((prev) => removeItemAt(prev, rowIndex));
@@ -1064,20 +1098,11 @@ function ServiceEventFormInner({
     const nodeOpt = leafNodeOptions.find((o) => o.id === nodeIdTrim);
     const nodeTitle = nodeOpt?.name ?? `Узел ${rowIndex + 1}`;
     const crumb = nodeIdTrim ? nodeBreadcrumbRu(nodeTree, row.nodeId) : "";
-    const availableLeafNodePickerOptions = leafNodePickerOptions.filter(
-      (option) =>
-        option.id === row.nodeId.trim() ||
-        !form.items.some((it, i) => i !== rowIndex && it.nodeId.trim() === option.id)
-    );
-
     const partsParsed = parseExpenseAmountInputToNumberOrNull(row.partCost.trim());
-    const laborParsed = parseExpenseAmountInputToNumberOrNull(row.laborCost.trim());
     const partsCostFormatted =
       partsParsed != null
         ? `${formatExpenseAmountRu(partsParsed * bundleItemQuantityMultiplier(row))} ${currencySuffix(form.currency)}`
         : "—";
-    const laborCostFormatted =
-      laborParsed != null ? `${formatExpenseAmountRu(laborParsed)} ${currencySuffix(form.currency)}` : "—";
 
     return (
       <BundleNodeCardExtended
@@ -1091,10 +1116,19 @@ function ServiceEventFormInner({
         collapsed={collapsedBundleKeys.has(row.key)}
         currency={form.currency}
         partsCostFormatted={partsCostFormatted}
-        laborCostFormatted={laborCostFormatted}
-        availableLeafNodePickerOptions={availableLeafNodePickerOptions}
+        onPickNode={() => {
+          setEditingUnitRowIndex(rowIndex);
+          setAddNodeSheetOpen(true);
+        }}
         onToggleCollapsed={() => toggleCollapsedBundleRow(row.key)}
-        onChangeNodeId={(nodeId) => updateForm((prev) => patchItemAt(prev, rowIndex, { nodeId }))}
+        onChangeNodeId={(nodeId) => {
+          updateForm((prev) =>
+            !nodeId.trim() ? clearNodeOrRemoveRowAt(prev, rowIndex) : patchItemAt(prev, rowIndex, { nodeId })
+          );
+          if (!nodeId.trim()) {
+            setEditingUnitRowIndex(null);
+          }
+        }}
         onChangeActionType={(actionType) =>
           updateForm((prev) => patchItemAt(prev, rowIndex, { actionType }))
         }
@@ -1116,7 +1150,10 @@ function ServiceEventFormInner({
   const bundleAddNodeFooter = hasFreeNodes ? (
     <button
       type="button"
-      onClick={() => setAddNodeSheetOpen(true)}
+      onClick={() => {
+        setEditingUnitRowIndex(null);
+        setAddNodeSheetOpen(true);
+      }}
       className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-3 text-sm font-semibold transition hover:opacity-95"
       style={{
         borderColor: productSemanticColors.border,
@@ -1195,17 +1232,12 @@ function ServiceEventFormInner({
     />
   );
 
-  // `editingUnitRowIndex` is reserved for future basic-mode inline node editing UX; reset on add/remove.
-  void editingUnitRowIndex;
-
   const resolvedTitle =
     title ??
     (editingServiceEventId ? "Редактировать сервисное событие" : "Добавить сервисное событие");
   const resolvedSubtitle =
     pageSubtitle ??
-    (editingServiceEventId
-      ? "Измените данные события и сохраните обновлённую запись в журнале."
-      : "Заполните дату, стоимость и узлы, затем сохраните запись в журнале обслуживания.");
+    (editingServiceEventId ? "Измените данные события и сохраните обновлённую запись в журнале." : "");
   const saveButtonLabel = isSubmitting
     ? "Сохранение…"
     : editingServiceEventId
@@ -1396,7 +1428,9 @@ function ServiceEventFormInner({
                 <div className="min-w-[220px] flex-1">{serviceEventModeControl}</div>
                 <div className="shrink-0">{serviceEventActions}</div>
               </div>
-              <p className={partsCartPageStyles.subtitle}>{resolvedSubtitle}</p>
+              {resolvedSubtitle.trim() ? (
+                <p className={partsCartPageStyles.subtitle}>{resolvedSubtitle}</p>
+              ) : null}
             </div>
           </header>
 
@@ -1426,8 +1460,7 @@ function ServiceEventFormInner({
                 isBasic={isBasic}
                 basicInfoCard={basicInfoCard}
                 costCard={costCard}
-                additionalCardFast={additionalCardFast}
-                additionalCardExtended={additionalCardExtended}
+                additionalCard={additionalCard}
                 preliminarySummary={preliminarySummary}
                 bundleHeader={bundleHeader}
                 bundleBanner={bundleBanner}
@@ -1446,17 +1479,15 @@ function ServiceEventFormInner({
               ) : null}
             </div>
 
-            {!isBasic ? (
-              <div
-                className="shrink-0 border-t px-4 py-2.5 sm:px-5 sm:py-3"
-                style={{
-                  borderTopColor: SERVICE_EVENT_PARTS_UI.border,
-                  backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
-                }}
-              >
-                <PostSaveExplainer />
-              </div>
-            ) : null}
+            <div
+              className="mt-4 shrink-0 border-t px-4 py-2.5 sm:mt-5 sm:px-5 sm:py-3"
+              style={{
+                borderTopColor: SERVICE_EVENT_PARTS_UI.border,
+                backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
+              }}
+            >
+              <PostSaveExplainer />
+            </div>
           </section>
 
           <TemplateContentsOverlay
@@ -1552,8 +1583,7 @@ function ServiceEventFormInner({
           isBasic={isBasic}
           basicInfoCard={basicInfoCard}
           costCard={costCard}
-          additionalCardFast={additionalCardFast}
-          additionalCardExtended={additionalCardExtended}
+          additionalCard={additionalCard}
           preliminarySummary={preliminarySummary}
           bundleHeader={bundleHeader}
           bundleBanner={bundleBanner}
@@ -1572,18 +1602,16 @@ function ServiceEventFormInner({
         ) : null}
       </div>
 
-      {/* Post-save explainer (Extended only, per references) */}
-      {!isBasic ? (
-        <div
-          className="shrink-0 border-t px-5 py-2.5 sm:px-6 sm:py-3"
-          style={{
-            borderTopColor: productSemanticColors.border,
-            backgroundColor: productSemanticColors.cardSubtle,
-          }}
-        >
-          <PostSaveExplainer />
-        </div>
-      ) : null}
+      {/* Post-save explainer — BASIC и ADVANCED */}
+      <div
+        className="mt-4 shrink-0 border-t px-5 py-2.5 sm:mt-5 sm:px-6 sm:py-3"
+        style={{
+          borderTopColor: productSemanticColors.border,
+          backgroundColor: productSemanticColors.cardSubtle,
+        }}
+      >
+        <PostSaveExplainer />
+      </div>
       {/* Overlays */}
       <TemplateContentsOverlay
         open={templateContentsOpen}

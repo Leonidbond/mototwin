@@ -196,7 +196,10 @@ export async function syncExpenseItemForServiceEvent(
     event.mode === "ADVANCED" && advLineItems.length > 0 && wishlistIdsForEvent.length === 0;
 
   if (!doAdvancedPerItem && !hasPositiveAmount(totalCost, event.currency)) {
-    return;
+    /** Установка из «Готово к установке»: суммы нулевые, но в JSON есть wishlist — всё равно линкуем / INSTALLED. */
+    if (wishlistIdsForEvent.length === 0) {
+      return;
+    }
   }
 
   const title = readEventTitleOrFallback(event);

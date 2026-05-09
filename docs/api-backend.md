@@ -87,18 +87,26 @@
 - Response `500`: fetch failure
 
 ### `POST /api/vehicles/[id]/service-events`
-- Creates a service event for selected node
+- Creates a **bundle** service event (`ServiceEvent` + `ServiceEventItem[]`); anchor node = `nodeId` in body or first `items[].nodeId`
 - Validation/business rules:
-  - node must exist
-  - node must be leaf (no children)
+  - nodes must exist
+  - each bundle `items[].nodeId` must be a leaf (no children)
   - event date cannot be in future
   - event odometer cannot exceed current vehicle odometer
   - top node state must exist for vehicle (compatibility requirement)
-- Side effects after create:
-  - `NodeState.upsert(..., status = RECENTLY_REPLACED)` for leaf node
-  - `TopNodeState.update(..., status = RECENTLY_REPLACED)` for top-level node
+- Request notes:
+  - **`nextReminderDate`**: допускается **`null`** при выключенном напоминании или при включённом напоминании без даты (только пробег/моточасы); см. Zod-схему в `service-events/route.ts`
+- Side effects after create (транзакция):
+  - `NodeState` для **каждого** узла из `items` и anchor (`RECENTLY_REPLACED`, `lastServiceEventId`)
+  - пересчёт **`TopNodeState`** по мотоциклу
+  - **`syncExpenseItemForServiceEvent`** — синтез/обновление **`ExpenseItem`** по сумме события и по **`installedPartsJson`** (wishlist id из JSON обрабатываются **даже при нулевых/пустых** верхних суммах частей/работы — сценарий «Готово к установке»)
+  - **`linkInstalledExpenseItemsToServiceEvent`** — привязка выбранных **`installedExpenseItemIds`**, перевод связанных wishlist-строк в **`INSTALLED`** там, где у расхода задан `shoppingListItemId`
 - Response `201`: `{ serviceEvent }`
 - Response `400` / `404` / `500` depending on failure class
+
+### `DELETE /api/vehicles/[id]/wishlist/[itemId]`
+- Удаляет позицию корзины замен и связанные **`ExpenseItem`** с тем же `shoppingListItemId`
+- Если удаляемая позиция в статусе **`INSTALLED`**, в **комментарий** всех связанных **`SERVICE`** событий (по расходам с `serviceEventId` и по **`installedPartsJson`**, где встречается этот `wishlistItemId`) дописывается строка вида: позиция удалена из корзины замен и расходников (см. `src/lib/wishlist-delete-service-log-note.ts`, лимит длины как у формы события)
 
 ## 3.5 Node status routes
 

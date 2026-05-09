@@ -13,6 +13,49 @@ function responseBodyLooksLikeHtml(body: string): boolean {
   return head.startsWith("<!doctype") || head.startsWith("<html");
 }
 
+type ZodIssueLike = { path?: unknown; message?: unknown };
+
+function formatZodIssuePath(path: unknown): string {
+  if (!Array.isArray(path) || path.length === 0) {
+    return "";
+  }
+  let out = "";
+  for (const segment of path) {
+    if (typeof segment === "number") {
+      out += `[${segment}]`;
+    } else {
+      const s = String(segment);
+      out += out === "" ? s : `.${s}`;
+    }
+  }
+  return out;
+}
+
+function formatValidationIssuesAppendix(issues: unknown, maxIssues: number): string {
+  if (!Array.isArray(issues) || issues.length === 0) {
+    return "";
+  }
+  const lines: string[] = [];
+  const slice = issues.slice(0, maxIssues);
+  for (const raw of slice) {
+    if (!raw || typeof raw !== "object") {
+      continue;
+    }
+    const issue = raw as ZodIssueLike;
+    const path = formatZodIssuePath(issue.path);
+    const message = typeof issue.message === "string" ? issue.message.trim() : "";
+    if (!message) {
+      continue;
+    }
+    lines.push(path ? `${path}: ${message}` : message);
+  }
+  if (lines.length === 0) {
+    return "";
+  }
+  const more = issues.length > maxIssues ? `\n…ещё ${issues.length - maxIssues}` : "";
+  return `\n${lines.join("\n")}${more}`;
+}
+
 /**
  * Best-effort message from a non-OK response: prefers `{ error: string }`, else short plain text.
  * HTML bodies (Next error pages, proxies) are not surfaced verbatim to the UI.
@@ -41,6 +84,7 @@ export async function readHttpErrorMessage(response: Response): Promise<string> 
       error?: unknown;
       hint?: unknown;
       devMessage?: unknown;
+      issues?: unknown;
     };
     if (
       parsed &&
@@ -53,7 +97,11 @@ export async function readHttpErrorMessage(response: Response): Promise<string> 
         typeof parsed.devMessage === "string" && parsed.devMessage.length > 0
           ? `\n(${parsed.devMessage})`
           : "";
-      return `${parsed.error}${hint}${dev}`;
+      const issuesAppendix =
+        parsed.error === "Validation failed"
+          ? formatValidationIssuesAppendix(parsed.issues, 12)
+          : "";
+      return `${parsed.error}${issuesAppendix}${hint}${dev}`;
     }
   } catch {
     // Body is not JSON.

@@ -1,12 +1,19 @@
 "use client";
 
 import { SERVICE_ACTION_TYPE_OPTIONS } from "@mototwin/domain";
-import { productSemanticColors } from "@mototwin/design-tokens";
 import type { BundleItemFormValues, ServiceActionType } from "@mototwin/types";
-import { useState } from "react";
-import { NodePickerModal, type SharedNodePickerOption } from "../../node-picker/NodePickerModal";
+import type { CSSProperties } from "react";
 import { FIELD_BASE, FOCUS_RING, LABEL_STYLE, SERVICE_EVENT_PARTS_UI } from "../styles";
+import { BundleNodeIndexIcon } from "./BundleNodeRowFast";
 import { BundleNodePartRow } from "./BundleNodePartRow";
+
+const detailCompactInput: CSSProperties = {
+  ...FIELD_BASE,
+  marginTop: 2,
+  padding: "5px 8px",
+  fontSize: "0.75rem",
+  lineHeight: 1.25,
+};
 
 export type BundleNodeCardExtendedProps = {
   index: number;
@@ -18,8 +25,8 @@ export type BundleNodeCardExtendedProps = {
   collapsed: boolean;
   currency: string;
   partsCostFormatted: string;
-  laborCostFormatted: string;
-  availableLeafNodePickerOptions: SharedNodePickerOption[];
+  /** Пустая строка узла — открыть общий `AddNodeSheet` (как в BASIC). */
+  onPickNode: () => void;
   onToggleCollapsed: () => void;
   onChangeNodeId: (nodeId: string) => void;
   onChangeActionType: (next: ServiceActionType) => void;
@@ -40,7 +47,7 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
     collapsed,
     currency,
     partsCostFormatted,
-    availableLeafNodePickerOptions,
+    onPickNode,
     onToggleCollapsed,
     onChangeNodeId,
     onChangeActionType,
@@ -49,229 +56,247 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
     onRemoveRow,
     onClearPart,
   } = props;
-  const [nodePickerOpen, setNodePickerOpen] = useState(false);
 
-  return (
+  const headerRow = (
     <div
-      className="rounded-2xl border"
+      role={!hasNode ? "button" : undefined}
+      tabIndex={!hasNode ? 0 : undefined}
+      onClick={!hasNode ? onPickNode : undefined}
+      onKeyDown={
+        !hasNode
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onPickNode();
+              }
+            }
+          : undefined
+      }
+      className="group relative items-center px-0 py-2 sm:py-2.5"
       style={{
-        backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
-        borderColor: hasNode ? SERVICE_EVENT_PARTS_UI.border : SERVICE_EVENT_PARTS_UI.orange,
-        boxShadow: hasNode ? undefined : "0 0 0 1px rgba(255, 107, 0, 0.18)",
+        display: "grid",
+        gridTemplateColumns: "36px minmax(0, 1fr) minmax(158px, min(28vw, 220px)) auto",
+        gap: "0.75rem",
+        borderBottom: collapsed
+          ? `1px solid ${hasNode ? SERVICE_EVENT_PARTS_UI.borderSubtle : SERVICE_EVENT_PARTS_UI.orange}`
+          : undefined,
+        cursor: hasNode ? "default" : "pointer",
       }}
     >
-      <div
-        className="items-end px-4 py-3"
+      <span
+        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
         style={{
-          display: "grid",
-          gridTemplateColumns: "32px minmax(180px, 1fr) minmax(150px, 190px) auto",
-          gap: "0.75rem",
-          ...(collapsed ? {} : { borderBottom: `1px solid ${SERVICE_EVENT_PARTS_UI.border}` }),
+          color: SERVICE_EVENT_PARTS_UI.orange,
+          backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
         }}
+        aria-hidden
+      >
+        <BundleNodeIndexIcon index={index} />
+      </span>
+      <div className="min-w-0 flex-1">
+        {hasNode ? (
+          <p
+            className="truncate text-[13px] font-semibold leading-tight"
+            style={{ color: SERVICE_EVENT_PARTS_UI.text }}
+          >
+            {nodeTitle}
+          </p>
+        ) : (
+          <p
+            className="truncate text-[13px] font-semibold leading-tight"
+            style={{ color: SERVICE_EVENT_PARTS_UI.orange }}
+          >
+            Выберите узел
+          </p>
+        )}
+        {hasNode && crumb ? (
+          <p className="mt-0.5 truncate text-[11px]" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
+            {crumb}
+          </p>
+        ) : !hasNode ? (
+          <p className="mt-0.5 truncate text-[11px]" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
+            Узел не выбран
+          </p>
+        ) : null}
+      </div>
+      <div
+        className="flex min-w-0 items-center gap-1.5 self-center"
+        onClick={(e) => e.stopPropagation()}
       >
         <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
-          style={{
-            backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
-            color: SERVICE_EVENT_PARTS_UI.orange,
-          }}
-          aria-hidden
+          className="shrink-0 whitespace-nowrap text-[10px] font-medium leading-none"
+          style={LABEL_STYLE}
+          id={`bundle-row-action-label-${row.key}`}
         >
-          {`${index + 1}.`}
-        </span>
-        <div className="min-w-0 flex-1">
-          {hasNode ? (
-            <p
-              className="truncate text-[14px] font-semibold leading-tight"
-              style={{ color: SERVICE_EVENT_PARTS_UI.text }}
-            >
-              {nodeTitle}
-            </p>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setNodePickerOpen(true)}
-                style={{
-                  ...FIELD_BASE,
-                  marginTop: 0,
-                  fontWeight: 600,
-                  textAlign: "left",
-                  cursor: "pointer",
-                }}
-                className={FOCUS_RING}
-              >
-                Выберите узел
-              </button>
-              <NodePickerModal
-                open={nodePickerOpen}
-                options={availableLeafNodePickerOptions}
-                selectedIds={row.nodeId ? new Set([row.nodeId]) : undefined}
-                onClose={() => setNodePickerOpen(false)}
-                onSelect={(nodeId) => {
-                  onChangeNodeId(nodeId);
-                  setNodePickerOpen(false);
-                }}
-              />
-            </>
-          )}
-          {hasNode && crumb ? (
-            <p
-              className="mt-0.5 truncate text-[11px]"
-              style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
-            >
-              {crumb}
-            </p>
-          ) : null}
-        </div>
-
-        <label className="min-w-0 text-[11px] font-medium" style={LABEL_STYLE}>
           Тип работы
-          <select
-            value={row.actionType}
-            onChange={(e) => onChangeActionType(e.target.value as ServiceActionType)}
-            style={{
-              ...FIELD_BASE,
-              marginTop: 4,
-              colorScheme: "dark",
-              width: "100%",
-            }}
-            className={FOCUS_RING}
-          >
-            {SERVICE_ACTION_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="flex shrink-0 items-end gap-1.5">
-          {itemsCount > 1 ? (
-            <button
-              type="button"
-              onClick={onRemoveRow}
-              aria-label="Удалить узел"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border transition hover:opacity-90"
-              style={{
-                borderColor: SERVICE_EVENT_PARTS_UI.border,
-                color: productSemanticColors.error,
-                backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M5 7h14M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          ) : null}
+        </span>
+        <select
+          value={row.actionType}
+          onChange={(e) => onChangeActionType(e.target.value as ServiceActionType)}
+          aria-labelledby={`bundle-row-action-label-${row.key}`}
+          style={{
+            ...FIELD_BASE,
+            marginTop: 0,
+            padding: "4px 6px",
+            fontSize: "0.6875rem",
+            lineHeight: 1.25,
+            colorScheme: "dark",
+            minWidth: 0,
+            flex: "1 1 0%",
+            maxWidth: "100%",
+          }}
+          className={FOCUS_RING}
+        >
+          {SERVICE_ACTION_TYPE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex shrink-0 items-center justify-end gap-1">
+        {hasNode ? (
           <button
             type="button"
-            onClick={onToggleCollapsed}
-            aria-label={collapsed ? "Развернуть" : "Свернуть"}
-            aria-expanded={!collapsed}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border transition hover:opacity-90"
+            onClick={(event) => {
+              event.stopPropagation();
+              onChangeNodeId("");
+            }}
+            aria-label="Очистить узел"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition hover:opacity-90"
             style={{
               borderColor: SERVICE_EVENT_PARTS_UI.border,
               color: SERVICE_EVENT_PARTS_UI.textMuted,
               backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
             }}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              className={collapsed ? "transition-transform" : "rotate-180 transition-transform"}
-              aria-hidden
-            >
-              <path
-                d="M6 9l6 6 6-6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </button>
-        </div>
-      </div>
-
-      {!collapsed ? (
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            <p
-              className="text-xs font-semibold tracking-tight"
-              style={{ color: SERVICE_EVENT_PARTS_UI.text }}
-            >
-              Детали
-            </p>
-            <span
-              className="text-[11px] font-medium"
-              style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
-            >
-              {/* Placeholder for parity with reference; multi-part not implemented per plan §0. */}
-            </span>
-          </div>
-
-          <div className="mt-2">
-            <BundleNodePartRow
-              row={row}
-              currency={currency}
-              onPatch={onPatchRow}
-              onSetSkuRow={onSetSkuRow}
-              onClear={onClearPart}
+        ) : (
+          <span className="inline-block w-8 shrink-0" aria-hidden />
+        )}
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleCollapsed();
+          }}
+          aria-label={collapsed ? "Развернуть" : "Свернуть"}
+          aria-expanded={!collapsed}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition hover:opacity-90"
+          style={{
+            borderColor: SERVICE_EVENT_PARTS_UI.border,
+            color: SERVICE_EVENT_PARTS_UI.textMuted,
+            backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            className={collapsed ? "transition-transform" : "rotate-180 transition-transform"}
+            aria-hidden
+          >
+            <path
+              d="M6 9l6 6 6-6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-          </div>
+          </svg>
+        </button>
+      </div>
+      {itemsCount > 1 ? (
+        <button
+          type="button"
+          onClick={onRemoveRow}
+          aria-label="Удалить строку"
+          className="absolute right-28 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg border opacity-0 transition group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 sm:right-32"
+          style={{
+            borderColor: SERVICE_EVENT_PARTS_UI.border,
+            color: "#ef4444",
+            backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M5 7h14M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      ) : null}
+    </div>
+  );
+
+  const detailIndent = { paddingLeft: "calc(36px + 0.75rem)" } as const;
+
+  return (
+    <div style={{ borderBottom: `1px solid ${SERVICE_EVENT_PARTS_UI.borderSubtle}` }}>
+      {headerRow}
+      {!collapsed ? (
+        <div
+          className="pb-8 pt-1.5"
+          style={{
+            ...detailIndent,
+            borderTop: `1px solid ${SERVICE_EVENT_PARTS_UI.borderSubtle}`,
+          }}
+        >
+          <BundleNodePartRow
+            row={row}
+            currency={currency}
+            onPatch={onPatchRow}
+            onSetSkuRow={onSetSkuRow}
+            onClear={onClearPart}
+            variant="flat"
+          />
 
           <div
-            className="mt-3 border-t pt-3"
+            className="mb-2 mt-2"
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(120px, 1fr) minmax(160px, 1fr) minmax(180px, 1.35fr)",
-              gap: "0.75rem",
-              borderTopColor: SERVICE_EVENT_PARTS_UI.border,
+              gridTemplateColumns: "minmax(88px, 1fr) minmax(100px, 1fr) minmax(0, 1.4fr)",
+              gap: "0.5rem 0.625rem",
             }}
           >
-            <div>
-              <p
-                className="text-[11px] font-medium"
-                style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
-              >
+            <div className="flex min-w-0 flex-col justify-end gap-px">
+              <span className="text-[8px] font-medium leading-none" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
                 Стоимость деталей
-              </p>
-              <p
-                className="mt-0.5 text-[15px] font-semibold tabular-nums"
+              </span>
+              <span
+                className="truncate text-[10px] font-semibold tabular-nums leading-tight"
                 style={{ color: SERVICE_EVENT_PARTS_UI.text }}
               >
                 {partsCostFormatted}
-              </p>
+              </span>
             </div>
             <div className="min-w-0">
-              <label className="block text-[11px] font-medium" style={LABEL_STYLE}>
+              <label className="block text-[10px] font-medium leading-tight" style={LABEL_STYLE}>
                 Стоимость работы
                 <input
                   value={row.laborCost}
                   onChange={(e) => onPatchRow({ laborCost: e.target.value })}
                   inputMode="decimal"
                   placeholder="0"
-                  style={{ ...FIELD_BASE, marginTop: 4 }}
+                  style={detailCompactInput}
                   className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
                 />
               </label>
             </div>
-            <label className="block min-w-0 text-[11px] font-medium" style={LABEL_STYLE}>
+            <label className="block min-w-0 text-[10px] font-medium leading-tight" style={LABEL_STYLE}>
               Комментарий к узлу
               <input
                 value={row.comment}
                 onChange={(e) => onPatchRow({ comment: e.target.value })}
                 placeholder="Опционально"
-                style={FIELD_BASE}
+                style={detailCompactInput}
                 className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
               />
             </label>
