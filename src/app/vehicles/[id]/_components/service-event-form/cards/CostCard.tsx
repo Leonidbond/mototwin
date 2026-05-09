@@ -1,6 +1,5 @@
 "use client";
 
-import { productSemanticColors } from "@mototwin/design-tokens";
 import type { AddServiceEventFormValues } from "@mototwin/types";
 import {
   FIELD_IN_STACK,
@@ -16,19 +15,14 @@ export type CostCardProps = {
   form: AddServiceEventFormValues;
   isEditing: boolean;
   totalLabel: string;
-  isAdvanced: boolean;
   onPatch: (patch: Partial<AddServiceEventFormValues>) => void;
-  /** Optional hint text below header for ADVANCED mode. */
-  showAdvancedHint?: boolean;
 };
 
 export function CostCard({
   sectionNumber,
   form,
   totalLabel,
-  isAdvanced,
   onPatch,
-  showAdvancedHint = true,
 }: CostCardProps) {
   const costInfoTitle =
     "В быстром режиме укажите общую стоимость деталей и работы; в подробном режиме итог по узлам складывается отдельно.";
@@ -73,14 +67,6 @@ export function CostCard({
           i
         </button>
       </div>
-      {isAdvanced && showAdvancedHint ? (
-        <p
-          className="mt-2 text-[11px] leading-snug"
-          style={{ color: productSemanticColors.textMuted }}
-        >
-          В подробном режиме итог считается из узлов; верхние поля прибавляются сверху.
-        </p>
-      ) : null}
       <div
         className="mt-3"
         style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.5rem" }}

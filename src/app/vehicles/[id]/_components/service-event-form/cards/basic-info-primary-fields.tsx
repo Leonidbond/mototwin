@@ -69,6 +69,18 @@ function performerStyle(active: boolean): CSSProperties {
       };
 }
 
+function RequiredMark() {
+  return <span style={{ color: SERVICE_EVENT_PARTS_UI.orange }}>*</span>;
+}
+
+function requiredFieldStyle(isMissing: boolean): CSSProperties {
+  return {
+    ...FIELD_IN_STACK,
+    borderColor: isMissing ? SERVICE_EVENT_PARTS_UI.orange : FIELD_IN_STACK.borderColor,
+    boxShadow: isMissing ? "0 0 0 1px rgba(255, 107, 0, 0.26)" : undefined,
+  };
+}
+
 function TemplateSelectField({
   bundleTemplates,
   bundleTemplatesLoadError,
@@ -162,11 +174,16 @@ export type BasicInfoPrimaryFieldsProps = {
   onSelectBundleTemplate: (id: string) => void;
   onOpenTemplateContents: () => void;
   onApplyTemplate: (templateId: string) => void;
-  eventDateDisplay: string;
-  onEventDateDisplayChange: (next: string) => void;
-  onEventDateBlur: () => void;
+  eventDateMaxYmd?: string;
   odometerInputMax?: number | null;
   onPatch: (patch: Partial<AddServiceEventFormValues>) => void;
+  currentVehicleOdometer: number | null;
+  currentVehicleEngineHours: number | null;
+  vehicleStateSaving: boolean;
+  vehicleStateError: string;
+  vehicleStateSuccess: string;
+  onOdometerBlur: () => void;
+  onEngineHoursBlur: () => void;
   commentTextareaRef: RefObject<HTMLTextAreaElement | null>;
 };
 
@@ -183,14 +200,22 @@ export function BasicInfoPrimaryFields({
   onSelectBundleTemplate,
   onOpenTemplateContents,
   onApplyTemplate,
-  eventDateDisplay,
-  onEventDateDisplayChange,
-  onEventDateBlur,
+  eventDateMaxYmd,
   odometerInputMax,
   onPatch,
+  currentVehicleOdometer,
+  currentVehicleEngineHours,
+  vehicleStateSaving,
+  vehicleStateError,
+  vehicleStateSuccess,
+  onOdometerBlur,
+  onEngineHoursBlur,
   commentTextareaRef,
 }: BasicInfoPrimaryFieldsProps) {
   const isBasicMode = form.mode === "BASIC";
+  const titleMissing = form.title.trim() === "";
+  const dateMissing = form.eventDate.trim() === "";
+  const odometerMissing = form.odometer.trim() === "";
 
   return (
     <>
@@ -207,13 +232,14 @@ export function BasicInfoPrimaryFields({
           style={showTemplate ? undefined : { gridColumn: "1 / -1" }}
         >
           <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
-            Название события
+            Название события <RequiredMark />
           </span>
           <input
             value={form.title}
             onChange={(e) => onPatch({ title: e.target.value })}
             placeholder="ТО 10 000 км"
-            style={FIELD_IN_STACK}
+            aria-required="true"
+            style={requiredFieldStyle(titleMissing)}
             className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
           />
         </label>
@@ -243,50 +269,73 @@ export function BasicInfoPrimaryFields({
           gap: "0.5rem",
         }}
       >
-        <label className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex min-w-0 flex-col gap-1.5">
           <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
-            Дата
+            Дата <RequiredMark />
           </span>
           <div className="relative w-full">
             <input
-              type="text"
-              inputMode="numeric"
+              type="date"
               autoComplete="off"
-              value={eventDateDisplay}
-              onChange={(e) => onEventDateDisplayChange(e.target.value)}
-              onBlur={onEventDateBlur}
-              placeholder="ДД.ММ.ГГГГ"
-              style={FIELD_IN_STACK}
+              value={form.eventDate}
+              onChange={(e) => onPatch({ eventDate: e.target.value })}
+              max={eventDateMaxYmd}
+              aria-required="true"
+              style={{ ...requiredFieldStyle(dateMissing), colorScheme: "dark" }}
               className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
             />
           </div>
-        </label>
-        <label className="flex min-w-0 flex-col gap-1.5">
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
           <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
-            Пробег, км
+            Пробег, км <RequiredMark />
           </span>
           <input
             value={form.odometer}
             onChange={(e) => onPatch({ odometer: e.target.value })}
+            onBlur={onOdometerBlur}
             inputMode="numeric"
             max={odometerInputMax ?? undefined}
-            style={FIELD_IN_STACK}
+            aria-required="true"
+            style={requiredFieldStyle(odometerMissing)}
             className={FOCUS_RING}
           />
-        </label>
-        <label className="flex min-w-0 flex-col gap-1.5">
+          <span className="text-[11px] font-medium leading-none" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
+            Текущий: {currentVehicleOdometer != null ? `${currentVehicleOdometer} км` : "не указан"}
+          </span>
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
           <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>
             Моточасы
           </span>
           <input
             value={form.engineHours}
             onChange={(e) => onPatch({ engineHours: e.target.value })}
+            onBlur={onEngineHoursBlur}
             inputMode="numeric"
             placeholder="—"
             style={FIELD_IN_STACK}
             className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
           />
-        </label>
+          <span className="text-[11px] font-medium leading-none" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
+            Текущие: {currentVehicleEngineHours != null ? `${currentVehicleEngineHours} ч` : "не указаны"}
+          </span>
+        </div>
+        {vehicleStateSaving || vehicleStateError || vehicleStateSuccess ? (
+          <p
+            className="text-[11px]"
+            style={{
+              gridColumn: "1 / -1",
+              color: vehicleStateError
+                ? productSemanticColors.error
+                : vehicleStateSuccess
+                  ? SERVICE_EVENT_PARTS_UI.orange
+                  : SERVICE_EVENT_PARTS_UI.textMuted,
+            }}
+          >
+            {vehicleStateError || vehicleStateSuccess || "Обновляем текущие показатели…"}
+          </p>
+        ) : null}
       </div>
 
       <p className="mt-3 text-xs font-medium leading-none" style={LABEL_STYLE}>

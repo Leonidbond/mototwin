@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable react-hooks/set-state-in-effect -- async catalog/picker loaders mirror state from network responses (same pattern as the journal page modal). */
-
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   applyExpenseInstallToAddFormRow,
@@ -15,6 +13,7 @@ import {
   getOrderedTopNodeIdsPresentInNodeTree,
   mergeServiceBundleTemplateIntoAddFormValues,
   mergeWishlistItemIntoAddFormValues,
+  normalizeVehicleStatePayload,
   parseExpenseAmountInputToNumberOrNull,
   removeWishlistItemFromAddFormValues,
   revertExpenseInstallFormPatch,
@@ -42,7 +41,6 @@ import { PostSaveExplainer } from "./PostSaveExplainer";
 import { BasicInfoCard } from "./cards/BasicInfoCard";
 import { CostCard } from "./cards/CostCard";
 import { AdditionalCardFast } from "./cards/AdditionalCardFast";
-import { AdditionalCardExtended } from "./cards/AdditionalCardExtended";
 import { PreliminarySummaryCard } from "./cards/PreliminarySummaryCard";
 import { BundleHeader } from "./bundle/BundleHeader";
 import { BundleNodeRowFast } from "./bundle/BundleNodeRowFast";
@@ -60,12 +58,16 @@ import {
   currencySuffix,
   nodeBreadcrumbRu,
   normalizePartNumber,
-  parseDdMmYyyyToYmd,
-  ymdToDdMmYyyy,
 } from "./utils";
 import { SERVICE_EVENT_PARTS_UI } from "./styles";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+
+type PendingVehicleStateUpdate = {
+  reasons: string[];
+  odometer: number;
+  engineHours: number | null;
+};
 
 function normalizeCostLineCurrency(line: string | null | undefined, currency: string): string | null {
   if (!line) return null;
@@ -252,6 +254,14 @@ function ServiceEventFormInner({
   const [form, setForm] = useState<AddServiceEventFormValues>(() => cloneAddServiceEventForm(initialForm));
   const [localValidationError, setLocalValidationError] = useState("");
   const [skuSearchRowIndex, setSkuSearchRowIndex] = useState(0);
+  const [skuSearchPanelOpen, setSkuSearchPanelOpen] = useState(false);
+  const [currentVehicleOdometer, setCurrentVehicleOdometer] = useState<number | null>(vehicleOdometer);
+  const [currentVehicleEngineHours, setCurrentVehicleEngineHours] = useState<number | null>(vehicleEngineHours);
+  const [vehicleStateSaving, setVehicleStateSaving] = useState(false);
+  const [vehicleStateError, setVehicleStateError] = useState("");
+  const [vehicleStateSuccess, setVehicleStateSuccess] = useState("");
+  const [pendingVehicleStateUpdate, setPendingVehicleStateUpdate] =
+    useState<PendingVehicleStateUpdate | null>(null);
 
   const [serviceEventSkuLookup, setServiceEventSkuLookup] = useState("");
   const [serviceEventSkuResults, setServiceEventSkuResults] = useState<PartSkuViewModel[]>([]);
@@ -277,11 +287,11 @@ function ServiceEventFormInner({
   const [collapsedBundleKeys, setCollapsedBundleKeys] = useState<Set<string>>(() => new Set());
 
   const commentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [eventDateDisplay, setEventDateDisplay] = useState(() => ymdToDdMmYyyy(initialForm.eventDate));
 
   useEffect(() => {
-    setEventDateDisplay(ymdToDdMmYyyy(form.eventDate));
-  }, [form.eventDate]);
+    setCurrentVehicleOdometer(vehicleOdometer);
+    setCurrentVehicleEngineHours(vehicleEngineHours);
+  }, [vehicleEngineHours, vehicleOdometer]);
 
   const updateForm = useCallback(
     (updater: (prev: AddServiceEventFormValues) => AddServiceEventFormValues) => {
@@ -291,6 +301,92 @@ function ServiceEventFormInner({
     },
     [onClearSubmitError]
   );
+
+  const maybeUpdateVehicleStateFromEventMetrics = useCallback(() => {
+    if (vehicleStateSaving) return;
+
+    const eventOdometer = Number(form.odometer.trim());
+    const eventEngineHours = form.engineHours.trim() === "" ? null : Number(form.engineHours.trim());
+    const odometerIsValid = Number.isInteger(eventOdometer) && eventOdometer >= 0;
+    const engineHoursIsValid =
+      eventEngineHours === null || (Number.isInteger(eventEngineHours) && eventEngineHours >= 0);
+    if (!odometerIsValid || !engineHoursIsValid) return;
+
+    let nextOdometer = currentVehicleOdometer;
+    let nextEngineHours = currentVehicleEngineHours;
+    const reasons: string[] = [];
+
+    if (currentVehicleOdometer != null && eventOdometer > currentVehicleOdometer) {
+      nextOdometer = eventOdometer;
+      reasons.push(
+        `пробег события ${eventOdometer} км больше текущего пробега ТС ${currentVehicleOdometer} км`
+      );
+    }
+    if (
+      eventEngineHours != null &&
+      currentVehicleEngineHours != null &&
+      eventEngineHours > currentVehicleEngineHours
+    ) {
+      nextEngineHours = eventEngineHours;
+      reasons.push(
+        `моточасы события ${eventEngineHours} ч больше текущих моточасов ТС ${currentVehicleEngineHours} ч`
+      );
+    }
+
+    if (reasons.length === 0) return;
+    const odometerForPayload = nextOdometer ?? eventOdometer;
+    setVehicleStateError("");
+    setVehicleStateSuccess("");
+    setPendingVehicleStateUpdate({
+      reasons,
+      odometer: odometerForPayload,
+      engineHours: nextEngineHours,
+    });
+  }, [
+    currentVehicleEngineHours,
+    currentVehicleOdometer,
+    form.engineHours,
+    form.odometer,
+    vehicleStateSaving,
+  ]);
+
+  const confirmVehicleStateUpdate = useCallback(async () => {
+    const pending = pendingVehicleStateUpdate;
+    if (!pending) return;
+
+    try {
+      setVehicleStateSaving(true);
+      setVehicleStateError("");
+      setVehicleStateSuccess("");
+      const data = await api.updateVehicleState(
+        vehicleId,
+        normalizeVehicleStatePayload({
+          odometer: String(pending.odometer),
+          engineHours: pending.engineHours != null ? String(pending.engineHours) : "",
+        })
+      );
+      setCurrentVehicleOdometer(data.vehicle.odometer);
+      setCurrentVehicleEngineHours(data.vehicle.engineHours);
+      setPendingVehicleStateUpdate(null);
+      setVehicleStateSuccess("Текущие показатели обновлены.");
+    } catch (error) {
+      console.error(error);
+      setVehicleStateError(error instanceof Error ? error.message : "Не удалось обновить текущие показатели.");
+    } finally {
+      setVehicleStateSaving(false);
+    }
+  }, [pendingVehicleStateUpdate, vehicleId]);
+
+  const cancelPendingVehicleStateUpdate = useCallback(() => {
+    if (vehicleStateSaving) return;
+    setPendingVehicleStateUpdate(null);
+    updateForm((prev) => ({
+      ...prev,
+      odometer: currentVehicleOdometer != null ? String(currentVehicleOdometer) : prev.odometer,
+      engineHours:
+        currentVehicleEngineHours != null ? String(currentVehicleEngineHours) : prev.engineHours,
+    }));
+  }, [currentVehicleEngineHours, currentVehicleOdometer, updateForm, vehicleStateSaving]);
 
   const onPatch = useCallback(
     (patch: Partial<AddServiceEventFormValues>) => {
@@ -346,6 +442,11 @@ function ServiceEventFormInner({
   useEffect(() => {
     setSkuSearchRowIndex((idx) => Math.min(Math.max(0, idx), Math.max(0, form.items.length - 1)));
   }, [form.items.length]);
+
+  const openSkuSearchForRow = useCallback((rowIndex: number) => {
+    setSkuSearchRowIndex(rowIndex);
+    setSkuSearchPanelOpen(true);
+  }, []);
 
   const preliminaryCostBreakdown = useMemo(
     () => buildAddServiceEventCostBreakdownLines(form),
@@ -764,7 +865,7 @@ function ServiceEventFormInner({
   const save = async () => {
     const validation = validateAddServiceEventFormValues(form, {
       todayDateYmd,
-      currentVehicleOdometer: vehicleOdometer,
+      currentVehicleOdometer,
       leafNodeIds: leafNodeIdsSet,
     });
     if (validation.errors.length > 0) {
@@ -782,25 +883,9 @@ function ServiceEventFormInner({
   const hasFreeNodes =
     leafNodeOptions.filter((o) => !form.items.some((it) => it.nodeId.trim() === o.id)).length > 0;
 
-  const onEventDateBlur = () => {
-    const parsed = parseDdMmYyyyToYmd(eventDateDisplay);
-    if (parsed === null) {
-      setEventDateDisplay(ymdToDdMmYyyy(form.eventDate));
-      setLocalValidationError("Введите дату в формате ДД.ММ.ГГГГ.");
-      return;
-    }
-    if (parsed !== "" && eventDateMaxYmd && parsed > eventDateMaxYmd) {
-      setEventDateDisplay(ymdToDdMmYyyy(form.eventDate));
-      setLocalValidationError("Дата не может быть позже допустимой.");
-      return;
-    }
-    setLocalValidationError("");
-    updateForm((prev) => ({ ...prev, eventDate: parsed === "" ? "" : parsed }));
-  };
-
   // ----- Section numbering per references -----
   const fastSectionNumbers = { basicInfo: 1, cost: 2, bundle: 3 };
-  const extendedSectionNumbers = { basicInfo: 1, cost: 2, additional: 3, bundle: 4 };
+  const extendedSectionNumbers = { basicInfo: 1, cost: 2, bundle: 3 };
 
   const basicInfoCard = (
     <BasicInfoCard
@@ -812,11 +897,16 @@ function ServiceEventFormInner({
       selectedBundleTemplateId={selectedBundleTemplateId}
       onSelectBundleTemplate={setSelectedBundleTemplateId}
       onOpenTemplateContents={() => setTemplateContentsOpen(true)}
-      eventDateDisplay={eventDateDisplay}
-      onEventDateDisplayChange={setEventDateDisplay}
-      onEventDateBlur={onEventDateBlur}
-      odometerInputMax={odometerInputMax}
+      eventDateMaxYmd={eventDateMaxYmd}
+      odometerInputMax={currentVehicleOdometer ?? odometerInputMax}
       onPatch={onPatch}
+      currentVehicleOdometer={currentVehicleOdometer}
+      currentVehicleEngineHours={currentVehicleEngineHours}
+      vehicleStateSaving={vehicleStateSaving}
+      vehicleStateError={vehicleStateError}
+      vehicleStateSuccess={vehicleStateSuccess}
+      onOdometerBlur={() => void maybeUpdateVehicleStateFromEventMetrics()}
+      onEngineHoursBlur={() => void maybeUpdateVehicleStateFromEventMetrics()}
       onApplyTemplate={onApplyTemplate}
       commentTextareaRef={commentTextareaRef}
     />
@@ -827,17 +917,7 @@ function ServiceEventFormInner({
       sectionNumber={isBasic ? fastSectionNumbers.cost : extendedSectionNumbers.cost}
       form={form}
       isEditing={Boolean(editingServiceEventId)}
-      isAdvanced={isAdvanced}
       totalLabel={totalLabel}
-      onPatch={onPatch}
-    />
-  );
-
-  const additionalCardExtended = (
-    <AdditionalCardExtended
-      sectionNumber={extendedSectionNumbers.additional}
-      form={form}
-      editingServiceEventId={editingServiceEventId}
       onPatch={onPatch}
     />
   );
@@ -849,6 +929,7 @@ function ServiceEventFormInner({
       onPatch={onPatch}
     />
   );
+  const additionalCardExtended = additionalCardFast;
 
   const preliminarySummary = (
     <PreliminarySummaryCard
@@ -1018,7 +1099,7 @@ function ServiceEventFormInner({
           updateForm((prev) => patchItemAt(prev, rowIndex, { actionType }))
         }
         onPatchRow={(patch) => updateForm((prev) => patchItemAt(prev, rowIndex, patch))}
-        onSetSkuRow={() => setSkuSearchRowIndex(rowIndex)}
+        onSetSkuRow={() => openSkuSearchForRow(rowIndex)}
         onRemoveRow={() => {
           setEditingUnitRowIndex(null);
           updateForm((prev) => removeItemAt(prev, rowIndex));
@@ -1051,7 +1132,7 @@ function ServiceEventFormInner({
   ) : null;
 
   const bundleSkuPanel =
-    isAdvanced && (form.items[effectiveSkuRowIndex]?.sku ?? "").trim().length >= 2 ? (
+    isAdvanced && skuSearchPanelOpen && (form.items[effectiveSkuRowIndex]?.sku ?? "").trim().length >= 2 ? (
       <div
         className="rounded-xl border px-3 py-2"
         style={{
@@ -1130,6 +1211,159 @@ function ServiceEventFormInner({
     : editingServiceEventId
       ? "Сохранить изменения"
       : "Сохранить событие";
+  const serviceEventActions = (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="inline-flex h-9 min-w-[7rem] items-center justify-center rounded-lg border px-4 text-xs font-bold leading-none transition hover:opacity-90"
+        style={{
+          borderColor: SERVICE_EVENT_PARTS_UI.border,
+          backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+          color: SERVICE_EVENT_PARTS_UI.text,
+        }}
+      >
+        Отменить
+      </button>
+      <button
+        type="button"
+        onClick={() => void save()}
+        disabled={isSubmitting}
+        className="inline-flex h-9 min-w-[10.5rem] items-center justify-center rounded-lg border px-4 text-xs font-bold leading-none transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
+        style={{
+          borderColor: SERVICE_EVENT_PARTS_UI.orange,
+          backgroundColor: SERVICE_EVENT_PARTS_UI.orange,
+          color: "#fff",
+        }}
+      >
+        {saveButtonLabel}
+      </button>
+    </div>
+  );
+  const serviceEventModeControl = (
+    <ServiceEventModeControl
+      variant="segmented"
+      isBasic={isBasic}
+      onSelectBasic={() => {
+        setSkuSearchRowIndex(0);
+        setSkuSearchPanelOpen(false);
+        updateForm((prev) => (prev.mode === "BASIC" ? prev : switchFormToBasic(prev)));
+      }}
+      onSelectDetailed={() => {
+        setSkuSearchRowIndex(0);
+        setSkuSearchPanelOpen(false);
+        updateForm((prev) => (prev.mode === "ADVANCED" ? prev : switchFormToAdvanced(prev)));
+      }}
+    />
+  );
+  const vehicleStateConfirmModal = pendingVehicleStateUpdate ? (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6"
+      style={{ backgroundColor: "rgba(3, 7, 18, 0.72)" }}
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !vehicleStateSaving) {
+          cancelPendingVehicleStateUpdate();
+        }
+      }}
+    >
+      <div
+        className="rounded-2xl border p-4 shadow-2xl sm:p-5"
+        style={{
+          width: "min(380px, calc(100vw - 32px))",
+          backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
+          borderColor: SERVICE_EVENT_PARTS_UI.border,
+          color: SERVICE_EVENT_PARTS_UI.text,
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Обновить текущие показатели ТС"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-base font-semibold tracking-tight">Обновить текущие показатели?</p>
+            <p className="mt-1 text-xs leading-snug" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
+              Введённое значение события больше текущего состояния мотоцикла.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={cancelPendingVehicleStateUpdate}
+            disabled={vehicleStateSaving}
+            aria-label="Закрыть"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              borderColor: SERVICE_EVENT_PARTS_UI.border,
+              backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+              color: SERVICE_EVENT_PARTS_UI.textMuted,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {pendingVehicleStateUpdate.reasons.map((reason) => (
+            <p
+              key={reason}
+              className="rounded-lg border px-3 py-2 text-xs leading-snug"
+              style={{
+                borderColor: SERVICE_EVENT_PARTS_UI.borderSubtle,
+                backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+                color: SERVICE_EVENT_PARTS_UI.textMuted,
+              }}
+            >
+              {reason}
+            </p>
+          ))}
+        </div>
+
+        <div
+          className="mt-4 rounded-xl border px-3 py-2 text-xs"
+          style={{
+            borderColor: SERVICE_EVENT_PARTS_UI.borderSubtle,
+            backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceControl,
+            color: SERVICE_EVENT_PARTS_UI.text,
+          }}
+        >
+          Новые текущие показатели: {pendingVehicleStateUpdate.odometer} км
+          {pendingVehicleStateUpdate.engineHours != null ? ` · ${pendingVehicleStateUpdate.engineHours} ч` : ""}
+        </div>
+
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={cancelPendingVehicleStateUpdate}
+            disabled={vehicleStateSaving}
+            className="inline-flex h-9 min-w-[7rem] items-center justify-center rounded-lg border px-4 text-xs font-bold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              borderColor: SERVICE_EVENT_PARTS_UI.border,
+              backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+              color: SERVICE_EVENT_PARTS_UI.text,
+            }}
+          >
+            Не обновлять
+          </button>
+          <button
+            type="button"
+            onClick={() => void confirmVehicleStateUpdate()}
+            disabled={vehicleStateSaving}
+            className="inline-flex h-9 min-w-[9rem] items-center justify-center rounded-lg border px-4 text-xs font-bold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
+            style={{
+              borderColor: SERVICE_EVENT_PARTS_UI.orange,
+              backgroundColor: SERVICE_EVENT_PARTS_UI.orange,
+              color: "#fff",
+            }}
+          >
+            {vehicleStateSaving ? "Обновляем…" : "Обновить"}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   if (pageChrome === "partsCart") {
     return (
@@ -1146,7 +1380,7 @@ function ServiceEventFormInner({
         <main className={`${partsCartPageStyles.mainColumn} ${partsCartPageStyles.mainColumnServiceEvent}`}>
           <header
             className={partsCartPageStyles.headerServiceEvent}
-            style={{ gridTemplateColumns: "28px minmax(0, 1fr) auto", alignItems: "start" }}
+            style={{ gridTemplateColumns: "28px minmax(0, 1fr)", alignItems: "start" }}
           >
             <button
               type="button"
@@ -1158,33 +1392,12 @@ function ServiceEventFormInner({
             </button>
             <div className={partsCartPageStyles.headerServiceEventText}>
               <h1 className={partsCartPageStyles.title}>{resolvedTitle}</h1>
-              <ServiceEventModeControl
-                variant="segmented"
-                isBasic={isBasic}
-                onSelectBasic={() => {
-                  setSkuSearchRowIndex(0);
-                  updateForm((prev) => (prev.mode === "BASIC" ? prev : switchFormToBasic(prev)));
-                }}
-                onSelectDetailed={() => {
-                  setSkuSearchRowIndex(0);
-                  updateForm((prev) => (prev.mode === "ADVANCED" ? prev : switchFormToAdvanced(prev)));
-                }}
-              />
+              <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                <div className="min-w-[220px] flex-1">{serviceEventModeControl}</div>
+                <div className="shrink-0">{serviceEventActions}</div>
+              </div>
               <p className={partsCartPageStyles.subtitle}>{resolvedSubtitle}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={isSubmitting}
-              className={partsCartPageStyles.primaryAction}
-              style={{
-                minWidth: 168,
-                opacity: isSubmitting ? 0.55 : 1,
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-              }}
-            >
-              {saveButtonLabel}
-            </button>
           </header>
 
           {contextHint ? (
@@ -1275,6 +1488,7 @@ function ServiceEventFormInner({
             counts={installableCounts}
             onToggleEntry={toggleInstallableEntry}
           />
+          {vehicleStateConfirmModal}
         </main>
       </div>
     );
@@ -1319,18 +1533,10 @@ function ServiceEventFormInner({
             </h1>
           </div>
         </div>
-        <ServiceEventModeControl
-          variant="segmented"
-          isBasic={isBasic}
-          onSelectBasic={() => {
-            setSkuSearchRowIndex(0);
-            updateForm((prev) => (prev.mode === "BASIC" ? prev : switchFormToBasic(prev)));
-          }}
-          onSelectDetailed={() => {
-            setSkuSearchRowIndex(0);
-            updateForm((prev) => (prev.mode === "ADVANCED" ? prev : switchFormToAdvanced(prev)));
-          }}
-        />
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+          <div className="min-w-[220px] flex-1">{serviceEventModeControl}</div>
+          <div className="shrink-0">{serviceEventActions}</div>
+        </div>
         {contextHint ? (
           <div className="text-sm" style={{ color: productSemanticColors.textSecondary }}>
             {contextHint}
@@ -1408,6 +1614,7 @@ function ServiceEventFormInner({
         counts={installableCounts}
         onToggleEntry={toggleInstallableEntry}
       />
+      {vehicleStateConfirmModal}
     </div>
   );
 }

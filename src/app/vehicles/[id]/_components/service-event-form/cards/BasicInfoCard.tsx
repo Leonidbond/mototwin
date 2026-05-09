@@ -15,11 +15,16 @@ export type BasicInfoCardProps = {
   selectedBundleTemplateId: string;
   onSelectBundleTemplate: (id: string) => void;
   onOpenTemplateContents: () => void;
-  eventDateDisplay: string;
-  onEventDateDisplayChange: (next: string) => void;
-  onEventDateBlur: () => void;
+  eventDateMaxYmd?: string;
   odometerInputMax?: number | null;
   onPatch: (patch: Partial<AddServiceEventFormValues>) => void;
+  currentVehicleOdometer: number | null;
+  currentVehicleEngineHours: number | null;
+  vehicleStateSaving: boolean;
+  vehicleStateError: string;
+  vehicleStateSuccess: string;
+  onOdometerBlur: () => void;
+  onEngineHoursBlur: () => void;
   /** Apply template merge result to form. */
   onApplyTemplate: (templateId: string) => void;
   /** Bound to comment textarea for auto-height. */
@@ -35,11 +40,16 @@ export function BasicInfoCard({
   selectedBundleTemplateId,
   onSelectBundleTemplate,
   onOpenTemplateContents,
-  eventDateDisplay,
-  onEventDateDisplayChange,
-  onEventDateBlur,
+  eventDateMaxYmd,
   odometerInputMax,
   onPatch,
+  currentVehicleOdometer,
+  currentVehicleEngineHours,
+  vehicleStateSaving,
+  vehicleStateError,
+  vehicleStateSuccess,
+  onOdometerBlur,
+  onEngineHoursBlur,
   onApplyTemplate,
   commentTextareaRef,
 }: BasicInfoCardProps) {
@@ -61,11 +71,16 @@ export function BasicInfoCard({
         onSelectBundleTemplate={onSelectBundleTemplate}
         onOpenTemplateContents={onOpenTemplateContents}
         onApplyTemplate={onApplyTemplate}
-        eventDateDisplay={eventDateDisplay}
-        onEventDateDisplayChange={onEventDateDisplayChange}
-        onEventDateBlur={onEventDateBlur}
+        eventDateMaxYmd={eventDateMaxYmd}
         odometerInputMax={odometerInputMax}
         onPatch={onPatch}
+        currentVehicleOdometer={currentVehicleOdometer}
+        currentVehicleEngineHours={currentVehicleEngineHours}
+        vehicleStateSaving={vehicleStateSaving}
+        vehicleStateError={vehicleStateError}
+        vehicleStateSuccess={vehicleStateSuccess}
+        onOdometerBlur={onOdometerBlur}
+        onEngineHoursBlur={onEngineHoursBlur}
         commentTextareaRef={commentTextareaRef}
       />
     </div>

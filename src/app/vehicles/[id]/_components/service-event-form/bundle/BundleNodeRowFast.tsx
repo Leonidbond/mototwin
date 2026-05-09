@@ -45,7 +45,7 @@ export function BundleNodeRowFast({
         display: "grid",
         gridTemplateColumns: "36px minmax(0, 1fr) minmax(72px, 120px) 32px",
         gap: "0.75rem",
-        borderBottom: `1px solid ${SERVICE_EVENT_PARTS_UI.borderSubtle}`,
+        borderBottom: `1px solid ${hasNode ? SERVICE_EVENT_PARTS_UI.borderSubtle : SERVICE_EVENT_PARTS_UI.orange}`,
         cursor: hasNode ? "default" : "pointer",
       }}
     >
@@ -62,7 +62,7 @@ export function BundleNodeRowFast({
       <div className="min-w-0 flex-1">
         <p
           className="truncate text-[13px] font-semibold leading-tight"
-          style={{ color: SERVICE_EVENT_PARTS_UI.text }}
+          style={{ color: hasNode ? SERVICE_EVENT_PARTS_UI.text : SERVICE_EVENT_PARTS_UI.orange }}
         >
           {nodeTitle}
         </p>

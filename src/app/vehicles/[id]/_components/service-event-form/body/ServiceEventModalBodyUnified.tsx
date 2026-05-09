@@ -108,10 +108,10 @@ export function ServiceEventModalBodyUnified({
             <>
               <div className="space-y-2.5">{bundleNodeCards}</div>
               {bundleSkuPanel}
+              {bundleTotalsExtended}
             </>
           )}
         </div>
-        {!isBasic ? bundleTotalsExtended : null}
         {isBasic ? additionalCardFast : null}
       </section>
     </div>

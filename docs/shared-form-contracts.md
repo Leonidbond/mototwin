@@ -32,6 +32,7 @@ Stable **`value`** enums plus **Russian labels** (aligned with web onboarding / 
 - **Layout**: Tailwind vs React Native `StyleSheet`, select vs chips.
 - **Validation context:** service event **дата не в будущем**, **пробег** и сопоставление с текущим пробегом ТС — через **`AddServiceEventValidationContext`** (`todayDateYmd`, `currentVehicleOdometer`, **`leafNodeIds`**) и на web, и в Expo bundle-форме.
 - **Layout / навигация:** на web — полноэкранные страницы **`ServiceEventForm`** (`service-event-form/`, маршруты `service-events/new` и `service-events/[eventId]/edit`); на Expo — полноэкранный блок (`basic-service-event-bundle-form`) внутри `service-events/new.tsx`.
+- **Web-only UX:** при вводе пробега/моточасов **выше** текущих показателей ТС форма предлагает обновить состояние ТС (`PATCH …/state`); при **отказе** поля события возвращаются к **текущим** показателям ТС (см. [web-service-event-form.md](./web-service-event-form.md), раздел 12). На Expo отдельный экран «Состояние»; такой модалки в bundle-форме нет.
 - **Defaults**: e.g. Expo «новый мотоцикл» still initializes **`ridingStyle`** with **`CALM`** locally; shared `createInitialAddMotorcycleFormValues` defaults match **web** (`ACTIVE`) for onboarding-style flows.
 
 ## Where it is wired

@@ -40,26 +40,28 @@ export function BundleTotals({ partsLine, laborLine, totalLine, variant = "exten
 
   return (
     <div
-      className="grid items-baseline gap-4 rounded-2xl border px-5 py-4 sm:grid-cols-[auto_1fr_1fr_auto]"
+      className="items-end pt-3"
       style={{
-        backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
-        borderColor: SERVICE_EVENT_PARTS_UI.border,
+        display: "grid",
+        gridTemplateColumns: "auto repeat(3, minmax(96px, 1fr))",
+        gap: "1rem",
+        borderTop: `1px solid ${SERVICE_EVENT_PARTS_UI.borderSubtle}`,
       }}
     >
       <span
-        className="text-xs font-semibold uppercase tracking-wide"
+        className="pb-0.5 text-xs font-semibold uppercase tracking-wide"
         style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}
       >
         Итого по узлам
       </span>
       <Cell label="Детали" value={partsLine} />
       <Cell label="Работа" value={laborLine} />
-      <div className="text-right">
+      <div className="min-w-0 text-right">
         <p className="text-[11px] font-medium" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
           Итого
         </p>
         <p
-          className="mt-0.5 text-xl font-bold tabular-nums tracking-tight"
+          className="mt-0.5 truncate text-xl font-bold tabular-nums tracking-tight"
           style={{ color: SERVICE_EVENT_PARTS_UI.orange }}
         >
           {totalLine}
@@ -71,12 +73,12 @@ export function BundleTotals({ partsLine, laborLine, totalLine, variant = "exten
 
 function Cell({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-[11px] font-medium" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
         {label}
       </p>
       <p
-        className="mt-0.5 text-[15px] font-semibold tabular-nums"
+        className="mt-0.5 truncate text-[15px] font-semibold tabular-nums"
         style={{ color: SERVICE_EVENT_PARTS_UI.text }}
       >
         {value}

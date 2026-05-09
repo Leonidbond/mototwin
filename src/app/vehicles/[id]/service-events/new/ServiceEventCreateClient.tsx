@@ -9,6 +9,7 @@ import {
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
   findNodePathById,
   findNodeTreeItemById,
+  getTodayDateYmdLocal,
   normalizeAddServiceEventPayload,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
@@ -42,7 +43,7 @@ export function ServiceEventCreateClient() {
   const wishlistPendingInstall = pendingInstallRaw === "1" || pendingInstallRaw === "true";
   const returnToEncoded = searchParams.get("returnTo");
 
-  const todayDateYmd = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayDateYmd = useMemo(() => getTodayDateYmdLocal(), []);
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -142,6 +143,9 @@ export function ServiceEventCreateClient() {
         }
 
         const empty = createInitialAddServiceEventFormValues();
+        empty.eventDate = todayDateYmd;
+        empty.odometer = odo != null ? String(odo) : "";
+        empty.engineHours = eng != null ? String(eng) : "";
         empty.currency = currencyDefault;
         bumpForm(empty);
       } catch (e) {

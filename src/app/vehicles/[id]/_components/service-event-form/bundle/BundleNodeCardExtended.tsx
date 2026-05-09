@@ -56,7 +56,8 @@ export function BundleNodeCardExtended(props: BundleNodeCardExtendedProps) {
       className="rounded-2xl border"
       style={{
         backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
-        borderColor: SERVICE_EVENT_PARTS_UI.border,
+        borderColor: hasNode ? SERVICE_EVENT_PARTS_UI.border : SERVICE_EVENT_PARTS_UI.orange,
+        boxShadow: hasNode ? undefined : "0 0 0 1px rgba(255, 107, 0, 0.18)",
       }}
     >
       <div
