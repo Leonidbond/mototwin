@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Keyboard,
   Modal,
@@ -36,7 +37,9 @@ import {
   getOrderedTopNodeIdsPresentInNodeTree,
   nodeAncestorPathLabelRu,
   removeFromDraft,
+  updateSkuDraftItemQuantity,
   vehicleDetailFromApiRecord,
+  arePickerQuantityResolutionsComplete,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -45,6 +48,8 @@ import type {
   PartSkuViewModel,
   PartWishlistItem,
   PickerDraftCart,
+  PickerQuantitySubmitResolution,
+  PickerSubmitPreview,
   PickerSubmitResult,
   ServiceKitViewModel,
   TopServiceNodeItem,
@@ -100,21 +105,10 @@ function skuFromRecommendation(rec: PartRecommendationViewModel): PartSkuViewMod
   };
 }
 
-function previewSummaryLabel(p: ReturnType<typeof buildPickerSubmitPreview>): string {
-  const parts = [
-    `Добавится: ${p.willAddCount}`,
-    `Уже в списке: ${p.duplicateCount}`,
-    `Нельзя: ${p.blockedCount}`,
-  ];
-  if (p.estimatedTotal != null && p.estimatedCurrency) {
-    parts.push(`Ориентир: ${p.estimatedTotal} ${p.estimatedCurrency}`);
-  }
-  return parts.join("\n");
-}
-
 function submitHasAnySuccess(result: PickerSubmitResult): boolean {
   return (
     result.createdWishlistItemIds.length > 0 ||
+    result.updatedWishlistItemIds.length > 0 ||
     result.createdSkuIds.length > 0 ||
     result.createdKitCodes.length > 0
   );
@@ -122,8 +116,15 @@ function submitHasAnySuccess(result: PickerSubmitResult): boolean {
 
 function formatSubmitResultMessage(result: PickerSubmitResult): string {
   const lines: string[] = [];
-  if (result.createdWishlistItemIds.length > 0) {
-    lines.push(`В списке покупок: ${result.createdWishlistItemIds.length} поз.`);
+  if (result.createdWishlistItemIds.length > 0 || result.updatedWishlistItemIds.length > 0) {
+    const bits: string[] = [];
+    if (result.createdWishlistItemIds.length > 0) {
+      bits.push(`новых ${result.createdWishlistItemIds.length}`);
+    }
+    if (result.updatedWishlistItemIds.length > 0) {
+      bits.push(`обновлено ${result.updatedWishlistItemIds.length}`);
+    }
+    lines.push(`В списке покупок: ${bits.join(", ")}.`);
   } else if (result.createdSkuIds.length > 0 || result.createdKitCodes.length > 0) {
     lines.push(`SKU: ${result.createdSkuIds.length}, комплекты: ${result.createdKitCodes.length}.`);
   }
@@ -209,6 +210,11 @@ export default function WishlistPickerScreen() {
   const [maxPriceRub, setMaxPriceRub] = useState("");
 
   const [draftSheetOpen, setDraftSheetOpen] = useState(false);
+  const [submitPreviewModalOpen, setSubmitPreviewModalOpen] = useState(false);
+  const [submitPreview, setSubmitPreview] = useState<PickerSubmitPreview | null>(null);
+  const [quantityResolutionByDraftId, setQuantityResolutionByDraftId] = useState<
+    Record<string, "setTotal" | "increment" | undefined>
+  >({});
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const searchSectionLayoutY = useRef(0);
@@ -520,55 +526,84 @@ export default function WishlistPickerScreen() {
   const openSubmit = useCallback(() => {
     const active = filterActiveWishlistItems(wishlistItems);
     const preview = buildPickerSubmitPreview({ draft, activeWishlistItems: active });
-    if (preview.willAddCount === 0) {
-      Alert.alert("Корзина", "Нет позиций для добавления (все дубликаты или без узла).");
+    if (preview.willAddCount === 0 && preview.quantityUpgradeCount === 0) {
+      Alert.alert(
+        "Корзина",
+        "Нет позиций для добавления или обновления: всё уже в списке в достаточном количестве, либо не выбран узел."
+      );
       return;
     }
-    Alert.alert("Перейти к оформлению", previewSummaryLabel(preview), [
-      { text: "Отмена", style: "cancel" },
-      {
-        text: "Добавить",
-        onPress: () => {
-          void (async () => {
-            setSubmitting(true);
-            const draftSnapshot = draft;
-            try {
-              const api = createPickerSubmitApi(apiBaseUrl);
-              const result = await submitPickerDraft(api, draftSnapshot);
-              const ok = submitHasAnySuccess(result);
-              if (!ok && draftSnapshot.items.length > 0) {
-                Alert.alert(
-                  "Не удалось добавить",
-                  formatSubmitResultMessage(result) || "Проверьте соединение и попробуйте снова."
-                );
-                return;
-              }
-              setDraft(createEmptyDraftCart(vehicleId));
-              setDraftSheetOpen(false);
-              const picked = result.createdWishlistItemIds.join(",");
-              const qs = picked ? `?picked=${encodeURIComponent(picked)}` : "";
-              const target = `/vehicles/${vehicleId}/wishlist${qs}`;
-              const detail = formatSubmitResultMessage(result);
-              const needsSummary = result.skipped.length > 0 || result.warnings.length > 0;
-              const title =
-                ok && result.skipped.length > 0 ? "Частично готово" : "Готово";
-              if (needsSummary && detail.trim()) {
-                Alert.alert(title, detail, [
-                  { text: "К списку покупок", onPress: () => router.replace(target) },
-                ]);
-              } else {
-                router.replace(target);
-              }
-            } catch (e) {
-              Alert.alert("Ошибка", e instanceof Error ? e.message : "Не удалось сохранить.");
-            } finally {
-              setSubmitting(false);
-            }
-          })();
-        },
-      },
-    ]);
-  }, [apiBaseUrl, draft, router, vehicleId, wishlistItems]);
+    setQuantityResolutionByDraftId({});
+    setSubmitPreview(preview);
+    setSubmitPreviewModalOpen(true);
+  }, [draft, wishlistItems]);
+
+  const runPickerSubmitConfirm = useCallback(async () => {
+    if (!submitPreview || !vehicleId) return;
+    if (
+      submitPreview.quantityUpgradeCount > 0 &&
+      !arePickerQuantityResolutionsComplete(submitPreview, quantityResolutionByDraftId)
+    ) {
+      return;
+    }
+    setSubmitting(true);
+    const draftSnapshot = draft;
+    const previewSnapshot = submitPreview;
+    const resSnapshot = { ...quantityResolutionByDraftId };
+    try {
+      const quantityResolutions: PickerQuantitySubmitResolution[] = [];
+      for (const d of previewSnapshot.decisions) {
+        if (d.kind !== "quantityUpgrade") continue;
+        const mode = resSnapshot[d.draftId];
+        if (!mode) continue;
+        quantityResolutions.push({
+          draftId: d.draftId,
+          existingWishlistItemId: d.existingWishlistItemId,
+          nodeId: d.nodeId,
+          mode,
+          draftRequestedQty: d.draftRequestedQty,
+          existingQty: d.existingQty,
+        });
+      }
+      const api = createPickerSubmitApi(apiBaseUrl);
+      const result = await submitPickerDraft(api, draftSnapshot, { quantityResolutions });
+      const ok = submitHasAnySuccess(result);
+      if (!ok && draftSnapshot.items.length > 0) {
+        Alert.alert(
+          "Не удалось добавить",
+          formatSubmitResultMessage(result) || "Проверьте соединение и попробуйте снова."
+        );
+        return;
+      }
+      setDraft(createEmptyDraftCart(vehicleId));
+      setDraftSheetOpen(false);
+      setSubmitPreviewModalOpen(false);
+      setSubmitPreview(null);
+      setQuantityResolutionByDraftId({});
+      const picked = [...result.createdWishlistItemIds, ...result.updatedWishlistItemIds].join(",");
+      const qs = picked ? `?picked=${encodeURIComponent(picked)}` : "";
+      const target = `/vehicles/${vehicleId}/wishlist${qs}`;
+      const detail = formatSubmitResultMessage(result);
+      const needsSummary = result.skipped.length > 0 || result.warnings.length > 0;
+      const title = ok && result.skipped.length > 0 ? "Частично готово" : "Готово";
+      if (needsSummary && detail.trim()) {
+        Alert.alert(title, detail, [{ text: "К списку покупок", onPress: () => router.replace(target) }]);
+      } else {
+        router.replace(target);
+      }
+    } catch (e) {
+      Alert.alert("Ошибка", e instanceof Error ? e.message : "Не удалось сохранить.");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [
+    apiBaseUrl,
+    draft,
+    quantityResolutionByDraftId,
+    router,
+    submitPreview,
+    vehicleId,
+  ]);
 
   const handleEditRideProfile = useCallback(() => {
     if (!vehicleId) return;
@@ -601,6 +636,12 @@ export default function WishlistPickerScreen() {
   const showSearchResults = debouncedSearch.length >= 2;
   const vehicleName = vehicleDisplayName(vehicle);
   const vehicleSubtitle = vehicle ? formatYearOdometerLine(vehicle) : "";
+
+  const canConfirmPickerSubmit =
+    submitPreview != null &&
+    (submitPreview.willAddCount > 0 || submitPreview.quantityUpgradeCount > 0) &&
+    (submitPreview.quantityUpgradeCount === 0 ||
+      arePickerQuantityResolutionsComplete(submitPreview, quantityResolutionByDraftId));
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
@@ -832,6 +873,152 @@ export default function WishlistPickerScreen() {
         </View>
       </Modal>
 
+      <Modal visible={submitPreviewModalOpen} animationType="fade" transparent>
+        <View style={styles.submitModalOverlay}>
+          <View style={styles.submitModalCard}>
+            <Text style={styles.submitModalTitle}>Подтвердите состав</Text>
+            {submitPreview ? (
+              <>
+                <View style={styles.submitSummaryGrid}>
+                  <View style={styles.submitSummaryCell}>
+                    <Text style={styles.submitSummaryLabel}>Новые</Text>
+                    <Text style={[styles.submitSummaryValue, { color: c.successText }]}>
+                      {submitPreview.willAddCount}
+                    </Text>
+                  </View>
+                  <View style={styles.submitSummaryCell}>
+                    <Text style={styles.submitSummaryLabel}>Обновить</Text>
+                    <Text style={[styles.submitSummaryValue, { color: "#FFC400" }]}>
+                      {submitPreview.quantityUpgradeCount}
+                    </Text>
+                  </View>
+                  <View style={styles.submitSummaryCell}>
+                    <Text style={styles.submitSummaryLabel}>Достаточно</Text>
+                    <Text style={[styles.submitSummaryValue, { color: c.textSecondary }]}>
+                      {submitPreview.duplicateCount}
+                    </Text>
+                  </View>
+                  <View style={styles.submitSummaryCell}>
+                    <Text style={styles.submitSummaryLabel}>Нельзя</Text>
+                    <Text style={[styles.submitSummaryValue, { color: c.error }]}>
+                      {submitPreview.blockedCount}
+                    </Text>
+                  </View>
+                </View>
+                <ScrollView
+                  style={styles.submitDecisionsScroll}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {submitPreview.decisions.map((decision) => (
+                    <View key={decision.draftId} style={styles.submitDecisionRow}>
+                      <View
+                        style={[
+                          styles.submitDecisionDot,
+                          decision.kind === "willAdd" && { backgroundColor: c.successStrong },
+                          decision.kind === "duplicate" && { backgroundColor: c.textMuted },
+                          decision.kind === "blocked" && { backgroundColor: c.error },
+                          decision.kind === "quantityUpgrade" && { backgroundColor: "#FFC400" },
+                        ]}
+                      />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.submitDecisionTitle}>{decision.label}</Text>
+                        {decision.kind === "willAdd" && decision.pieceCount > 1 ? (
+                          <Text style={styles.submitDecisionMeta}>
+                            В количестве: {decision.pieceCount} шт.
+                          </Text>
+                        ) : null}
+                        {decision.kind === "quantityUpgrade" ? (
+                          <View style={{ marginTop: 8, gap: 8 }}>
+                            <Text style={styles.submitDecisionMeta}>
+                              В списке {decision.existingQty} шт., в подборе {decision.draftRequestedQty} шт.
+                              Не хватает {decision.addQty} шт.
+                            </Text>
+                            <View style={styles.submitChoiceRow}>
+                              <Pressable
+                                onPress={() =>
+                                  setQuantityResolutionByDraftId((prev) => ({
+                                    ...prev,
+                                    [decision.draftId]: "setTotal",
+                                  }))
+                                }
+                                style={({ pressed }) => [
+                                  styles.submitChoiceChip,
+                                  quantityResolutionByDraftId[decision.draftId] === "setTotal" &&
+                                    styles.submitChoiceChipSelected,
+                                  pressed && { opacity: 0.88 },
+                                ]}
+                              >
+                                <Text style={styles.submitChoiceChipText}>
+                                  В списке будет {decision.draftRequestedQty} шт.
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                onPress={() =>
+                                  setQuantityResolutionByDraftId((prev) => ({
+                                    ...prev,
+                                    [decision.draftId]: "increment",
+                                  }))
+                                }
+                                style={({ pressed }) => [
+                                  styles.submitChoiceChip,
+                                  quantityResolutionByDraftId[decision.draftId] === "increment" &&
+                                    styles.submitChoiceChipSelected,
+                                  pressed && { opacity: 0.88 },
+                                ]}
+                              >
+                                <Text style={styles.submitChoiceChipText}>
+                                  Докупить +{decision.addQty}
+                                </Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        ) : null}
+                        {decision.kind === "duplicate" || decision.kind === "blocked" ? (
+                          <Text style={styles.submitDecisionMeta}>{decision.reason}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+                <Text style={styles.submitFooterHint}>
+                  Всего изменений:{" "}
+                  {submitPreview.willAddCount + submitPreview.quantityUpgradeCount} поз.,{" "}
+                  {submitPreview.willAddTotalPieces + submitPreview.quantityUpgradeExtraPieces} шт.
+                </Text>
+              </>
+            ) : null}
+            <View style={styles.submitModalActions}>
+              <Pressable
+                onPress={() => {
+                  setSubmitPreviewModalOpen(false);
+                  setSubmitPreview(null);
+                  setQuantityResolutionByDraftId({});
+                }}
+                disabled={submitting}
+                style={({ pressed }) => [styles.submitBtnSecondary, pressed && { opacity: 0.9 }]}
+              >
+                <Text style={styles.submitBtnSecondaryText}>Назад</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void runPickerSubmitConfirm()}
+                disabled={submitting || !canConfirmPickerSubmit}
+                style={({ pressed }) => [
+                  styles.submitBtnPrimary,
+                  (submitting || !canConfirmPickerSubmit) && styles.submitBtnPrimaryDisabled,
+                  pressed && { opacity: 0.92 },
+                ]}
+              >
+                {submitting ? (
+                  <ActivityIndicator color={c.onPrimaryAction} />
+                ) : (
+                  <Text style={styles.submitBtnPrimaryText}>Подтвердить</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <PickerDraftCartSheet
         visible={draftSheetOpen}
         draft={draft}
@@ -840,6 +1027,9 @@ export default function WishlistPickerScreen() {
         onClose={() => setDraftSheetOpen(false)}
         onClear={handleClearAndCloseSheet}
         onRemove={(draftId) => setDraft((d) => removeFromDraft(d, draftId))}
+        onChangeSkuQuantity={(draftId, nextQuantity) =>
+          setDraft((d) => updateSkuDraftItemQuantity(d, draftId, nextQuantity))
+        }
         onCheckout={() => {
           setDraftSheetOpen(false);
           openSubmit();
@@ -1080,4 +1270,102 @@ const styles = StyleSheet.create({
     backgroundColor: c.primaryAction,
   },
   filterApplyText: { fontSize: 13, fontWeight: "800", color: c.onPrimaryAction },
+  submitModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    padding: 16,
+  },
+  submitModalCard: {
+    borderRadius: 20,
+    padding: 16,
+    maxHeight: "88%",
+    backgroundColor: c.card,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  submitModalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: c.textPrimary,
+    marginBottom: 12,
+  },
+  submitSummaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 10,
+  },
+  submitSummaryCell: {
+    flexGrow: 1,
+    flexBasis: "45%",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: c.cardMuted,
+    borderWidth: 1,
+    borderColor: c.border,
+    alignItems: "center",
+  },
+  submitSummaryLabel: { fontSize: 10, color: c.textMuted, textAlign: "center" },
+  submitSummaryValue: { fontSize: 18, fontWeight: "800", marginTop: 2 },
+  submitDecisionsScroll: { maxHeight: 280, marginBottom: 8 },
+  submitDecisionRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.border,
+  },
+  submitDecisionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    marginTop: 6,
+    backgroundColor: c.textMuted,
+  },
+  submitDecisionTitle: { fontSize: 13, fontWeight: "600", color: c.textPrimary },
+  submitDecisionMeta: { fontSize: 11, color: c.textMuted, marginTop: 4 },
+  submitChoiceRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  submitChoiceChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardSubtle,
+    maxWidth: "100%",
+  },
+  submitChoiceChipSelected: {
+    borderColor: c.primaryAction,
+    backgroundColor: "rgba(255,122,0,0.12)",
+  },
+  submitChoiceChipText: { fontSize: 12, fontWeight: "700", color: c.textPrimary },
+  submitFooterHint: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textSecondary,
+    textAlign: "right",
+    marginBottom: 10,
+  },
+  submitModalActions: { flexDirection: "row", gap: 10, justifyContent: "flex-end" },
+  submitBtnSecondary: {
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+  },
+  submitBtnSecondaryText: { fontSize: 13, fontWeight: "700", color: c.textPrimary },
+  submitBtnPrimary: {
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: c.primaryAction,
+    minWidth: 120,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitBtnPrimaryDisabled: { opacity: 0.5 },
+  submitBtnPrimaryText: { fontSize: 13, fontWeight: "800", color: c.onPrimaryAction },
 });

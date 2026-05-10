@@ -99,6 +99,7 @@ export function PickerDraftCartSheet(props: {
   onClose: () => void;
   onClear: () => void;
   onRemove: (draftId: string) => void;
+  onChangeSkuQuantity?: (draftId: string, nextQuantity: number) => void;
   onCheckout: () => void;
 }) {
   const totals = useMemo(() => getDraftTotals(props.draft), [props.draft]);
@@ -145,6 +146,47 @@ export function PickerDraftCartSheet(props: {
                       <Text style={styles.sheetRowMeta} numberOfLines={1}>
                         SKU
                       </Text>
+                      <View style={styles.sheetSkuQtyRow}>
+                        {props.onChangeSkuQuantity ? (
+                          <View style={styles.sheetQtyStepper}>
+                            <Pressable
+                              onPress={() =>
+                                props.onChangeSkuQuantity?.(item.draftId, Math.max(1, item.quantity - 1))
+                              }
+                              disabled={item.quantity <= 1}
+                              style={({ pressed }) => [
+                                styles.sheetQtyBtn,
+                                item.quantity <= 1 && styles.sheetQtyBtnDisabled,
+                                pressed && item.quantity > 1 && styles.sheetQtyBtnPressed,
+                              ]}
+                              accessibilityRole="button"
+                              accessibilityLabel="Меньше"
+                            >
+                              <Text style={styles.sheetQtyBtnText}>−</Text>
+                            </Pressable>
+                            <Text style={styles.sheetQtyValue}>{item.quantity}</Text>
+                            <Pressable
+                              onPress={() => props.onChangeSkuQuantity?.(item.draftId, item.quantity + 1)}
+                              style={({ pressed }) => [styles.sheetQtyBtn, pressed && styles.sheetQtyBtnPressed]}
+                              accessibilityRole="button"
+                              accessibilityLabel="Больше"
+                            >
+                              <Text style={styles.sheetQtyBtnText}>+</Text>
+                            </Pressable>
+                            <Text style={styles.sheetQtyUnit}>шт.</Text>
+                          </View>
+                        ) : (
+                          <Text style={styles.sheetRowMeta}>{item.quantity} шт.</Text>
+                        )}
+                        <Text style={styles.sheetLinePrice}>
+                          {item.sku.priceAmount != null && Number.isFinite(item.sku.priceAmount)
+                            ? formatPriceRu(
+                                item.sku.priceAmount * Math.max(1, item.quantity),
+                                item.sku.currency
+                              )
+                            : "—"}
+                        </Text>
+                      </View>
                     </View>
                     <Pressable
                       onPress={() => props.onRemove(item.draftId)}
@@ -349,6 +391,34 @@ const styles = StyleSheet.create({
   sheetTextCol: { flex: 1, minWidth: 0 },
   sheetRowTitle: { fontSize: 13, fontWeight: "700", color: c.textPrimary },
   sheetRowMeta: { marginTop: 2, fontSize: 11, color: c.textMuted },
+  sheetSkuQtyRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  sheetQtyStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  sheetQtyBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetQtyBtnDisabled: { opacity: 0.35 },
+  sheetQtyBtnPressed: { opacity: 0.85 },
+  sheetQtyBtnText: { fontSize: 16, fontWeight: "800", color: c.textPrimary, lineHeight: 18 },
+  sheetQtyValue: { fontSize: 14, fontWeight: "800", color: c.textPrimary, minWidth: 22, textAlign: "center" },
+  sheetQtyUnit: { fontSize: 11, fontWeight: "600", color: c.textMuted },
+  sheetLinePrice: { fontSize: 13, fontWeight: "800", color: c.textPrimary },
   sheetRowRemove: {
     width: 36,
     height: 36,

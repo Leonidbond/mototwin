@@ -29,6 +29,7 @@ import {
   getWishlistItemSkuDisplayLines,
   groupPartWishlistItemsByStatus,
   isWishlistTransitionToInstalled,
+  wishlistLineTotalAmount,
   partWishlistStatusLabelsRu,
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
 } from "@mototwin/domain";
@@ -137,8 +138,9 @@ function detailPriceDisplay(item: PartWishlistItemViewModel): string {
   if (item.costLabelRu?.trim()) {
     return item.costLabelRu.trim();
   }
-  if (item.costAmount != null && item.costAmount > 0) {
-    return `${formatExpenseAmountRu(item.costAmount)} ${(item.currency ?? "RUB").toUpperCase()}`;
+  const line = wishlistLineTotalAmount(item);
+  if (line != null && line > 0) {
+    return `${formatExpenseAmountRu(line)} ${(item.currency ?? "RUB").toUpperCase()}`;
   }
   return "—";
 }
@@ -654,8 +656,9 @@ export default function VehicleWishlistScreen() {
     if (!vehicleId) {
       return;
     }
-    if (item.costAmount == null || item.costAmount <= 0 || !item.currency) {
-      Alert.alert("Расходы", "Укажите стоимость и валюту в карточке позиции перед переносом в расходы.");
+    const lineTotal = wishlistLineTotalAmount(item);
+    if (lineTotal == null || lineTotal <= 0 || !item.currency) {
+      Alert.alert("Расходы", "Укажите цену за шт. и валюту в карточке позиции перед переносом в расходы.");
       return;
     }
     try {
@@ -663,7 +666,7 @@ export default function VehicleWishlistScreen() {
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
       await endpoints.createExpenseFromShoppingListItem(item.id, {
-        amount: item.costAmount,
+        amount: lineTotal,
         currency: item.currency,
         purchasedAt: new Date().toISOString().slice(0, 10),
         comment: item.commentBodyRu ?? item.comment ?? null,
@@ -1189,7 +1192,16 @@ export default function VehicleWishlistScreen() {
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Стоимость</Text>
-                    <Text style={styles.detailValue}>{detailPriceDisplay(detailItem)}</Text>
+                    <View style={styles.detailValueCol}>
+                      {detailItem.unitCostLabelRu ? (
+                        <>
+                          <Text style={styles.detailValue}>{detailItem.unitCostLabelRu}</Text>
+                          <Text style={styles.detailValueMuted}>Всего: {detailPriceDisplay(detailItem)}</Text>
+                        </>
+                      ) : (
+                        <Text style={styles.detailValue}>{detailPriceDisplay(detailItem)}</Text>
+                      )}
+                    </View>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Комментарий</Text>
@@ -1270,7 +1282,7 @@ export default function VehicleWishlistScreen() {
                     >
                       <MaterialIcons name="local-shipping" size={17} color={CART_STATUS_COLOR.ORDERED} />
                       <Text style={[styles.detailActionBtnText, { color: CART_STATUS_COLOR.ORDERED }]}>
-                        Заказано
+                        Заказать
                       </Text>
                     </Pressable>
                   ) : null}
@@ -1289,7 +1301,7 @@ export default function VehicleWishlistScreen() {
                     >
                       <MaterialIcons name="shopping-bag" size={17} color={CART_STATUS_COLOR.BOUGHT} />
                       <Text style={[styles.detailActionBtnText, { color: CART_STATUS_COLOR.BOUGHT }]}>
-                        Куплено
+                        Купить
                       </Text>
                     </Pressable>
                   ) : null}
@@ -1308,7 +1320,7 @@ export default function VehicleWishlistScreen() {
                     >
                       <MaterialIcons name="build" size={17} color={CART_STATUS_COLOR.INSTALLED} />
                       <Text style={[styles.detailActionBtnText, { color: CART_STATUS_COLOR.INSTALLED }]}>
-                        Установлено
+                        Установить
                       </Text>
                     </Pressable>
                   ) : null}
@@ -1327,7 +1339,7 @@ export default function VehicleWishlistScreen() {
                     >
                       <MaterialIcons name="add-shopping-cart" size={17} color={PARTS_CART_REF.orange} />
                       <Text style={[styles.detailActionBtnText, { color: PARTS_CART_REF.orange }]}>
-                        Повторить покупку
+                        Повторить
                       </Text>
                     </Pressable>
                   ) : null}
@@ -1351,6 +1363,7 @@ export default function VehicleWishlistScreen() {
                 </View>
 
                 <Pressable
+                  accessibilityLabel="Перейти в журнал обслуживания"
                   onPress={() => {
                     const eventId =
                       detailItem.status === "INSTALLED"
@@ -1368,7 +1381,7 @@ export default function VehicleWishlistScreen() {
                   }}
                   style={({ pressed }) => [styles.detailJournalBtn, pressed && styles.detailActionBtnPressed]}
                 >
-                  <Text style={styles.detailJournalBtnText}>Перейти в журнал обслуживания</Text>
+                  <Text style={styles.detailJournalBtnText}>Перейти</Text>
                   <Text style={styles.detailJournalChevron}>›</Text>
                 </Pressable>
               </ScrollView>
@@ -2341,6 +2354,18 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     fontWeight: "700",
     color: PARTS_CART_REF.text,
+    textAlign: "right",
+  },
+  detailValueCol: {
+    flex: 1,
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  detailValueMuted: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "600",
+    color: PARTS_CART_REF.textMuted,
     textAlign: "right",
   },
   detailKitBox: {

@@ -127,12 +127,21 @@ async function main() {
   );
   assert(form.items[0]?.nodeId === installed.nodeId, "nodeId prefill in items[0]");
   assert(form.title === WISHLIST_INSTALL_SERVICE_TYPE_RU, "title (legacy serviceType)");
-  assert(
-    installed.costAmount != null &&
-      form.partsCost === formatExpenseAmountRu(installed.costAmount) &&
+  assert(form.mode === "ADVANCED", "wishlist install opens in ADVANCED (Подробно)");
+  assert(form.partsCost === "" && form.laborCost === "", "ADVANCED: top parts/labor empty, sums on rows");
+  assert(form.items[0]?.quantity === String(Math.max(1, installed.quantity ?? 1)), "quantity on bundle row");
+  if (installed.costAmount != null && installed.costAmount > 0) {
+    assert(
+      form.items[0]?.partCost === formatExpenseAmountRu(installed.costAmount),
+      "unit partCost on bundle row when wishlist has price",
+    );
+    assert(
       form.currency === (installed.currency?.trim() || "RUB").toUpperCase(),
-    "cost/currency from wishlist",
-  );
+      "currency when wishlist has price",
+    );
+  } else {
+    assert(form.items[0]?.partCost === "", "empty partCost when wishlist has no unit price");
+  }
   assert(
     form.comment?.includes(installed.title) || form.comment?.includes(sku.canonicalName),
     `comment should mention title or SKU: ${form.comment}`,

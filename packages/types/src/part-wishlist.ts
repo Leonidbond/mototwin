@@ -17,6 +17,7 @@ export type PartWishlistItem = {
   quantity: number;
   status: PartWishlistItemStatus;
   comment: string | null;
+  /** Цена за одну штуку; сумма по строке в UI = `costAmount * quantity`. */
   costAmount: number | null;
   currency: string | null;
   createdAt: string;
@@ -28,8 +29,13 @@ export type PartWishlistItem = {
 
 export type PartWishlistItemViewModel = PartWishlistItem & {
   statusLabelRu: string;
-  /** Preformatted “amount currency” for list UI when {@link PartWishlistItem.costAmount} is set. */
+  /**
+   * Сумма по строке: {@link PartWishlistItem.costAmount} (цена за 1 шт.) × {@link PartWishlistItem.quantity},
+   * если стоимость задана.
+   */
   costLabelRu?: string;
+  /** Цена за одну штуку (только если quantity больше 1 и задана стоимость). */
+  unitCostLabelRu?: string;
   /** UI-only label extracted from comment prefix, e.g. "Из комплекта: Замена масла". */
   kitOriginLabelRu?: string | null;
   /** Comment without kit-origin line for compact display. */

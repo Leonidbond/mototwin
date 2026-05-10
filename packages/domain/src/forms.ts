@@ -774,8 +774,18 @@ export function mergeWishlistItemIntoAddFormValues(
     hasCost &&
     itemCur === formCurrency;
   const baseParts = parseDecimalOrNull(form.partsCost) ?? 0;
+  const wishlistLineTotal =
+    active.costAmount != null && Number.isFinite(active.costAmount)
+      ? (active.costAmount as number) *
+        (active.quantity != null &&
+        Number.isFinite(active.quantity) &&
+        Number.isInteger(active.quantity) &&
+        active.quantity >= 1
+          ? active.quantity
+          : 1)
+      : 0;
   const nextPartsCost = shouldBumpPartsCost
-    ? formatExpenseAmountRu(baseParts + (active.costAmount as number))
+    ? formatExpenseAmountRu(baseParts + wishlistLineTotal)
     : form.partsCost;
 
   const appendedComment = buildAddServiceEventCommentFromWishlistItem(active);
@@ -899,33 +909,42 @@ export function createInitialAddServiceEventFromWishlistItem(
 ): AddServiceEventFormValues {
   const base = createInitialAddServiceEventFormValues();
   const eventDate = options?.todayDateYmd ?? getTodayDateYmdLocal();
-  const hasCost = item.costAmount != null && Number.isFinite(item.costAmount);
-  const partsCost = hasCost ? formatExpenseAmountRu(item.costAmount as number) : "";
+  const hasCost =
+    item.costAmount != null && Number.isFinite(item.costAmount) && (item.costAmount as number) > 0;
   const currency = hasCost
     ? (item.currency?.trim() || DEFAULT_ADD_SERVICE_EVENT_CURRENCY).toUpperCase()
     : base.currency;
   const skuPartNumber = item.sku?.primaryPartNumber?.trim() ?? "";
+  const qty =
+    item.quantity != null &&
+    Number.isFinite(item.quantity) &&
+    Number.isInteger(item.quantity) &&
+    item.quantity >= 1
+      ? item.quantity
+      : 1;
+  const row = createEmptyBundleItemFormValues({
+    nodeId: item.nodeId ?? "",
+    actionType: "REPLACE",
+    partName: item.title.trim(),
+    sku: skuPartNumber,
+    quantity: String(qty),
+    partCost: hasCost ? formatExpenseAmountRu(item.costAmount as number) : "",
+    laborCost: "",
+  });
   return {
     ...base,
     title: WISHLIST_INSTALL_SERVICE_TYPE_RU,
-    mode: "BASIC",
+    mode: "ADVANCED",
     commonActionType: "REPLACE",
     eventDate,
     odometer: String(vehicle.odometer),
     engineHours: vehicle.engineHours != null ? String(vehicle.engineHours) : "",
-    partsCost,
+    partsCost: "",
     laborCost: "",
     currency,
     comment: buildAddServiceEventCommentFromWishlistItem(item),
     installedPartsJson: buildWishlistInstalledPartsJsonString(item),
-    items: [
-      createEmptyBundleItemFormValues({
-        nodeId: item.nodeId ?? "",
-        actionType: "REPLACE",
-        partName: item.title.trim(),
-        sku: skuPartNumber,
-      }),
-    ],
+    items: [row],
   };
 }
 

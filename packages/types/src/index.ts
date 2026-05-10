@@ -235,6 +235,7 @@ export type {
   PickerSubmitDecision,
   PickerSubmitPreview,
   PickerSubmitResult,
+  PickerQuantitySubmitResolution,
 } from "./picker";
 export type {
   NodeContextActionKey,

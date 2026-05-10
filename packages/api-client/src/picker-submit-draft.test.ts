@@ -51,6 +51,9 @@ describe("submitPickerDraft", () => {
       async addServiceKitToWishlist() {
         throw new Error("should not be called");
       },
+      async updateWishlistItem() {
+        throw new Error("should not be called");
+      },
     };
     const result = await submitPickerDraft(api, draft);
     assert.equal(result.createdWishlistItemIds.length, 0);
@@ -120,6 +123,9 @@ describe("submitPickerDraft", () => {
       async addServiceKitToWishlist() {
         throw new Error("should not be called");
       },
+      async updateWishlistItem() {
+        throw new Error("should not be called");
+      },
     };
     const result = await submitPickerDraft(api, draft);
     assert.deepEqual(seen, {
@@ -177,6 +183,9 @@ describe("submitPickerDraft", () => {
       async addServiceKitToWishlist() {
         throw new Error("no");
       },
+      async updateWishlistItem() {
+        throw new Error("no");
+      },
     };
     const result = await submitPickerDraft(api, draft);
     assert.equal(result.skipped.length, 1);
@@ -217,6 +226,9 @@ describe("submitPickerDraft", () => {
           },
         };
       },
+      async updateWishlistItem() {
+        throw new Error("no");
+      },
     };
     const result = await submitPickerDraft(api, draft);
     assert.ok(result.createdKitCodes.includes("OIL_KIT"));
@@ -233,10 +245,98 @@ describe("submitPickerDraft", () => {
       async addServiceKitToWishlist() {
         throw new Error("no");
       },
+      async updateWishlistItem() {
+        throw new Error("no");
+      },
     };
     const result = await submitPickerDraft(api, emptyDraft("v"));
     assert.deepEqual(result.createdSkuIds, []);
     assert.deepEqual(result.createdKitCodes, []);
     assert.deepEqual(result.skipped, []);
+    assert.deepEqual(result.updatedWishlistItemIds, []);
+  });
+
+  it("PATCHes wishlist when quantity resolution is set (increment vs setTotal)", async () => {
+    const now = new Date().toISOString();
+    const draft: PickerDraftCart = {
+      vehicleId: "v1",
+      items: [
+        {
+          kind: "sku",
+          draftId: "d1",
+          quantity: 3,
+          nodeId: "node-1",
+          source: "search",
+          sku: {
+            id: "s1",
+            seedKey: null,
+            primaryNodeId: null,
+            brandName: "B",
+            canonicalName: "X",
+            partType: "",
+            description: null,
+            category: null,
+            priceAmount: 10,
+            currency: "RUB",
+            sourceUrl: null,
+            isOem: false,
+            isActive: true,
+            createdAt: now,
+            updatedAt: now,
+            primaryNode: null,
+            partNumbers: [],
+            nodeLinks: [],
+            fitments: [],
+            offers: [],
+          },
+        },
+      ],
+    };
+    const patches: Array<{ itemId: string; body: { nodeId: string; quantity: number } }> = [];
+    const api = {
+      async createWishlistItem() {
+        throw new Error("should not be called");
+      },
+      async addServiceKitToWishlist() {
+        throw new Error("should not be called");
+      },
+      async updateWishlistItem(
+        _vid: string,
+        itemId: string,
+        body: { nodeId: string; quantity: number }
+      ) {
+        patches.push({ itemId, body });
+        return { item: { id: itemId } };
+      },
+    };
+    const inc = await submitPickerDraft(api, draft, {
+      quantityResolutions: [
+        {
+          draftId: "d1",
+          existingWishlistItemId: "wl-7",
+          nodeId: "node-1",
+          mode: "increment",
+          draftRequestedQty: 3,
+          existingQty: 1,
+        },
+      ],
+    });
+    assert.deepEqual(patches[0]?.body, { nodeId: "node-1", quantity: 3 });
+    assert.deepEqual(inc.updatedWishlistItemIds, ["wl-7"]);
+    patches.length = 0;
+    const setTot = await submitPickerDraft(api, draft, {
+      quantityResolutions: [
+        {
+          draftId: "d1",
+          existingWishlistItemId: "wl-8",
+          nodeId: "node-1",
+          mode: "setTotal",
+          draftRequestedQty: 3,
+          existingQty: 1,
+        },
+      ],
+    });
+    assert.deepEqual(patches[0]?.body, { nodeId: "node-1", quantity: 3 });
+    assert.deepEqual(setTot.updatedWishlistItemIds, ["wl-8"]);
   });
 });

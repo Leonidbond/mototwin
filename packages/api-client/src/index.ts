@@ -4,4 +4,5 @@ export {
   createPickerSubmitApi,
   submitPickerDraft,
   type SubmitPickerDraftApi,
+  type SubmitPickerDraftOptions,
 } from "./picker-submit-draft";

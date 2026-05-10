@@ -99,11 +99,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
             include: { node: { select: { id: true, name: true } } },
           });
 
+      const qty = Math.max(1, item.quantity);
+      /** В wishlist `costAmount` хранится как цена за 1 шт.; в расходе — фактическая сумма покупки. */
+      const unitCost = Math.round((data.amount / qty) * 100) / 100;
+
       await tx.partWishlistItem.update({
         where: { id: item.id },
         data: {
           status: PartWishlistItemStatus.BOUGHT,
-          costAmount: data.amount,
+          costAmount: unitCost,
           currency: data.currency.trim().toUpperCase(),
         },
       });

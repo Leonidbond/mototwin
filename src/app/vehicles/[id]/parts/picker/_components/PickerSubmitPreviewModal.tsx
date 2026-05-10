@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import type { PickerSubmitPreview } from "@mototwin/types";
+import { arePickerQuantityResolutionsComplete } from "@mototwin/domain";
 import { pickerColors } from "./picker-styles";
 
 export function PickerSubmitPreviewModal(props: {
@@ -9,15 +10,32 @@ export function PickerSubmitPreviewModal(props: {
   isSubmitting: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  quantityResolutionByDraftId: Record<string, "setTotal" | "increment" | undefined>;
+  onQuantityResolutionChange: (draftId: string, mode: "setTotal" | "increment") => void;
 }) {
+  const canConfirm =
+    (props.preview.willAddCount > 0 || props.preview.quantityUpgradeCount > 0) &&
+    (props.preview.quantityUpgradeCount === 0 ||
+      arePickerQuantityResolutionsComplete(props.preview, props.quantityResolutionByDraftId));
+
+  const totalPiecesShown =
+    props.preview.willAddTotalPieces + props.preview.quantityUpgradeExtraPieces;
+
   return (
     <div style={overlayStyle} role="dialog" aria-modal="true" aria-labelledby="submit-preview-title">
       <div style={dialogStyle}>
-        <h2 id="submit-preview-title" style={titleStyle}>Подтвердите состав</h2>
+        <h2 id="submit-preview-title" style={titleStyle}>
+          Подтвердите состав
+        </h2>
 
-        <div style={summaryStyle}>
-          <SummaryItem label="Будет добавлено" count={props.preview.willAddCount} color={pickerColors.successText} />
-          <SummaryItem label="Уже в списке" count={props.preview.duplicateCount} color={pickerColors.info} />
+        <div style={summaryGridStyle}>
+          <SummaryItem label="Новые позиции" count={props.preview.willAddCount} color={pickerColors.successText} />
+          <SummaryItem
+            label="Обновить кол-во"
+            count={props.preview.quantityUpgradeCount}
+            color={pickerColors.warning}
+          />
+          <SummaryItem label="Уже достаточно" count={props.preview.duplicateCount} color={pickerColors.info} />
           <SummaryItem label="Не получится" count={props.preview.blockedCount} color={pickerColors.warning} />
         </div>
 
@@ -27,7 +45,34 @@ export function PickerSubmitPreviewModal(props: {
               <DecisionDot kind={decision.kind} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: pickerColors.text }}>{decision.label}</div>
-                {decision.kind !== "willAdd" ? (
+                {decision.kind === "willAdd" && decision.pieceCount > 1 ? (
+                  <div style={{ fontSize: 11, color: pickerColors.textMuted, marginTop: 2 }}>
+                    В количестве: {decision.pieceCount} шт.
+                  </div>
+                ) : null}
+                {decision.kind === "quantityUpgrade" ? (
+                  <div style={{ marginTop: 8 }}>
+                    <p style={{ fontSize: 11, color: pickerColors.textMuted, margin: "0 0 6px" }}>
+                      В списке уже {decision.existingQty} шт., в подборе — {decision.draftRequestedQty} шт.
+                      Донакопить {decision.addQty} шт.
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      <ChoiceChip
+                        label={`В списке будет ${decision.draftRequestedQty} шт.`}
+                        selected={props.quantityResolutionByDraftId[decision.draftId] === "setTotal"}
+                        onClick={() => props.onQuantityResolutionChange(decision.draftId, "setTotal")}
+                        disabled={props.isSubmitting}
+                      />
+                      <ChoiceChip
+                        label={`Докупить +${decision.addQty} к текущим`}
+                        selected={props.quantityResolutionByDraftId[decision.draftId] === "increment"}
+                        onClick={() => props.onQuantityResolutionChange(decision.draftId, "increment")}
+                        disabled={props.isSubmitting}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                {decision.kind === "duplicate" || decision.kind === "blocked" ? (
                   <div style={{ fontSize: 11, color: pickerColors.textMuted, marginTop: 2 }}>
                     {decision.reason}
                   </div>
@@ -39,12 +84,15 @@ export function PickerSubmitPreviewModal(props: {
 
         {props.preview.estimatedTotal != null ? (
           <div style={totalStyle}>
-            Будет добавлено: {props.preview.willAddCount} {positionsLabel(props.preview.willAddCount)},
-            ≈ {formatPriceRu(props.preview.estimatedTotal, props.preview.estimatedCurrency)}
+            Итого к изменению: {props.preview.willAddCount + props.preview.quantityUpgradeCount}{" "}
+            {positionsLabel(props.preview.willAddCount + props.preview.quantityUpgradeCount)} в количестве{" "}
+            {totalPiecesShown} шт., ≈ {formatPriceRu(props.preview.estimatedTotal, props.preview.estimatedCurrency)}
           </div>
         ) : (
           <div style={totalStyle}>
-            Будет добавлено: {props.preview.willAddCount} {positionsLabel(props.preview.willAddCount)}
+            Итого к изменению: {props.preview.willAddCount + props.preview.quantityUpgradeCount}{" "}
+            {positionsLabel(props.preview.willAddCount + props.preview.quantityUpgradeCount)} в количестве{" "}
+            {totalPiecesShown} шт.
           </div>
         )}
 
@@ -60,11 +108,11 @@ export function PickerSubmitPreviewModal(props: {
           <button
             type="button"
             onClick={props.onConfirm}
-            disabled={props.isSubmitting || props.preview.willAddCount === 0}
+            disabled={props.isSubmitting || !canConfirm}
             style={{
               ...primaryButtonStyle,
-              opacity: props.isSubmitting || props.preview.willAddCount === 0 ? 0.6 : 1,
-              cursor: props.isSubmitting || props.preview.willAddCount === 0 ? "default" : "pointer",
+              opacity: props.isSubmitting || !canConfirm ? 0.6 : 1,
+              cursor: props.isSubmitting || !canConfirm ? "default" : "pointer",
             }}
           >
             {props.isSubmitting ? "Сохраняем..." : "Подтвердить"}
@@ -75,22 +123,57 @@ export function PickerSubmitPreviewModal(props: {
   );
 }
 
+function ChoiceChip(props: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      disabled={props.disabled}
+      style={{
+        padding: "8px 12px",
+        borderRadius: 10,
+        border: `1px solid ${props.selected ? pickerColors.primary : pickerColors.border}`,
+        backgroundColor: props.selected ? "rgba(255,122,0,0.12)" : pickerColors.surfaceMuted,
+        color: pickerColors.text,
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: props.disabled ? "default" : "pointer",
+        textAlign: "left",
+        maxWidth: "100%",
+      }}
+    >
+      {props.label}
+    </button>
+  );
+}
+
 function SummaryItem({ label, count, color }: { label: string; count: number; color: string }) {
   return (
     <div style={summaryItemStyle}>
-      <span style={{ fontSize: 11, color: pickerColors.textMuted }}>{label}</span>
-      <span style={{ fontSize: 20, fontWeight: 800, color }}>{count}</span>
+      <span style={{ fontSize: 10, color: pickerColors.textMuted, textAlign: "center" }}>{label}</span>
+      <span style={{ fontSize: 18, fontWeight: 800, color }}>{count}</span>
     </div>
   );
 }
 
-function DecisionDot({ kind }: { kind: "willAdd" | "duplicate" | "blocked" }) {
+function DecisionDot({
+  kind,
+}: {
+  kind: "willAdd" | "duplicate" | "blocked" | "quantityUpgrade";
+}) {
   const color =
     kind === "willAdd"
       ? pickerColors.successStrong
       : kind === "duplicate"
         ? pickerColors.info
-        : pickerColors.error;
+        : kind === "quantityUpgrade"
+          ? pickerColors.warning
+          : pickerColors.error;
   return (
     <span
       style={{
@@ -118,7 +201,7 @@ function formatPriceRu(amount: number, currency: string | null): string {
     maximumFractionDigits: 0,
   }).format(amount);
   const cur = currency?.trim().toUpperCase();
-  const sym = cur === "RUB" ? "₽" : cur === "USD" ? "$" : cur === "EUR" ? "€" : (cur || "");
+  const sym = cur === "RUB" ? "₽" : cur === "USD" ? "$" : cur === "EUR" ? "€" : cur || "";
   return sym ? `${numFmt} ${sym}` : numFmt;
 }
 
@@ -154,9 +237,9 @@ const titleStyle: CSSProperties = {
   color: pickerColors.text,
 };
 
-const summaryStyle: CSSProperties = {
+const summaryGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: 8,
 };
 

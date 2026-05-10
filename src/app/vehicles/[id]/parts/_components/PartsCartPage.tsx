@@ -12,6 +12,7 @@ import {
   getWishlistItemSkuDisplayLines,
   partWishlistStatusLabelsRu,
   PART_WISHLIST_STATUS_ORDER,
+  wishlistLineTotalAmount,
   type CartSummaryMetric,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
@@ -461,9 +462,12 @@ export function PartsCartPage(props: PartsCartPageProps) {
       (item.status === "ORDERED" || item.status === "BOUGHT" || item.status === "INSTALLED");
     const installedServiceEventId = item.status === "INSTALLED" ? installedWishlistServiceEventIdByItemId.get(item.id) : null;
     const pathRow = nodePathForRow(nodeTree, item.nodeId);
+    const lineTotal = wishlistLineTotalAmount(item);
     const priceDisplay =
       item.costLabelRu ??
-      (item.costAmount != null ? `${formatRubAmount(item.costAmount)} ${(item.currency ?? "RUB").toUpperCase()}` : "—");
+      (lineTotal != null
+        ? `${formatRubAmount(lineTotal)} ${(item.currency ?? "RUB").toUpperCase()}`
+        : "—");
     const statusTransition = statusTransitionHistoryByItemId[item.id];
     const fallbackStatusTransition =
       !statusTransition && raw.updatedAt !== raw.createdAt && item.status !== "NEEDED"
@@ -534,7 +538,18 @@ export function PartsCartPage(props: PartsCartPageProps) {
             </div>
             <div className={styles.detailRow}>
               <dt className={styles.detailLabel}>Стоимость</dt>
-              <dd className={styles.detailValue}>{priceDisplay}</dd>
+              <dd className={styles.detailValue}>
+                {item.unitCostLabelRu ? (
+                  <>
+                    <span className="block">{item.unitCostLabelRu}</span>
+                    <span className="mt-1 block text-xs font-semibold" style={{ color: PARTS_CART_REF.textMuted }}>
+                      Всего: {priceDisplay}
+                    </span>
+                  </>
+                ) : (
+                  priceDisplay
+                )}
+              </dd>
             </div>
             <div className={styles.detailRow}>
               <dt className={styles.detailLabel}>Комментарий</dt>
@@ -582,19 +597,19 @@ export function PartsCartPage(props: PartsCartPageProps) {
             {item.status === "NEEDED" ? (
               <button type="button" className={styles.actionButton} onClick={() => onPatchWishlistItemStatus(item.id, "ORDERED", item.status)} disabled={isBusy} style={{ background: tint(PARTS_CART_REF.statusOrdered, 0.18), borderColor: tint(PARTS_CART_REF.statusOrdered, 0.35), color: PARTS_CART_REF.statusOrdered }}>
                 <span className={styles.actionIcon}><DetailActionIcon kind="ordered" /></span>
-                <span>Заказано</span>
+                <span>Заказать</span>
               </button>
             ) : null}
             {(item.status === "NEEDED" || item.status === "ORDERED") ? (
               <button type="button" className={styles.actionButton} onClick={() => onOpenWishlistPurchaseExpense(raw)} disabled={isBusy} style={{ background: tint(PARTS_CART_REF.statusBought, 0.16), borderColor: tint(PARTS_CART_REF.statusBought, 0.35), color: PARTS_CART_REF.statusBought }}>
                 <span className={styles.actionIcon}><DetailActionIcon kind="bought" /></span>
-                <span>Куплено</span>
+                <span>Купить</span>
               </button>
             ) : null}
             {item.status !== "INSTALLED" ? (
               <button type="button" className={styles.actionButton} onClick={() => onPatchWishlistItemStatus(item.id, "INSTALLED", item.status)} disabled={isBusy} style={{ background: tint(PARTS_CART_REF.statusInstalled, 0.16), borderColor: tint(PARTS_CART_REF.statusInstalled, 0.35), color: PARTS_CART_REF.statusInstalled }}>
                 <span className={styles.actionIcon}><DetailActionIcon kind="installed" /></span>
-                <span>Установлено</span>
+                <span>Установить</span>
               </button>
             ) : null}
             {detailCanRepeatWishlistPurchase ? (
@@ -612,7 +627,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
                 <span className={styles.actionIcon} style={{ color: "#fff" }}>
                   <DetailActionIcon kind="repeatPurchase" />
                 </span>
-                <span>Повторить покупку</span>
+                <span>Повторить</span>
               </button>
             ) : null}
             <button type="button" className={styles.actionButton} onClick={() => setDeleteConfirmItemId(item.id)} disabled={isBusy} style={{ background: tint(PARTS_CART_REF.statusNeeded, 0.16), borderColor: tint(PARTS_CART_REF.statusNeeded, 0.35), color: PARTS_CART_REF.statusNeeded }}>
@@ -624,6 +639,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
           <button
             type="button"
             className={styles.journalButton}
+            aria-label="Перейти в журнал обслуживания"
             onClick={() => {
               if (installedServiceEventId) {
                 openWishlistItemJournal(item);
@@ -632,7 +648,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
               openWishlistItemJournal(item);
             }}
           >
-            <span>Перейти в журнал обслуживания</span><span aria-hidden>›</span>
+            <span>Перейти</span><span aria-hidden>›</span>
           </button>
         </div>
       </aside>
@@ -870,7 +886,11 @@ export function PartsCartPage(props: PartsCartPageProps) {
                                 </span>
                                 <span className={styles.skuLine}>{skuLines?.primaryLine ?? "—"}</span>
                                 <span className={styles.qty}>{item.quantity} шт.</span>
-                                <span className={styles.price}>{formatRubAmount(item.costAmount)}</span>
+                                <span className={styles.price}>
+                                  {wishlistLineTotalAmount(item) != null
+                                    ? formatRubAmount(wishlistLineTotalAmount(item))
+                                    : "—"}
+                                </span>
                                 <button
                                   type="button"
                                   className={styles.statusPill}

@@ -117,8 +117,9 @@ Defined in `apps/app/app/_layout.tsx`:
 - Calls `updateVehicleProfile()` -> `/api/vehicles/[id]/profile`
 
 ### 3.8 Parts wishlist / «корзина замен» (`vehicles/[id]/wishlist/index.tsx`)
-- Full-vehicle wishlist list + status groups, summary cards, search, detail bottom sheet, and swipe actions; behavior and contracts match [parts-wishlist-mvp.md](./parts-wishlist-mvp.md).
+- Full-vehicle wishlist list + status groups, summary cards, search, detail bottom sheet, and swipe actions; behavior and contracts match [parts-wishlist-mvp.md](./parts-wishlist-mvp.md). В блоке **«Действия»** детальной модалки — короткие подписи **Редактировать / Заказать / Купить / Установить / Повторить / Удалить**, к журналу — **Перейти** (с `accessibilityLabel` полной фразы).
 - **Repeat purchase** from the cart matches web `PartsCartPage`: confirmation modal, `createWishlistItem` with `NEEDED`, comment suffix «Повтор из корзины замен», no cost copy, then filter to NEEDED and `applyWishlistRowFocus` on the new item id. Entry points: orange action in detail sheet, row shortcut next to the status pill, and a row inside the status-change modal.
+- **Picker checkout** (`vehicles/[id]/wishlist/picker.tsx`): перед отправкой draft — модалка превью с тем же доменным `buildPickerSubmitPreview`, что и web (в т.ч. **`quantityUpgrade`** и выбор варианта количества); **`submitPickerDraft`** с **`quantityResolutions`** и **`updateWishlistItem`**; редирект на wishlist с **`picked=`** из созданных и обновлённых id.
 
 ## 4. Expo-specific technical notes
 

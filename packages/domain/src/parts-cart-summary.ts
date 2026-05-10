@@ -1,4 +1,5 @@
 import type { PartWishlistItemStatus, PartWishlistItemViewModel } from "@mototwin/types";
+import { wishlistLineTotalAmount } from "./part-wishlist";
 
 export type CartSummaryMetric = { count: number; amount: number };
 
@@ -11,7 +12,10 @@ export type PartsCartSummary = {
 };
 
 function sumCostAmount(items: PartWishlistItemViewModel[]): number {
-  return items.reduce((acc, it) => acc + (it.costAmount ?? 0), 0);
+  return items.reduce((acc, it) => {
+    const line = wishlistLineTotalAmount(it);
+    return acc + (line ?? 0);
+  }, 0);
 }
 
 function byStatus(items: PartWishlistItemViewModel[], status: PartWishlistItemStatus) {

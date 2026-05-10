@@ -4,6 +4,7 @@ import type {
   PickerDraftCart,
   PickerDraftItemKit,
   PickerDraftItemSku,
+  PickerQuantitySubmitResolution,
   PickerSubmitResult,
 } from "@mototwin/types";
 
@@ -11,7 +12,7 @@ type MotoTwinEndpoints = ReturnType<typeof createMotoTwinEndpoints>;
 
 export type SubmitPickerDraftApi = Pick<
   MotoTwinEndpoints,
-  "createWishlistItem" | "addServiceKitToWishlist"
+  "createWishlistItem" | "addServiceKitToWishlist" | "updateWishlistItem"
 >;
 
 export function createPickerSubmitApi(baseUrl: string): SubmitPickerDraftApi {
@@ -34,9 +35,23 @@ function buildKitLabel(item: PickerDraftItemKit): string {
  * - SKU → POST wishlist
  * - Kit → POST wishlist/kits
  */
+export type SubmitPickerDraftOptions = {
+  /** Для строк превью `quantityUpgrade`: как обновить количество в существующей строке wishlist. */
+  quantityResolutions?: PickerQuantitySubmitResolution[];
+};
+
+function nextWishlistQtyFromResolution(res: PickerQuantitySubmitResolution): number {
+  if (res.mode === "setTotal") {
+    return Math.max(1, Math.trunc(res.draftRequestedQty));
+  }
+  const delta = Math.max(0, Math.trunc(res.draftRequestedQty) - Math.trunc(res.existingQty));
+  return Math.max(1, Math.trunc(res.existingQty) + delta);
+}
+
 export async function submitPickerDraft(
   api: SubmitPickerDraftApi,
-  draft: PickerDraftCart
+  draft: PickerDraftCart,
+  options?: SubmitPickerDraftOptions
 ): Promise<PickerSubmitResult> {
   const result: PickerSubmitResult = {
     createdSkuIds: [],
@@ -44,7 +59,13 @@ export async function submitPickerDraft(
     skipped: [],
     warnings: [],
     createdWishlistItemIds: [],
+    updatedWishlistItemIds: [],
   };
+
+  const resolutionByDraftId = new Map<string, PickerQuantitySubmitResolution>();
+  for (const r of options?.quantityResolutions ?? []) {
+    resolutionByDraftId.set(r.draftId, r);
+  }
 
   for (const item of draft.items) {
     if (item.kind === "sku") {
@@ -56,6 +77,21 @@ export async function submitPickerDraft(
           label,
           reason: "Не выбран узел для позиции",
         });
+        continue;
+      }
+      const qtyRes = resolutionByDraftId.get(item.draftId);
+      if (qtyRes) {
+        try {
+          const nextQty = nextWishlistQtyFromResolution(qtyRes);
+          await api.updateWishlistItem(draft.vehicleId, qtyRes.existingWishlistItemId, {
+            nodeId: qtyRes.nodeId,
+            quantity: nextQty,
+          });
+          result.updatedWishlistItemIds.push(qtyRes.existingWishlistItemId);
+        } catch (e) {
+          const message = e instanceof Error ? e.message : "Не удалось обновить количество";
+          result.skipped.push({ kind: "sku", label, reason: message });
+        }
         continue;
       }
       try {

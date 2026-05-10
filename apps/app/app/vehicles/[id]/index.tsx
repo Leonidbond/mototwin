@@ -2993,7 +2993,8 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                               <View style={styles.searchResultTextCol}>
                                 <Text style={styles.searchResultTitle}>{item.title}</Text>
                                 <Text style={styles.searchResultPath}>
-                                  {item.costLabelRu ?? "Стоимость не указана"}
+                                  {item.quantity} шт.
+                                  {item.costLabelRu ? ` · ${item.costLabelRu}` : " · цена не указана"}
                                   {item.kitOriginLabelRu ? ` · ${item.kitOriginLabelRu}` : ""}
                                 </Text>
                               </View>

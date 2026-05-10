@@ -1066,6 +1066,8 @@ type PickerSubmitResult = {
   createdKitCodes: string[];
   skipped: { kind: "sku" | "kit"; reason: string; label: string }[];
   warnings: string[];
+  createdWishlistItemIds: string[];
+  updatedWishlistItemIds: string[];
 };
 ```
 
@@ -1131,19 +1133,13 @@ Success toast:
 
 ---
 
-## 19. Duplicate logic
+## 19. Duplicate logic (и частичное совпадение по количеству)
 
-A duplicate is active if:
+Активная «конкурирующая» строка — та же **`vehicleId` + leaf `nodeId` + `skuId`**, статус не **`INSTALLED`**.
 
-- same vehicleId;
-- same nodeId;
-- same SKU id or same normalized name;
-- status is not `installed`.
-
-Default behavior:
-
-- do not add duplicates;
-- show warning in preview.
+- Если в черновике подбора **не больше** штук, чем уже в активной строке → в превью **`duplicate`** (ничего не добавляем и не PATCH-им).
+- Если в черновике **больше** штук, чем в существующей активной строке → **`quantityUpgrade`**: пользователь выбирает способ обновления количества; сабмит делает **`PATCH .../wishlist/[itemId]`** с новым **`quantity`** (см. `buildPickerSubmitPreview`, `submitPickerDraft` с `quantityResolutions`, `updatedWishlistItemIds` в `@mototwin/types`).
+- Полностью новая позиция (нет совпадения) → **`willAdd`** и **`POST .../wishlist`** как раньше.
 
 ---
 
@@ -1200,7 +1196,7 @@ All POST/PATCH input must be validated with Zod.
 2. **Web каркас**: новый маршрут `/vehicles/[id]/parts/picker` с `PartPickerPage`, заглушки секций.
 3. **Web данные**: подключить `getRecommendedSkusForNode`, `getServiceKits`, `getPartSkus`.
 4. **Web draft cart**: реализовать `PickerDraftCartPanel`, `DraftCartItemRow`, кнопки `+` и `Добавить комплект`.
-5. **Web submit flow**: `submitPickerDraft` в `@mototwin/api-client` (`picker-submit-draft.ts`) + `PickerSubmitPreviewModal`, batch POST, redirect с подсветкой.
+5. **Web submit flow**: `submitPickerDraft` в `@mototwin/api-client` (`picker-submit-draft.ts`) + `PickerSubmitPreviewModal` (в т.ч. **`quantityUpgrade`** и выбор режима перед **`updateWishlistItem`**), batch POST/PATCH, redirect с подсветкой по **`createdWishlistItemIds` + `updatedWishlistItemIds`**.
 6. **Web cleanup**: пункт сайдбара `«Подбор деталей»` и общий `GarageSidebar` обновлены (см. `garage-dashboard-mvp.md`); дальше: переключить оставшиеся точки входа при необходимости, выделить `WishlistItemEditModal` (для edit-only), удалить `PartPickerShell`.
 7. **Web polish**: skeletons, empty/error состояния, `?focus=kits`, стили под референс.
 8. **Mobile (Expo) экран**: `wishlist/picker.tsx` с тем же flow, `MobileDraftCartBar`, submit sheet.

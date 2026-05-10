@@ -75,6 +75,27 @@ export function addKitToDraft(
   return { ...draft, items: [...draft.items, item] };
 }
 
+/**
+ * Изменяет количество для позиции SKU в черновой корзине подбора (минимум 1).
+ */
+export function updateSkuDraftItemQuantity(
+  draft: PickerDraftCart,
+  draftId: string,
+  nextQuantity: number
+): PickerDraftCart {
+  const q = Number.isFinite(nextQuantity) ? Math.trunc(nextQuantity) : 1;
+  const clamped = q < 1 ? 1 : q > 9999 ? 9999 : q;
+  return {
+    ...draft,
+    items: draft.items.map((item) => {
+      if (item.kind !== "sku" || item.draftId !== draftId) {
+        return item;
+      }
+      return { ...item, quantity: clamped };
+    }),
+  };
+}
+
 export function removeFromDraft(draft: PickerDraftCart, draftId: string): PickerDraftCart {
   return { ...draft, items: draft.items.filter((item) => item.draftId !== draftId) };
 }
@@ -164,17 +185,41 @@ function buildKitLabel(item: PickerDraftItemKit): string {
   return item.kit.title || `Комплект ${item.kit.code}`;
 }
 
-type ActiveWishlistItemLike = Pick<PartWishlistItem, "status" | "nodeId" | "sku" | "title" | "vehicleId">;
+function pieceCountForDraftSku(item: PickerDraftItemSku): number {
+  const q = item.quantity;
+  return typeof q === "number" && Number.isFinite(q) && Number.isInteger(q) && q >= 1 ? q : 1;
+}
 
-function isSkuDuplicate(
+function pieceCountForDraftKit(item: PickerDraftItemKit): number {
+  if (item.kit.items.length === 0) {
+    return 1;
+  }
+  let sum = 0;
+  for (const ki of item.kit.items) {
+    const q = ki.quantity;
+    sum +=
+      typeof q === "number" && Number.isFinite(q) && Number.isInteger(q) && q >= 1
+        ? q
+        : 1;
+  }
+  return sum > 0 ? sum : 1;
+}
+
+type ActiveWishlistItemLike = Pick<
+  PartWishlistItem,
+  "id" | "status" | "nodeId" | "sku" | "title" | "vehicleId" | "quantity"
+>;
+
+function findActiveSkuWishlistMatch(
   item: PickerDraftItemSku,
   activeItems: ActiveWishlistItemLike[]
-): boolean {
+): ActiveWishlistItemLike | null {
   const targetNodeId = item.nodeId ?? item.sku.primaryNodeId;
-  if (!targetNodeId) return false;
-  return activeItems
+  if (!targetNodeId) return null;
+  const found = activeItems
     .filter(isActiveWishlistItem)
-    .some((existing) => existing.nodeId === targetNodeId && existing.sku?.id === item.sku.id);
+    .find((existing) => existing.nodeId === targetNodeId && existing.sku?.id === item.sku.id);
+  return found ?? null;
 }
 
 export type BuildPickerSubmitPreviewInput = {
@@ -189,6 +234,9 @@ export function buildPickerSubmitPreview(
 ): PickerSubmitPreview {
   const decisions: PickerSubmitDecision[] = [];
   let willAddCount = 0;
+  let willAddTotalPieces = 0;
+  let quantityUpgradeCount = 0;
+  let quantityUpgradeExtraPieces = 0;
   let duplicateCount = 0;
   let blockedCount = 0;
   let estimatedTotal = 0;
@@ -208,25 +256,64 @@ export function buildPickerSubmitPreview(
         blockedCount += 1;
         continue;
       }
-      if (isSkuDuplicate(item, input.activeWishlistItems)) {
+      const matched = findActiveSkuWishlistMatch(item, input.activeWishlistItems);
+      if (matched) {
+        const draftQty = pieceCountForDraftSku(item);
+        const existingQty = Math.max(1, Math.trunc(Number(matched.quantity) || 1));
+        if (draftQty <= existingQty) {
+          decisions.push({
+            kind: "duplicate",
+            draftId: item.draftId,
+            label,
+            reason: `В списке уже ${existingQty} шт. — не меньше, чем в подборе (${draftQty}).`,
+          });
+          duplicateCount += 1;
+          continue;
+        }
+        const addQty = draftQty - existingQty;
+        if (!matched.id) {
+          decisions.push({
+            kind: "blocked",
+            draftId: item.draftId,
+            label,
+            reason: "Не удалось сопоставить строку списка (нет id).",
+          });
+          blockedCount += 1;
+          continue;
+        }
         decisions.push({
-          kind: "duplicate",
+          kind: "quantityUpgrade",
           draftId: item.draftId,
           label,
-          reason: "Уже есть в активном списке",
+          existingWishlistItemId: matched.id,
+          nodeId: targetNodeId,
+          draftRequestedQty: draftQty,
+          existingQty,
+          addQty,
         });
-        duplicateCount += 1;
+        quantityUpgradeCount += 1;
+        quantityUpgradeExtraPieces += addQty;
+        const price = item.sku.priceAmount;
+        if (price != null && Number.isFinite(price)) {
+          estimatedTotal += price * addQty;
+        }
+        const c = item.sku.currency?.trim();
+        if (c) currencies.add(c);
         continue;
       }
-      decisions.push({ kind: "willAdd", draftId: item.draftId, label });
+      const pieces = pieceCountForDraftSku(item);
+      decisions.push({ kind: "willAdd", draftId: item.draftId, label, pieceCount: pieces });
       willAddCount += 1;
+      willAddTotalPieces += pieces;
       estimatedTotal += getSkuLineAmount(item);
       const c = item.sku.currency?.trim();
       if (c) currencies.add(c);
     } else {
       const label = buildKitLabel(item);
-      decisions.push({ kind: "willAdd", draftId: item.draftId, label });
+      const pieces = pieceCountForDraftKit(item);
+      decisions.push({ kind: "willAdd", draftId: item.draftId, label, pieceCount: pieces });
       willAddCount += 1;
+      willAddTotalPieces += pieces;
       estimatedTotal += getKitLineAmount(item);
       const c = getItemCurrency(item);
       if (c) currencies.add(c);
@@ -237,9 +324,24 @@ export function buildPickerSubmitPreview(
   return {
     decisions,
     willAddCount,
+    willAddTotalPieces,
+    quantityUpgradeCount,
+    quantityUpgradeExtraPieces,
     duplicateCount,
     blockedCount,
     estimatedTotal: estimatedCurrency ? estimatedTotal : null,
     estimatedCurrency,
   };
+}
+
+/** Все строки `quantityUpgrade` в превью имеют выбранный режим в `map`. */
+export function arePickerQuantityResolutionsComplete(
+  preview: PickerSubmitPreview,
+  resolutionByDraftId: Record<string, "setTotal" | "increment" | undefined>
+): boolean {
+  for (const d of preview.decisions) {
+    if (d.kind !== "quantityUpgrade") continue;
+    if (!resolutionByDraftId[d.draftId]) return false;
+  }
+  return true;
 }

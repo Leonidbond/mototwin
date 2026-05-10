@@ -9,6 +9,7 @@ import { pickerColors } from "./picker-styles";
 export function PickerDraftCartPanel(props: {
   draft: PickerDraftCart;
   onRemove: (draftId: string) => void;
+  onChangeSkuQuantity?: (draftId: string, nextQuantity: number) => void;
   onClear: () => void;
   onCheckout: () => void;
   isSubmitting: boolean;
@@ -52,7 +53,12 @@ export function PickerDraftCartPanel(props: {
       ) : (
         <ul style={listStyle}>
           {props.draft.items.map((item) => (
-            <DraftItemRow key={item.draftId} item={item} onRemove={() => props.onRemove(item.draftId)} />
+            <DraftItemRow
+              key={item.draftId}
+              item={item}
+              onRemove={() => props.onRemove(item.draftId)}
+              onChangeSkuQuantity={props.onChangeSkuQuantity}
+            />
           ))}
         </ul>
       )}
@@ -102,10 +108,18 @@ export function PickerDraftCartPanel(props: {
   );
 }
 
-function DraftItemRow(props: { item: PickerDraftItem; onRemove: () => void }) {
+function DraftItemRow(props: {
+  item: PickerDraftItem;
+  onRemove: () => void;
+  onChangeSkuQuantity?: (draftId: string, nextQuantity: number) => void;
+}) {
   const { item } = props;
   if (item.kind === "sku") {
-    const price = formatPriceRu(item.sku.priceAmount ?? 0, item.sku.currency);
+    const unit = item.sku.priceAmount;
+    const hasUnit = unit != null && Number.isFinite(unit);
+    const line = hasUnit ? unit * Math.max(item.quantity, 1) : 0;
+    const lineLabel = hasUnit ? formatPriceRu(line, item.sku.currency) : "—";
+    const canStep = Boolean(props.onChangeSkuQuantity);
     return (
       <li style={itemRowStyle}>
         <div style={itemImageStyle} aria-hidden>🛞</div>
@@ -116,11 +130,35 @@ function DraftItemRow(props: { item: PickerDraftItem; onRemove: () => void }) {
           {item.sku.partType ? (
             <div style={itemMetaStyle}>{item.sku.partType.replaceAll("_", " ")}</div>
           ) : null}
-          <div style={itemQtyRowStyle}>
-            <span>{item.quantity} шт.</span>
-            <span style={{ marginLeft: "auto", color: pickerColors.text, fontWeight: 700 }}>
-              {price}
-            </span>
+          <div style={{ ...itemQtyRowStyle, alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            {canStep ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <button
+                  type="button"
+                  aria-label="Меньше"
+                  disabled={item.quantity <= 1}
+                  onClick={() => props.onChangeSkuQuantity?.(item.draftId, item.quantity - 1)}
+                  style={qtyStepButtonStyle}
+                >
+                  −
+                </button>
+                <span style={{ fontSize: 13, fontWeight: 700, color: pickerColors.text, minWidth: 22, textAlign: "center" }}>
+                  {item.quantity}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Больше"
+                  onClick={() => props.onChangeSkuQuantity?.(item.draftId, item.quantity + 1)}
+                  style={qtyStepButtonStyle}
+                >
+                  +
+                </button>
+                <span style={{ fontSize: 12, color: pickerColors.textMuted }}>шт.</span>
+              </span>
+            ) : (
+              <span style={{ fontSize: 12, color: pickerColors.textMuted }}>{item.quantity} шт.</span>
+            )}
+            <span style={{ marginLeft: "auto", color: pickerColors.text, fontWeight: 700 }}>{lineLabel}</span>
           </div>
         </div>
         <button type="button" onClick={props.onRemove} aria-label="Удалить" style={removeButtonStyle}>
@@ -224,6 +262,20 @@ function formatPriceRu(amount: number, currency: string | null): string {
   const sym = cur === "RUB" ? "₽" : cur === "USD" ? "$" : cur === "EUR" ? "€" : (cur || "");
   return sym ? `${numFmt} ${sym}` : numFmt;
 }
+
+const qtyStepButtonStyle: CSSProperties = {
+  width: 28,
+  height: 28,
+  borderRadius: 8,
+  border: `1px solid ${pickerColors.border}`,
+  backgroundColor: pickerColors.surfaceSubtle,
+  color: pickerColors.text,
+  fontSize: 16,
+  fontWeight: 700,
+  cursor: "pointer",
+  lineHeight: 1,
+  padding: 0,
+};
 
 const panelStyle: CSSProperties = {
   display: "flex",

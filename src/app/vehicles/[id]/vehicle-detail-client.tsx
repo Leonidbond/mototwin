@@ -53,6 +53,7 @@ import {
   partWishlistStatusLabelsRu,
   PART_WISHLIST_STATUS_ORDER,
   validatePartWishlistFormValues,
+  wishlistLineTotalAmount,
   isWishlistTransitionToInstalled,
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
   buildTopNodeOverviewCards,
@@ -2802,8 +2803,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const openWishlistPurchaseExpenseForm = (item: PartWishlistItem) => {
     setWishlistPurchaseExpenseItemId(item.id);
     setWishlistPurchaseExpenseError("");
+    const line = wishlistLineTotalAmount(item);
     setWishlistPurchaseExpenseForm({
-      amount: item.costAmount != null ? String(item.costAmount) : "",
+      amount: line != null ? String(line) : "",
       currency: item.currency?.trim() || readDefaultCurrencySetting(),
       purchasedAt: new Date().toISOString().slice(0, 10),
       vendor: "",
@@ -5594,9 +5596,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                   Кол-во: {it.quantity}
                                   {it.node ? ` · Узел: ${it.node.name}` : ""}
                                 </p>
+                                {it.unitCostLabelRu ? (
+                                  <p className="mt-0.5 text-xs text-gray-500">{it.unitCostLabelRu}</p>
+                                ) : null}
                                 {it.costLabelRu ? (
                                   <p className="mt-0.5 text-xs text-gray-600">
-                                    Стоимость: {it.costLabelRu}
+                                    Всего: {it.costLabelRu}
                                   </p>
                                 ) : null}
                                 {it.kitOriginLabelRu ? (

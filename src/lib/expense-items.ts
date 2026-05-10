@@ -357,6 +357,14 @@ export async function syncExpenseItemForWishlistItem(
     return;
   }
 
+  const qty =
+    item.quantity != null && Number.isInteger(item.quantity) && item.quantity >= 1
+      ? item.quantity
+      : 1;
+  const lineTotal =
+    item.costAmount != null && Number.isFinite(item.costAmount)
+      ? item.costAmount * qty
+      : item.costAmount;
   await db.expenseItem.create({
     data: {
       vehicleId: item.vehicleId,
@@ -368,9 +376,9 @@ export async function syncExpenseItemForWishlistItem(
       installationStatus: "NOT_INSTALLED",
       expenseDate: item.updatedAt,
       title: item.title.trim(),
-      amount: item.costAmount,
+      amount: lineTotal,
       currency: normalizeCurrency(item.currency as string),
-      quantity: item.quantity,
+      quantity: qty,
       comment: item.comment?.trim() || null,
       purchasedAt: item.updatedAt,
       installedAt: null,

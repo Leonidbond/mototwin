@@ -508,6 +508,23 @@ export function normalizeUpdatePartWishlistPayload(
   return out;
 }
 
+/** Целое количество ≥ 1 для расчётов стоимости строки. */
+export function wishlistQuantityForLine(item: Pick<PartWishlistItem, "quantity">): number {
+  const q = item.quantity;
+  return typeof q === "number" && Number.isInteger(q) && q >= 1 ? q : 1;
+}
+
+/**
+ * Сумма по позиции списка покупок: цена за 1 шт. × количество.
+ * `costAmount` в API хранится как **цена за единицу** (как в строке bundle журнала при переносе из wishlist).
+ */
+export function wishlistLineTotalAmount(item: Pick<PartWishlistItem, "costAmount" | "quantity">): number | null {
+  if (item.costAmount == null || !Number.isFinite(item.costAmount)) {
+    return null;
+  }
+  return item.costAmount * wishlistQuantityForLine(item);
+}
+
 export function buildPartWishlistItemViewModel(item: PartWishlistItem): PartWishlistItemViewModel {
   const kitOriginLabelRu = extractWishlistKitOriginLabel(item.comment);
   const commentBodyRu = stripWishlistKitOriginFromComment(item.comment);
@@ -519,9 +536,15 @@ export function buildPartWishlistItemViewModel(item: PartWishlistItem): PartWish
   };
   if (item.costAmount != null && Number.isFinite(item.costAmount)) {
     const cur = item.currency?.trim() || PART_WISHLIST_DEFAULT_CURRENCY;
+    const qty = wishlistQuantityForLine(item);
+    const unitStr = `${formatExpenseAmountRu(item.costAmount)} ${cur.toUpperCase()}`;
+    const line = wishlistLineTotalAmount(item);
+    const lineStr =
+      line != null ? `${formatExpenseAmountRu(line)} ${cur.toUpperCase()}` : unitStr;
     return {
       ...base,
-      costLabelRu: `${formatExpenseAmountRu(item.costAmount)} ${cur.toUpperCase()}`,
+      costLabelRu: lineStr,
+      ...(qty > 1 ? { unitCostLabelRu: `${unitStr} за шт.` } : {}),
     };
   }
   return base;

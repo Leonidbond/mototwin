@@ -88,6 +88,22 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
   const wishlistSkuSearchGen = useRef(0);
   const [loadedWishlistItem, setLoadedWishlistItem] = useState<PartWishlistItem | null>(null);
 
+  const costLinePreviewRu = useMemo(() => {
+    const qtyRaw = form.quantity.trim();
+    const qtyParsed = qtyRaw ? Number.parseInt(qtyRaw, 10) : 1;
+    const qty = Number.isInteger(qtyParsed) && qtyParsed >= 1 ? qtyParsed : 1;
+    const normalizedCost = form.costAmount.trim().replace(/\s/g, "").replace(",", ".");
+    if (normalizedCost === "") {
+      return null;
+    }
+    const unit = Number.parseFloat(normalizedCost);
+    if (Number.isNaN(unit) || unit < 0) {
+      return null;
+    }
+    const cur = form.currency.trim().toUpperCase() || "RUB";
+    return `${formatExpenseAmountRu(unit * qty)} ${cur}`;
+  }, [form.quantity, form.costAmount, form.currency]);
+
   const selectedNodeLabel = useMemo(() => {
     const raw = form.nodeId.trim();
     if (!raw) {
@@ -550,7 +566,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
             style={styles.input}
           />
 
-          <Text style={styles.label}>Стоимость (необязательно)</Text>
+          <Text style={styles.label}>Цена за 1 шт. (необязательно)</Text>
           <TextInput
             value={form.costAmount}
             onChangeText={(costAmount) => setForm((f) => ({ ...f, costAmount }))}
@@ -559,6 +575,11 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
             keyboardType="decimal-pad"
             style={styles.input}
           />
+          {costLinePreviewRu ? (
+            <Text style={styles.costLineHint}>
+              Всего за {form.quantity.trim() || "1"} шт.: {costLinePreviewRu}
+            </Text>
+          ) : null}
 
           <Text style={styles.label}>Валюта</Text>
           <TextInput
@@ -670,6 +691,12 @@ const styles = StyleSheet.create({
     color: c.textMuted,
     marginBottom: 6,
     marginTop: 14,
+  },
+  costLineHint: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textSecondary,
   },
   requiredMark: { color: c.error },
   labelCompact: {

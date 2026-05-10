@@ -31,7 +31,9 @@ import {
   getOrderedTopNodeIdsPresentInNodeTree,
   nodeAncestorPathLabelRu,
   removeFromDraft,
+  updateSkuDraftItemQuantity,
   vehicleDetailFromApiRecord,
+  arePickerQuantityResolutionsComplete,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
@@ -41,6 +43,7 @@ import type {
   PartSkuViewModel,
   PartWishlistItem,
   PickerDraftCart,
+  PickerQuantitySubmitResolution,
   PickerSubmitPreview,
   ServiceKitViewModel,
   TopServiceNodeItem,
@@ -143,6 +146,9 @@ export function PartPickerPage({
 
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [submitPreview, setSubmitPreview] = useState<PickerSubmitPreview | null>(null);
+  const [quantityResolutionByDraftId, setQuantityResolutionByDraftId] = useState<
+    Record<string, "setTotal" | "increment" | undefined>
+  >({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addingKitCode, setAddingKitCode] = useState<string | null>(null);
   const [recAlternativesVisible, setRecAlternativesVisible] = useState(false);
@@ -580,6 +586,7 @@ export function PartPickerPage({
 
   const openCheckoutPreview = useCallback(() => {
     const active = filterActiveWishlistItems(wishlistItems);
+    setQuantityResolutionByDraftId({});
     setSubmitPreview(
       buildPickerSubmitPreview({
         draft,
@@ -589,13 +596,36 @@ export function PartPickerPage({
   }, [draft, wishlistItems]);
 
   const handleConfirmSubmit = useCallback(async () => {
-    if (!submitPreview || submitPreview.willAddCount === 0) return;
+    if (!submitPreview) return;
+    const hasWork =
+      submitPreview.willAddCount > 0 || submitPreview.quantityUpgradeCount > 0;
+    if (!hasWork) return;
+    if (
+      submitPreview.quantityUpgradeCount > 0 &&
+      !arePickerQuantityResolutionsComplete(submitPreview, quantityResolutionByDraftId)
+    ) {
+      return;
+    }
     setIsSubmitting(true);
     setBanner(null);
     try {
+      const quantityResolutions: PickerQuantitySubmitResolution[] = [];
+      for (const d of submitPreview.decisions) {
+        if (d.kind !== "quantityUpgrade") continue;
+        const mode = quantityResolutionByDraftId[d.draftId];
+        if (!mode) continue;
+        quantityResolutions.push({
+          draftId: d.draftId,
+          existingWishlistItemId: d.existingWishlistItemId,
+          nodeId: d.nodeId,
+          mode,
+          draftRequestedQty: d.draftRequestedQty,
+          existingQty: d.existingQty,
+        });
+      }
       const api = createPickerSubmitApi("");
-      const result = await submitPickerDraft(api, draft);
-      const picked = result.createdWishlistItemIds.join(",");
+      const result = await submitPickerDraft(api, draft, { quantityResolutions });
+      const picked = [...result.createdWishlistItemIds, ...result.updatedWishlistItemIds].join(",");
       const parts = [];
       if (result.createdSkuIds.length) {
         parts.push(`SKU: ${result.createdSkuIds.length}`);
@@ -607,6 +637,7 @@ export function PartPickerPage({
         parts.push(`пропущено: ${result.skipped.length}`);
       }
       setSubmitPreview(null);
+      setQuantityResolutionByDraftId({});
       setDraft(createEmptyDraftCart(vehicleId));
       const qs = picked ? `?picked=${encodeURIComponent(picked)}` : "";
       router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts${qs}`);
@@ -618,7 +649,7 @@ export function PartPickerPage({
     } finally {
       setIsSubmitting(false);
     }
-  }, [submitPreview, draft, vehicleId, router]);
+  }, [submitPreview, quantityResolutionByDraftId, draft, vehicleId, router]);
 
   const showSearchResults = debouncedSearch.trim().length >= 2;
   const centerLoading = vehicleLoading || nodeTreeLoading;
@@ -857,6 +888,9 @@ export function PartPickerPage({
                     <PickerDraftCartPanel
                       draft={draft}
                       onRemove={(id) => setDraft((d) => removeFromDraft(d, id))}
+                      onChangeSkuQuantity={(draftId, nextQuantity) =>
+                        setDraft((d) => updateSkuDraftItemQuantity(d, draftId, nextQuantity))
+                      }
                       onClear={() => setDraft((d) => clearDraft(d))}
                       onCheckout={openCheckoutPreview}
                       isSubmitting={isSubmitting}
@@ -884,6 +918,9 @@ export function PartPickerPage({
                     variant="dock"
                     draft={draft}
                     onRemove={(id) => setDraft((d) => removeFromDraft(d, id))}
+                    onChangeSkuQuantity={(draftId, nextQuantity) =>
+                      setDraft((d) => updateSkuDraftItemQuantity(d, draftId, nextQuantity))
+                    }
                     onClear={() => setDraft((d) => clearDraft(d))}
                     onCheckout={openCheckoutPreview}
                     isSubmitting={isSubmitting}
@@ -911,7 +948,14 @@ export function PartPickerPage({
             <PickerSubmitPreviewModal
               preview={submitPreview}
               isSubmitting={isSubmitting}
-              onCancel={() => setSubmitPreview(null)}
+              quantityResolutionByDraftId={quantityResolutionByDraftId}
+              onQuantityResolutionChange={(draftId, mode) =>
+                setQuantityResolutionByDraftId((prev) => ({ ...prev, [draftId]: mode }))
+              }
+              onCancel={() => {
+                setSubmitPreview(null);
+                setQuantityResolutionByDraftId({});
+              }}
               onConfirm={() => void handleConfirmSubmit()}
             />
           ) : null}

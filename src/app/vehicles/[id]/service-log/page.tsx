@@ -9,11 +9,9 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
-  type RefObject,
 } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
-  buildServiceLogEntryViewModel,
   buildServiceLogTimelineProps,
   expenseCategoryLabelsRu,
   filterLeafOptionsUnderTopNodeAncestors,
@@ -35,7 +33,6 @@ import { Button } from "@/components/ui";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { NodePickerModal, type SharedNodePickerOption } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
 import type {
-  CreatePartWishlistItemInput,
   NodeTreeItem,
   ServiceActionType,
   ServiceEventItem,
@@ -56,13 +53,6 @@ const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 const SIDEBAR_COLLAPSED_KEY = "vehicle.detail.sidebar.collapsed";
 const LOAD_MORE_STEP = 20;
 const SERVICE_LOG_DETAILS_COL_WIDTH = 460;
-
-type RepeatPurchaseConfirmPayload = {
-  eventId: string;
-  entryMainTitle: string;
-  entryDateLabel: string;
-  items: ServiceLogBundleItemSummary[];
-};
 
 // ─── Visual system ─────────────────────────────────────────────────────────────
 // All colours route through `productSemanticColors` so the journal stays in the
@@ -291,15 +281,21 @@ const mutedBtnStyle: CSSProperties = {
   gap: 6,
 };
 
-/** Правая панель журнала: компактные бейджи узлов и ссылки на суммы/расходы. */
+/** Вертикальные отступы секций правой панели деталей (визуальное разделение блоков). */
+const detailPanelSectionPad: CSSProperties["padding"] = "12px 20px 14px";
+const detailPanelHeaderPad: CSSProperties["padding"] = "14px 20px 10px";
+const detailPanelMetricsPad: CSSProperties["padding"] = "10px 20px 12px";
+const detailPanelFooterPad: CSSProperties["padding"] = "12px 20px 14px";
+
+/** Правая панель журнала: бейджи узлов в одной шкале с телом панели (~11–13px). */
 const detailPanelNodeChipStyle: CSSProperties = {
-  fontSize: 9,
+  fontSize: 11,
   fontWeight: 600,
-  letterSpacing: "0.02em",
+  letterSpacing: "0.01em",
   color: SPEC.textPrimary,
-  lineHeight: 1.15,
-  padding: "1px 6px",
-  borderRadius: 5,
+  lineHeight: 1.35,
+  padding: "2px 8px",
+  borderRadius: 6,
   backgroundColor: "rgba(255,255,255,0.04)",
   border: SPEC.borderSubtle,
   maxWidth: "100%",
@@ -344,44 +340,6 @@ const detailPanelCostTotalLinkStyle: CSSProperties = {
 
 function parsePaidOnly(v: string | null): boolean {
   return v === "1" || v === "true";
-}
-
-function wishlistPayloadFromLogBundleItem(
-  item: ServiceLogBundleItemSummary,
-  entryMainTitle: string,
-  entryDateLabel: string
-): CreatePartWishlistItemInput {
-  const title =
-    (item.partName ?? item.actionLabelRu ?? "Позиция из журнала").trim() || "Позиция из журнала";
-  const quantity =
-    item.quantity != null && Number.isInteger(item.quantity) && item.quantity >= 1 ? item.quantity : 1;
-  const bits: string[] = [];
-  if (item.sku?.trim()) bits.push(`SKU: ${item.sku.trim()}`);
-  bits.push(`Из журнала: ${entryMainTitle} (${entryDateLabel})`);
-  return {
-    nodeId: item.nodeId,
-    title,
-    quantity,
-    skuId: null,
-    comment: bits.join(" · "),
-    status: "NEEDED",
-  };
-}
-
-function useClosePanelOnOutsidePress(
-  open: boolean,
-  rootRef: RefObject<HTMLElement | null>,
-  onClose: () => void
-) {
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      const el = rootRef.current;
-      if (el && !el.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open, onClose, rootRef]);
 }
 
 function getCompactCost(entry: ServiceLogEntryViewModel): string | null {
@@ -581,8 +539,6 @@ export default function VehicleServiceLogPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-  const [repeatPurchaseBusy, setRepeatPurchaseBusy] = useState(false);
-  const [repeatPurchaseModal, setRepeatPurchaseModal] = useState<RepeatPurchaseConfirmPayload | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(highlightedServiceEventId ?? "");
   const [visibleCount, setVisibleCount] = useState(LOAD_MORE_STEP);
@@ -975,68 +931,6 @@ export default function VehicleServiceLogPage() {
     if (serviceEventById.get(id)?.eventKind === "STATE_UPDATE") return;
     router.push(`/vehicles/${vehicleId}/service-events/new?repeatOf=${encodeURIComponent(id)}&returnTo=${serviceLogReturnTo}`);
   };
-
-  const repeatPurchaseInstalledParts = useCallback(
-    async (eventId: string, bundleItemIds?: string[] | null) => {
-      const ev = serviceEventById.get(eventId);
-      if (!ev || ev.eventKind === "STATE_UPDATE") {
-        setActionMessage("Для этой записи нельзя добавить позиции в список покупок.");
-        return;
-      }
-      if ((ev.mode ?? "BASIC") !== "ADVANCED") {
-        setActionMessage(
-          "В быстром режиме нет отдельных позиций запчастей по строкам — только узлы и тип работ. Повтор покупки по списку установленных деталей доступен для записей в подробном режиме."
-        );
-        return;
-      }
-      const entry = buildServiceLogEntryViewModel(ev);
-      let targets = entry.bundleItemsSummary;
-      if (bundleItemIds && bundleItemIds.length > 0) {
-        targets = targets.filter((t) => bundleItemIds.includes(t.id));
-      }
-      if (targets.length === 0) {
-        setActionMessage("В этой записи нет установленных запчастей для повторной покупки.");
-        return;
-      }
-      setRepeatPurchaseBusy(true);
-      setActionMessage("");
-      let created = 0;
-      let lastError = "";
-      for (const item of targets) {
-        try {
-          const payload = wishlistPayloadFromLogBundleItem(item, entry.mainTitle, entry.dateLabel);
-          await api.createWishlistItem(vehicleId, payload);
-          created += 1;
-        } catch (e) {
-          lastError = e instanceof Error ? e.message : "Ошибка создания позиции";
-        }
-      }
-      setRepeatPurchaseBusy(false);
-      if (created > 0) {
-        const rt = encodeURIComponent(serviceLogHighlightReturnPath(eventId));
-        router.push(`/vehicles/${vehicleId}/parts?returnTo=${rt}`);
-        if (lastError) {
-          setActionMessage(
-            `Добавлено в список покупок: ${created}. Не удалось добавить часть позиций: ${lastError}`
-          );
-        }
-      } else {
-        setActionMessage(lastError || "Не удалось добавить позиции в список покупок.");
-      }
-    },
-    [router, serviceEventById, serviceLogHighlightReturnPath, vehicleId]
-  );
-
-  const openRepeatPurchaseConfirm = useCallback((payload: RepeatPurchaseConfirmPayload) => {
-    const ev = serviceEventById.get(payload.eventId);
-    if (!ev || ev.eventKind === "STATE_UPDATE" || (ev.mode ?? "BASIC") !== "ADVANCED") {
-      setActionMessage(
-        "В быстром режиме нет отдельных позиций запчастей по строкам — только узлы и тип работ. Повтор покупки по списку установленных деталей доступен для записей в подробном режиме."
-      );
-      return;
-    }
-    setRepeatPurchaseModal(payload);
-  }, [serviceEventById]);
 
   const openEdit = (id: string) => {
     if (serviceEventById.get(id)?.eventKind === "STATE_UPDATE") return;
@@ -2046,8 +1940,6 @@ export default function VehicleServiceLogPage() {
                                       onRepeat={() => openRepeat(entry.id)}
                                       onEdit={() => openEdit(entry.id)}
                                       onDelete={() => void deleteEvent(entry.id)}
-                                      onRequestRepeatPurchaseModal={openRepeatPurchaseConfirm}
-                                      repeatPurchaseBusy={repeatPurchaseBusy}
                                     />
                                   </div>
                                 ) : null}
@@ -2105,8 +1997,6 @@ export default function VehicleServiceLogPage() {
                       onRepeat={() => openRepeat(selectedEntry.id)}
                       onEdit={() => openEdit(selectedEntry.id)}
                       onDelete={() => void deleteEvent(selectedEntry.id)}
-                      onRequestRepeatPurchaseModal={openRepeatPurchaseConfirm}
-                      repeatPurchaseBusy={repeatPurchaseBusy}
                     />
                   ) : (
                     <div
@@ -2146,25 +2036,6 @@ export default function VehicleServiceLogPage() {
         onClose={() => setNodePickerOpen(false)}
         onConfirm={applyNodePickerSelection}
       />
-      {repeatPurchaseModal ? (
-        <RepeatPurchaseConfirmModal
-          payload={repeatPurchaseModal}
-          busy={repeatPurchaseBusy}
-          onClose={() => {
-            if (!repeatPurchaseBusy) setRepeatPurchaseModal(null);
-          }}
-          onConfirm={() => {
-            const p = repeatPurchaseModal;
-            setRepeatPurchaseModal(null);
-            if (p) {
-              void repeatPurchaseInstalledParts(
-                p.eventId,
-                p.items.map((it) => it.id)
-              );
-            }
-          }}
-        />
-      ) : null}
     </main>
   );
 }
@@ -2569,327 +2440,16 @@ function RowMetric({ icon, value, label }: { icon: ReactNode; value: string; lab
   );
 }
 
-const logDetailsMenuPanelStyle: CSSProperties = {
-  position: "absolute",
-  top: "100%",
-  marginTop: 6,
-  minWidth: 280,
-  padding: 4,
-  borderRadius: 10,
-  border: SPEC.borderSubtle,
-  backgroundColor: SPEC.bgPanel,
-  boxShadow: "0 10px 28px rgba(0,0,0,0.5)",
-  zIndex: 40,
-};
-
-const logDetailsMenuItemStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 10,
-  width: "100%",
-  textAlign: "left",
-  padding: "9px 12px",
-  fontSize: 13,
-  fontWeight: 500,
-  color: SPEC.textPrimary,
-  background: "transparent",
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer",
-  font: "inherit",
-  lineHeight: 1.35,
-  whiteSpace: "normal",
-};
-
-const logDetailsMenuItemRepeatPurchaseStyle: CSSProperties = {
-  ...logDetailsMenuItemStyle,
-  color: SPEC.accent,
-  fontWeight: 600,
-};
-
-/** Корзина + стрелка «снова» — пункт «Повторить покупку» в меню деталей журнала. */
-function RepeatPurchaseMenuSvg({ size = 18 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.65"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M4 10h2l1.2 8h10.6L19 10H6" />
-      <circle cx="9" cy="20" r="1" fill="currentColor" stroke="none" />
-      <circle cx="17" cy="20" r="1" fill="currentColor" stroke="none" />
-      <path d="M15 4.5a4 4 0 1 1 1.2 3.1" strokeWidth="1.5" />
-      <path d="M17 3v3h-3" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function RepeatPurchaseConfirmModal({
-  payload,
-  busy,
-  onClose,
-  onConfirm,
-}: {
-  payload: RepeatPurchaseConfirmPayload;
-  busy: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  const plural = payload.items.length > 1;
-  return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6"
-      style={{ backgroundColor: productSemanticColors.overlayModal }}
-      onClick={() => {
-        if (!busy) onClose();
-      }}
-      role="presentation"
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="repeat-purchase-dialog-title"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 420,
-          borderRadius: radiusScale.lg,
-          border: SPEC.borderSubtle,
-          backgroundColor: SPEC.bgPanel,
-          padding: "20px 22px 18px",
-          boxShadow: "0 24px 48px rgba(0,0,0,0.55)",
-        }}
-      >
-        <h2
-          id="repeat-purchase-dialog-title"
-          style={{
-            margin: 0,
-            fontSize: 17,
-            fontWeight: 700,
-            color: SPEC.textPrimary,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <span style={{ color: SPEC.textSecondary, display: "inline-flex" }}>
-            <RepeatPurchaseMenuSvg size={22} />
-          </span>
-          Повторить покупку
-        </h2>
-        <p
-          style={{
-            margin: "14px 0 0",
-            fontSize: 13,
-            fontWeight: 500,
-            color: SPEC.textPrimary,
-            lineHeight: 1.45,
-          }}
-        >
-          {plural
-            ? "Выбранные запчасти будут добавлены в корзину замен в раздел «Нужно купить»."
-            : "Запчасть будет добавлена в корзину замен в раздел «Нужно купить»."}
-        </p>
-        <p style={{ margin: "8px 0 0", fontSize: 12, color: SPEC.textMuted, lineHeight: 1.4 }}>
-          Запись журнала: {payload.entryMainTitle} · {payload.entryDateLabel}
-        </p>
-        <div
-          style={{
-            marginTop: 14,
-            maxHeight: 260,
-            overflowY: "auto",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          {payload.items.map((it) => (
-            <div
-              key={it.id}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: SPEC.borderSubtle,
-                backgroundColor: C.wash,
-              }}
-            >
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: SPEC.textPrimary, lineHeight: 1.3 }}>
-                {it.partName ?? it.actionLabelRu}
-              </p>
-              <p style={{ margin: "6px 0 0", fontSize: 12, color: SPEC.textSecondary, lineHeight: 1.35 }}>
-                Узел: {it.nodeName}
-                {it.sku ? ` · SKU: ${it.sku}` : ""}
-                {it.quantity != null ? ` · ${it.quantity} шт.` : ""}
-              </p>
-              {it.lineCostRu ? (
-                <p style={{ margin: "4px 0 0", fontSize: 12, fontWeight: 600, color: C.green }}>
-                  {it.lineCostRu}
-                </p>
-              ) : null}
-            </div>
-          ))}
-        </div>
-        <div
-          style={{
-            marginTop: 18,
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "flex-end",
-            gap: 8,
-          }}
-        >
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onClose}
-            style={{
-              height: 38,
-              padding: "0 16px",
-              borderRadius: 8,
-              border: SPEC.borderSubtle,
-              backgroundColor: "transparent",
-              color: SPEC.textSecondary,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: busy ? "not-allowed" : "pointer",
-            }}
-          >
-            Отмена
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onConfirm}
-            style={{
-              height: 38,
-              padding: "0 18px",
-              borderRadius: 8,
-              border: "none",
-              backgroundColor: SPEC.accent,
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: busy ? "not-allowed" : "pointer",
-              opacity: busy ? 0.75 : 1,
-            }}
-          >
-            {busy ? "Добавление…" : "Добавить в корзину"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ServiceLogDetailsActionsMenu({
-  hasBundleParts,
-  busy,
-  onRequestRepeatPurchaseAll,
-}: {
-  hasBundleParts: boolean;
-  busy: boolean;
-  onRequestRepeatPurchaseAll: () => void;
-}) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const [open, setOpen] = useState(false);
-  useClosePanelOnOutsidePress(open, rootRef, () => setOpen(false));
-
-  if (!hasBundleParts) return null;
-
-  return (
-    <div
-      ref={rootRef}
-      style={{
-        padding: "6px 20px 8px",
-        borderBottom: SPEC.borderSubtle,
-        flexShrink: 0,
-        position: "relative",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <PanelSectionTitle>Действия</PanelSectionTitle>
-        <button
-          type="button"
-          disabled={busy}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          aria-label="Меню действий"
-          onClick={() => setOpen((v) => !v)}
-          style={{
-            width: 34,
-            height: 34,
-            flexShrink: 0,
-            borderRadius: 8,
-            border: SPEC.borderSubtle,
-            backgroundColor: C.wash,
-            color: SPEC.textSecondary,
-            cursor: busy ? "not-allowed" : "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            opacity: busy ? 0.55 : 1,
-          }}
-        >
-          <span style={{ fontSize: 18, lineHeight: 1, letterSpacing: 1 }} aria-hidden>
-            ⋮
-          </span>
-        </button>
-      </div>
-      {open ? (
-        <div role="menu" style={{ ...logDetailsMenuPanelStyle, right: 16 }}>
-          <button
-            type="button"
-            role="menuitem"
-            disabled={busy}
-            style={logDetailsMenuItemRepeatPurchaseStyle}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              setOpen(false);
-              onRequestRepeatPurchaseAll();
-            }}
-          >
-            <span
-              style={{
-                flexShrink: 0,
-                color: SPEC.accent,
-                display: "inline-flex",
-                marginTop: 1,
-              }}
-            >
-              <RepeatPurchaseMenuSvg size={18} />
-            </span>
-            <span>Повторить покупку по установленным запчастям</span>
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function InstalledPartRowWithMenu({
+/** Строка установленной запчасти: переход в подбор по клику на карточку (без меню «⋯»). */
+function InstalledPartRow({
   item,
   event,
   onOpenParts,
-  onRequestRepeatPurchaseModal,
-  busy,
 }: {
   item: ServiceLogBundleItemSummary;
   event: ServiceEventItem | null;
   onOpenParts: (opts: { wishlistItemId?: string; nodeId?: string; partsSearch?: string }) => void;
-  onRequestRepeatPurchaseModal: () => void;
-  busy: boolean;
 }) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  useClosePanelOnOutsidePress(menuOpen, rootRef, () => setMenuOpen(false));
-
   const wishId = event ? resolveWishlistItemIdForServiceBundleItem(event, item.id) : null;
   const partsSearchLabel = (item.partName ?? item.actionLabelRu ?? "").trim();
   const canOpenParts = Boolean(wishId || item.nodeId || partsSearchLabel);
@@ -2909,147 +2469,79 @@ function InstalledPartRowWithMenu({
   };
 
   return (
-    <div
+    <button
+      type="button"
+      disabled={!canOpenParts}
+      onClick={openPartsNow}
+      title={
+        wishId
+          ? "Подбор запчастей: позиция из списка"
+          : item.nodeId || partsSearchLabel
+            ? "Подбор запчастей: узел и поиск по названию"
+            : undefined
+      }
       style={{
-        display: "flex",
-        flexDirection: "row",
-        gap: 4,
-        alignItems: "stretch",
         width: "100%",
+        boxSizing: "border-box",
+        display: "flex",
+        gap: 6,
+        alignItems: "center",
+        padding: "5px 8px",
+        borderRadius: 8,
+        backgroundColor: C.row,
+        border: SPEC.borderSubtle,
+        textAlign: "left",
+        cursor: canOpenParts ? "pointer" : "default",
+        fontFamily: "inherit",
+        opacity: canOpenParts ? 1 : 0.85,
       }}
     >
-      <button
-        type="button"
-        disabled={!canOpenParts}
-        onClick={openPartsNow}
-        title={
-          wishId
-            ? "Подбор запчастей: позиция из списка"
-            : item.nodeId || partsSearchLabel
-              ? "Подбор запчастей: узел и поиск по названию"
-              : undefined
-        }
+      <div
         style={{
-          flex: 1,
-          minWidth: 0,
-          display: "flex",
-          gap: 6,
-          alignItems: "center",
-          padding: "5px 8px",
-          borderRadius: 8,
-          backgroundColor: C.row,
+          width: 36,
+          height: 36,
+          borderRadius: 6,
+          backgroundColor: C.wash,
           border: SPEC.borderSubtle,
-          textAlign: "left",
-          cursor: canOpenParts ? "pointer" : "default",
-          font: "inherit",
-          opacity: canOpenParts ? 1 : 0.85,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          color: C.text3,
         }}
       >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 6,
-            backgroundColor: C.wash,
-            border: SPEC.borderSubtle,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            color: C.text3,
-          }}
-        >
-          <BoxSvg />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: C.text,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {item.partName ?? item.actionLabelRu}
-          </p>
-          <p style={{ fontSize: 11, color: C.text3, marginTop: 1 }}>
-            {item.sku ? `SKU: ${item.sku}` : item.nodeName}
-            {item.quantity != null ? ` · ${item.quantity} шт.` : ""}
-          </p>
-        </div>
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: item.lineCostRu ? C.green : C.text3,
-            flexShrink: 0,
-            textAlign: "right",
-          }}
-        >
-          {item.lineCostRu ?? "—"}
-        </span>
-      </button>
-      <div ref={rootRef} style={{ position: "relative", flexShrink: 0, alignSelf: "center" }}>
-        <button
-          type="button"
-          disabled={busy}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          aria-label={`Действия: ${item.partName ?? item.actionLabelRu}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setMenuOpen((v) => !v);
-          }}
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 8,
-            border: SPEC.borderSubtle,
-            backgroundColor: C.wash,
-            color: SPEC.textSecondary,
-            cursor: busy ? "not-allowed" : "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            opacity: busy ? 0.55 : 1,
-          }}
-        >
-          <span style={{ fontSize: 18, lineHeight: 1, letterSpacing: 1 }} aria-hidden>
-            ⋮
-          </span>
-        </button>
-        {menuOpen ? (
-          <div role="menu" style={{ ...logDetailsMenuPanelStyle, right: 0 }}>
-            <button
-              type="button"
-              role="menuitem"
-              disabled={busy}
-              style={logDetailsMenuItemRepeatPurchaseStyle}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                setMenuOpen(false);
-                onRequestRepeatPurchaseModal();
-              }}
-            >
-              <span
-                style={{
-                  flexShrink: 0,
-                  color: SPEC.accent,
-                  display: "inline-flex",
-                  marginTop: 1,
-                }}
-              >
-                <RepeatPurchaseMenuSvg size={18} />
-              </span>
-              <span>Повторить покупку по установленным запчастям</span>
-            </button>
-          </div>
-        ) : null}
+        <BoxSvg />
       </div>
-    </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: C.text,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {item.partName ?? item.actionLabelRu}
+        </p>
+        <p style={{ fontSize: 11, color: C.text3, marginTop: 1 }}>
+          {item.sku ? `SKU: ${item.sku}` : item.nodeName}
+          {item.quantity != null ? ` · ${item.quantity} шт.` : ""}
+        </p>
+      </div>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: item.lineCostRu ? C.green : C.text3,
+          flexShrink: 0,
+          textAlign: "right",
+        }}
+      >
+        {item.lineCostRu ?? "—"}
+      </span>
+    </button>
   );
 }
 
@@ -3066,8 +2558,6 @@ function ServiceLogEventDetails({
   onRepeat,
   onEdit,
   onDelete,
-  onRequestRepeatPurchaseModal,
-  repeatPurchaseBusy,
 }: {
   entry: ServiceLogEntryViewModel;
   event: ServiceEventItem | null;
@@ -3079,8 +2569,6 @@ function ServiceLogEventDetails({
   onRepeat: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onRequestRepeatPurchaseModal: (payload: RepeatPurchaseConfirmPayload) => void;
-  repeatPurchaseBusy: boolean;
 }) {
   const isStateUpdate = entry.eventKind === "STATE_UPDATE";
   const actionKind = getRowActionKind(entry, event);
@@ -3107,7 +2595,7 @@ function ServiceLogEventDetails({
       }}
     >
       {/* Panel header */}
-      <div style={{ padding: "10px 20px 6px", borderBottom: SPEC.borderSubtle }}>
+      <div style={{ padding: detailPanelHeaderPad, borderBottom: SPEC.borderSubtle }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
             <ServiceTypeIcon actionKind={actionKind} iconCfg={iconCfg} size={34} />
@@ -3164,6 +2652,7 @@ function ServiceLogEventDetails({
           gridTemplateColumns: "repeat(4, 1fr)",
           borderBottom: SPEC.borderSubtle,
           flexShrink: 0,
+          padding: detailPanelMetricsPad,
         }}
       >
         <MetricCol label="Дата" value={entry.dateLabel} />
@@ -3184,23 +2673,8 @@ function ServiceLogEventDetails({
         />
       </div>
 
-      {!isStateUpdate ? (
-        <ServiceLogDetailsActionsMenu
-          hasBundleParts={entry.mode === "ADVANCED" && entry.bundleItemsSummary.length > 0}
-          busy={repeatPurchaseBusy}
-          onRequestRepeatPurchaseAll={() =>
-            onRequestRepeatPurchaseModal({
-              eventId: entry.id,
-              entryMainTitle: entry.mainTitle,
-              entryDateLabel: entry.dateLabel,
-              items: entry.bundleItemsSummary.slice(),
-            })
-          }
-        />
-      ) : null}
-
       {/* Узлы — бейджи в ряд с переносом */}
-      <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+      <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
         <PanelSectionTitle>Узлы</PanelSectionTitle>
         {detailNodes.length > 0 ? (
           <ul
@@ -3211,7 +2685,7 @@ function ServiceLogEventDetails({
               display: "flex",
               flexDirection: "row",
               flexWrap: "wrap",
-              gap: 4,
+              gap: 6,
               alignItems: "center",
             }}
           >
@@ -3235,7 +2709,7 @@ function ServiceLogEventDetails({
 
       {/* 2. Режим bundle */}
       {!isStateUpdate ? (
-        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+        <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
           <PanelSectionTitle>Режим записи</PanelSectionTitle>
           <p style={{ marginTop: 2, fontSize: 13, fontWeight: 600, color: SPEC.textPrimary }}>{entry.modeBadgeRu}</p>
           <p style={{ marginTop: 2, fontSize: 11, color: C.text3, lineHeight: 1.4 }}>
@@ -3248,7 +2722,7 @@ function ServiceLogEventDetails({
 
       {/* 3. Моточасы */}
       {entry.engineHoursValue !== null ? (
-        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+        <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
           <PanelSectionTitle>{entry.engineHoursLabel ?? "Моточасы"}</PanelSectionTitle>
           <p style={{ marginTop: 2, fontSize: 13, fontWeight: 600, color: SPEC.textPrimary }}>{entry.engineHoursValue}</p>
         </div>
@@ -3256,7 +2730,7 @@ function ServiceLogEventDetails({
 
       {/* 4. Напоминание целиком */}
       {fullReminderText ? (
-        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+        <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
           <PanelSectionTitle>Следующее напоминание</PanelSectionTitle>
           <p style={{ marginTop: 2, fontSize: 13, color: C.text2, lineHeight: 1.4 }}>{fullReminderText}</p>
         </div>
@@ -3264,7 +2738,7 @@ function ServiceLogEventDetails({
 
       {/* 5. Комментарии по позициям bundle */}
       {!isStateUpdate && entry.bundleItemsSummary.some((i) => i.comment?.trim()) ? (
-        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+        <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
           <PanelSectionTitle>Комментарии по работам</PanelSectionTitle>
           <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 4 }}>
             {entry.bundleItemsSummary
@@ -3294,7 +2768,7 @@ function ServiceLogEventDetails({
 
       {/* 6. Детали и работа в одну строку (итого — в сетке метрик сверху) */}
       {!isStateUpdate && (entry.partsCostLabel || entry.laborCostLabel) ? (
-        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+        <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
           <PanelSectionTitle>Стоимость по статьям</PanelSectionTitle>
           <button
             type="button"
@@ -3320,13 +2794,13 @@ function ServiceLogEventDetails({
 
         {/* Установленные запчасти — только ADVANCED; в BASIC строки bundle = узлы/работы. */}
         {!isStateUpdate && entry.mode === "ADVANCED" && entry.bundleItemsSummary.length > 0 ? (
-          <div style={{ padding: "6px 20px 8px", borderBottom: SPEC.borderSubtle }}>
+          <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle }}>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 4,
+                marginBottom: 6,
               }}
             >
               <PanelSectionTitle>Установленные запчасти</PanelSectionTitle>
@@ -3336,21 +2810,7 @@ function ServiceLogEventDetails({
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {entry.bundleItemsSummary.map((item) => (
-                <InstalledPartRowWithMenu
-                  key={item.id}
-                  item={item}
-                  event={event}
-                  onOpenParts={onOpenParts}
-                  onRequestRepeatPurchaseModal={() =>
-                    onRequestRepeatPurchaseModal({
-                      eventId: entry.id,
-                      entryMainTitle: entry.mainTitle,
-                      entryDateLabel: entry.dateLabel,
-                      items: [item],
-                    })
-                  }
-                  busy={repeatPurchaseBusy}
-                />
+                <InstalledPartRow key={item.id} item={item} event={event} onOpenParts={onOpenParts} />
               ))}
             </div>
           </div>
@@ -3358,7 +2818,7 @@ function ServiceLogEventDetails({
 
         {/* State update lines */}
         {isStateUpdate ? (
-          <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
+          <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle }}>
             <PanelSectionTitle>Изменения состояния</PanelSectionTitle>
             <div style={{ marginTop: 3, display: "flex", flexDirection: "column", gap: 2 }}>
               {(entry.stateUpdateLines.length > 0 ? entry.stateUpdateLines : [entry.stateUpdateSubtitle]).map((line) =>
@@ -3374,7 +2834,7 @@ function ServiceLogEventDetails({
 
         {/* Comment */}
         {entry.comment ? (
-          <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
+          <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle }}>
             <PanelSectionTitle>Комментарий</PanelSectionTitle>
             <p
               style={{
@@ -3391,7 +2851,7 @@ function ServiceLogEventDetails({
         ) : null}
 
         {/* Performer */}
-        <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
+        <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle }}>
           <PanelSectionTitle>Исполнитель</PanelSectionTitle>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 3 }}>
             <div
@@ -3429,7 +2889,7 @@ function ServiceLogEventDetails({
         </div>
 
         {/* Sources / wishlist origin */}
-        <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
+        <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle }}>
           <PanelSectionTitle>Источники</PanelSectionTitle>
           {originWishlistItemIds.length > 0 ? (
             <div style={{ marginTop: 3, display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -3459,8 +2919,8 @@ function ServiceLogEventDetails({
 
         {/* Expenses */}
         {!isStateUpdate && linkedExpenses.length > 0 ? (
-          <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <div style={{ padding: detailPanelSectionPad, borderBottom: SPEC.borderSubtle }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
               <PanelSectionTitle>Расходы</PanelSectionTitle>
               <button
                 type="button"
@@ -3538,7 +2998,7 @@ function ServiceLogEventDetails({
           style={{
             display: "flex",
             gap: 6,
-            padding: "8px 20px 10px",
+            padding: detailPanelFooterPad,
             borderTop: SPEC.borderSubtle,
             backgroundColor: SPEC.bgPanel,
             flexShrink: 0,

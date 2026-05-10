@@ -11,6 +11,7 @@ import {
   isDraftEmpty,
   isKitInDraft,
   removeFromDraft,
+  updateSkuDraftItemQuantity,
 } from "./picker-draft-cart.ts";
 
 function isoNow(): string {
@@ -100,6 +101,21 @@ describe("picker-draft-cart", () => {
     assert.ok(isKitInDraft(d, "K1"));
   });
 
+  it("updateSkuDraftItemQuantity clamps quantity", () => {
+    let d = addSkuToDraft(createEmptyDraftCart("v"), {
+      sku: sku({ priceAmount: 50, currency: "RUB" }),
+      nodeId: "n",
+      source: "search",
+    });
+    const id = d.items[0]!.draftId;
+    d = updateSkuDraftItemQuantity(d, id, 4);
+    assert.equal((d.items[0] as { kind: "sku" }).quantity, 4);
+    const t = getDraftTotals(d);
+    assert.equal(t.totalAmount, 200);
+    d = updateSkuDraftItemQuantity(d, id, 0);
+    assert.equal((d.items[0] as { kind: "sku" }).quantity, 1);
+  });
+
   it("removeFromDraft + clearDraft", () => {
     let d = addSkuToDraft(createEmptyDraftCart("v"), {
       sku: sku({ id: "x" }),
@@ -141,25 +157,63 @@ describe("picker-draft-cart", () => {
     const p = buildPickerSubmitPreview({ draft: d, activeWishlistItems: [] });
     assert.equal(p.blockedCount, 1);
     assert.equal(p.willAddCount, 0);
+    assert.equal(p.willAddTotalPieces, 0);
+    assert.equal(p.quantityUpgradeCount, 0);
     assert.equal(p.decisions[0]?.kind, "blocked");
   });
 
-  it("buildPickerSubmitPreview marks duplicate when active wishlist has same node+sku", () => {
+  it("buildPickerSubmitPreview marks duplicate when active wishlist has same node+sku and qty enough", () => {
     const s = sku({ id: "dup-sku" });
     let d = createEmptyDraftCart("v");
     d = addSkuToDraft(d, { sku: s, nodeId: "node-a", source: "search" });
     const active = [
       {
+        id: "wl-1",
         status: "NEEDED" as PartWishlistItemStatus,
         nodeId: "node-a",
         sku: { id: "dup-sku" },
         title: "t",
         vehicleId: "v",
+        quantity: 1,
       },
     ];
     const p = buildPickerSubmitPreview({ draft: d, activeWishlistItems: active });
     assert.equal(p.duplicateCount, 1);
+    assert.equal(p.quantityUpgradeCount, 0);
     assert.equal(p.willAddCount, 0);
+    assert.equal(p.willAddTotalPieces, 0);
+  });
+
+  it("buildPickerSubmitPreview quantityUpgrade when active has fewer pieces than draft", () => {
+    const s = sku({ id: "dup-sku", priceAmount: 100, currency: "RUB" });
+    let d = createEmptyDraftCart("v");
+    d = addSkuToDraft(d, { sku: s, nodeId: "node-a", source: "search" });
+    const id = d.items[0]!.draftId;
+    d = updateSkuDraftItemQuantity(d, id, 3);
+    const active = [
+      {
+        id: "wl-1",
+        status: "NEEDED" as PartWishlistItemStatus,
+        nodeId: "node-a",
+        sku: { id: "dup-sku" },
+        title: "t",
+        vehicleId: "v",
+        quantity: 1,
+      },
+    ];
+    const p = buildPickerSubmitPreview({ draft: d, activeWishlistItems: active });
+    assert.equal(p.duplicateCount, 0);
+    assert.equal(p.quantityUpgradeCount, 1);
+    assert.equal(p.quantityUpgradeExtraPieces, 2);
+    assert.equal(p.willAddCount, 0);
+    const dec = p.decisions[0];
+    assert.ok(dec && dec.kind === "quantityUpgrade");
+    if (dec?.kind === "quantityUpgrade") {
+      assert.equal(dec.draftRequestedQty, 3);
+      assert.equal(dec.existingQty, 1);
+      assert.equal(dec.addQty, 2);
+      assert.equal(dec.existingWishlistItemId, "wl-1");
+    }
   });
 
   it("buildPickerSubmitPreview willAdd kit without duplicate check", () => {
@@ -167,6 +221,26 @@ describe("picker-draft-cart", () => {
     d = addKitToDraft(d, { kit: kit("C1", "Kit"), contextNodeId: "node-a" });
     const p = buildPickerSubmitPreview({ draft: d, activeWishlistItems: [] });
     assert.equal(p.willAddCount, 1);
+    assert.equal(p.willAddTotalPieces, 1);
+    assert.equal(p.quantityUpgradeCount, 0);
     assert.equal(p.blockedCount, 0);
+  });
+
+  it("buildPickerSubmitPreview sums pieceCount for SKU quantity", () => {
+    let d = addSkuToDraft(createEmptyDraftCart("v"), {
+      sku: sku({ priceAmount: 10, currency: "RUB" }),
+      nodeId: "n",
+      source: "search",
+    });
+    const id = d.items[0]!.draftId;
+    d = updateSkuDraftItemQuantity(d, id, 5);
+    const p = buildPickerSubmitPreview({ draft: d, activeWishlistItems: [] });
+    assert.equal(p.willAddCount, 1);
+    assert.equal(p.willAddTotalPieces, 5);
+    const dec = p.decisions[0];
+    assert.ok(dec && dec.kind === "willAdd");
+    if (dec?.kind === "willAdd") {
+      assert.equal(dec.pieceCount, 5);
+    }
   });
 });

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   applyPartSkuViewModelToPartWishlistFormValues,
   clearPartWishlistFormSkuSelection,
+  formatExpenseAmountRu,
   formatPartSkuSearchResultMetaLineRu,
   getPartSkuViewModelDisplayLines,
   getWishlistItemSkuDisplayLines,
@@ -81,6 +82,22 @@ export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
     mq.addEventListener("change", u);
     return () => mq.removeEventListener("change", u);
   }, []);
+
+  const costLinePreviewRu = useMemo(() => {
+    const qtyRaw = wishlistForm.quantity.trim();
+    const qtyParsed = qtyRaw ? Number.parseInt(qtyRaw, 10) : 1;
+    const qty = Number.isInteger(qtyParsed) && qtyParsed >= 1 ? qtyParsed : 1;
+    const normalizedCost = wishlistForm.costAmount.trim().replace(/\s/g, "").replace(",", ".");
+    if (normalizedCost === "") {
+      return null;
+    }
+    const unit = Number.parseFloat(normalizedCost);
+    if (Number.isNaN(unit) || unit < 0) {
+      return null;
+    }
+    const cur = wishlistForm.currency.trim().toUpperCase() || "RUB";
+    return `${formatExpenseAmountRu(unit * qty)} ${cur}`;
+  }, [wishlistForm.quantity, wishlistForm.costAmount, wishlistForm.currency]);
 
   const stickySelectionLabel = useMemo(() => {
     if (wishlistForm.skuId.trim()) {
@@ -189,7 +206,7 @@ export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
       <div className="grid grid-cols-[1fr_88px] gap-3">
         <div>
           <label className="block text-xs font-medium" style={{ color: productSemanticColors.textSecondary }}>
-            Стоимость (опц.)
+            Цена за 1 шт. (опц.)
           </label>
           <input
             type="text"
@@ -200,6 +217,11 @@ export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
             style={{ ...control, borderRadius: RADIUS_INNER, borderWidth: 1, borderStyle: "solid" }}
             placeholder="1500"
           />
+          {costLinePreviewRu ? (
+            <p className="mt-1 text-[11px] font-semibold" style={{ color: productSemanticColors.textMuted }}>
+              Всего за {wishlistForm.quantity.trim() || "1"} шт.: {costLinePreviewRu}
+            </p>
+          ) : null}
         </div>
         <div>
           <label className="block text-xs font-medium" style={{ color: productSemanticColors.textSecondary }}>

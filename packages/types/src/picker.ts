@@ -53,17 +53,51 @@ export type PickerMerchandiseRecommendations = {
 };
 
 export type PickerSubmitDecision =
-  | { kind: "willAdd"; draftId: string; label: string }
+  | {
+      kind: "willAdd";
+      draftId: string;
+      label: string;
+      /** Сколько штук уйдёт в wishlist по этой строке драфта (SKU: quantity; комплект: сумма quantity по строкам состава). */
+      pieceCount: number;
+    }
   | { kind: "duplicate"; draftId: string; label: string; reason: string }
-  | { kind: "blocked"; draftId: string; label: string; reason: string };
+  | { kind: "blocked"; draftId: string; label: string; reason: string }
+  | {
+      /** В списке уже есть эта позиция, но количества не хватает — пользователь выбирает, как обновить строку. */
+      kind: "quantityUpgrade";
+      draftId: string;
+      label: string;
+      existingWishlistItemId: string;
+      nodeId: string;
+      draftRequestedQty: number;
+      existingQty: number;
+      /** Сколько штук не хватает до запрошенного количества (`draftRequestedQty - existingQty`). */
+      addQty: number;
+    };
 
 export type PickerSubmitPreview = {
   decisions: PickerSubmitDecision[];
   willAddCount: number;
+  /** Сумма штук по всем строкам, которые реально добавятся (`willAdd`). */
+  willAddTotalPieces: number;
+  /** Строки SKU, где позиция уже в списке, но в подборе запрошено больше штук. */
+  quantityUpgradeCount: number;
+  /** Сумма «донакопленных» штук по `quantityUpgrade` (для итога «сколько шт. станет в списке»). */
+  quantityUpgradeExtraPieces: number;
   duplicateCount: number;
   blockedCount: number;
   estimatedTotal: number | null;
   estimatedCurrency: string | null;
+};
+
+/** Разрешение количества при сабмите подбора (см. `quantityUpgrade` в превью). */
+export type PickerQuantitySubmitResolution = {
+  draftId: string;
+  existingWishlistItemId: string;
+  nodeId: string;
+  mode: "setTotal" | "increment";
+  draftRequestedQty: number;
+  existingQty: number;
 };
 
 export type PickerSubmitResult = {
@@ -73,4 +107,6 @@ export type PickerSubmitResult = {
   warnings: string[];
   /** Wishlist-item ids созданные за этот сабмит — для подсветки на cart-странице. */
   createdWishlistItemIds: string[];
+  /** Строки, у которых обновили только количество (без нового POST). */
+  updatedWishlistItemIds: string[];
 };
