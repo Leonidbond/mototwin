@@ -9,7 +9,7 @@ Service log **data preparation** now lives in `@mototwin/types` and `@mototwin/d
 - **`ServiceLogEntryViewModel`** — One journal row: ids, kind (`SERVICE` / `STATE_UPDATE`), Russian-facing titles and labels, odometer / motochasy / cost fields, comment, `compactMetricsLine` for mobile meta, and `expoServiceNodeLabel` where Expo historically differed from web for the node line.
 - **`ServiceLogMonthGroupViewModel`** — Month section: key, sort timestamp, Russian month/year label, **`entries`** (view models), and **`summary`** with counts plus a preformatted **`costLabel`**.
 - **`ServiceLogMonthlySummaryViewModel`** — Counts, `costByCurrency`, and **`costLabel`** (multi-currency MVP string from existing `getMonthlyCostLabel` logic).
-- **`ServiceLogFilters`** — Alias of `ServiceEventsFilters` (date range, node text, kind, service type).
+- **`ServiceLogFilters`** — Alias of **`ServiceEventsFilters`**: диапазон дат (`dateFrom` / `dateTo`), вид события (`eventKind`), текстовый поиск по полю **`serviceType`** (legacy-строка события), опционально **`node`** (подстрока имени узла, в основном для Expo/совместимости), **`paidOnly`**, а также **расширенные клиентские поля**: **`odometerMin` / `odometerMax`**, **`costMin` / `costMax`**, **`performerKind`** (`SELF` | `SERVICE` | `OTHER`), **`actionType`** (тип работы из bundle, `REPLACE` …). Фильтр **по поддереву узлов** задаётся отдельно аргументом **`restrictToNodeIds`** в `buildServiceLogTimelineProps` / `filterAndSortServiceEvents`, а в URL на web — **`nodeIds`** + **`nodeLabel`** (см. `docs/web-expo-service-log-parity-fixes.md`).
 - **`ServiceLogSortState`** — Sort field + direction (same as the existing service-events sort types).
 - **`ServiceLogEntryDateStyle`** — `"default"` (full `ru-RU` date, web) vs `"compact"` (short month, Expo).
 
@@ -30,7 +30,7 @@ Service log **data preparation** now lives in `@mototwin/types` and `@mototwin/d
 
 ## Where it is used
 
-- **Web:** `src/app/vehicles/[id]/page.tsx` — service log modal uses **`groupServiceLogByMonth(..., "default")`** and renders **`group.entries`** / **`group.summary.costLabel`**.
+- **Web:** основной журнал — **`src/app/vehicles/[id]/service-log/page.tsx`** (отдельная страница): **`groupServiceLogByMonth(..., "default")`**, **`group.entries`**, **`group.summary.costLabel`**. У каждой записи во view model есть **`mode`** (`BASIC` \| `ADVANCED`) и **`bundleItemsSummary`**; на web блок **«Установленные запчасти»** в деталях события показывается **только для `ADVANCED`** (в BASIC строки bundle = узлы/работы, без SKU-строк).
 - **Expo:** `apps/app/app/vehicles/[id]/service-log.tsx` — **`groupServiceLogByMonth(..., "compact")`** and the same summary/entry fields inside existing components.
 
 ## Boundaries

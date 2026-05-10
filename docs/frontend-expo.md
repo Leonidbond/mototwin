@@ -116,6 +116,10 @@ Defined in `apps/app/app/_layout.tsx`:
 - Prefills nickname, vin, ride profile
 - Calls `updateVehicleProfile()` -> `/api/vehicles/[id]/profile`
 
+### 3.8 Parts wishlist / «корзина замен» (`vehicles/[id]/wishlist/index.tsx`)
+- Full-vehicle wishlist list + status groups, summary cards, search, detail bottom sheet, and swipe actions; behavior and contracts match [parts-wishlist-mvp.md](./parts-wishlist-mvp.md).
+- **Repeat purchase** from the cart matches web `PartsCartPage`: confirmation modal, `createWishlistItem` with `NEEDED`, comment suffix «Повтор из корзины замен», no cost copy, then filter to NEEDED and `applyWishlistRowFocus` on the new item id. Entry points: orange action in detail sheet, row shortcut next to the status pill, and a row inside the status-change modal.
+
 ## 4. Expo-specific technical notes
 
 - API base URL is resolved dynamically from Expo host (`apps/app/src/api-base-url.ts`).
@@ -140,7 +144,7 @@ Defined in `apps/app/app/_layout.tsx`:
 
 - Garage flow: mostly aligned with web, with mobile-first layout.
 - Add motorcycle flow: now implemented in Expo route-based flow.
-- Vehicle detail/service log/state/profile flows: implemented and functionally aligned. Vehicle detail now mirrors the web dashboard's first-screen information hierarchy while keeping mobile route-based flows and Expo icon fallback.
+- Vehicle detail/service log/state/profile/wishlist flows: implemented and functionally aligned (including **repeat purchase** from the full wishlist screen vs web cart). Vehicle detail now mirrors the web dashboard's first-screen information hierarchy while keeping mobile route-based flows and Expo icon fallback.
 - Web still keeps richer modal orchestration in one page; Expo uses decomposed routes.
 
 Detailed parity matrix: `cross-platform-parity.md`.

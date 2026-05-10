@@ -1,11 +1,13 @@
 import type {
   MonthlyServiceLogGroup,
+  ServiceActionType,
   ServiceEventItem,
   ServiceEventsFilters,
   ServiceEventsSortDirection,
   ServiceEventsSortField,
   ServiceLogNodeFilter,
   ServiceLogSortState,
+  ServicePerformedBy,
 } from "@mototwin/types";
 import { applyServiceLogNodeFilter } from "./service-log-node-filter";
 
@@ -54,6 +56,12 @@ function trimServiceLogFilterFields(filters: ServiceEventsFilters) {
     eventKind: filters.eventKind.trim(),
     serviceType: filters.serviceType.trim(),
     node: filters.node.trim(),
+    odometerMin: filters.odometerMin.trim(),
+    odometerMax: filters.odometerMax.trim(),
+    costMin: filters.costMin.trim(),
+    costMax: filters.costMax.trim(),
+    performerKind: filters.performerKind.trim(),
+    actionType: filters.actionType.trim(),
   };
 }
 
@@ -69,7 +77,13 @@ export function isServiceLogTimelineQueryActive(
     Boolean(t.dateTo) ||
     Boolean(t.eventKind) ||
     Boolean(t.serviceType) ||
-    Boolean(t.node);
+    Boolean(t.node) ||
+    Boolean(t.odometerMin) ||
+    Boolean(t.odometerMax) ||
+    Boolean(t.costMin) ||
+    Boolean(t.costMax) ||
+    Boolean(t.performerKind) ||
+    Boolean(t.actionType);
   const sortNonDefault =
     sort.field !== DEFAULT_SERVICE_LOG_SORT_STATE.field ||
     sort.direction !== DEFAULT_SERVICE_LOG_SORT_STATE.direction;
@@ -85,7 +99,47 @@ function normalizeServiceLogFilters(serviceEventsFilters: ServiceEventsFilters) 
     eventKind: serviceEventsFilters.eventKind.trim().toLowerCase(),
     serviceType: serviceEventsFilters.serviceType.trim().toLowerCase(),
     node: serviceEventsFilters.node.trim().toLowerCase(),
+    odometerMin: serviceEventsFilters.odometerMin.trim(),
+    odometerMax: serviceEventsFilters.odometerMax.trim(),
+    costMin: serviceEventsFilters.costMin.trim().replace(",", "."),
+    costMax: serviceEventsFilters.costMax.trim().replace(",", "."),
+    performerKind: serviceEventsFilters.performerKind.trim().toUpperCase(),
+    actionType: serviceEventsFilters.actionType.trim().toUpperCase(),
   };
+}
+
+const SERVICE_ACTION_TYPES: ReadonlySet<string> = new Set([
+  "REPLACE",
+  "SERVICE",
+  "INSPECT",
+  "CLEAN",
+  "ADJUST",
+]);
+
+const PERFORMER_KINDS: ReadonlySet<string> = new Set(["SELF", "SERVICE", "OTHER"]);
+
+function parseOdometerBound(raw: string): number | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const n = Number(t);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n);
+}
+
+function parseCostBound(raw: string): number | null {
+  const t = raw.trim().replace(",", ".");
+  if (!t) return null;
+  const n = Number(t);
+  if (!Number.isFinite(n)) return null;
+  return n;
+}
+
+function eventTotalCost(event: ServiceEventItem): number | null {
+  const v = event.totalCost ?? event.costAmount;
+  if (v === null || v === undefined || !Number.isFinite(v)) {
+    return null;
+  }
+  return v;
 }
 
 export function filterServiceLogEntries(
@@ -111,8 +165,37 @@ export function filterServiceLogEntries(
     const passesPaidOnly =
       serviceEventsFilters.paidOnly !== true || isPaidServiceEvent(event);
 
+    const odoMin = parseOdometerBound(normalizedFilters.odometerMin);
+    const odoMax = parseOdometerBound(normalizedFilters.odometerMax);
+    const passesOdometer =
+      (odoMin === null || event.odometer >= odoMin) &&
+      (odoMax === null || event.odometer <= odoMax);
+
+    const costMin = parseCostBound(normalizedFilters.costMin);
+    const costMax = parseCostBound(normalizedFilters.costMax);
+    const costVal = eventTotalCost(event);
+    const passesCost =
+      (costMin === null || (costVal !== null && costVal >= costMin)) &&
+      (costMax === null || (costVal !== null && costVal <= costMax));
+
+    const actionFilter = normalizedFilters.actionType;
+    const passesActionType =
+      !actionFilter ||
+      !SERVICE_ACTION_TYPES.has(actionFilter) ||
+      (event.items ?? []).some((it) => it.actionType === (actionFilter as ServiceActionType));
+
+    const perfFilter = normalizedFilters.performerKind;
+    const passesPerformer =
+      !perfFilter ||
+      !PERFORMER_KINDS.has(perfFilter) ||
+      (event.performedBy ?? "") === (perfFilter as ServicePerformedBy);
+
     return (
       passesPaidOnly &&
+      passesOdometer &&
+      passesCost &&
+      passesActionType &&
+      passesPerformer &&
       (!normalizedFilters.dateFrom || eventDateOnly >= normalizedFilters.dateFrom) &&
       (!normalizedFilters.dateTo || eventDateOnly <= normalizedFilters.dateTo) &&
       (!normalizedFilters.eventKind ||

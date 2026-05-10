@@ -94,6 +94,9 @@ type PartsCartPageProps = {
   onOpenWishlistPurchaseExpense: (item: PartWishlistItem) => void;
   onOpenWishlistEdit: (item: PartWishlistItem) => void;
   onDeleteWishlistItem: (itemId: string, options?: { skipConfirm?: boolean }) => void | Promise<void>;
+  /** Добавить копию позиции в «Нужно» (заказано / куплено / установлено). */
+  onRepeatWishlistPurchase?: (item: PartWishlistItem) => void | Promise<void>;
+  wishlistRepeatPurchaseBusyId?: string;
   router: AppRouterInstance;
   hasNodeFilter: boolean;
   onClearNodeFilter: () => void;
@@ -225,7 +228,35 @@ function PartPlaceholderIcon() {
   );
 }
 
-function DetailActionIcon({ kind }: { kind: "edit" | "ordered" | "bought" | "installed" | "delete" }) {
+function RepeatPurchaseActionIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 10h2l1.2 8h10.6L19 10H6"
+        stroke="currentColor"
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="9" cy="20" r="1" fill="currentColor" />
+      <circle cx="17" cy="20" r="1" fill="currentColor" />
+      <path
+        d="M15 4.5a4 4 0 1 1 1.2 3.1"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M17 3v3h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function DetailActionIcon({
+  kind,
+}: {
+  kind: "edit" | "ordered" | "bought" | "installed" | "delete" | "repeatPurchase";
+}) {
   if (kind === "edit") {
     return (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -260,6 +291,10 @@ function DetailActionIcon({ kind }: { kind: "edit" | "ordered" | "bought" | "ins
         <path d="M8.7 12.2l2.2 2.2 4.7-5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
+  }
+
+  if (kind === "repeatPurchase") {
+    return <RepeatPurchaseActionIcon />;
   }
 
   return (
@@ -308,6 +343,8 @@ export function PartsCartPage(props: PartsCartPageProps) {
     onOpenWishlistPurchaseExpense,
     onOpenWishlistEdit,
     onDeleteWishlistItem,
+    onRepeatWishlistPurchase,
+    wishlistRepeatPurchaseBusyId = "",
     router,
     hasNodeFilter,
     onClearNodeFilter,
@@ -320,6 +357,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
   );
 
   const [deleteConfirmItemId, setDeleteConfirmItemId] = useState<string | null>(null);
+  const [repeatPurchaseConfirmRaw, setRepeatPurchaseConfirmRaw] = useState<PartWishlistItem | null>(null);
   const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
   const [openStatusMenuId, setOpenStatusMenuId] = useState<string | null>(null);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -344,6 +382,16 @@ export function PartsCartPage(props: PartsCartPageProps) {
     [selectedVm, wishlistItems]
   );
   const selectedId = selectedVm?.id ?? null;
+
+  const repeatPurchaseConfirmVm = useMemo(() => {
+    if (!repeatPurchaseConfirmRaw) return null;
+    return wishlistViewModels.find((w) => w.id === repeatPurchaseConfirmRaw.id) ?? null;
+  }, [repeatPurchaseConfirmRaw, wishlistViewModels]);
+
+  const repeatPurchaseModalBusy =
+    Boolean(repeatPurchaseConfirmRaw) &&
+    Boolean(wishlistRepeatPurchaseBusyId) &&
+    wishlistRepeatPurchaseBusyId === repeatPurchaseConfirmRaw?.id;
 
   const summaryCards: Array<{
     key: string;
@@ -404,7 +452,13 @@ export function PartsCartPage(props: PartsCartPageProps) {
     const raw = selectedRaw;
     const skuLines = item.sku ? getWishlistItemSkuDisplayLines(item.sku) : null;
     const st = statusColor(item.status);
-    const isBusy = wishlistStatusUpdatingId === item.id || wishlistDeletingId === item.id;
+    const isBusy =
+      wishlistStatusUpdatingId === item.id ||
+      wishlistDeletingId === item.id ||
+      wishlistRepeatPurchaseBusyId === item.id;
+    const detailCanRepeatWishlistPurchase =
+      Boolean(onRepeatWishlistPurchase && raw.nodeId) &&
+      (item.status === "ORDERED" || item.status === "BOUGHT" || item.status === "INSTALLED");
     const installedServiceEventId = item.status === "INSTALLED" ? installedWishlistServiceEventIdByItemId.get(item.id) : null;
     const pathRow = nodePathForRow(nodeTree, item.nodeId);
     const priceDisplay =
@@ -541,6 +595,24 @@ export function PartsCartPage(props: PartsCartPageProps) {
               <button type="button" className={styles.actionButton} onClick={() => onPatchWishlistItemStatus(item.id, "INSTALLED", item.status)} disabled={isBusy} style={{ background: tint(PARTS_CART_REF.statusInstalled, 0.16), borderColor: tint(PARTS_CART_REF.statusInstalled, 0.35), color: PARTS_CART_REF.statusInstalled }}>
                 <span className={styles.actionIcon}><DetailActionIcon kind="installed" /></span>
                 <span>Установлено</span>
+              </button>
+            ) : null}
+            {detailCanRepeatWishlistPurchase ? (
+              <button
+                type="button"
+                className={styles.actionButton}
+                onClick={() => setRepeatPurchaseConfirmRaw(raw)}
+                disabled={isBusy}
+                style={{
+                  background: PARTS_CART_REF.orange,
+                  borderColor: PARTS_CART_REF.orangeHover,
+                  color: "#fff",
+                }}
+              >
+                <span className={styles.actionIcon} style={{ color: "#fff" }}>
+                  <DetailActionIcon kind="repeatPurchase" />
+                </span>
+                <span>Повторить покупку</span>
               </button>
             ) : null}
             <button type="button" className={styles.actionButton} onClick={() => setDeleteConfirmItemId(item.id)} disabled={isBusy} style={{ background: tint(PARTS_CART_REF.statusNeeded, 0.16), borderColor: tint(PARTS_CART_REF.statusNeeded, 0.35), color: PARTS_CART_REF.statusNeeded }}>
@@ -766,7 +838,15 @@ export function PartsCartPage(props: PartsCartPageProps) {
                           const skuLines = item.sku ? getWishlistItemSkuDisplayLines(item.sku) : null;
                           const st = statusColor(item.status);
                           const isSelected = item.id === selectedId;
-                          const isBusy = wishlistStatusUpdatingId === item.id || wishlistDeletingId === item.id;
+                          const isBusy =
+                            wishlistStatusUpdatingId === item.id ||
+                            wishlistDeletingId === item.id ||
+                            wishlistRepeatPurchaseBusyId === item.id;
+                          const canRepeatWishlistPurchase =
+                            Boolean(onRepeatWishlistPurchase && raw?.nodeId) &&
+                            (item.status === "ORDERED" ||
+                              item.status === "BOUGHT" ||
+                              item.status === "INSTALLED");
                           return (
                             <div key={item.id} className={styles.rowShell}>
                               <div
@@ -848,6 +928,23 @@ export function PartsCartPage(props: PartsCartPageProps) {
                                   {item.status !== "BOUGHT" ? <button type="button" onClick={() => runStatusAction(item, raw, "BOUGHT")} disabled={isBusy}>Куплено</button> : null}
                                   {item.status !== "INSTALLED" ? <button type="button" onClick={() => runStatusAction(item, raw, "INSTALLED")} disabled={isBusy}>Установлено</button> : null}
                                   {item.status === "INSTALLED" ? <button type="button" onClick={() => { setOpenRowMenuId(null); openWishlistItemJournal(item); }}>В журнал</button> : null}
+                                  {canRepeatWishlistPurchase ? (
+                                    <button
+                                      type="button"
+                                      className={styles.rowMenuItemWithIcon}
+                                      onClick={() => {
+                                        setOpenRowMenuId(null);
+                                        setRepeatPurchaseConfirmRaw(raw);
+                                      }}
+                                      disabled={isBusy}
+                                      style={{ color: PARTS_CART_REF.orange }}
+                                    >
+                                      <span className={styles.rowMenuIcon} style={{ color: PARTS_CART_REF.orange }} aria-hidden>
+                                        <RepeatPurchaseActionIcon />
+                                      </span>
+                                      <span>Повторить покупку</span>
+                                    </button>
+                                  ) : null}
                                   <button type="button" onClick={() => { setOpenRowMenuId(null); setDeleteConfirmItemId(item.id); }} style={{ color: PARTS_CART_REF.statusNeeded }}>Удалить</button>
                                 </div>
                               ) : null}
@@ -875,6 +972,88 @@ export function PartsCartPage(props: PartsCartPageProps) {
       </main>
 
       {renderDetail()}
+
+      {repeatPurchaseConfirmRaw ? (
+        <div
+          className="fixed inset-0 z-[65] flex items-center justify-center px-4 py-6"
+          style={{ backgroundColor: productSemanticColors.overlayModal }}
+          onClick={() => {
+            if (!repeatPurchaseModalBusy) setRepeatPurchaseConfirmRaw(null);
+          }}
+          role="presentation"
+        >
+          <div
+            className={styles.historyBox}
+            style={{ width: "100%", maxWidth: 420 }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="parts-repeat-purchase-title"
+          >
+            <h3 id="parts-repeat-purchase-title" className="text-base font-semibold" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span className={styles.rowMenuIcon} style={{ width: 22, height: 22 }}>
+                <RepeatPurchaseActionIcon />
+              </span>
+              Повторить покупку
+            </h3>
+            <p className="mt-3 text-sm font-medium" style={{ color: PARTS_CART_REF.text, lineHeight: 1.45 }}>
+              Запчасть будет добавлена в корзину замен в раздел «Нужно купить».
+            </p>
+            <div
+              className="mt-3 rounded-lg border p-3 text-left"
+              style={{ borderColor: PARTS_CART_REF.border, background: "#0b1118" }}
+            >
+              <p className="text-sm font-bold" style={{ color: PARTS_CART_REF.text }}>
+                {repeatPurchaseConfirmVm?.title ?? repeatPurchaseConfirmRaw.title}
+              </p>
+              <p className="mt-2 text-xs" style={{ color: PARTS_CART_REF.textMuted, lineHeight: 1.4 }}>
+                Узел: {nodePathForRow(nodeTree, repeatPurchaseConfirmRaw.nodeId)}
+              </p>
+              <p className="mt-1 text-xs" style={{ color: PARTS_CART_REF.textMuted }}>
+                {repeatPurchaseConfirmVm?.sku
+                  ? getWishlistItemSkuDisplayLines(repeatPurchaseConfirmVm.sku)?.primaryLine ?? "—"
+                  : "Без артикула каталога"}
+                {" · "}
+                {repeatPurchaseConfirmVm?.quantity ?? repeatPurchaseConfirmRaw.quantity} шт.
+              </p>
+              {repeatPurchaseConfirmVm?.costLabelRu ? (
+                <p className="mt-1 text-xs font-semibold" style={{ color: PARTS_CART_REF.statusBought }}>
+                  {repeatPurchaseConfirmVm.costLabelRu}
+                </p>
+              ) : null}
+              <p className="mt-2 text-xs" style={{ color: PARTS_CART_REF.textMuted }}>
+                Статус сейчас:{" "}
+                {repeatPurchaseConfirmVm?.statusLabelRu ??
+                  partWishlistStatusLabelsRu[repeatPurchaseConfirmRaw.status]}
+              </p>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className={styles.secondaryAction}
+                disabled={repeatPurchaseModalBusy}
+                onClick={() => setRepeatPurchaseConfirmRaw(null)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={styles.actionButton}
+                disabled={repeatPurchaseModalBusy || !onRepeatWishlistPurchase}
+                style={{ background: PARTS_CART_REF.orange, color: "#fff", paddingInline: 18 }}
+                onClick={() => {
+                  const raw = repeatPurchaseConfirmRaw;
+                  if (!raw || !onRepeatWishlistPurchase) return;
+                  void onRepeatWishlistPurchase(raw);
+                  setRepeatPurchaseConfirmRaw(null);
+                }}
+              >
+                Добавить в корзину
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {deleteConfirmItemId ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-6" style={{ backgroundColor: productSemanticColors.overlayModal }}>

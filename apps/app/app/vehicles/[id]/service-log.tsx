@@ -656,6 +656,12 @@ export default function ServiceLogScreen() {
     eventKind: "",
     serviceType: "",
     node: "",
+    odometerMin: "",
+    odometerMax: "",
+    costMin: "",
+    costMax: "",
+    performerKind: "",
+    actionType: "",
   });
   const [sortField, setSortField] = useState<ServiceEventsSortField>("eventDate");
   const [sortDirection, setSortDirection] = useState<ServiceEventsSortDirection>("desc");
@@ -845,6 +851,12 @@ export default function ServiceLogScreen() {
       eventKind: "",
       serviceType: "",
       node: "",
+      odometerMin: "",
+      odometerMax: "",
+      costMin: "",
+      costMax: "",
+      performerKind: "",
+      actionType: "",
     });
     setSortField("eventDate");
     setSortDirection("desc");

@@ -13,7 +13,7 @@ Current key groups:
 - `node.ts` — `NodeTreeItem`, status explanation types, node selection types
 - `service-event.ts` — service event DTO/input types
 - `vehicle.ts` — vehicle/garage/detail/profile/state/create DTO types
-- `service-log.ts` — filters/sort/grouping types
+- `service-log.ts` — `ServiceEventsFilters` (даты, поиск, узел-текст, вид, `paidOnly`, расширение: пробег/сумма/исполнитель/тип работы), сортировка, группировка, view models
 
 Usage:
 - consumed by Expo screens
@@ -31,7 +31,7 @@ Current modules:
   - node path search/select helpers
   - leaf reason short extraction
 - `service-log.ts`
-  - filtering and sorting service events
+  - filtering and sorting service events (`filterServiceLogEntries`, расширенные числовые/enum-поля фильтра)
   - monthly grouping
   - summary labels (`STATE_UPDATE` summary, monthly cost labels)
 

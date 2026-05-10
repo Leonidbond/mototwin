@@ -17,6 +17,8 @@
 
 **Мультивыбор** в форме сервисного события: **`AddNodeSheet`** (`service-event-form/overlays/AddNodeSheet.tsx`) внутри рендерит **`NodePickerModal`** с `mode="multi"`.
 
+**Журнал обслуживания (web):** `src/app/vehicles/[id]/service-log/page.tsx` — **`NodePickerModal`** с `mode="multi"` для фильтра по узлам; выбранные id уходят в query **`nodeIds`** (+ **`nodeLabel`**).
+
 ---
 
 ## 2. Expo (React Native)

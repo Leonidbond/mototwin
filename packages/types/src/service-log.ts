@@ -24,6 +24,17 @@ export type ServiceEventsFilters = {
   eventKind: string;
   serviceType: string;
   node: string;
+  /** Min пробег (км), пусто — без нижней границы. */
+  odometerMin: string;
+  /** Max пробег (км), пусто — без верхней границы. */
+  odometerMax: string;
+  /** Min сумма (канонический `totalCost` / legacy `costAmount`), пусто — без границы. */
+  costMin: string;
+  costMax: string;
+  /** Фильтр по исполнителю (`SELF` | `SERVICE` | `OTHER`), пусто — любой. */
+  performerKind: string;
+  /** Фильтр по типу работы в строках bundle (`REPLACE`, `SERVICE`, …), пусто — любой. */
+  actionType: string;
   /**
    * When true, only events with costAmount &gt; 0 and non-empty currency (client-side).
    * Combines with other filters and with optional node subtree restriction.

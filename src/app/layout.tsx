@@ -24,6 +24,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  /* Extensions may inject attributes on <html>/<body> before hydrate — suppressHydrationWarning avoids false positives. */
   return (
     <html
       lang="ru"
@@ -32,6 +33,7 @@ export default function RootLayout({
         backgroundColor: "#080d12",
         colorScheme: "dark",
       }}
+      suppressHydrationWarning
     >
       <body
         className="mototwin-dark min-h-full flex flex-col"
@@ -39,6 +41,7 @@ export default function RootLayout({
           margin: 0,
           backgroundColor: "#080d12",
         }}
+        suppressHydrationWarning
       >
         {children}
         <AppHelpFab />

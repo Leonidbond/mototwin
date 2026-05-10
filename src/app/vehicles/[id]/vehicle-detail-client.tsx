@@ -92,6 +92,7 @@ import type {
   ServiceKitViewModel,
   PartWishlistItemStatus,
   PartWishlistFormValues,
+  CreatePartWishlistItemInput,
   PartWishlistItem,
   PartWishlistItemViewModel,
   PartSkuViewModel,
@@ -100,6 +101,25 @@ import type {
 } from "@mototwin/types";
 
 const vehicleDetailApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+
+function decodeMototwinInternalReturnTo(raw: string | null): string | null {
+  if (!raw?.trim()) {
+    return null;
+  }
+  let decoded = raw.trim();
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    return null;
+  }
+  if (!decoded.startsWith("/") || decoded.startsWith("//")) {
+    return null;
+  }
+  if (!decoded.startsWith("/vehicles/") && !decoded.startsWith("/garage")) {
+    return null;
+  }
+  return decoded;
+}
 
 function NodeContextReferencePanel({
   viewModel,
@@ -1317,6 +1337,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   });
   const [wishlistPurchaseExpenseError, setWishlistPurchaseExpenseError] = useState("");
   const [wishlistDeletingId, setWishlistDeletingId] = useState("");
+  const [wishlistRepeatPurchaseBusyId, setWishlistRepeatPurchaseBusyId] = useState("");
   const [partsStatusFilter, setPartsStatusFilter] = useState<PartsStatusFilter>("ALL");
   const [selectedPartsWishlistItemId, setSelectedPartsWishlistItemId] = useState<string | null>(null);
   const [pickedReturnHighlightIds, setPickedReturnHighlightIds] = useState<string[]>([]);
@@ -2182,6 +2203,21 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   }, [highlightedWishlistItemIdFromSearchParams, pageView]);
 
   useEffect(() => {
+    if (pageView !== "partsSelection" || !vehicleId) {
+      return;
+    }
+    const raw = searchParams.get("partsSearch")?.trim() ?? "";
+    if (!raw) {
+      return;
+    }
+    setPartsSearchQuery(raw);
+    const q = new URLSearchParams(searchParams.toString());
+    q.delete("partsSearch");
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    router.replace(`/vehicles/${encodeURIComponent(vehicleId)}/parts${suffix}`, { scroll: false });
+  }, [pageView, router, searchParams, vehicleId]);
+
+  useEffect(() => {
     if (pageView !== "partsSelection" || !highlightedWishlistItemIdFromSearchParams) {
       return;
     }
@@ -2721,6 +2757,45 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       setWishlistNotice(`Ошибка: ${msg}`);
     } finally {
       setWishlistDeletingId("");
+    }
+  };
+
+  const repeatWishlistPurchaseFromItem = async (source: PartWishlistItem) => {
+    if (!vehicleId) {
+      return;
+    }
+    const nodeId = source.nodeId?.trim();
+    if (!nodeId) {
+      setWishlistNotice("У позиции нет привязки к узлу — повторить покупку нельзя.");
+      return;
+    }
+    try {
+      setWishlistNotice("");
+      setWishlistRepeatPurchaseBusyId(source.id);
+      const remark = "Повтор из корзины замен";
+      const baseComment = source.comment?.trim() ?? "";
+      const comment = baseComment ? `${baseComment} · ${remark}` : remark;
+      const payload: CreatePartWishlistItemInput = {
+        nodeId,
+        title: source.title.trim() || undefined,
+        skuId: source.skuId ?? null,
+        quantity: source.quantity >= 1 ? source.quantity : 1,
+        comment,
+        status: "NEEDED",
+        costAmount: null,
+        currency: null,
+      };
+      await vehicleDetailApi.createWishlistItem(vehicleId, payload);
+      await Promise.all([loadWishlist(), loadNodeTree()]);
+      setPartsStatusFilter("NEEDED");
+      setWishlistNotice("Добавлена новая позиция «Нужно» по этой запчасти.");
+    } catch (e) {
+      console.error(e);
+      setWishlistNotice(
+        `Ошибка: ${e instanceof Error ? e.message : "Не удалось повторить покупку."}`
+      );
+    } finally {
+      setWishlistRepeatPurchaseBusyId("");
     }
   };
 
@@ -4692,9 +4767,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (!vehicle || !vehicleStateViewModel) {
       return null;
     }
-    const partsBackFallbackHref = targetNodeIdFromSearchParams
-      ? `/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(targetNodeIdFromSearchParams)}`
-      : `/vehicles/${vehicleId}`;
+    const returnToDecoded = decodeMototwinInternalReturnTo(searchParams.get("returnTo"));
+    const partsBackFallbackHref =
+      returnToDecoded ||
+      (targetNodeIdFromSearchParams
+        ? `/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(targetNodeIdFromSearchParams)}`
+        : `/vehicles/${vehicleId}`);
     const vehicleDisplayName = detailViewModel?.displayName ?? title;
     const vehicleYearOdometerLine = `${vehicle.year} · ${vehicleStateViewModel.odometerLabel}`;
 
@@ -4753,6 +4831,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         onOpenWishlistPurchaseExpense={openWishlistPurchaseExpenseForm}
         onOpenWishlistEdit={openWishlistModalForEdit}
         onDeleteWishlistItem={deleteWishlistItemById}
+        onRepeatWishlistPurchase={repeatWishlistPurchaseFromItem}
+        wishlistRepeatPurchaseBusyId={wishlistRepeatPurchaseBusyId}
         router={router}
         hasNodeFilter={Boolean(partsNodeFilterIds)}
         onClearNodeFilter={clearPartsNodeUrlFilter}

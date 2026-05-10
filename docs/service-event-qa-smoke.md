@@ -46,7 +46,7 @@ BASE_URL=http://127.0.0.1:3000 npm run qa:service-event-full-smoke
 
 ## Ручной service-log compact/details checklist
 
-1. Web desktop: `/vehicles/{id}/service-log` открывается с левым `GarageSidebar`; header около 72px, справа counters/CTA, под ним sticky toolbar около 56px.
+1. Web desktop: `/vehicles/{id}/service-log` открывается с левым `GarageSidebar`; header около 72px, справа одна primary CTA **«Добавить ТО»**, под ним sticky toolbar около 56px.
 2. Web timeline: строки выглядят как dense operational timeline, а не карточки; проверяются 6 зон — rail/dot, дата+метрики, title/meta, chips, cost, action.
 3. Web details: выбранное событие открыто в правой sticky-панели с metric tiles, компактной таблицей работ/деталей, комментарием и fixed actions.
 4. Web deep link: `serviceEventId` / `highlightServiceEventId` скроллит к событию, выделяет row и раскрывает details; `expandExpenses=1` сохраняет paid-only context и усиливает cost/expense акцент.

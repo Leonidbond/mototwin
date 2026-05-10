@@ -29,13 +29,21 @@ Web and Expo now use the journal as a dense operational index first:
 - collapsed web rows use a 6-zone layout: timeline rail/status dot, date/metrics, title/meta, up to two chips, cost, and action affordance;
 - collapsed mobile rows target a 64–76px feed item with title/cost first and date/node/mileage/chips second;
 - full bundle rows, comments, wishlist origin, expense details, and lifecycle actions are shown only in contextual details: sticky panel on desktop, inline preview + bottom sheet on Expo;
-- `serviceEventId` / `highlightServiceEventId` still scrolls to the row and opens the event details after create/edit or when returning from installed parts;
+- `serviceEventId` / `highlightServiceEventId` still scrolls to the row and opens the event details after create/edit or when returning from installed parts; after the scroll the journal **strips these query keys** so the URL does not keep re-applying selection when the user changes node filter or picks another event;
 - `STATE_UPDATE` rows stay visually muted and compact, with full before/after lines inside details/sheet;
 - `paidOnly=1` keeps cost/expense context visually active in toolbar and detail summaries.
 
 Platform layout:
 
-- **Web:** `/vehicles/[id]/service-log` is rendered inside the vehicle shell with `GarageSidebar`. On desktop the journal uses a reference-style master-detail layout: sticky header/toolbar, dense grouped timeline on the left, and a sticky right details panel. On narrower viewports details open inline under the selected row.
+- **Web:** `/vehicles/[id]/service-log` is rendered inside the vehicle shell with `GarageSidebar`. On desktop the journal uses a reference-style master-detail layout: sticky header/toolbar, dense grouped timeline on the left, and a sticky right details panel. On narrower viewports details open inline under the selected row. Header exposes a single primary action **«Добавить ТО»** (same route as create flow); there is no separate **«Добавить событие»** ghost button on this page.
+  - **Web toolbar:** поиск (поле `serviceType`), тип события; **узлы** — `NodePickerModal` (multi) + query `nodeIds` / `nodeLabel`; **период** — всплывающая панель с датами и пресетами; переключатель **оплаченные**; кнопка **«Фильтры»** раскрывает одну строку с пробегом, суммой, типом работы, исполнителем и **«Сброс»** (полный сброс фильтров, сортировки и query). Домен: `ServiceEventsFilters` + `filterServiceLogEntries` в `packages/domain/src/service-log.ts`.
+  - **Web details:** в блоке **«Исполнитель»** для `SERVICE` показывается строка **«Название сервиса»** (`serviceProviderNote`).
+  - **Web: детальная панель (`SERVICE`) — переходы:** узлы, суммы и строки расходов ведут на целевые страницы с уже принятой в продукте логикой подсветки/скролла и **`returnTo`** для «Назад»:
+    - **Узлы** → `/vehicles/[id]/nodes?nodeId=…` (фокус дерева в `VehicleDetailClient`, как при других входах).
+    - **Расходы** → `/vehicles/[id]/expenses?year=…&serviceEventId=…` (+ при клике по строке расхода **`highlightExpenseId`**); в query передаётся **`returnTo`** на журнал с **`highlightServiceEventId`**, чтобы кнопка «Назад» на странице расходов вернула к тому же событию. Подробнее — [expense-tracking-mvp.md](./expense-tracking-mvp.md).
+    - **Подбор / корзина замен** → `/vehicles/[id]/parts?…` с **`wishlistItemId`** и/или **`nodeId`**; если wishlist-строку нельзя сопоставить однозначно с bundle по `installedPartsJson`, добавляется **`partsSearch`** (текст из названия работы/запчасти в журнале). **`returnTo`** обрабатывается в `VehicleDetailClient` как приоритетный fallback для кнопки «Назад» на странице подбора (до перехода на узел по `nodeId` или на карточку ТС).
+  - **Сопоставление wishlist ↔ строка bundle (домен):** `parseWishlistInstalledPartsRecordsOrdered` и `resolveWishlistItemIdForServiceBundleItem` в `packages/domain/src/part-wishlist.ts` — порядок записей в `installedPartsJson` без дедупа по `Set`, выравнивание по индексу при **равной** длине с `items[]`, иначе эвристика по `title` / `skuLabel` и полям строки; при нескольких записях без однозначного совпадения произвольный «первый id» не подставляется.
+  - **BASIC vs ADVANCED в деталях (web):** в **BASIC** строки `bundleItemsSummary` — это **узлы и тип работ**, не SKU-позиции; блок **«Установленные запчасти»** и меню **«Повторить покупку по установленным запчастям»** показываются **только в `ADVANCED`** (`src/app/vehicles/[id]/service-log/page.tsx`).
 - **Expo:** `vehicles/[id]/service-log` keeps `GarageBottomNav`; service rows are ultra-compact feed rows. Tapping a row expands a short preview/actions area, while **Подробнее** opens an 85–92% bottom sheet with full details.
 
 Supported route/query params:
@@ -151,7 +159,7 @@ Wishlist-install events are stored as normal `SERVICE` rows. The origin is recog
 Web and Expo behavior:
 
 - if a wishlist-install row has `wishlistItemId`, the label **«Из списка покупок»** is rendered as a button
-- clicking it opens the full parts/wishlist screen with `wishlistItemId=...`
+- clicking it opens the full parts/wishlist screen with `wishlistItemId=...` (on web from the journal detail panel, also **`returnTo`** back to the highlighted journal event)
 - the parts/wishlist screen expands/filters to the matching status group, highlights that part card, and scrolls it into view
 - the reverse link exists on installed part cards: **«В журнал»** opens the service log with `serviceEventId=...`, and the journal scrolls/highlights the corresponding event
 
@@ -191,6 +199,10 @@ After `SERVICE` event edit:
 - linked `ExpenseItem` is updated from edited `costAmount`/`currency` values
 
 This keeps service history correction compatible with existing create flows (node context, wishlist install, kits, direct add).
+
+## Web development notes
+
+- Предупреждение React **hydration mismatch** с лишними атрибутами вроде **`bis_skin_checked="1"`** на `localhost` чаще всего даёт **расширение браузера**, меняющее DOM до гидрации. Имеет смысл проверять страницу в окне без расширений или в инкогнито перед отладкой «как в коде».
 
 ## Status and expense consistency after delete
 

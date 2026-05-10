@@ -48,7 +48,7 @@ The page consolidates multiple operational blocks and modal flows:
 - vehicle identity/profile
 - current state with inline update (`PATCH /state`)
 - node tree with expand/collapse and status badges
-- link to **Service Log** page `/vehicles/[id]/service-log` (filters/sorting; primary journal UX)
+- link to **Service Log** page `/vehicles/[id]/service-log` (primary journal UX: фильтры — узлы через **`NodePickerModal`**, период, раскрываемая строка пробег/сумма/тип работы/исполнитель, сортировка; см. [service-log-mvp.md](./service-log-mvp.md), [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md))
 - **`ServiceEventForm`** (`src/app/vehicles/[id]/_components/service-event-form/`) — создание / редактирование / повтор (bundle, только **листовые** узлы); страницы **`/vehicles/[id]/service-events/new`** и **`…/edit`**; навигация из **`vehicle-detail-client.tsx`** и **`service-log/page.tsx`** (см. [service-log-mvp.md](./service-log-mvp.md), [web-service-event-form.md](./web-service-event-form.md))
 - status explanation modal
 - edit profile modal (`PATCH /profile`)
@@ -67,7 +67,8 @@ After successful mutation, page reloads relevant datasets to reflect updated sta
 
 ## 5. Current web-specific notes
 
-- Выбор узла дерева в модалках (сервисное событие, wishlist, каталог запчастей): общий **`NodePickerModal`** / обёртки — см. [node-picker-reuse.md](./node-picker-reuse.md).
+- **`src/app/layout.tsx`:** на `<html>` и `<body>` задан **`suppressHydrationWarning`**, чтобы не получать ложные предупреждения гидрации, когда расширения браузера дописывают атрибуты на `<body>` до React (типичный признак — атрибуты вида `bis_register`, `__processed_*` в diff).
+- Выбор узла дерева в модалках (сервисное событие, wishlist, каталог запчастей, **журнал**): общий **`NodePickerModal`** / обёртки — см. [node-picker-reuse.md](./node-picker-reuse.md).
 - Часть операционных сценариев (профиль, пояснения статуса) по-прежнему через модалки; сервисное событие — отдельные full-page маршруты (`service-events/new`, `…/edit`).
 - This differs from Expo route-based decomposition, but backend outcome remains aligned.
 - Web does not currently use shared `@mototwin/api-client` as primary data layer for page fetches.

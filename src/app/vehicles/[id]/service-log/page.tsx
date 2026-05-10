@@ -1,33 +1,68 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  buildServiceLogEntryViewModel,
   buildServiceLogTimelineProps,
   expenseCategoryLabelsRu,
+  filterLeafOptionsUnderTopNodeAncestors,
   filterPaidServiceEvents,
+  findNodeTreeItemById,
   formatExpenseAmountRu,
+  formatIsoCalendarDateRu,
+  getLeafNodeOptions,
+  getOrderedTopNodeIdsPresentInNodeTree,
+  getTodayDateYmdLocal,
   getWishlistItemIdsFromInstalledPartsJson,
+  resolveWishlistItemIdForServiceBundleItem,
   isServiceLogTimelineQueryActive,
+  nodeAncestorPathLabelRu,
+  SERVICE_ACTION_TYPE_OPTIONS,
 } from "@mototwin/domain";
 import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 import { Button } from "@/components/ui";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { NodePickerModal, type SharedNodePickerOption } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
 import type {
+  CreatePartWishlistItemInput,
+  NodeTreeItem,
+  ServiceActionType,
   ServiceEventItem,
   ServiceEventsFilters,
   ServiceEventsSortDirection,
   ServiceEventsSortField,
+  ServiceLogBundleItemSummary,
   ServiceLogEntryViewModel,
   ServiceLogMonthGroupViewModel,
   ServiceLogNodeFilter,
+  TopServiceNodeItem,
 } from "@mototwin/types";
+
+/** Тип строки журнала: действие по узлу или запись состояния. */
+type ServiceRowActionKind = ServiceActionType | "STATE_UPDATE";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 const SIDEBAR_COLLAPSED_KEY = "vehicle.detail.sidebar.collapsed";
 const LOAD_MORE_STEP = 20;
 const SERVICE_LOG_DETAILS_COL_WIDTH = 460;
+
+type RepeatPurchaseConfirmPayload = {
+  eventId: string;
+  entryMainTitle: string;
+  entryDateLabel: string;
+  items: ServiceLogBundleItemSummary[];
+};
 
 // ─── Visual system ─────────────────────────────────────────────────────────────
 // All colours route through `productSemanticColors` so the journal stays in the
@@ -85,9 +120,6 @@ const REF_TOP = {
   ctaGap: 10,
   ctaH: 40,
   ctaRadius: 8,
-  ghostFont: 13,
-  ghostWeight: 500 as const,
-  ghostPadX: 18,
   primaryPadX: 20,
   primaryFont: 13,
   primaryWeight: 600 as const,
@@ -111,9 +143,13 @@ const REF_TOP = {
   infoFont: 13,
   infoMuted: SPEC.textSecondary,
   sortComboH: 28,
+  sortComboRadius: 8,
   filterBadgeBg: SPEC.accent,
   filterBadgeColor: productSemanticColors.onPrimaryAction,
-  viewBtn: { w: 30, h: 28, radius: 8 },
+  /** Строка журнала в карточке месяца: правый отступ меньше левого — карточка события ближе к правой границе блока. */
+  monthJournalRowPadRight: 4,
+  /** Вертикальный зазор между событиями в месяце = отступ первого события от шапки месяца (минимально). */
+  monthJournalEntryVGap: 2,
 } as const;
 
 /** Панель поиска/фильтров — 4 модуля в ряд, цвета из токенов. */
@@ -215,7 +251,7 @@ const monthCardStyle: CSSProperties = {
   border: SPEC.borderSubtle,
   backgroundColor: "rgba(255,255,255,0.012)",
   overflow: "hidden",
-  marginTop: 10,
+  marginTop: 6,
   width: "100%",
   boxSizing: "border-box",
 };
@@ -255,10 +291,97 @@ const mutedBtnStyle: CSSProperties = {
   gap: 6,
 };
 
+/** Правая панель журнала: компактные бейджи узлов и ссылки на суммы/расходы. */
+const detailPanelNodeChipStyle: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 600,
+  letterSpacing: "0.02em",
+  color: SPEC.textPrimary,
+  lineHeight: 1.15,
+  padding: "1px 6px",
+  borderRadius: 5,
+  backgroundColor: "rgba(255,255,255,0.04)",
+  border: SPEC.borderSubtle,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  textAlign: "left",
+};
+
+const detailPanelCostTextLinkStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 500,
+  color: SPEC.textSecondary,
+  lineHeight: 1.35,
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  fontFamily: "inherit",
+  textAlign: "left",
+  textDecoration: "underline",
+  textDecorationStyle: "dotted",
+  textDecorationColor: "rgba(148,163,184,0.45)",
+  textUnderlineOffset: 2,
+};
+
+const detailPanelCostTotalLinkStyle: CSSProperties = {
+  ...detailPanelCostTextLinkStyle,
+  fontWeight: 600,
+  color: C.green,
+  textAlign: "right",
+  textDecorationColor: "rgba(74,222,128,0.35)",
+  maxWidth: "56%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
 // ─── Pure helpers ──────────────────────────────────────────────────────────────
 
 function parsePaidOnly(v: string | null): boolean {
   return v === "1" || v === "true";
+}
+
+function wishlistPayloadFromLogBundleItem(
+  item: ServiceLogBundleItemSummary,
+  entryMainTitle: string,
+  entryDateLabel: string
+): CreatePartWishlistItemInput {
+  const title =
+    (item.partName ?? item.actionLabelRu ?? "Позиция из журнала").trim() || "Позиция из журнала";
+  const quantity =
+    item.quantity != null && Number.isInteger(item.quantity) && item.quantity >= 1 ? item.quantity : 1;
+  const bits: string[] = [];
+  if (item.sku?.trim()) bits.push(`SKU: ${item.sku.trim()}`);
+  bits.push(`Из журнала: ${entryMainTitle} (${entryDateLabel})`);
+  return {
+    nodeId: item.nodeId,
+    title,
+    quantity,
+    skuId: null,
+    comment: bits.join(" · "),
+    status: "NEEDED",
+  };
+}
+
+function useClosePanelOnOutsidePress(
+  open: boolean,
+  rootRef: RefObject<HTMLElement | null>,
+  onClose: () => void
+) {
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const el = rootRef.current;
+      if (el && !el.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open, onClose, rootRef]);
 }
 
 function getCompactCost(entry: ServiceLogEntryViewModel): string | null {
@@ -269,21 +392,78 @@ function getCompactCost(entry: ServiceLogEntryViewModel): string | null {
   return null;
 }
 
-type ActionType = "REPLACE" | "SERVICE" | "INSPECT" | "STATE_UPDATE";
-
-function getServiceIconConfig(actionType: ActionType): { bg: string; iconColor: string; variant: ActionType } {
+function getServiceIconConfig(actionType: ServiceRowActionKind): {
+  bg: string;
+  iconColor: string;
+  variant: ServiceRowActionKind;
+} {
   if (actionType === "REPLACE") return { bg: "#172440", iconColor: "#60a5fa", variant: "REPLACE" };
-  if (actionType === "INSPECT") return { bg: "#0f2b1f", iconColor: "#4ade80", variant: "INSPECT" };
+  if (actionType === "INSPECT") return { bg: "#0a2524", iconColor: "#5eead4", variant: "INSPECT" };
   if (actionType === "STATE_UPDATE") return { bg: "rgba(255,255,255,0.055)", iconColor: C.text3, variant: "STATE_UPDATE" };
-  return { bg: "#112038", iconColor: "#38bdf8", variant: "SERVICE" };
+  if (actionType === "CLEAN") return { bg: "#082026", iconColor: "#22d3ee", variant: "CLEAN" };
+  if (actionType === "ADJUST") return { bg: "#241c0a", iconColor: "#fbbf24", variant: "ADJUST" };
+  /* ТО / сервис — тёмно-зелёный круг + неоново-зелёная иконка (референс «Замена масла»). */
+  return { bg: "#0a2518", iconColor: "#4ade80", variant: "SERVICE" };
 }
 
-function getFirstActionType(entry: ServiceLogEntryViewModel, event: ServiceEventItem | null): ActionType {
+function getRowActionKind(entry: ServiceLogEntryViewModel, event: ServiceEventItem | null): ServiceRowActionKind {
   if (entry.eventKind === "STATE_UPDATE") return "STATE_UPDATE";
-  const raw = (event?.items?.[0] as { actionType?: string } | undefined)?.actionType;
-  if (raw === "REPLACE") return "REPLACE";
-  if (raw === "INSPECT") return "INSPECT";
+  const raw = event?.items?.[0]?.actionType;
+  if (
+    raw === "REPLACE" ||
+    raw === "INSPECT" ||
+    raw === "CLEAN" ||
+    raw === "ADJUST" ||
+    raw === "SERVICE"
+  ) {
+    return raw;
+  }
   return "SERVICE";
+}
+
+/** Цвет линии таймлайна и обводки/заливки маркера по типу действия (без выбранной строки). */
+function getTimelineColors(kind: ServiceRowActionKind): { rail: string; dotBorder: string; dotBg: string } {
+  if (kind === "STATE_UPDATE") {
+    return {
+      rail: "rgba(148,163,184,0.38)",
+      dotBorder: "rgba(255,255,255,0.24)",
+      dotBg: "rgba(15,23,42,0.92)",
+    };
+  }
+  if (kind === "REPLACE") {
+    return {
+      rail: "rgba(96,165,250,0.52)",
+      dotBorder: "rgba(147,197,253,0.95)",
+      dotBg: "#0c1524",
+    };
+  }
+  if (kind === "INSPECT") {
+    return {
+      rail: "rgba(45,212,191,0.52)",
+      dotBorder: "rgba(94,234,212,0.92)",
+      dotBg: "#0a1f1c",
+    };
+  }
+  if (kind === "CLEAN") {
+    return {
+      rail: "rgba(34,211,238,0.48)",
+      dotBorder: "rgba(34,211,238,0.9)",
+      dotBg: "#071a1f",
+    };
+  }
+  if (kind === "ADJUST") {
+    return {
+      rail: "rgba(251,191,36,0.48)",
+      dotBorder: "rgba(252,211,77,0.92)",
+      dotBg: "#1c1708",
+    };
+  }
+  /* SERVICE */
+  return {
+    rail: "rgba(34,197,94,0.55)",
+    dotBorder: "rgba(74,222,128,0.95)",
+    dotBg: "#0f1711",
+  };
 }
 
 function getPerformerLabel(performedBy: string | null | undefined): string {
@@ -293,15 +473,42 @@ function getPerformerLabel(performedBy: string | null | undefined): string {
   return "—";
 }
 
-/** Reference layout: day+month on line 1, year on line 2 (`docs/service-log-web-reference-pixel-spec.md` §9.1 col 2). */
-function formatRowDateParts(iso: string): { dayMonth: string; year: string } {
+function buildMultiNodeLabel(nodeTree: NodeTreeItem[], ids: string[]): string {
+  if (ids.length === 0) return "";
+  const names = ids.map((id) => findNodeTreeItemById(nodeTree, id)?.name ?? id);
+  if (names.length === 1) return names[0] ?? "";
+  if (names.length === 2) return `${names[0]}, ${names[1]}`;
+  return `${names[0]}, ${names[1]} +${names.length - 2}`;
+}
+
+function localDateToYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function periodToolbarLabel(dateFrom: string, dateTo: string): string {
+  const a = dateFrom.trim();
+  const b = dateTo.trim();
+  if (!a && !b) return "Все время";
+  const left = a ? formatIsoCalendarDateRu(`${a}T12:00:00`) : "…";
+  const right = b ? formatIsoCalendarDateRu(`${b}T12:00:00`) : "…";
+  return `${left} – ${right}`;
+}
+
+/** Трёхбуквенные сокращения месяцев (ширина колонки даты считается по контенту). */
+const ROW_DATE_MONTH_3 = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"] as const;
+
+/** Первая строка: «14 апр», вторая: год. При невалидной дате — подпись из журнала в первой строке. */
+function formatRowDateColumnParts(iso: string, fallbackLabel: string): { dayMonth: string; year: string } {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
-    return { dayMonth: iso.slice(0, 10), year: "" };
+    return { dayMonth: fallbackLabel.trim() || iso.slice(0, 10), year: "" };
   }
-  const dayMonth = date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-  const year = date.toLocaleDateString("ru-RU", { year: "numeric" });
-  return { dayMonth, year };
+  const day = date.getDate();
+  const mon = ROW_DATE_MONTH_3[date.getMonth()];
+  return { dayMonth: `${day} ${mon}`, year: String(date.getFullYear()) };
 }
 
 function getIntervalLabel(event: ServiceEventItem | null): string {
@@ -310,6 +517,43 @@ function getIntervalLabel(event: ServiceEventItem | null): string {
   if (event.nextReminderEngineHours) return `${event.nextReminderEngineHours} ч`;
   if (event.nextReminderDate) return event.nextReminderDate.slice(0, 10).split("-").reverse().join(".");
   return "—";
+}
+
+/** Уникальные узлы для детальной панели: из bundle или якорь события (в т.ч. STATE_UPDATE). */
+function getDetailPanelNodeRows(
+  entry: ServiceLogEntryViewModel,
+  event: ServiceEventItem | null
+): { nodeId: string; name: string }[] {
+  if (entry.bundleItemsSummary.length > 0) {
+    const byId = new Map<string, string>();
+    for (const item of entry.bundleItemsSummary) {
+      byId.set(item.nodeId, item.nodeName);
+    }
+    return [...byId.entries()].map(([nodeId, name]) => ({ nodeId, name }));
+  }
+  if (event?.nodeId) {
+    const name = event.node?.name?.trim() || event.nodeId;
+    return [{ nodeId: event.nodeId, name }];
+  }
+  return [];
+}
+
+/** Полное описание напоминания (пробег / моточасы / дата). */
+function formatFullServiceReminder(event: ServiceEventItem | null): string | null {
+  if (!event) return null;
+  const bits: string[] = [];
+  if (event.nextReminderOdometer != null && Number.isFinite(event.nextReminderOdometer)) {
+    bits.push(`пробег ${event.nextReminderOdometer.toLocaleString("ru-RU")} км`);
+  }
+  if (event.nextReminderEngineHours != null && Number.isFinite(event.nextReminderEngineHours)) {
+    bits.push(`моточасы ${event.nextReminderEngineHours} ч`);
+  }
+  if (event.nextReminderDate?.trim()) {
+    bits.push(`дата ${formatIsoCalendarDateRu(event.nextReminderDate)}`);
+  }
+  if (bits.length === 0) return null;
+  const on = event.nextReminderEnabled === true ? "Включено: " : event.nextReminderEnabled === false ? "Выключено (параметры сохранены): " : "";
+  return `${on}${bits.join(" · ")}`;
 }
 
 // ─── Page component ────────────────────────────────────────────────────────────
@@ -332,18 +576,34 @@ export default function VehicleServiceLogPage() {
   const [vehicleVin, setVehicleVin] = useState<string | null>(null);
   const [isWideViewport, setIsWideViewport] = useState(false);
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
+  const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [repeatPurchaseBusy, setRepeatPurchaseBusy] = useState(false);
+  const [repeatPurchaseModal, setRepeatPurchaseModal] = useState<RepeatPurchaseConfirmPayload | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(highlightedServiceEventId ?? "");
   const [visibleCount, setVisibleCount] = useState(LOAD_MORE_STEP);
+  const [nodePickerOpen, setNodePickerOpen] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [periodPopoverOpen, setPeriodPopoverOpen] = useState(false);
+  const periodPopoverRef = useRef<HTMLDivElement | null>(null);
+  /** Prevents URL highlight params from re-forcing selection on every `selectedEventId` change (e.g. after return from expenses). */
+  const appliedServiceLogHighlightFromUrlRef = useRef<string | null>(null);
   const [filters, setFilters] = useState<ServiceEventsFilters>({
     dateFrom: "",
     dateTo: "",
     eventKind: "",
     serviceType: "",
     node: "",
+    odometerMin: "",
+    odometerMax: "",
+    costMin: "",
+    costMax: "",
+    performerKind: "",
+    actionType: "",
     paidOnly: paidOnlyFromQuery ? true : undefined,
   });
   const [sort, setSort] = useState<{
@@ -361,6 +621,52 @@ export default function VehicleServiceLogPage() {
     return { nodeIds: resolvedNodeIds, displayLabel: nodeLabelFromQuery || "Узел" };
   }, [nodeIdFromQuery, nodeIdsFromQuery, nodeLabelFromQuery]);
 
+  const nodePickerSelectedIds = useMemo(() => {
+    const resolved =
+      nodeIdsFromQuery && nodeIdsFromQuery.length > 0
+        ? nodeIdsFromQuery.split(",").filter(Boolean)
+        : nodeIdFromQuery
+          ? [nodeIdFromQuery]
+          : [];
+    return new Set(resolved);
+  }, [nodeIdFromQuery, nodeIdsFromQuery]);
+
+  const nodePickerOptions = useMemo((): SharedNodePickerOption[] => {
+    return getLeafNodeOptions(nodeTree).map((o) => ({
+      id: o.id,
+      name: o.name,
+      level: o.level,
+      pathLabel: nodeAncestorPathLabelRu(nodeTree, o.id),
+    }));
+  }, [nodeTree]);
+
+  const nodePickerTopOptions = useMemo((): SharedNodePickerOption[] => {
+    const leafRows = getLeafNodeOptions(nodeTree).map((o) => ({
+      id: o.id,
+      name: o.name,
+      level: o.level,
+      pathLabel: nodeAncestorPathLabelRu(nodeTree, o.id),
+    }));
+    const topIds = getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes);
+    return filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafRows, topIds);
+  }, [nodeTree, topServiceNodes]);
+
+  const applyNodePickerSelection = useCallback(
+    (nodeIds: string[]) => {
+      const q = new URLSearchParams(searchParams.toString());
+      q.delete("nodeId");
+      if (nodeIds.length === 0) {
+        q.delete("nodeIds");
+        q.delete("nodeLabel");
+      } else {
+        q.set("nodeIds", nodeIds.join(","));
+        q.set("nodeLabel", buildMultiNodeLabel(nodeTree, nodeIds));
+      }
+      router.replace(`/vehicles/${vehicleId}/service-log${q.toString() ? `?${q.toString()}` : ""}`);
+    },
+    [nodeTree, router, searchParams, vehicleId]
+  );
+
   useEffect(() => {
     setFilters((prev) => ({ ...prev, paidOnly: paidOnlyFromQuery ? true : undefined }));
   }, [paidOnlyFromQuery]);
@@ -375,9 +681,11 @@ export default function VehicleServiceLogPage() {
     try {
       setIsLoading(true);
       setError("");
-      const [detail, service] = await Promise.all([
+      const [detail, service, treeRes, topRes] = await Promise.all([
         api.getVehicleDetail(vehicleId),
         api.getServiceEvents(vehicleId),
+        api.getNodeTree(vehicleId),
+        api.getTopServiceNodes(),
       ]);
       const vehicle = detail.vehicle;
       const title =
@@ -387,6 +695,8 @@ export default function VehicleServiceLogPage() {
       setVehicleTitle(title);
       setVehicleVin(vehicle?.vin ?? null);
       setEvents(service.serviceEvents ?? []);
+      setNodeTree(treeRes.nodeTree ?? []);
+      setTopServiceNodes(topRes.nodes ?? []);
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : "Не удалось загрузить журнал обслуживания.");
@@ -468,9 +778,13 @@ export default function VehicleServiceLogPage() {
 
   useEffect(() => {
     if (highlightedServiceEventId) {
-      setSelectedEventId(highlightedServiceEventId);
+      if (appliedServiceLogHighlightFromUrlRef.current !== highlightedServiceEventId) {
+        appliedServiceLogHighlightFromUrlRef.current = highlightedServiceEventId;
+        setSelectedEventId(highlightedServiceEventId);
+      }
       return;
     }
+    appliedServiceLogHighlightFromUrlRef.current = null;
     if (!flatEntries.some((e) => e.id === selectedEventId)) {
       setSelectedEventId(flatEntries[0]?.id ?? "");
     }
@@ -482,9 +796,17 @@ export default function VehicleServiceLogPage() {
       document
         .getElementById(`service-log-event-${highlightedServiceEventId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const q = new URLSearchParams(searchParams.toString());
+      if (!q.get("serviceEventId") && !q.get("highlightServiceEventId")) {
+        return;
+      }
+      q.delete("serviceEventId");
+      q.delete("highlightServiceEventId");
+      const qs = q.toString();
+      router.replace(`/vehicles/${vehicleId}/service-log${qs ? `?${qs}` : ""}`, { scroll: false });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [groups, highlightedServiceEventId, isLoading]);
+  }, [groups, highlightedServiceEventId, isLoading, router, searchParams, vehicleId]);
 
   const hasAnyPaid = useMemo(() => filterPaidServiceEvents(events).length > 0, [events]);
   const isQueryActive = useMemo(
@@ -495,20 +817,66 @@ export default function VehicleServiceLogPage() {
     [filters, sort, effectiveNodeIds]
   );
   const visibleEventCount = flatEntries.length;
-  const activeFilterCount = [
-    filters.dateFrom, filters.dateTo, filters.eventKind, filters.serviceType, filters.node,
-    filters.paidOnly === true ? "paidOnly" : "",
-    effectiveNodeIds?.length ? "nodeLink" : "",
-  ].filter(Boolean).length;
+  const activeFilterCount = useMemo(
+    () =>
+      [
+        filters.dateFrom,
+        filters.dateTo,
+        filters.eventKind,
+        filters.serviceType,
+        filters.node,
+        filters.odometerMin,
+        filters.odometerMax,
+        filters.costMin,
+        filters.costMax,
+        filters.performerKind,
+        filters.actionType,
+        filters.paidOnly === true ? "paidOnly" : "",
+        effectiveNodeIds?.length ? "nodeLink" : "",
+      ].filter(Boolean).length,
+    [filters, effectiveNodeIds]
+  );
 
   const updateFilter = (field: keyof ServiceEventsFilters, value: string) =>
     setFilters((prev) => ({ ...prev, [field]: value }));
 
   const resetFilters = () => {
-    setFilters({ dateFrom: "", dateTo: "", eventKind: "", serviceType: "", node: "", paidOnly: undefined });
+    setFilters({
+      dateFrom: "",
+      dateTo: "",
+      eventKind: "",
+      serviceType: "",
+      node: "",
+      odometerMin: "",
+      odometerMax: "",
+      costMin: "",
+      costMax: "",
+      performerKind: "",
+      actionType: "",
+      paidOnly: undefined,
+    });
     setSort({ field: "eventDate", direction: "desc" });
+    setFiltersExpanded(false);
+    setPeriodPopoverOpen(false);
     router.replace(`/vehicles/${vehicleId}/service-log`);
   };
+
+  useEffect(() => {
+    if (!periodPopoverOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      const el = periodPopoverRef.current;
+      if (el && target && !el.contains(target)) {
+        setPeriodPopoverOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [periodPopoverOpen]);
 
   const setPaidOnly = (next: boolean) => {
     const q = new URLSearchParams(searchParams.toString());
@@ -517,7 +885,88 @@ export default function VehicleServiceLogPage() {
     router.replace(`/vehicles/${vehicleId}/service-log${q.toString() ? `?${q.toString()}` : ""}`);
   };
 
+  const applyPeriodPreset = useCallback((kind: "month" | "quarter" | "year" | "all") => {
+    if (kind === "all") {
+      setFilters((p) => ({ ...p, dateFrom: "", dateTo: "" }));
+      return;
+    }
+    const todayYmd = getTodayDateYmdLocal();
+    const y = Number(todayYmd.slice(0, 4));
+    const mo = Number(todayYmd.slice(5, 7)) - 1;
+    const day = Number(todayYmd.slice(8, 10));
+    const today = new Date(y, mo, day);
+    let from = new Date(today);
+    if (kind === "month") {
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+    } else if (kind === "quarter") {
+      from = new Date(today);
+      from.setMonth(from.getMonth() - 3);
+    } else {
+      from = new Date(today.getFullYear(), 0, 1);
+    }
+    setFilters((p) => ({
+      ...p,
+      dateFrom: localDateToYmd(from),
+      dateTo: todayYmd,
+    }));
+  }, []);
+
   const serviceLogReturnTo = encodeURIComponent(`/vehicles/${vehicleId}/service-log`);
+
+  const serviceLogHighlightReturnPath = useCallback(
+    (eventId: string) => {
+      const q = new URLSearchParams();
+      q.set("highlightServiceEventId", eventId);
+      return `/vehicles/${vehicleId}/service-log?${q.toString()}`;
+    },
+    [vehicleId]
+  );
+
+  const openExpensesForServiceEvent = useCallback(
+    (eventId: string, opts?: { highlightExpenseId?: string; expenseDateIso?: string }) => {
+      const ev = serviceEventById.get(eventId);
+      const rawYear = opts?.expenseDateIso
+        ? new Date(opts.expenseDateIso).getFullYear()
+        : ev?.eventDate
+          ? new Date(ev.eventDate).getFullYear()
+          : new Date().getFullYear();
+      const year = Number.isFinite(rawYear) && rawYear > 1900 ? rawYear : new Date().getFullYear();
+      const q = new URLSearchParams();
+      q.set("year", String(year));
+      q.set("serviceEventId", eventId);
+      if (opts?.highlightExpenseId) {
+        q.set("highlightExpenseId", opts.highlightExpenseId);
+      }
+      q.set("returnTo", serviceLogHighlightReturnPath(eventId));
+      router.push(`/vehicles/${vehicleId}/expenses?${q.toString()}`);
+    },
+    [router, serviceEventById, serviceLogHighlightReturnPath, vehicleId]
+  );
+
+  const openPartsSelectionFromLog = useCallback(
+    (eventId: string, opts: { wishlistItemId?: string; nodeId?: string; partsSearch?: string } = {}) => {
+      const q = new URLSearchParams();
+      if (opts.wishlistItemId) {
+        q.set("wishlistItemId", opts.wishlistItemId);
+      }
+      if (opts.nodeId) {
+        q.set("nodeId", opts.nodeId);
+      }
+      if (opts.partsSearch?.trim()) {
+        q.set("partsSearch", opts.partsSearch.trim());
+      }
+      q.set("returnTo", serviceLogHighlightReturnPath(eventId));
+      router.push(`/vehicles/${vehicleId}/parts?${q.toString()}`);
+    },
+    [router, serviceLogHighlightReturnPath, vehicleId]
+  );
+
+  const openNodeTreeFromLog = useCallback(
+    (nodeId: string) => {
+      router.push(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(nodeId)}`);
+    },
+    [router, vehicleId]
+  );
 
   const openCreate = () =>
     router.push(`/vehicles/${vehicleId}/service-events/new?returnTo=${serviceLogReturnTo}`);
@@ -526,6 +975,68 @@ export default function VehicleServiceLogPage() {
     if (serviceEventById.get(id)?.eventKind === "STATE_UPDATE") return;
     router.push(`/vehicles/${vehicleId}/service-events/new?repeatOf=${encodeURIComponent(id)}&returnTo=${serviceLogReturnTo}`);
   };
+
+  const repeatPurchaseInstalledParts = useCallback(
+    async (eventId: string, bundleItemIds?: string[] | null) => {
+      const ev = serviceEventById.get(eventId);
+      if (!ev || ev.eventKind === "STATE_UPDATE") {
+        setActionMessage("Для этой записи нельзя добавить позиции в список покупок.");
+        return;
+      }
+      if ((ev.mode ?? "BASIC") !== "ADVANCED") {
+        setActionMessage(
+          "В быстром режиме нет отдельных позиций запчастей по строкам — только узлы и тип работ. Повтор покупки по списку установленных деталей доступен для записей в подробном режиме."
+        );
+        return;
+      }
+      const entry = buildServiceLogEntryViewModel(ev);
+      let targets = entry.bundleItemsSummary;
+      if (bundleItemIds && bundleItemIds.length > 0) {
+        targets = targets.filter((t) => bundleItemIds.includes(t.id));
+      }
+      if (targets.length === 0) {
+        setActionMessage("В этой записи нет установленных запчастей для повторной покупки.");
+        return;
+      }
+      setRepeatPurchaseBusy(true);
+      setActionMessage("");
+      let created = 0;
+      let lastError = "";
+      for (const item of targets) {
+        try {
+          const payload = wishlistPayloadFromLogBundleItem(item, entry.mainTitle, entry.dateLabel);
+          await api.createWishlistItem(vehicleId, payload);
+          created += 1;
+        } catch (e) {
+          lastError = e instanceof Error ? e.message : "Ошибка создания позиции";
+        }
+      }
+      setRepeatPurchaseBusy(false);
+      if (created > 0) {
+        const rt = encodeURIComponent(serviceLogHighlightReturnPath(eventId));
+        router.push(`/vehicles/${vehicleId}/parts?returnTo=${rt}`);
+        if (lastError) {
+          setActionMessage(
+            `Добавлено в список покупок: ${created}. Не удалось добавить часть позиций: ${lastError}`
+          );
+        }
+      } else {
+        setActionMessage(lastError || "Не удалось добавить позиции в список покупок.");
+      }
+    },
+    [router, serviceEventById, serviceLogHighlightReturnPath, vehicleId]
+  );
+
+  const openRepeatPurchaseConfirm = useCallback((payload: RepeatPurchaseConfirmPayload) => {
+    const ev = serviceEventById.get(payload.eventId);
+    if (!ev || ev.eventKind === "STATE_UPDATE" || (ev.mode ?? "BASIC") !== "ADVANCED") {
+      setActionMessage(
+        "В быстром режиме нет отдельных позиций запчастей по строкам — только узлы и тип работ. Повтор покупки по списку установленных деталей доступен для записей в подробном режиме."
+      );
+      return;
+    }
+    setRepeatPurchaseModal(payload);
+  }, [serviceEventById]);
 
   const openEdit = (id: string) => {
     if (serviceEventById.get(id)?.eventKind === "STATE_UPDATE") return;
@@ -655,21 +1166,6 @@ export default function VehicleServiceLogPage() {
                 }}
               >
                 <Button
-                  variant="ghost"
-                  onClick={openCreate}
-                  leadingIcon={<WrenchHeaderSvg />}
-                  style={{
-                    height: REF_TOP.ctaH,
-                    borderRadius: REF_TOP.ctaRadius,
-                    padding: `0 ${REF_TOP.ghostPadX}px`,
-                    fontSize: REF_TOP.ghostFont,
-                    fontWeight: REF_TOP.ghostWeight,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Добавить событие
-                </Button>
-                <Button
                   variant="primary"
                   onClick={openCreate}
                   leadingIcon={<PlusSmallSvg />}
@@ -794,69 +1290,173 @@ export default function VehicleServiceLogPage() {
                         </select>
                       </div>
 
-                    {/* 3 — узел */}
-                    <div
+                    {/* 3 — узел (мультивыбор через модальное окно) */}
+                    <button
+                      type="button"
+                      onClick={() => setNodePickerOpen(true)}
                       style={{
                         ...serviceLogFilterDropdownBase,
                         border: TOOLBAR_REF.moduleBorder,
                         backgroundColor: TOOLBAR_REF.moduleBg,
                         borderRadius: TOOLBAR_REF.moduleRadius,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
                       }}
+                      aria-label="Выбрать узлы для фильтра"
                     >
                       <span style={serviceLogFilterLabelStyle}>Узел</span>
-                      <span style={serviceLogFilterValueStyle}>
-                        {filters.node.trim() ? filters.node : "Все узлы"}
+                      <span
+                        style={{
+                          ...serviceLogFilterValueStyle,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          maxWidth: "100%",
+                        }}
+                      >
+                        {nodeFilter ? nodeFilter.displayLabel : "Все узлы"}
                       </span>
                       <span style={toolbarDropdownChevronStyle}>▾</span>
-                      <input
-                        value={filters.node}
-                        onChange={(e) => updateFilter("node", e.target.value)}
-                        placeholder="Введите название узла"
-                        title="Узел"
-                        aria-label="Фильтр по узлу"
-                        style={dropdownSelectOverlayStyle}
-                      />
-                    </div>
+                    </button>
 
-                    {/* 4 — период */}
+                    {/* 4 — период (календарь + пресеты) */}
                     <div
+                      ref={periodPopoverRef}
                       style={{
                         ...serviceLogFilterDropdownBase,
                         border: TOOLBAR_REF.moduleBorder,
                         backgroundColor: TOOLBAR_REF.moduleBg,
                         borderRadius: TOOLBAR_REF.moduleRadius,
+                        position: "relative",
+                        padding: 0,
+                        /* Иначе панель с датами (absolute ниже блока) целиком режется базовым overflow:hidden */
+                        overflow: "visible",
+                        ...(periodPopoverOpen ? { zIndex: 50 } : {}),
                       }}
                     >
-                      <span style={serviceLogFilterLabelStyle}>Период</span>
-                      <span style={serviceLogFilterValueStyle}>
-                        {filters.dateFrom || filters.dateTo
-                          ? `${filters.dateFrom || "…"} – ${filters.dateTo || "…"}`
-                          : "Все время"}
-                      </span>
-                      <span style={toolbarDropdownChevronStyle}>▾</span>
-                      <div
+                      <button
+                        type="button"
+                        onClick={() => setPeriodPopoverOpen((o) => !o)}
                         style={{
-                          ...dropdownSelectOverlayStyle,
                           display: "flex",
-                          gap: 4,
-                          padding: 4,
-                          opacity: 0,
-                          zIndex: 1,
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          justifyContent: "center",
+                          gap: 0,
+                          width: "100%",
+                          height: "100%",
+                          minHeight: REF_TOP.searchH - 4,
+                          margin: 0,
+                          padding: "2px 14px 2px 5px",
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          fontFamily: "inherit",
+                          color: "inherit",
+                          boxSizing: "border-box",
+                          position: "relative",
                         }}
+                        aria-expanded={periodPopoverOpen}
+                        aria-label="Выбрать период"
                       >
-                        <input
-                          type="date"
-                          value={filters.dateFrom}
-                          onChange={(e) => updateFilter("dateFrom", e.target.value)}
-                          style={{ flex: 1, padding: 4, fontSize: 11, border: "none", background: "transparent", color: C.text }}
-                        />
-                        <input
-                          type="date"
-                          value={filters.dateTo}
-                          onChange={(e) => updateFilter("dateTo", e.target.value)}
-                          style={{ flex: 1, padding: 4, fontSize: 11, border: "none", background: "transparent", color: C.text }}
-                        />
-                      </div>
+                        <span style={serviceLogFilterLabelStyle}>Период</span>
+                        <span style={serviceLogFilterValueStyle}>
+                          {periodToolbarLabel(filters.dateFrom, filters.dateTo)}
+                        </span>
+                        <span style={toolbarDropdownChevronStyle}>▾</span>
+                      </button>
+                      {periodPopoverOpen ? (
+                        <div
+                          role="dialog"
+                          aria-label="Период"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 6px)",
+                            left: 0,
+                            minWidth: 280,
+                            maxWidth: "min(360px, 92vw)",
+                            zIndex: 40,
+                            padding: 12,
+                            borderRadius: 12,
+                            border: TOOLBAR_REF.moduleBorder,
+                            backgroundColor: SPEC.bgPanel,
+                            boxShadow: "0 14px 40px rgba(0,0,0,0.45)",
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                            {(
+                              [
+                                { k: "month" as const, label: "Этот месяц" },
+                                { k: "quarter" as const, label: "90 дней" },
+                                { k: "year" as const, label: "Год" },
+                                { k: "all" as const, label: "Всё время" },
+                              ] as const
+                            ).map(({ k, label }) => (
+                              <button
+                                key={k}
+                                type="button"
+                                onClick={() => {
+                                  applyPeriodPreset(k);
+                                  if (k === "all") setPeriodPopoverOpen(false);
+                                }}
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: 8,
+                                  border: SPEC.borderSubtle,
+                                  backgroundColor: C.wash,
+                                  color: SPEC.textPrimary,
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: SPEC.textSecondary }}>
+                              С даты
+                              <input
+                                type="date"
+                                value={filters.dateFrom}
+                                onChange={(e) => updateFilter("dateFrom", e.target.value)}
+                                style={{
+                                  height: 36,
+                                  borderRadius: 8,
+                                  border: REF_TOP.searchBorder,
+                                  backgroundColor: REF_TOP.searchBg,
+                                  color: SPEC.textPrimary,
+                                  fontSize: 14,
+                                  padding: "0 10px",
+                                  boxSizing: "border-box",
+                                }}
+                              />
+                            </label>
+                            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: SPEC.textSecondary }}>
+                              По дату
+                              <input
+                                type="date"
+                                value={filters.dateTo}
+                                onChange={(e) => updateFilter("dateTo", e.target.value)}
+                                style={{
+                                  height: 36,
+                                  borderRadius: 8,
+                                  border: REF_TOP.searchBorder,
+                                  backgroundColor: REF_TOP.searchBg,
+                                  color: SPEC.textPrimary,
+                                  fontSize: 14,
+                                  padding: "0 10px",
+                                  boxSizing: "border-box",
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* 5 — тумблер + подпись в 2 строки */}
@@ -926,64 +1526,336 @@ export default function VehicleServiceLogPage() {
                       </span>
                     </label>
 
-                    {/* 6 — кнопка «Фильтры» */}
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      disabled={!isQueryActive}
-                      aria-label="Сбросить фильтры"
-                      style={{
-                        position: "relative",
-                        alignSelf: "center",
-                        flexShrink: 0,
-                        height: REF_TOP.searchH,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 4,
-                        padding: "0 7px 0 6px",
-                        borderRadius: TOOLBAR_REF.moduleRadius,
-                        border: TOOLBAR_REF.moduleBorder,
-                        backgroundColor: TOOLBAR_REF.moduleBg,
-                        color: SPEC.textPrimary,
-                        fontSize: 12,
-                        fontWeight: 500,
-                        cursor: isQueryActive ? "pointer" : "not-allowed",
-                        opacity: isQueryActive ? 1 : 0.55,
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      <FilterSvg />
-                      Фильтры
-                      {activeFilterCount > 0 ? (
-                        <span
-                          style={{
-                            position: "absolute",
-                            top: -4,
-                            right: -4,
-                            minWidth: 18,
-                            height: 18,
-                            padding: "0 4px",
-                            borderRadius: 999,
-                            backgroundColor: TOOLBAR_REF.filterCountBadgeBg,
-                            color: TOOLBAR_REF.filterCountBadgeColor,
-                            fontSize: 10,
-                            fontWeight: 800,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            boxSizing: "border-box",
-                            lineHeight: 1,
-                            pointerEvents: "none",
-                          }}
-                        >
-                          {activeFilterCount}
+                    {/* 6 — раскрытие доп. фильтров */}
+                    <div style={{ display: "flex", alignItems: "center", flexShrink: 0, alignSelf: "center" }}>
+                      <button
+                        type="button"
+                        onClick={() => setFiltersExpanded((v) => !v)}
+                        aria-expanded={filtersExpanded}
+                        aria-label="Дополнительные фильтры"
+                        style={{
+                          position: "relative",
+                          height: REF_TOP.searchH,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 4,
+                          padding: "0 10px 0 8px",
+                          borderRadius: TOOLBAR_REF.moduleRadius,
+                          border: TOOLBAR_REF.moduleBorder,
+                          backgroundColor: TOOLBAR_REF.moduleBg,
+                          color: SPEC.textPrimary,
+                          fontSize: 12,
+                          fontWeight: 500,
+                          cursor: "pointer",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <FilterSvg />
+                        Фильтры
+                        <span style={{ fontSize: 10, color: SPEC.textSecondary, marginLeft: 2 }}>
+                          {filtersExpanded ? "▴" : "▾"}
                         </span>
-                      ) : null}
-                    </button>
+                        {activeFilterCount > 0 ? (
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: -4,
+                              right: -4,
+                              minWidth: 18,
+                              height: 18,
+                              padding: "0 4px",
+                              borderRadius: 999,
+                              backgroundColor: TOOLBAR_REF.filterCountBadgeBg,
+                              color: TOOLBAR_REF.filterCountBadgeColor,
+                              fontSize: 10,
+                              fontWeight: 800,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxSizing: "border-box",
+                              lineHeight: 1,
+                              pointerEvents: "none",
+                            }}
+                          >
+                            {activeFilterCount}
+                          </span>
+                        ) : null}
+                      </button>
+                    </div>
                   </div>
 
-                    {/* Вторая строка: как в макете — найдено, сортировка, вид (не в полоске фильтров) */}
+                  {filtersExpanded ? (
+                    <div
+                      style={{
+                        padding: "6px 0 12px",
+                        borderBottom: SPEC.borderSubtle,
+                        width: "100%",
+                        boxSizing: "border-box",
+                        overflowX: "auto",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "row",
+                          flexWrap: "nowrap",
+                          alignItems: "center",
+                          gap: 10,
+                          width: "100%",
+                          minWidth: "min-content",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            flexShrink: 0,
+                          }}
+                          title="Пробег, км"
+                        >
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 600,
+                              color: TOOLBAR_REF.labelColor,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Пробег
+                          </span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            value={filters.odometerMin}
+                            onChange={(e) => updateFilter("odometerMin", e.target.value)}
+                            placeholder="от"
+                            aria-label="Пробег от, км"
+                            className="service-log-ref-ph"
+                            style={{
+                              width: 72,
+                              height: 30,
+                              borderRadius: 6,
+                              border: REF_TOP.searchBorder,
+                              backgroundColor: REF_TOP.searchBg,
+                              color: SPEC.textPrimary,
+                              fontSize: 12,
+                              padding: "0 6px",
+                              boxSizing: "border-box",
+                            }}
+                          />
+                          <span style={{ fontSize: 11, color: SPEC.textMuted, padding: "0 1px" }}>—</span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            value={filters.odometerMax}
+                            onChange={(e) => updateFilter("odometerMax", e.target.value)}
+                            placeholder="до"
+                            aria-label="Пробег до, км"
+                            className="service-log-ref-ph"
+                            style={{
+                              width: 72,
+                              height: 30,
+                              borderRadius: 6,
+                              border: REF_TOP.searchBorder,
+                              backgroundColor: REF_TOP.searchBg,
+                              color: SPEC.textPrimary,
+                              fontSize: 12,
+                              padding: "0 6px",
+                              boxSizing: "border-box",
+                            }}
+                          />
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            flexShrink: 0,
+                          }}
+                          title="Сумма события"
+                        >
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 600,
+                              color: TOOLBAR_REF.labelColor,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Сумма
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={filters.costMin}
+                            onChange={(e) => updateFilter("costMin", e.target.value)}
+                            placeholder="от"
+                            aria-label="Сумма от"
+                            className="service-log-ref-ph"
+                            style={{
+                              width: 68,
+                              height: 30,
+                              borderRadius: 6,
+                              border: REF_TOP.searchBorder,
+                              backgroundColor: REF_TOP.searchBg,
+                              color: SPEC.textPrimary,
+                              fontSize: 12,
+                              padding: "0 6px",
+                              boxSizing: "border-box",
+                            }}
+                          />
+                          <span style={{ fontSize: 11, color: SPEC.textMuted, padding: "0 1px" }}>—</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={filters.costMax}
+                            onChange={(e) => updateFilter("costMax", e.target.value)}
+                            placeholder="до"
+                            aria-label="Сумма до"
+                            className="service-log-ref-ph"
+                            style={{
+                              width: 68,
+                              height: 30,
+                              borderRadius: 6,
+                              border: REF_TOP.searchBorder,
+                              backgroundColor: REF_TOP.searchBg,
+                              color: SPEC.textPrimary,
+                              fontSize: 12,
+                              padding: "0 6px",
+                              boxSizing: "border-box",
+                            }}
+                          />
+                        </div>
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            flexShrink: 0,
+                            margin: 0,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 600,
+                              color: TOOLBAR_REF.labelColor,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Тип
+                          </span>
+                          <select
+                            value={filters.actionType}
+                            onChange={(e) => updateFilter("actionType", e.target.value)}
+                            aria-label="Тип работы"
+                            style={{
+                              width: 118,
+                              height: 30,
+                              borderRadius: 6,
+                              border: REF_TOP.searchBorder,
+                              backgroundColor: REF_TOP.searchBg,
+                              color: SPEC.textPrimary,
+                              fontSize: 11,
+                              padding: "0 4px",
+                              boxSizing: "border-box",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <option value="">Все</option>
+                            {SERVICE_ACTION_TYPE_OPTIONS.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            flexShrink: 0,
+                            margin: 0,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 600,
+                              color: TOOLBAR_REF.labelColor,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Исп.
+                          </span>
+                          <select
+                            value={filters.performerKind}
+                            onChange={(e) => updateFilter("performerKind", e.target.value)}
+                            aria-label="Исполнитель"
+                            style={{
+                              width: 108,
+                              height: 30,
+                              borderRadius: 6,
+                              border: REF_TOP.searchBorder,
+                              backgroundColor: REF_TOP.searchBg,
+                              color: SPEC.textPrimary,
+                              fontSize: 11,
+                              padding: "0 4px",
+                              boxSizing: "border-box",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <option value="">Все</option>
+                            <option value="SELF">{getPerformerLabel("SELF")}</option>
+                            <option value="SERVICE">{getPerformerLabel("SERVICE")}</option>
+                            <option value="OTHER">{getPerformerLabel("OTHER")}</option>
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={resetFilters}
+                          disabled={!isQueryActive}
+                          aria-label="Сбросить все фильтры"
+                          style={{
+                            height: 30,
+                            marginLeft: "auto",
+                            padding: "0 10px",
+                            borderRadius: 6,
+                            border: TOOLBAR_REF.moduleBorder,
+                            backgroundColor: "transparent",
+                            color: SPEC.textSecondary,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            cursor: isQueryActive ? "pointer" : "not-allowed",
+                            opacity: isQueryActive ? 1 : 0.45,
+                            boxSizing: "border-box",
+                            flexShrink: 0,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Сброс
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                    {/* Вторая строка: найдено, сортировка (не в полоске фильтров) */}
                     <div
                       style={{
                         display: "flex",
@@ -1044,65 +1916,62 @@ export default function VehicleServiceLogPage() {
                           </span>
                         ) : null}
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              height: REF_TOP.sortComboH,
-                              padding: "0 30px 0 12px",
-                              borderRadius: REF_TOP.viewBtn.radius,
-                              border: REF_TOP.searchBorder,
-                              backgroundColor: REF_TOP.searchBg,
-                              color: SPEC.textPrimary,
-                              fontSize: 13,
-                              fontWeight: 500,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            <span style={{ color: REF_TOP.infoMuted, fontWeight: 400 }}>Сортировка:</span>
-                            <span style={{ fontWeight: 500 }}>{sortLabel}</span>
-                          </span>
-                          <span
-                            style={{
-                              position: "absolute",
-                              right: 10,
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              color: "#94A3B8",
-                              fontSize: 11,
-                              pointerEvents: "none",
-                            }}
-                          >
-                            ▾
-                          </span>
-                          <select
-                            value={sortValue}
-                            onChange={(e) => {
-                              const [field, direction] = e.target.value.split(":") as [
-                                ServiceEventsSortField,
-                                ServiceEventsSortDirection,
-                              ];
-                              setSort({ field, direction });
-                            }}
-                            aria-label="Сортировка"
-                            style={{
-                              position: "absolute",
-                              inset: 0,
-                              opacity: 0,
-                              cursor: "pointer",
-                            }}
-                          >
-                            <option value="eventDate:desc">Сначала новые</option>
-                            <option value="eventDate:asc">Сначала старые</option>
-                            <option value="cost:desc">Расходы ↓</option>
-                            <option value="cost:asc">Расходы ↑</option>
-                            <option value="node:asc">Узел A-Z</option>
-                          </select>
-                        </div>
-                        <ViewToggleIcons />
+                      <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            height: REF_TOP.sortComboH,
+                            padding: "0 30px 0 12px",
+                            borderRadius: REF_TOP.sortComboRadius,
+                            border: REF_TOP.searchBorder,
+                            backgroundColor: REF_TOP.searchBg,
+                            color: SPEC.textPrimary,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          <span style={{ color: REF_TOP.infoMuted, fontWeight: 400 }}>Сортировка:</span>
+                          <span style={{ fontWeight: 500 }}>{sortLabel}</span>
+                        </span>
+                        <span
+                          style={{
+                            position: "absolute",
+                            right: 10,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            color: "#94A3B8",
+                            fontSize: 11,
+                            pointerEvents: "none",
+                          }}
+                        >
+                          ▾
+                        </span>
+                        <select
+                          value={sortValue}
+                          onChange={(e) => {
+                            const [field, direction] = e.target.value.split(":") as [
+                              ServiceEventsSortField,
+                              ServiceEventsSortDirection,
+                            ];
+                            setSort({ field, direction });
+                          }}
+                          aria-label="Сортировка"
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            opacity: 0,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <option value="eventDate:desc">Сначала новые</option>
+                          <option value="eventDate:asc">Сначала старые</option>
+                          <option value="cost:desc">Расходы ↓</option>
+                          <option value="cost:asc">Расходы ↑</option>
+                          <option value="node:asc">Узел A-Z</option>
+                        </select>
                       </div>
                     </div>
 
@@ -1137,7 +2006,14 @@ export default function VehicleServiceLogPage() {
                     {visibleGroups.map((group) => (
                       <section key={group.monthKey} style={monthCardStyle}>
                         <MonthGroupHeader group={group} />
-                        <div>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: REF_TOP.monthJournalEntryVGap,
+                            paddingTop: REF_TOP.monthJournalEntryVGap,
+                          }}
+                        >
                           {group.entries.map((entry, idx) => {
                             const isSelected = entry.id === selectedEntry?.id;
                             const isHighlighted = entry.id === highlightedServiceEventId;
@@ -1163,13 +2039,15 @@ export default function VehicleServiceLogPage() {
                                       entry={entry}
                                       event={rawEvent}
                                       originWishlistItemIds={wishlistItemIdsByServiceEventId.get(entry.id) ?? []}
-                                      onOpenWishlistOrigin={(wid) =>
-                                        router.push(`/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(wid)}`)
-                                      }
+                                      onOpenNodeInTree={(nodeId) => openNodeTreeFromLog(nodeId)}
+                                      onOpenExpenses={(opts) => openExpensesForServiceEvent(entry.id, opts)}
+                                      onOpenParts={(opts) => openPartsSelectionFromLog(entry.id, opts)}
                                       onClearSelection={() => setSelectedEventId("")}
                                       onRepeat={() => openRepeat(entry.id)}
                                       onEdit={() => openEdit(entry.id)}
                                       onDelete={() => void deleteEvent(entry.id)}
+                                      onRequestRepeatPurchaseModal={openRepeatPurchaseConfirm}
+                                      repeatPurchaseBusy={repeatPurchaseBusy}
                                     />
                                   </div>
                                 ) : null}
@@ -1220,13 +2098,15 @@ export default function VehicleServiceLogPage() {
                       entry={selectedEntry}
                       event={selectedServiceEvent}
                       originWishlistItemIds={wishlistItemIdsByServiceEventId.get(selectedEntry.id) ?? []}
-                      onOpenWishlistOrigin={(wid) =>
-                        router.push(`/vehicles/${vehicleId}/parts?wishlistItemId=${encodeURIComponent(wid)}`)
-                      }
+                      onOpenNodeInTree={(nodeId) => openNodeTreeFromLog(nodeId)}
+                      onOpenExpenses={(opts) => openExpensesForServiceEvent(selectedEntry.id, opts)}
+                      onOpenParts={(opts) => openPartsSelectionFromLog(selectedEntry.id, opts)}
                       onClearSelection={() => setSelectedEventId("")}
                       onRepeat={() => openRepeat(selectedEntry.id)}
                       onEdit={() => openEdit(selectedEntry.id)}
                       onDelete={() => void deleteEvent(selectedEntry.id)}
+                      onRequestRepeatPurchaseModal={openRepeatPurchaseConfirm}
+                      repeatPurchaseBusy={repeatPurchaseBusy}
                     />
                   ) : (
                     <div
@@ -1250,6 +2130,41 @@ export default function VehicleServiceLogPage() {
           </div>
         </section>
       </div>
+      <NodePickerModal
+        key={
+          nodePickerOpen
+            ? `open:${[...nodePickerSelectedIds].sort().join("|")}`
+            : "node-picker-shut"
+        }
+        open={nodePickerOpen}
+        title="Узлы для фильтра"
+        options={nodePickerOptions}
+        topOptions={nodePickerTopOptions.length > 0 ? nodePickerTopOptions : undefined}
+        mode="multi"
+        selectedIds={nodePickerSelectedIds}
+        confirmLabel="Применить"
+        onClose={() => setNodePickerOpen(false)}
+        onConfirm={applyNodePickerSelection}
+      />
+      {repeatPurchaseModal ? (
+        <RepeatPurchaseConfirmModal
+          payload={repeatPurchaseModal}
+          busy={repeatPurchaseBusy}
+          onClose={() => {
+            if (!repeatPurchaseBusy) setRepeatPurchaseModal(null);
+          }}
+          onConfirm={() => {
+            const p = repeatPurchaseModal;
+            setRepeatPurchaseModal(null);
+            if (p) {
+              void repeatPurchaseInstalledParts(
+                p.eventId,
+                p.items.map((it) => it.id)
+              );
+            }
+          }}
+        />
+      ) : null}
     </main>
   );
 }
@@ -1267,46 +2182,6 @@ const dropdownSelectOverlayStyle: CSSProperties = {
   background: "transparent",
   color: "transparent",
 };
-
-function ViewToggleIcons() {
-  const { w, h, radius } = REF_TOP.viewBtn;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-      <span
-        aria-label="Список"
-        style={{
-          width: w,
-          height: h,
-          borderRadius: radius,
-          border: REF_TOP.searchBorder,
-          backgroundColor: "rgba(255,255,255,0.08)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#F8FAFC",
-        }}
-      >
-        <ListSvg />
-      </span>
-      <span
-        aria-label="Сетка"
-        style={{
-          width: w,
-          height: h,
-          borderRadius: radius,
-          border: REF_TOP.searchBorder,
-          backgroundColor: "transparent",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#64748B",
-        }}
-      >
-        <GridSvg />
-      </span>
-    </div>
-  );
-}
 
 // ─── Month group header (inside month card) ──────────────────────────────────
 
@@ -1355,6 +2230,61 @@ function MonthGroupHeader({ group }: { group: ServiceLogMonthGroupViewModel }) {
   );
 }
 
+// ─── Timeline marker glyph (внутри кружка на шкале, ~10px) ─────────────────────
+
+function TimelineMarkerGlyph({ kind, color }: { kind: ServiceRowActionKind; color: string }) {
+  const sw = 2.2;
+  if (kind === "STATE_UPDATE") {
+    return (
+      <svg width={10} height={10} viewBox="0 0 24 24" aria-hidden>
+        <circle cx="7" cy="12" r="2" fill={color} />
+        <circle cx="12" cy="12" r="2" fill={color} />
+        <circle cx="17" cy="12" r="2" fill={color} />
+      </svg>
+    );
+  }
+  if (kind === "REPLACE") {
+    return (
+      <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+      </svg>
+    );
+  }
+  if (kind === "SERVICE") {
+    return (
+      <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M12 3c-4 7-8 9.5-8 14a8 8 0 0 0 16 0c0-4.5-4-7-8-14z" />
+      </svg>
+    );
+  }
+  if (kind === "INSPECT") {
+    return (
+      <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <circle cx="11" cy="11" r="7.5" />
+        <path d="m21 21-4.35-4.35" />
+      </svg>
+    );
+  }
+  if (kind === "CLEAN") {
+    return (
+      <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M12 3v2.5M12 18.5V21M4.2 4.2l1.8 1.8M18 18l1.8 1.8M3 12h2.5M18.5 12H21M4.2 19.8l1.8-1.8M18 6l1.8-1.8" />
+      </svg>
+    );
+  }
+  /* ADJUST */
+  return (
+    <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="4" y1="8" x2="20" y2="8" />
+      <circle cx="9" cy="8" r="2" fill={color} stroke="none" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <circle cx="15" cy="12" r="2" fill={color} stroke="none" />
+      <line x1="4" y1="16" x2="20" y2="16" />
+      <circle cx="11" cy="16" r="2" fill={color} stroke="none" />
+    </svg>
+  );
+}
+
 // ─── Timeline row (with rail column) ─────────────────────────────────────────
 
 function ServiceLogRow({
@@ -1375,240 +2305,751 @@ function ServiceLogRow({
   onSelect: () => void;
 }) {
   const isStateUpdate = entry.eventKind === "STATE_UPDATE";
-  const actionType = getFirstActionType(entry, event);
-  const iconCfg = getServiceIconConfig(actionType);
+  const actionKind = getRowActionKind(entry, event);
+  const iconCfg = getServiceIconConfig(actionKind);
   const cost = getCompactCost(entry);
   const intervalLabel = getIntervalLabel(event);
   const performerLabel = getPerformerLabel(event?.performedBy);
+  const dateParts = formatRowDateColumnParts(event?.eventDate ?? "", entry.dateLabel);
 
-  // Timeline circle: orange filled w/ check (selected), green outlined check (services), gray (state-update)
-  const dotInner = isSelected ? (
-    <CheckSvg color="#fff" size={9} />
-  ) : !isStateUpdate ? (
-    <CheckSvg color="#22c55e" size={9} />
-  ) : null;
-  const dotBg = isSelected ? SPEC.accent : "transparent";
-  const dotBorder = isSelected
-    ? SPEC.accent
-    : isStateUpdate
-      ? "rgba(255,255,255,0.18)"
-      : "rgba(34,197,94,0.6)";
+  const timelineBase = getTimelineColors(actionKind);
+  const railLineColor = isSelected ? "rgba(249,115,22,0.5)" : timelineBase.rail;
+  const dotBg = isSelected ? SPEC.accent : timelineBase.dotBg;
+  const dotBorder = isSelected ? SPEC.accent : timelineBase.dotBorder;
+  const glyphColor = isSelected ? "#ffffff" : actionKind === "STATE_UPDATE" ? "rgba(226,232,240,0.85)" : timelineBase.dotBorder;
+  const dotInner = <TimelineMarkerGlyph kind={actionKind} color={glyphColor} />;
+  const dotSize = 18;
+
+  const cardBorder = isSelected
+    ? `1px solid ${productSemanticColors.primaryAction}55`
+    : "1px solid rgba(148,163,184,0.22)";
+  const cardBg = isSelected ? "rgba(255,255,255,0.045)" : "rgba(255,255,255,0.032)";
 
   return (
     <button
       type="button"
       onClick={onSelect}
       style={{
-        display: "grid",
-        gridTemplateColumns:
-          "minmax(72px, 1.1fr) 32px 44px minmax(0, 2.5fr) minmax(88px, 1fr) minmax(88px, 1fr) minmax(96px, 1fr) 22px",
-        gap: 12,
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "stretch",
+        gap: 10,
         width: "100%",
-        alignItems: "center",
-        minHeight: isStateUpdate ? 56 : 72,
-        padding: `10px ${REF_TOP.padX}px`,
+        boxSizing: "border-box",
+        minHeight: isStateUpdate ? 56 : 68,
+        padding: `2px ${REF_TOP.monthJournalRowPadRight}px 2px ${REF_TOP.padX}px`,
         textAlign: "left",
         background: isSelected ? SPEC.rowSelectWash : "transparent",
         border: "none",
-        borderTop: !isFirst ? SPEC.borderSubtle : "none",
         cursor: "pointer",
-        transition: "background 0.1s",
+        transition: "background 0.12s",
       }}
       aria-expanded={isSelected}
     >
-      {/* Col 1 — Date (day+month / year) + odometer (3 lines, ref §9.1) */}
-      <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-        {(() => {
-          const { dayMonth, year } = formatRowDateParts(event?.eventDate ?? "");
-          return (
-            <>
-              <span
-                style={{
-                  display: "block",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: SPEC.textPrimary,
-                  lineHeight: 1.2,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {dayMonth || entry.dateLabel}
-              </span>
-              {year ? (
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: SPEC.textPrimary,
-                    lineHeight: 1.2,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {year}
-                </span>
-              ) : null}
-            </>
-          );
-        })()}
-        <span style={{ display: "block", fontSize: 11, color: SPEC.textMuted, marginTop: 2 }}>
-          {entry.odometerValue}
-        </span>
-      </span>
-
-      {/* Col 2 — Timeline rail (vertical line + circle) */}
-      <span
+      {/* Левая колонка: дата по ширине контента (день + 3 буквы месяца, год ниже) + пробег; шкала времени. */}
+      <div
         style={{
-          position: "relative",
-          height: "100%",
+          flex: "0 0 auto",
           display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: 56,
+          flexDirection: "row",
+          alignItems: "stretch",
+          gap: 0,
         }}
       >
-        <span
-          aria-hidden
+        <div
           style={{
-            position: "absolute",
-            top: isFirst ? "50%" : 0,
-            bottom: isLast ? "50%" : 0,
-            width: 1,
-            backgroundColor: SPEC.timelineLine,
+            flex: "0 0 auto",
+            width: "max-content",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            gap: 2,
+            paddingRight: 4,
           }}
-        />
+        >
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: SPEC.textPrimary,
+              lineHeight: 1.15,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {dateParts.dayMonth}
+          </span>
+          {dateParts.year ? (
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: SPEC.textPrimary,
+                lineHeight: 1.15,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {dateParts.year}
+            </span>
+          ) : null}
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 400,
+              color: SPEC.textSecondary,
+              lineHeight: 1.2,
+              whiteSpace: "nowrap",
+              marginTop: 1,
+            }}
+          >
+            {entry.odometerValue}
+          </span>
+        </div>
+        <div
+          style={{
+            width: 22,
+            flexShrink: 0,
+            position: "relative",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: 48,
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: "50%",
+              marginLeft: -1,
+              top: isFirst ? "50%" : 0,
+              bottom: isLast ? "50%" : 0,
+              width: 2,
+              borderRadius: 1,
+              backgroundColor: railLineColor,
+            }}
+          />
+          <span
+            style={{
+              position: "relative",
+              width: dotSize,
+              height: dotSize,
+              borderRadius: "50%",
+              backgroundColor: dotBg,
+              border: `2px solid ${dotBorder}`,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              boxShadow: isHighlighted && !isSelected ? `0 0 0 3px ${SPEC.rowSelectWash}` : undefined,
+            }}
+          >
+            {dotInner}
+          </span>
+        </div>
+      </div>
+
+      {/* Карточка события — ~80–85% ширины, скругление и тонкая рамка. */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 2.05fr) repeat(3, minmax(0, 1fr)) 20px",
+          columnGap: 10,
+          rowGap: 4,
+          alignItems: "center",
+          padding: "10px 12px 10px 10px",
+          borderRadius: 9,
+          border: cardBorder,
+          backgroundColor: cardBg,
+          boxSizing: "border-box",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12, minWidth: 0 }}>
+          <ServiceTypeIcon actionKind={actionKind} iconCfg={iconCfg} size={36} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span
+              style={{
+                display: "block",
+                fontSize: 14,
+                fontWeight: 700,
+                color: SPEC.textPrimary,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                lineHeight: 1.2,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              {entry.mainTitle}
+            </span>
+            <span
+              style={{
+                display: "block",
+                fontSize: 12,
+                fontWeight: 400,
+                color: SPEC.textSecondary,
+                marginTop: 2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                lineHeight: 1.25,
+              }}
+            >
+              {isStateUpdate
+                ? (entry.stateUpdateSubtitle ?? entry.compactMetricsLine)
+                : entry.secondaryTitle}
+            </span>
+          </div>
+        </div>
+
+        <RowMetric icon={<HandCoinMetricSvg />} value={cost ?? "—"} label="Стоимость" />
+        <RowMetric icon={<ClockSvg size={14} />} value={intervalLabel} label="Интервал" />
+        <RowMetric icon={<PersonSvg size={14} />} value={performerLabel} label="Исполнитель" />
+
         <span
           style={{
-            position: "relative",
-            width: 16,
-            height: 16,
-            borderRadius: "50%",
-            backgroundColor: dotBg,
-            border: `1.5px solid ${dotBorder}`,
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: isHighlighted && !isSelected ? `0 0 0 3px ${SPEC.rowSelectWash}` : undefined,
+            color: isSelected ? SPEC.accent : "rgba(148,163,184,0.55)",
           }}
+          aria-hidden
         >
-          {dotInner}
+          <ChevronRightThinSvg />
         </span>
-      </span>
-
-      {/* Col 3 — Service icon */}
-      <span style={{ display: "flex", justifyContent: "center" }}>
-        <ServiceTypeIcon actionType={actionType} iconCfg={iconCfg} size={36} />
-      </span>
-
-      {/* Col 4 — Title + subtitle */}
-      <span style={{ minWidth: 0 }}>
-        <span
-          style={{
-            display: "block",
-            fontSize: 13.5,
-            fontWeight: 700,
-            color: SPEC.textPrimary,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            lineHeight: 1.25,
-          }}
-        >
-          {entry.mainTitle}
-        </span>
-        <span
-          style={{
-            display: "block",
-            fontSize: 11.5,
-            color: SPEC.textSecondary,
-            marginTop: 2,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {isStateUpdate
-            ? (entry.stateUpdateSubtitle ?? entry.compactMetricsLine)
-            : entry.secondaryTitle}
-        </span>
-      </span>
-
-      {/* Col 5 — Cost */}
-      <RowMetric
-        icon={<CoinSvg />}
-        value={cost ?? "—"}
-        label="Стоимость"
-        emphasize={!!cost}
-        emphasizeColor={C.green}
-      />
-
-      {/* Col 6 — Interval */}
-      <RowMetric icon={<ClockSvg />} value={intervalLabel} label="Интервал" />
-
-      {/* Col 7 — Performer */}
-      <RowMetric icon={<PersonSvg />} value={performerLabel} label="Исполнитель" />
-
-      {/* Col 8 — Chevron */}
-      <span
-        style={{
-          fontSize: 16,
-          color: isSelected ? SPEC.accent : SPEC.textMuted,
-          display: "flex",
-          justifyContent: "flex-end",
-          lineHeight: 1,
-        }}
-      >
-        ›
-      </span>
+      </div>
     </button>
   );
 }
 
-function RowMetric({
-  icon,
-  value,
-  label,
-  emphasize = false,
-  emphasizeColor,
-}: {
-  icon: ReactNode;
-  value: string;
-  label: string;
-  emphasize?: boolean;
-  emphasizeColor?: string;
-}) {
+function RowMetric({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
+  const metricIconColor = "rgba(248,250,252,0.78)";
   return (
-    <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-      <span
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          fontWeight: 700,
-          fontSize: 12.5,
-          color: emphasize && emphasizeColor ? emphasizeColor : SPEC.textPrimary,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        <span style={{ color: SPEC.textSecondary, display: "inline-flex" }}>{icon}</span>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
-      </span>
-      <span
-        style={{
-          fontSize: 9.5,
-          color: SPEC.textSecondary,
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          fontWeight: 600,
-        }}
-      >
-        {label}
+    <span
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        minWidth: 0,
+        width: "100%",
+        justifyContent: "center",
+      }}
+    >
+      <span style={{ color: metricIconColor, display: "inline-flex", flexShrink: 0 }}>{icon}</span>
+      <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+        <span
+          style={{
+            fontWeight: 700,
+            fontSize: 12,
+            color: SPEC.textPrimary,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            lineHeight: 1.2,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {value}
+        </span>
+        <span
+          style={{
+            fontSize: 11,
+            color: SPEC.textSecondary,
+            fontWeight: 400,
+            lineHeight: 1.2,
+            letterSpacing: "0.01em",
+          }}
+        >
+          {label}
+        </span>
       </span>
     </span>
+  );
+}
+
+const logDetailsMenuPanelStyle: CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  marginTop: 6,
+  minWidth: 280,
+  padding: 4,
+  borderRadius: 10,
+  border: SPEC.borderSubtle,
+  backgroundColor: SPEC.bgPanel,
+  boxShadow: "0 10px 28px rgba(0,0,0,0.5)",
+  zIndex: 40,
+};
+
+const logDetailsMenuItemStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 10,
+  width: "100%",
+  textAlign: "left",
+  padding: "9px 12px",
+  fontSize: 13,
+  fontWeight: 500,
+  color: SPEC.textPrimary,
+  background: "transparent",
+  border: "none",
+  borderRadius: 8,
+  cursor: "pointer",
+  font: "inherit",
+  lineHeight: 1.35,
+  whiteSpace: "normal",
+};
+
+const logDetailsMenuItemRepeatPurchaseStyle: CSSProperties = {
+  ...logDetailsMenuItemStyle,
+  color: SPEC.accent,
+  fontWeight: 600,
+};
+
+/** Корзина + стрелка «снова» — пункт «Повторить покупку» в меню деталей журнала. */
+function RepeatPurchaseMenuSvg({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.65"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 10h2l1.2 8h10.6L19 10H6" />
+      <circle cx="9" cy="20" r="1" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="20" r="1" fill="currentColor" stroke="none" />
+      <path d="M15 4.5a4 4 0 1 1 1.2 3.1" strokeWidth="1.5" />
+      <path d="M17 3v3h-3" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function RepeatPurchaseConfirmModal({
+  payload,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  payload: RepeatPurchaseConfirmPayload;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const plural = payload.items.length > 1;
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center px-4 py-6"
+      style={{ backgroundColor: productSemanticColors.overlayModal }}
+      onClick={() => {
+        if (!busy) onClose();
+      }}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="repeat-purchase-dialog-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          borderRadius: radiusScale.lg,
+          border: SPEC.borderSubtle,
+          backgroundColor: SPEC.bgPanel,
+          padding: "20px 22px 18px",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.55)",
+        }}
+      >
+        <h2
+          id="repeat-purchase-dialog-title"
+          style={{
+            margin: 0,
+            fontSize: 17,
+            fontWeight: 700,
+            color: SPEC.textPrimary,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <span style={{ color: SPEC.textSecondary, display: "inline-flex" }}>
+            <RepeatPurchaseMenuSvg size={22} />
+          </span>
+          Повторить покупку
+        </h2>
+        <p
+          style={{
+            margin: "14px 0 0",
+            fontSize: 13,
+            fontWeight: 500,
+            color: SPEC.textPrimary,
+            lineHeight: 1.45,
+          }}
+        >
+          {plural
+            ? "Выбранные запчасти будут добавлены в корзину замен в раздел «Нужно купить»."
+            : "Запчасть будет добавлена в корзину замен в раздел «Нужно купить»."}
+        </p>
+        <p style={{ margin: "8px 0 0", fontSize: 12, color: SPEC.textMuted, lineHeight: 1.4 }}>
+          Запись журнала: {payload.entryMainTitle} · {payload.entryDateLabel}
+        </p>
+        <div
+          style={{
+            marginTop: 14,
+            maxHeight: 260,
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          {payload.items.map((it) => (
+            <div
+              key={it.id}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: SPEC.borderSubtle,
+                backgroundColor: C.wash,
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: SPEC.textPrimary, lineHeight: 1.3 }}>
+                {it.partName ?? it.actionLabelRu}
+              </p>
+              <p style={{ margin: "6px 0 0", fontSize: 12, color: SPEC.textSecondary, lineHeight: 1.35 }}>
+                Узел: {it.nodeName}
+                {it.sku ? ` · SKU: ${it.sku}` : ""}
+                {it.quantity != null ? ` · ${it.quantity} шт.` : ""}
+              </p>
+              {it.lineCostRu ? (
+                <p style={{ margin: "4px 0 0", fontSize: 12, fontWeight: 600, color: C.green }}>
+                  {it.lineCostRu}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <div
+          style={{
+            marginTop: 18,
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+            gap: 8,
+          }}
+        >
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            style={{
+              height: 38,
+              padding: "0 16px",
+              borderRadius: 8,
+              border: SPEC.borderSubtle,
+              backgroundColor: "transparent",
+              color: SPEC.textSecondary,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: busy ? "not-allowed" : "pointer",
+            }}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onConfirm}
+            style={{
+              height: 38,
+              padding: "0 18px",
+              borderRadius: 8,
+              border: "none",
+              backgroundColor: SPEC.accent,
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: busy ? "not-allowed" : "pointer",
+              opacity: busy ? 0.75 : 1,
+            }}
+          >
+            {busy ? "Добавление…" : "Добавить в корзину"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ServiceLogDetailsActionsMenu({
+  hasBundleParts,
+  busy,
+  onRequestRepeatPurchaseAll,
+}: {
+  hasBundleParts: boolean;
+  busy: boolean;
+  onRequestRepeatPurchaseAll: () => void;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+  useClosePanelOnOutsidePress(open, rootRef, () => setOpen(false));
+
+  if (!hasBundleParts) return null;
+
+  return (
+    <div
+      ref={rootRef}
+      style={{
+        padding: "6px 20px 8px",
+        borderBottom: SPEC.borderSubtle,
+        flexShrink: 0,
+        position: "relative",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <PanelSectionTitle>Действия</PanelSectionTitle>
+        <button
+          type="button"
+          disabled={busy}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label="Меню действий"
+          onClick={() => setOpen((v) => !v)}
+          style={{
+            width: 34,
+            height: 34,
+            flexShrink: 0,
+            borderRadius: 8,
+            border: SPEC.borderSubtle,
+            backgroundColor: C.wash,
+            color: SPEC.textSecondary,
+            cursor: busy ? "not-allowed" : "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+            opacity: busy ? 0.55 : 1,
+          }}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1, letterSpacing: 1 }} aria-hidden>
+            ⋮
+          </span>
+        </button>
+      </div>
+      {open ? (
+        <div role="menu" style={{ ...logDetailsMenuPanelStyle, right: 16 }}>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={busy}
+            style={logDetailsMenuItemRepeatPurchaseStyle}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setOpen(false);
+              onRequestRepeatPurchaseAll();
+            }}
+          >
+            <span
+              style={{
+                flexShrink: 0,
+                color: SPEC.accent,
+                display: "inline-flex",
+                marginTop: 1,
+              }}
+            >
+              <RepeatPurchaseMenuSvg size={18} />
+            </span>
+            <span>Повторить покупку по установленным запчастям</span>
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function InstalledPartRowWithMenu({
+  item,
+  event,
+  onOpenParts,
+  onRequestRepeatPurchaseModal,
+  busy,
+}: {
+  item: ServiceLogBundleItemSummary;
+  event: ServiceEventItem | null;
+  onOpenParts: (opts: { wishlistItemId?: string; nodeId?: string; partsSearch?: string }) => void;
+  onRequestRepeatPurchaseModal: () => void;
+  busy: boolean;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useClosePanelOnOutsidePress(menuOpen, rootRef, () => setMenuOpen(false));
+
+  const wishId = event ? resolveWishlistItemIdForServiceBundleItem(event, item.id) : null;
+  const partsSearchLabel = (item.partName ?? item.actionLabelRu ?? "").trim();
+  const canOpenParts = Boolean(wishId || item.nodeId || partsSearchLabel);
+
+  const openPartsNow = () => {
+    if (!canOpenParts) return;
+    if (wishId) {
+      onOpenParts({ wishlistItemId: wishId, nodeId: item.nodeId });
+    } else if (item.nodeId) {
+      onOpenParts({
+        nodeId: item.nodeId,
+        partsSearch: partsSearchLabel || undefined,
+      });
+    } else if (partsSearchLabel) {
+      onOpenParts({ partsSearch: partsSearchLabel });
+    }
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        gap: 4,
+        alignItems: "stretch",
+        width: "100%",
+      }}
+    >
+      <button
+        type="button"
+        disabled={!canOpenParts}
+        onClick={openPartsNow}
+        title={
+          wishId
+            ? "Подбор запчастей: позиция из списка"
+            : item.nodeId || partsSearchLabel
+              ? "Подбор запчастей: узел и поиск по названию"
+              : undefined
+        }
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          gap: 6,
+          alignItems: "center",
+          padding: "5px 8px",
+          borderRadius: 8,
+          backgroundColor: C.row,
+          border: SPEC.borderSubtle,
+          textAlign: "left",
+          cursor: canOpenParts ? "pointer" : "default",
+          font: "inherit",
+          opacity: canOpenParts ? 1 : 0.85,
+        }}
+      >
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 6,
+            backgroundColor: C.wash,
+            border: SPEC.borderSubtle,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            color: C.text3,
+          }}
+        >
+          <BoxSvg />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: C.text,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {item.partName ?? item.actionLabelRu}
+          </p>
+          <p style={{ fontSize: 11, color: C.text3, marginTop: 1 }}>
+            {item.sku ? `SKU: ${item.sku}` : item.nodeName}
+            {item.quantity != null ? ` · ${item.quantity} шт.` : ""}
+          </p>
+        </div>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: item.lineCostRu ? C.green : C.text3,
+            flexShrink: 0,
+            textAlign: "right",
+          }}
+        >
+          {item.lineCostRu ?? "—"}
+        </span>
+      </button>
+      <div ref={rootRef} style={{ position: "relative", flexShrink: 0, alignSelf: "center" }}>
+        <button
+          type="button"
+          disabled={busy}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label={`Действия: ${item.partName ?? item.actionLabelRu}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen((v) => !v);
+          }}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border: SPEC.borderSubtle,
+            backgroundColor: C.wash,
+            color: SPEC.textSecondary,
+            cursor: busy ? "not-allowed" : "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+            opacity: busy ? 0.55 : 1,
+          }}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1, letterSpacing: 1 }} aria-hidden>
+            ⋮
+          </span>
+        </button>
+        {menuOpen ? (
+          <div role="menu" style={{ ...logDetailsMenuPanelStyle, right: 0 }}>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busy}
+              style={logDetailsMenuItemRepeatPurchaseStyle}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setMenuOpen(false);
+                onRequestRepeatPurchaseModal();
+              }}
+            >
+              <span
+                style={{
+                  flexShrink: 0,
+                  color: SPEC.accent,
+                  display: "inline-flex",
+                  marginTop: 1,
+                }}
+              >
+                <RepeatPurchaseMenuSvg size={18} />
+              </span>
+              <span>Повторить покупку по установленным запчастям</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -1618,24 +3059,32 @@ function ServiceLogEventDetails({
   entry,
   event,
   originWishlistItemIds,
-  onOpenWishlistOrigin,
+  onOpenNodeInTree,
+  onOpenExpenses,
+  onOpenParts,
   onClearSelection,
   onRepeat,
   onEdit,
   onDelete,
+  onRequestRepeatPurchaseModal,
+  repeatPurchaseBusy,
 }: {
   entry: ServiceLogEntryViewModel;
   event: ServiceEventItem | null;
   originWishlistItemIds: string[];
-  onOpenWishlistOrigin: (wishlistItemId: string) => void;
+  onOpenNodeInTree: (nodeId: string) => void;
+  onOpenExpenses: (opts?: { highlightExpenseId?: string; expenseDateIso?: string }) => void;
+  onOpenParts: (opts: { wishlistItemId?: string; nodeId?: string; partsSearch?: string }) => void;
   onClearSelection: () => void;
   onRepeat: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onRequestRepeatPurchaseModal: (payload: RepeatPurchaseConfirmPayload) => void;
+  repeatPurchaseBusy: boolean;
 }) {
   const isStateUpdate = entry.eventKind === "STATE_UPDATE";
-  const actionType = getFirstActionType(entry, event);
-  const iconCfg = getServiceIconConfig(actionType);
+  const actionKind = getRowActionKind(entry, event);
+  const iconCfg = getServiceIconConfig(actionKind);
   const cost = getCompactCost(entry);
   const intervalLabel = getIntervalLabel(event);
   const performerLabel = getPerformerLabel(event?.performedBy);
@@ -1644,6 +3093,9 @@ function ServiceLogEventDetails({
   for (const expense of linkedExpenses) {
     linkedExpenseTotals.set(expense.currency, (linkedExpenseTotals.get(expense.currency) ?? 0) + expense.amount);
   }
+
+  const detailNodes = getDetailPanelNodeRows(entry, event);
+  const fullReminderText = formatFullServiceReminder(event);
 
   return (
     <div
@@ -1655,15 +3107,15 @@ function ServiceLogEventDetails({
       }}
     >
       {/* Panel header */}
-      <div style={{ padding: "18px 24px 14px", borderBottom: SPEC.borderSubtle }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0 }}>
-            <ServiceTypeIcon actionType={actionType} iconCfg={iconCfg} size={40} />
+      <div style={{ padding: "10px 20px 6px", borderBottom: SPEC.borderSubtle }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
+            <ServiceTypeIcon actionKind={actionKind} iconCfg={iconCfg} size={34} />
             <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 16, fontWeight: 700, color: SPEC.textPrimary, lineHeight: 1.2 }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: SPEC.textPrimary, lineHeight: 1.2 }}>
                 {entry.mainTitle}
               </p>
-              <p style={{ fontSize: 12, color: SPEC.textMuted, marginTop: 3 }}>
+              <p style={{ fontSize: 12, color: SPEC.textMuted, marginTop: 2 }}>
                 {isStateUpdate ? (entry.stateUpdateSubtitle ?? "") : entry.secondaryTitle}
               </p>
             </div>
@@ -1686,13 +3138,13 @@ function ServiceLogEventDetails({
             ×
           </button>
         </div>
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 5 }}>
           <span
             style={{
               display: "inline-flex",
               alignItems: "center",
               borderRadius: 6,
-              padding: "3px 9px",
+              padding: "2px 8px",
               fontSize: 11,
               fontWeight: 700,
               backgroundColor: isStateUpdate ? C.wash : "rgba(34,197,94,0.14)",
@@ -1715,23 +3167,166 @@ function ServiceLogEventDetails({
         }}
       >
         <MetricCol label="Дата" value={entry.dateLabel} />
-        <MetricCol label="Пробег" value={entry.odometerLabel} />
+        <MetricCol label="Пробег" value={entry.odometerValue} />
         <MetricCol label="Интервал" value={intervalLabel} />
-        <MetricCol label="Стоимость" value={cost ?? "—"} accent={!!cost} noRightBorder />
+        <MetricCol
+          label="Стоимость"
+          value={cost ?? "—"}
+          accent={!!cost}
+          noRightBorder
+          valueSize="sm"
+          onNavigate={
+            !isStateUpdate && event && (linkedExpenses.length > 0 || cost)
+              ? () => onOpenExpenses()
+              : undefined
+          }
+          navigateLabel="Открыть расходы по этому событию"
+        />
       </div>
+
+      {!isStateUpdate ? (
+        <ServiceLogDetailsActionsMenu
+          hasBundleParts={entry.mode === "ADVANCED" && entry.bundleItemsSummary.length > 0}
+          busy={repeatPurchaseBusy}
+          onRequestRepeatPurchaseAll={() =>
+            onRequestRepeatPurchaseModal({
+              eventId: entry.id,
+              entryMainTitle: entry.mainTitle,
+              entryDateLabel: entry.dateLabel,
+              items: entry.bundleItemsSummary.slice(),
+            })
+          }
+        />
+      ) : null}
+
+      {/* Узлы — бейджи в ряд с переносом */}
+      <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+        <PanelSectionTitle>Узлы</PanelSectionTitle>
+        {detailNodes.length > 0 ? (
+          <ul
+            style={{
+              margin: "2px 0 0",
+              padding: 0,
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 4,
+              alignItems: "center",
+            }}
+          >
+            {detailNodes.map((row) => (
+              <li key={row.nodeId} style={{ listStyle: "none" }}>
+                <button
+                  type="button"
+                  onClick={() => onOpenNodeInTree(row.nodeId)}
+                  title={`Дерево узлов: ${row.name}`}
+                  style={detailPanelNodeChipStyle}
+                >
+                  {row.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ marginTop: 2, fontSize: 12, color: C.text3 }}>Узел не указан</p>
+        )}
+      </div>
+
+      {/* 2. Режим bundle */}
+      {!isStateUpdate ? (
+        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+          <PanelSectionTitle>Режим записи</PanelSectionTitle>
+          <p style={{ marginTop: 2, fontSize: 13, fontWeight: 600, color: SPEC.textPrimary }}>{entry.modeBadgeRu}</p>
+          <p style={{ marginTop: 2, fontSize: 11, color: C.text3, lineHeight: 1.4 }}>
+            {entry.mode === "ADVANCED"
+              ? "Отдельные поля по каждому узлу: запчасть, SKU, количество, стоимость."
+              : "Одна форма на событие: общий тип работ и комментарий по узлам."}
+          </p>
+        </div>
+      ) : null}
+
+      {/* 3. Моточасы */}
+      {entry.engineHoursValue !== null ? (
+        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+          <PanelSectionTitle>{entry.engineHoursLabel ?? "Моточасы"}</PanelSectionTitle>
+          <p style={{ marginTop: 2, fontSize: 13, fontWeight: 600, color: SPEC.textPrimary }}>{entry.engineHoursValue}</p>
+        </div>
+      ) : null}
+
+      {/* 4. Напоминание целиком */}
+      {fullReminderText ? (
+        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+          <PanelSectionTitle>Следующее напоминание</PanelSectionTitle>
+          <p style={{ marginTop: 2, fontSize: 13, color: C.text2, lineHeight: 1.4 }}>{fullReminderText}</p>
+        </div>
+      ) : null}
+
+      {/* 5. Комментарии по позициям bundle */}
+      {!isStateUpdate && entry.bundleItemsSummary.some((i) => i.comment?.trim()) ? (
+        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+          <PanelSectionTitle>Комментарии по работам</PanelSectionTitle>
+          <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 4 }}>
+            {entry.bundleItemsSummary
+              .filter((i) => i.comment?.trim())
+              .map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    padding: "5px 8px",
+                    borderRadius: 6,
+                    backgroundColor: C.wash,
+                    border: SPEC.borderSubtle,
+                  }}
+                >
+                  <p style={{ fontSize: 12, fontWeight: 700, color: SPEC.textPrimary }}>
+                    {(item.partName ?? item.actionLabelRu).trim()}
+                    <span style={{ fontWeight: 500, color: C.text3 }}> · {item.nodeName}</span>
+                  </p>
+                  <p style={{ marginTop: 2, fontSize: 12, color: C.text2, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
+                    {item.comment!.trim()}
+                  </p>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* 6. Детали и работа в одну строку (итого — в сетке метрик сверху) */}
+      {!isStateUpdate && (entry.partsCostLabel || entry.laborCostLabel) ? (
+        <div style={{ padding: "4px 20px 4px", borderBottom: SPEC.borderSubtle, flexShrink: 0 }}>
+          <PanelSectionTitle>Стоимость по статьям</PanelSectionTitle>
+          <button
+            type="button"
+            onClick={() => onOpenExpenses()}
+            title="Открыть расходы по этому событию"
+            style={{
+              margin: "2px 0 0",
+              ...detailPanelCostTextLinkStyle,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              display: "block",
+              width: "100%",
+            }}
+          >
+            {[entry.partsCostLabel, entry.laborCostLabel].filter(Boolean).join(" · ")}
+          </button>
+        </div>
+      ) : null}
 
       {/* Scrollable body */}
       <div style={{ overflowY: "auto", flex: 1 }}>
 
-        {/* Parts / work items */}
-        {!isStateUpdate && entry.bundleItemsSummary.length > 0 ? (
-          <div style={{ padding: "14px 24px", borderBottom: SPEC.borderSubtle }}>
+        {/* Установленные запчасти — только ADVANCED; в BASIC строки bundle = узлы/работы. */}
+        {!isStateUpdate && entry.mode === "ADVANCED" && entry.bundleItemsSummary.length > 0 ? (
+          <div style={{ padding: "6px 20px 8px", borderBottom: SPEC.borderSubtle }}>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 10,
+                marginBottom: 4,
               }}
             >
               <PanelSectionTitle>Установленные запчасти</PanelSectionTitle>
@@ -1739,67 +3334,23 @@ function ServiceLogEventDetails({
                 {entry.bundleItemsSummary.length} позиций
               </span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {entry.bundleItemsSummary.map((item) => (
-                <div
+                <InstalledPartRowWithMenu
                   key={item.id}
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    alignItems: "center",
-                    padding: "8px 10px",
-                    borderRadius: 10,
-                    backgroundColor: C.row,
-                    border: SPEC.borderSubtle,
-                  }}
-                >
-                  {/* Placeholder thumbnail */}
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 8,
-                      backgroundColor: C.wash,
-                      border: SPEC.borderSubtle,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                      color: C.text3,
-                    }}
-                  >
-                    <BoxSvg />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: C.text,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {item.partName ?? item.actionLabelRu}
-                    </p>
-                    <p style={{ fontSize: 11, color: C.text3, marginTop: 2 }}>
-                      {item.sku ? `SKU: ${item.sku}` : item.nodeName}
-                      {item.quantity != null ? ` · ${item.quantity} шт.` : ""}
-                    </p>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: item.lineCostRu ? C.green : C.text3,
-                      flexShrink: 0,
-                      textAlign: "right",
-                    }}
-                  >
-                    {item.lineCostRu ?? "—"}
-                  </span>
-                </div>
+                  item={item}
+                  event={event}
+                  onOpenParts={onOpenParts}
+                  onRequestRepeatPurchaseModal={() =>
+                    onRequestRepeatPurchaseModal({
+                      eventId: entry.id,
+                      entryMainTitle: entry.mainTitle,
+                      entryDateLabel: entry.dateLabel,
+                      items: [item],
+                    })
+                  }
+                  busy={repeatPurchaseBusy}
+                />
               ))}
             </div>
           </div>
@@ -1807,9 +3358,9 @@ function ServiceLogEventDetails({
 
         {/* State update lines */}
         {isStateUpdate ? (
-          <div style={{ padding: "14px 24px", borderBottom: SPEC.borderSubtle }}>
+          <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
             <PanelSectionTitle>Изменения состояния</PanelSectionTitle>
-            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ marginTop: 3, display: "flex", flexDirection: "column", gap: 2 }}>
               {(entry.stateUpdateLines.length > 0 ? entry.stateUpdateLines : [entry.stateUpdateSubtitle]).map((line) =>
                 line ? (
                   <p key={line} style={{ fontSize: 13, color: C.text2 }}>
@@ -1823,14 +3374,14 @@ function ServiceLogEventDetails({
 
         {/* Comment */}
         {entry.comment ? (
-          <div style={{ padding: "14px 24px", borderBottom: SPEC.borderSubtle }}>
+          <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
             <PanelSectionTitle>Комментарий</PanelSectionTitle>
             <p
               style={{
-                marginTop: 8,
-                fontSize: 13,
+                marginTop: 3,
+                fontSize: 12,
                 color: C.text2,
-                lineHeight: 1.6,
+                lineHeight: 1.45,
                 whiteSpace: "pre-wrap",
               }}
             >
@@ -1840,13 +3391,13 @@ function ServiceLogEventDetails({
         ) : null}
 
         {/* Performer */}
-        <div style={{ padding: "14px 24px", borderBottom: SPEC.borderSubtle }}>
+        <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
           <PanelSectionTitle>Исполнитель</PanelSectionTitle>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 3 }}>
             <div
               style={{
-                width: 32,
-                height: 32,
+                width: 28,
+                height: 28,
                 borderRadius: "50%",
                 backgroundColor: C.wash,
                 border: SPEC.borderSubtle,
@@ -1855,27 +3406,38 @@ function ServiceLogEventDetails({
                 justifyContent: "center",
                 color: C.text3,
                 flexShrink: 0,
+                marginTop: 1,
               }}
             >
               <PersonSvg />
             </div>
-            <span style={{ fontSize: 13, color: C.text2 }}>{performerLabel}</span>
-            {event?.serviceProviderNote ? (
-              <span style={{ fontSize: 12, color: C.text3 }}>· {event.serviceProviderNote}</span>
-            ) : null}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: 13, color: C.text2, lineHeight: 1.35 }}>
+                {performerLabel}
+                {event?.performedBy !== "SERVICE" && event?.serviceProviderNote?.trim() ? (
+                  <span style={{ fontSize: 12, color: C.text3 }}> · {event.serviceProviderNote.trim()}</span>
+                ) : null}
+              </span>
+              {event?.performedBy === "SERVICE" ? (
+                <p style={{ margin: 0, fontSize: 12, color: C.text2, lineHeight: 1.4 }}>
+                  <span style={{ color: C.text3 }}>Название сервиса: </span>
+                  {event.serviceProviderNote?.trim() ? event.serviceProviderNote.trim() : "—"}
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
 
         {/* Sources / wishlist origin */}
-        <div style={{ padding: "14px 24px", borderBottom: SPEC.borderSubtle }}>
+        <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
           <PanelSectionTitle>Источники</PanelSectionTitle>
           {originWishlistItemIds.length > 0 ? (
-            <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <div style={{ marginTop: 3, display: "flex", flexWrap: "wrap", gap: 4 }}>
               {originWishlistItemIds.map((wid, idx) => (
                 <button
                   key={wid}
                   type="button"
-                  onClick={() => onOpenWishlistOrigin(wid)}
+                  onClick={() => onOpenParts({ wishlistItemId: wid })}
                   style={{
                     ...mutedBtnStyle,
                     height: 28,
@@ -1889,41 +3451,82 @@ function ServiceLogEventDetails({
               ))}
             </div>
           ) : entry.wishlistOriginLabelRu ? (
-            <p style={{ marginTop: 6, fontSize: 13, color: C.text2 }}>{entry.wishlistOriginLabelRu}</p>
+            <p style={{ marginTop: 3, fontSize: 12, color: C.text2 }}>{entry.wishlistOriginLabelRu}</p>
           ) : (
-            <p style={{ marginTop: 6, fontSize: 13, color: C.text3 }}>—</p>
+            <p style={{ marginTop: 3, fontSize: 12, color: C.text3 }}>—</p>
           )}
         </div>
 
         {/* Expenses */}
         {!isStateUpdate && linkedExpenses.length > 0 ? (
-          <div style={{ padding: "14px 24px", borderBottom: SPEC.borderSubtle }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ padding: "6px 20px", borderBottom: SPEC.borderSubtle }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
               <PanelSectionTitle>Расходы</PanelSectionTitle>
-              <span style={{ fontSize: 12, fontWeight: 700, color: C.green }}>
+              <button
+                type="button"
+                onClick={() => onOpenExpenses()}
+                title="Открыть расходы по этому событию"
+                style={detailPanelCostTotalLinkStyle}
+              >
                 {Array.from(linkedExpenseTotals.entries())
                   .map(([cur, amt]) => `${formatExpenseAmountRu(amt)} ${cur}`)
                   .join(" · ")}
-              </span>
+              </button>
             </div>
             {linkedExpenses.map((expense) => (
-              <div
+              <button
                 key={expense.id}
+                type="button"
+                onClick={() =>
+                  onOpenExpenses({ highlightExpenseId: expense.id, expenseDateIso: expense.expenseDate })
+                }
+                title="Показать расход в списке"
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  padding: "5px 0",
+                  gap: 8,
+                  padding: "2px 0",
                   borderTop: SPEC.borderSubtle,
+                  width: "100%",
+                  background: "none",
+                  borderLeft: "none",
+                  borderRight: "none",
+                  borderBottom: "none",
+                  cursor: "pointer",
+                  font: "inherit",
+                  textAlign: "left",
                 }}
               >
-                <span style={{ fontSize: 12, color: C.text2 }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 500,
+                    color: C.text2,
+                    lineHeight: 1.35,
+                    minWidth: 0,
+                    flex: 1,
+                    textAlign: "left",
+                  }}
+                >
                   {expense.title} · {expenseCategoryLabelsRu[expense.category]}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: SPEC.textPrimary,
+                    lineHeight: 1.35,
+                    flexShrink: 0,
+                    textDecoration: "underline",
+                    textDecorationStyle: "dotted",
+                    textDecorationColor: "rgba(148,163,184,0.35)",
+                    textUnderlineOffset: 2,
+                  }}
+                >
                   {formatExpenseAmountRu(expense.amount)} {expense.currency}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         ) : null}
@@ -1934,8 +3537,8 @@ function ServiceLogEventDetails({
         <div
           style={{
             display: "flex",
-            gap: 10,
-            padding: "14px 24px 16px",
+            gap: 6,
+            padding: "8px 20px 10px",
             borderTop: SPEC.borderSubtle,
             backgroundColor: SPEC.bgPanel,
             flexShrink: 0,
@@ -1946,7 +3549,7 @@ function ServiceLogEventDetails({
             onClick={onEdit}
             style={{
               flex: 1,
-              height: 40,
+              height: 36,
               borderRadius: 8,
               border: SPEC.borderSubtle,
               backgroundColor: "transparent",
@@ -1957,7 +3560,7 @@ function ServiceLogEventDetails({
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
+              gap: 6,
             }}
           >
             <EditSvg /> Редактировать
@@ -1967,7 +3570,7 @@ function ServiceLogEventDetails({
             onClick={onDelete}
             style={{
               flex: 1,
-              height: 40,
+              height: 36,
               borderRadius: 8,
               border: SPEC.borderSubtle,
               backgroundColor: "transparent",
@@ -1978,7 +3581,7 @@ function ServiceLogEventDetails({
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
+              gap: 6,
             }}
           >
             <TrashSvg /> Удалить
@@ -1988,7 +3591,7 @@ function ServiceLogEventDetails({
             onClick={onRepeat}
             style={{
               flex: 1,
-              height: 40,
+              height: 36,
               borderRadius: 8,
               border: SPEC.borderSubtle,
               backgroundColor: "transparent",
@@ -1999,7 +3602,7 @@ function ServiceLogEventDetails({
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
+              gap: 6,
             }}
           >
             <RepeatSvg /> Повторить ТО
@@ -2013,14 +3616,28 @@ function ServiceLogEventDetails({
 // ─── Small components ──────────────────────────────────────────────────────────
 
 function ServiceTypeIcon({
-  actionType,
+  actionKind,
   iconCfg,
   size = 36,
 }: {
-  actionType: ActionType;
-  iconCfg: { bg: string; iconColor: string; variant: ActionType };
+  actionKind: ServiceRowActionKind;
+  iconCfg: { bg: string; iconColor: string; variant: ServiceRowActionKind };
   size?: number;
 }) {
+  const glyph =
+    actionKind === "INSPECT" ? (
+      <InspectSvg />
+    ) : actionKind === "STATE_UPDATE" ? (
+      <StateSvg />
+    ) : actionKind === "SERVICE" ? (
+      <OilCanSvg />
+    ) : actionKind === "CLEAN" ? (
+      <SparkleSvg />
+    ) : actionKind === "ADJUST" ? (
+      <SlidersSvg />
+    ) : (
+      <WrenchSvg />
+    );
   return (
     <span
       style={{
@@ -2036,7 +3653,7 @@ function ServiceTypeIcon({
         flexShrink: 0,
       }}
     >
-      {actionType === "INSPECT" ? <InspectSvg /> : actionType === "STATE_UPDATE" ? <StateSvg /> : <WrenchSvg />}
+      {glyph}
     </span>
   );
 }
@@ -2046,34 +3663,85 @@ function MetricCol({
   value,
   accent = false,
   noRightBorder = false,
+  onNavigate,
+  navigateLabel,
+  valueSize = "default",
 }: {
   label: string;
   value: string;
   accent?: boolean;
   noRightBorder?: boolean;
+  onNavigate?: () => void;
+  navigateLabel?: string;
+  valueSize?: "default" | "sm";
 }) {
-  return (
-    <div
-      style={{
-        padding: "12px 16px",
-        borderRight: noRightBorder ? undefined : SPEC.borderSubtle,
-      }}
-    >
+  const valueFontSize = valueSize === "sm" ? 11 : 13;
+  const valueFontWeight = valueSize === "sm" ? 600 : 700;
+  const valueIsLink = Boolean(onNavigate);
+  const body = (
+    <>
       <p
         style={{
           fontSize: 10,
           color: SPEC.textSecondary,
           textTransform: "uppercase",
           letterSpacing: "0.1em",
-          marginBottom: 4,
+          marginBottom: 2,
           fontWeight: 600,
         }}
       >
         {label}
       </p>
-      <p style={{ fontSize: 14, fontWeight: 700, color: accent ? C.green : SPEC.textPrimary }}>
+      <p
+        style={{
+          fontSize: valueFontSize,
+          fontWeight: valueFontWeight,
+          color: accent ? C.green : SPEC.textPrimary,
+          ...(valueIsLink
+            ? {
+                textDecoration: "underline",
+                textDecorationStyle: "dotted" as const,
+                textDecorationColor: accent ? "rgba(74,222,128,0.35)" : "rgba(148,163,184,0.45)",
+                textUnderlineOffset: 2,
+              }
+            : {}),
+        }}
+      >
         {value}
       </p>
+    </>
+  );
+  return (
+    <div
+      style={{
+        padding: "5px 8px",
+        borderRight: noRightBorder ? undefined : SPEC.borderSubtle,
+      }}
+    >
+      {onNavigate ? (
+        <button
+          type="button"
+          onClick={onNavigate}
+          aria-label={navigateLabel ?? label}
+          title={navigateLabel}
+          style={{
+            display: "block",
+            width: "100%",
+            margin: 0,
+            padding: 0,
+            border: "none",
+            background: "none",
+            cursor: "pointer",
+            textAlign: "left",
+            font: "inherit",
+            color: "inherit",
+          }}
+        >
+          {body}
+        </button>
+      ) : (
+        body
+      )}
     </div>
   );
 }
@@ -2082,11 +3750,13 @@ function PanelSectionTitle({ children }: { children: ReactNode }) {
   return (
     <p
       style={{
-        fontSize: 11,
+        margin: 0,
+        fontSize: 10,
         fontWeight: 700,
         color: SPEC.textSecondary,
         textTransform: "uppercase",
         letterSpacing: "0.1em",
+        lineHeight: 1.2,
       }}
     >
       {children}
@@ -2105,25 +3775,35 @@ function WrenchSvg() {
   );
 }
 
-/** Иконка ключа для кнопки «Добавить событие» в шапке (референс ~15×15). */
-function WrenchHeaderSvg() {
+/** Канистра с носиком — референс «ТО / масло» в журнале. */
+function OilCanSvg() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <title>Добавить событие</title>
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <title>ТО</title>
+      <path d="M10 3h4v3h-4z" />
+      <path d="M8 6h10l1 4v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V10l1-4z" />
+      <path d="M18 8h2.5a1 1 0 0 1 1 1v2h-2" />
     </svg>
   );
 }
 
-/** Монета с ₽ — иконка слева у метрики «Стоимость» (см. референс service-log-web.png). */
-function CoinSvg() {
+function SparkleSvg() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <title>Стоимость</title>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9 8h4.2a2.6 2.6 0 0 1 0 5.2H9" />
-      <path d="M9 8v9" />
-      <path d="M7.5 13.2H12" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <title>Очистка</title>
+      <path d="M12 3v2.5M12 18.5V21M4.2 4.2l1.8 1.8M18 18l1.8 1.8M3 12h2.5M18.5 12H21M4.2 19.8l1.8-1.8M18 6l1.8-1.8" />
+    </svg>
+  );
+}
+
+function SlidersSvg() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <title>Регулировка</title>
+      <line x1="3" y1="8" x2="21" y2="8" />
+      <circle cx="8" cy="8" r="2.5" fill="currentColor" stroke="none" />
+      <line x1="3" y1="16" x2="21" y2="16" />
+      <circle cx="16" cy="16" r="2.5" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -2147,9 +3827,9 @@ function StateSvg() {
   );
 }
 
-function ClockSvg() {
+function ClockSvg({ size = 13 }: { size?: number }) {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <title>Интервал</title>
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
@@ -2157,12 +3837,35 @@ function ClockSvg() {
   );
 }
 
-function PersonSvg() {
+function PersonSvg({ size = 13 }: { size?: number }) {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <title>Исполнитель</title>
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+/** Рука с монетой — метрика «Стоимость» (белый контур, референс). */
+function HandCoinMetricSvg() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <title>Стоимость</title>
+      <ellipse cx="9.5" cy="10" rx="2.8" ry="2.8" />
+      <path d="M12.5 8.5c2 0 3.5 1.6 3.5 3.5V14" />
+      <path d="M6 14.5c0-1.1.9-2 2-2h1.5" />
+      <path d="M5.5 19.5v-3c0-1.4 1.1-2.5 2.5-2.5H11" />
+      <path d="M16 12v4.5a2 2 0 0 1-2 2h-1" />
+      <path d="M13 18.5H8.5" />
+    </svg>
+  );
+}
+
+function ChevronRightThinSvg() {
+  return (
+    <svg width="10" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M10 6l6 6-6 6" />
     </svg>
   );
 }
@@ -2237,15 +3940,6 @@ function RepeatSvg() {
   );
 }
 
-function CheckSvg({ color = "currentColor", size = 10 }: { color?: string; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-      <title>Выполнено</title>
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
 function SearchSvg() {
   return (
     <svg
@@ -2266,28 +3960,3 @@ function SearchSvg() {
   );
 }
 
-function ListSvg() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <title>Список</title>
-      <line x1="8" y1="6" x2="21" y2="6" />
-      <line x1="8" y1="12" x2="21" y2="12" />
-      <line x1="8" y1="18" x2="21" y2="18" />
-      <line x1="3" y1="6" x2="3.01" y2="6" />
-      <line x1="3" y1="12" x2="3.01" y2="12" />
-      <line x1="3" y1="18" x2="3.01" y2="18" />
-    </svg>
-  );
-}
-
-function GridSvg() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <title>Сетка</title>
-      <rect x="3" y="3" width="7" height="7" />
-      <rect x="14" y="3" width="7" height="7" />
-      <rect x="14" y="14" width="7" height="7" />
-      <rect x="3" y="14" width="7" height="7" />
-    </svg>
-  );
-}

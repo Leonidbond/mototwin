@@ -25,6 +25,25 @@ import type {
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 const SIDEBAR_COLLAPSED_KEY = "expenses.sidebar.collapsed";
 
+function decodeMototwinInternalReturnTo(raw: string | null): string | null {
+  if (!raw?.trim()) {
+    return null;
+  }
+  let decoded = raw.trim();
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    return null;
+  }
+  if (!decoded.startsWith("/") || decoded.startsWith("//")) {
+    return null;
+  }
+  if (!decoded.startsWith("/vehicles/") && !decoded.startsWith("/garage")) {
+    return null;
+  }
+  return decoded;
+}
+
 const categoryOptions: ExpenseCategory[] = [
   "PART",
   "CONSUMABLE",
@@ -150,6 +169,9 @@ export function ExpensesPageClient(props: {
   const vehicleIdFromQuery = searchParams.get("vehicleId")?.trim() || "";
   const nodeIdFromQuery = searchParams.get("nodeId")?.trim() || "";
   const returnNodeIdFromQuery = searchParams.get("returnNodeId")?.trim() || "";
+  const serviceEventIdFromQuery = searchParams.get("serviceEventId")?.trim() || "";
+  const highlightExpenseIdFromQuery = searchParams.get("highlightExpenseId")?.trim() || "";
+  const returnToFromQuery = decodeMototwinInternalReturnTo(searchParams.get("returnTo"));
   const effectiveVehicleId = props.vehicleId ?? vehicleIdFromQuery;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedYear, setSelectedYear] = useState(selectedYearDefault);
@@ -183,6 +205,7 @@ export function ExpensesPageClient(props: {
     monthKey: "",
     source: "",
     search: "",
+    serviceEventId: serviceEventIdFromQuery,
   });
 
   useEffect(() => {
@@ -194,6 +217,32 @@ export function ExpensesPageClient(props: {
       // localStorage can be unavailable in restricted browser contexts.
     }
   }, []);
+
+  useEffect(() => {
+    const nextServiceEventId = searchParams.get("serviceEventId")?.trim() || "";
+    setFilters((prev) =>
+      prev.serviceEventId === nextServiceEventId ? prev : { ...prev, serviceEventId: nextServiceEventId }
+    );
+  }, [searchParams]);
+
+  useEffect(() => {
+    const y = Number(searchParams.get("year"));
+    if (Number.isFinite(y) && y > 0) {
+      setSelectedYear(y);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (isLoading || !highlightExpenseIdFromQuery) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-expense-id="${CSS.escape(highlightExpenseIdFromQuery)}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [highlightExpenseIdFromQuery, isLoading, expenses.length]);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
@@ -233,6 +282,7 @@ export function ExpensesPageClient(props: {
         if (filters.source === "service" && !expense.serviceEventId) return false;
         if (filters.source === "wishlist" && !expense.shoppingListItemId) return false;
         if (filters.source === "manual" && (expense.serviceEventId || expense.shoppingListItemId)) return false;
+        if (filters.serviceEventId && expense.serviceEventId !== filters.serviceEventId) return false;
         if (filters.search.trim()) {
           const query = filters.search.trim().toLowerCase();
           const haystack = [
@@ -367,7 +417,8 @@ export function ExpensesPageClient(props: {
       filters.nodeId ||
       filters.monthKey ||
       filters.source ||
-      filters.search.trim()
+      filters.search.trim() ||
+      filters.serviceEventId
     );
   }, [effectiveVehicleId, filters]);
 
@@ -460,6 +511,10 @@ export function ExpensesPageClient(props: {
   }
 
   function navigateBack() {
+    if (returnToFromQuery) {
+      router.push(returnToFromQuery);
+      return;
+    }
     if (returnNodeIdFromQuery && effectiveVehicleId) {
       router.push(`/vehicles/${effectiveVehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeIdFromQuery)}`);
       return;
@@ -490,6 +545,7 @@ export function ExpensesPageClient(props: {
       monthKey: "",
       source: "",
       search: "",
+      serviceEventId: "",
     });
   }
 
@@ -753,6 +809,7 @@ export function ExpensesPageClient(props: {
                 <ExpenseTable
                   expenses={filteredExpenses}
                   hasFilters={hasFilters}
+                  highlightExpenseId={highlightExpenseIdFromQuery}
                   onDelete={deleteExpense}
                   onMarkInstalled={markExpenseInstalled}
                   onOpenServiceEvent={(expense) => router.push(`/vehicles/${expense.vehicleId}/service-log?serviceEventId=${encodeURIComponent(expense.serviceEventId!)}`)}
@@ -976,6 +1033,7 @@ function InsightRow(props: { icon: string; label: string; value: string }) {
 function ExpenseTable(props: {
   expenses: ExpenseItem[];
   hasFilters: boolean;
+  highlightExpenseId?: string;
   onDelete: (expenseId: string) => void;
   onMarkInstalled: (expenseId: string) => void;
   onOpenServiceEvent: (expense: ExpenseItem) => void;
@@ -1003,7 +1061,20 @@ function ExpenseTable(props: {
         </thead>
         <tbody>
           {props.expenses.map((expense) => (
-            <tr key={expense.id} style={trStyle}>
+            <tr
+              key={expense.id}
+              data-expense-id={expense.id}
+              style={{
+                ...trStyle,
+                ...(props.highlightExpenseId === expense.id
+                  ? {
+                      outline: `2px solid ${c.primaryAction}`,
+                      outlineOffset: -2,
+                      backgroundColor: "rgba(59,130,246,0.08)",
+                    }
+                  : {}),
+              }}
+            >
               <td style={tdStyle}>{new Date(expense.expenseDate).toLocaleDateString("ru-RU")}</td>
               <td style={tdStyle}>{expense.node?.name ?? "Без узла"}</td>
               <td style={tdStyle}>{expense.title}</td>

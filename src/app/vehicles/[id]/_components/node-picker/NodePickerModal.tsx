@@ -45,7 +45,13 @@ export function NodePickerModal({
 }: NodePickerModalProps) {
   const [query, setQuery] = useState("");
   const [topNodesOnly, setTopNodesOnly] = useState(false);
-  const [localSelected, setLocalSelected] = useState<Set<string>>(() => new Set());
+  const [localSelected, setLocalSelected] = useState<Set<string>>(() => {
+    const next = new Set<string>();
+    if (selectedIds) {
+      for (const id of selectedIds) next.add(id);
+    }
+    return next;
+  });
 
   const baseOptions = useMemo(() => {
     if (topNodesOnly && topOptions && topOptions.length > 0) {

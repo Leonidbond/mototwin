@@ -99,6 +99,134 @@ export function getWishlistItemIdFromInstalledPartsJson(payload: unknown): strin
   return ids[0] ?? null;
 }
 
+/** One wishlist-sourced row stored in `installedPartsJson` (order preserved for bundle alignment). */
+export type WishlistInstalledPartsRecord = {
+  wishlistItemId: string;
+  title: string;
+  quantity: number;
+  skuId: string | null;
+  skuLabel: string | null;
+};
+
+/**
+ * Parses `installedPartsJson` wishlist records in **array order** (no deduping — unlike
+ * {@link getWishlistItemIdsFromInstalledPartsJson}) so indices can align with bundle lines.
+ */
+export function parseWishlistInstalledPartsRecordsOrdered(payload: unknown): WishlistInstalledPartsRecord[] {
+  const parsed = parseInstalledPartsJsonPayload(payload);
+  if (!parsed) {
+    return [];
+  }
+  const pushRecord = (o: Record<string, unknown>, out: WishlistInstalledPartsRecord[]) => {
+    if (o.source !== "wishlist" || typeof o.wishlistItemId !== "string") {
+      return;
+    }
+    const id = o.wishlistItemId.trim();
+    if (!id) {
+      return;
+    }
+    out.push({
+      wishlistItemId: id,
+      title: typeof o.title === "string" ? o.title : "",
+      quantity: typeof o.quantity === "number" && Number.isFinite(o.quantity) ? o.quantity : 1,
+      skuId: typeof o.skuId === "string" ? o.skuId : null,
+      skuLabel: typeof o.skuLabel === "string" ? o.skuLabel : null,
+    });
+  };
+  if (Array.isArray(parsed)) {
+    const out: WishlistInstalledPartsRecord[] = [];
+    for (const el of parsed) {
+      if (el && typeof el === "object" && !Array.isArray(el)) {
+        pushRecord(el as Record<string, unknown>, out);
+      }
+    }
+    return out;
+  }
+  if (typeof parsed === "object") {
+    const out: WishlistInstalledPartsRecord[] = [];
+    pushRecord(parsed as Record<string, unknown>, out);
+    return out;
+  }
+  return [];
+}
+
+function normalizeWishlistBundleMatchToken(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+export type ServiceBundleItemWishlistMatchInput = {
+  id: string;
+  sortOrder: number;
+  partName?: string | null;
+  sku?: string | null;
+};
+
+/**
+ * Resolves `wishlistItemId` for one service bundle row using `installedPartsJson` wishlist records.
+ * Uses index parity when lengths match, otherwise title / SKU label matching; avoids returning an
+ * arbitrary first id when several wishlist lines exist but the row cannot be identified.
+ */
+export function resolveWishlistItemIdForServiceBundleItem(
+  event: {
+    installedPartsJson?: unknown | null;
+    items: readonly ServiceBundleItemWishlistMatchInput[];
+  },
+  bundleItemId: string
+): string | null {
+  const records = parseWishlistInstalledPartsRecordsOrdered(event.installedPartsJson);
+  if (records.length === 0) {
+    return null;
+  }
+  const sortedItems = [...event.items].sort((a, b) => a.sortOrder - b.sortOrder);
+  const idx = sortedItems.findIndex((it) => it.id === bundleItemId);
+  if (idx < 0) {
+    return records.length === 1 ? records[0]!.wishlistItemId : null;
+  }
+  const bundleItem = sortedItems[idx]!;
+
+  if (records.length === sortedItems.length) {
+    return records[idx]!.wishlistItemId;
+  }
+
+  const partNameN = normalizeWishlistBundleMatchToken(bundleItem.partName);
+  const skuN = normalizeWishlistBundleMatchToken(bundleItem.sku);
+
+  if (partNameN) {
+    const byTitle = records.filter((r) => normalizeWishlistBundleMatchToken(r.title) === partNameN);
+    if (byTitle.length === 1) {
+      return byTitle[0]!.wishlistItemId;
+    }
+    if (skuN && byTitle.length > 0) {
+      const byTitleAndSku = byTitle.filter((r) => {
+        const lbl = normalizeWishlistBundleMatchToken(r.skuLabel);
+        if (!lbl) {
+          return false;
+        }
+        return lbl === skuN || lbl.includes(skuN) || skuN.includes(lbl);
+      });
+      if (byTitleAndSku.length === 1) {
+        return byTitleAndSku[0]!.wishlistItemId;
+      }
+    }
+  }
+
+  if (skuN) {
+    const bySkuOnly = records.filter((r) => {
+      const lbl = normalizeWishlistBundleMatchToken(r.skuLabel);
+      return lbl && (lbl === skuN || lbl.includes(skuN) || skuN.includes(lbl));
+    });
+    if (bySkuOnly.length === 1) {
+      return bySkuOnly[0]!.wishlistItemId;
+    }
+  }
+
+  if (records.length === 1) {
+    return records[0]!.wishlistItemId;
+  }
+
+  return null;
+}
+
 /** Heuristic: SERVICE event with install type and wishlist comment prefix (no new `ServiceEvent` kind). */
 export function isLikelyWishlistInstallServiceEvent(event: {
   eventKind?: ServiceEventKind;

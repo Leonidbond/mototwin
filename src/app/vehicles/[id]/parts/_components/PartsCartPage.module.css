@@ -584,6 +584,27 @@
   font-weight: 600;
 }
 
+.rowMenuItemWithIcon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rowMenuIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+}
+
+.rowMenuIcon svg {
+  width: 14px;
+  height: 14px;
+}
+
 .showMore {
   width: 100%;
   border: 0;

@@ -176,6 +176,12 @@ function formatYearOdometerLine(vehicle: VehicleDetail): string {
   return `${year || "—"} · ${vehicle.odometer.toLocaleString("ru-RU")} км`;
 }
 
+/** Как web `PartsCartPage`: повтор для заказано / куплено / установлено при привязке к узлу. */
+function canRepeatWishlistPurchase(item: PartWishlistItemViewModel): boolean {
+  return Boolean(item.nodeId?.trim()) &&
+    (item.status === "ORDERED" || item.status === "BOUGHT" || item.status === "INSTALLED");
+}
+
 const SWIPE_DX = 72;
 const SWIPE_MAX_DY = 56;
 
@@ -240,6 +246,8 @@ export default function VehicleWishlistScreen() {
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [wishlistStatusMenuItemId, setWishlistStatusMenuItemId] = useState<string | null>(null);
+  const [repeatPurchaseConfirmItem, setRepeatPurchaseConfirmItem] =
+    useState<PartWishlistItemViewModel | null>(null);
   const [detailItemId, setDetailItemId] = useState<string | null>(null);
   const [detailHistoryExpanded, setDetailHistoryExpanded] = useState(false);
   const [items, setItems] = useState<PartWishlistItemViewModel[]>([]);
@@ -682,6 +690,49 @@ export default function VehicleWishlistScreen() {
     );
   }
 
+  async function submitRepeatWishlistPurchase(source: PartWishlistItemViewModel) {
+    if (!vehicleId) {
+      return;
+    }
+    const nodeId = source.nodeId?.trim();
+    if (!nodeId) {
+      Alert.alert("Список покупок", "У позиции нет привязки к узлу — повторить покупку нельзя.");
+      return;
+    }
+    try {
+      setBusyId(source.id);
+      const remark = "Повтор из корзины замен";
+      const baseComment = source.comment?.trim() ?? "";
+      const comment = baseComment ? `${baseComment} · ${remark}` : remark;
+      const client = createApiClient({ baseUrl: apiBaseUrl });
+      const endpoints = createMotoTwinEndpoints(client);
+      const res = await endpoints.createWishlistItem(vehicleId, {
+        nodeId,
+        title: source.title.trim() || undefined,
+        skuId: source.skuId ?? null,
+        quantity: source.quantity >= 1 ? source.quantity : 1,
+        comment,
+        status: "NEEDED",
+        costAmount: null,
+        currency: null,
+      });
+      const nextItems = await load();
+      setRepeatPurchaseConfirmItem(null);
+      setDetailItemId(null);
+      setStatusFilter("NEEDED");
+      Alert.alert("Список покупок", "Добавлена новая позиция «Нужно» по этой запчасти.");
+      if (nextItems) {
+        applyWishlistRowFocus(res.item.id, nextItems);
+      }
+    } catch (e) {
+      console.error(e);
+      const message = e instanceof Error ? e.message : "Не удалось повторить покупку.";
+      Alert.alert("Ошибка", message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function deleteItem(itemId: string) {
     if (!vehicleId) {
       return;
@@ -947,36 +998,57 @@ export default function VehicleWishlistScreen() {
                               <Text style={styles.rowPrice} numberOfLines={2}>
                                 {wishlistRowPriceCell(item)}
                               </Text>
-                              <Pressable
-                                disabled={isBusy}
-                                accessibilityRole="button"
-                                accessibilityLabel={`Сменить статус: ${getPartWishlistStatusLabelRu(item.status)}`}
-                                onPress={() =>
-                                  setWishlistStatusMenuItemId((prev) => (prev === item.id ? null : item.id))
-                                }
-                                style={({ pressed }) => {
-                                  const st = CART_STATUS_COLOR[item.status];
-                                  return [
-                                    styles.statusBtn,
-                                    styles.statusBtnUnderPrice,
-                                    {
-                                      borderColor: tintRgb(st, 0.28),
-                                      backgroundColor: tintRgb(st, 0.15),
-                                    },
-                                    pressed && !isBusy && styles.statusBtnPressed,
-                                  ];
-                                }}
-                              >
-                                <Text
-                                  style={[
-                                    styles.statusBtnText,
-                                    { color: CART_STATUS_COLOR[item.status] },
-                                  ]}
-                                  numberOfLines={1}
+                              <View style={styles.rowStatusRail}>
+                                <Pressable
+                                  disabled={isBusy}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Сменить статус: ${getPartWishlistStatusLabelRu(item.status)}`}
+                                  onPress={() =>
+                                    setWishlistStatusMenuItemId((prev) => (prev === item.id ? null : item.id))
+                                  }
+                                  style={({ pressed }) => {
+                                    const st = CART_STATUS_COLOR[item.status];
+                                    return [
+                                      styles.statusBtn,
+                                      styles.statusBtnUnderPrice,
+                                      styles.statusBtnFlex,
+                                      {
+                                        borderColor: tintRgb(st, 0.28),
+                                        backgroundColor: tintRgb(st, 0.15),
+                                      },
+                                      pressed && !isBusy && styles.statusBtnPressed,
+                                    ];
+                                  }}
                                 >
-                                  {getPartWishlistStatusLabelRu(item.status)}
-                                </Text>
-                              </Pressable>
+                                  <Text
+                                    style={[
+                                      styles.statusBtnText,
+                                      { color: CART_STATUS_COLOR[item.status] },
+                                    ]}
+                                    numberOfLines={1}
+                                  >
+                                    {getPartWishlistStatusLabelRu(item.status)}
+                                  </Text>
+                                </Pressable>
+                                {canRepeatWishlistPurchase(item) ? (
+                                  <Pressable
+                                    disabled={isBusy}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Повторить покупку"
+                                    onPress={() => setRepeatPurchaseConfirmItem(item)}
+                                    style={({ pressed }) => [
+                                      styles.repeatPurchaseRowIconBtn,
+                                      pressed && !isBusy && styles.statusBtnPressed,
+                                    ]}
+                                  >
+                                    <MaterialIcons
+                                      name="add-shopping-cart"
+                                      size={17}
+                                      color={PARTS_CART_REF.orange}
+                                    />
+                                  </Pressable>
+                                ) : null}
+                              </View>
                             </View>
                           </View>
                         </View>
@@ -1240,6 +1312,25 @@ export default function VehicleWishlistScreen() {
                       </Text>
                     </Pressable>
                   ) : null}
+                  {canRepeatWishlistPurchase(detailItem) ? (
+                    <Pressable
+                      disabled={busyId === detailItem.id}
+                      onPress={() => setRepeatPurchaseConfirmItem(detailItem)}
+                      style={({ pressed }) => [
+                        styles.detailActionBtn,
+                        {
+                          backgroundColor: tintRgb(PARTS_CART_REF.orange, 0.22),
+                          borderColor: tintRgb(PARTS_CART_REF.orange, 0.45),
+                        },
+                        pressed && styles.detailActionBtnPressed,
+                      ]}
+                    >
+                      <MaterialIcons name="add-shopping-cart" size={17} color={PARTS_CART_REF.orange} />
+                      <Text style={[styles.detailActionBtnText, { color: PARTS_CART_REF.orange }]}>
+                        Повторить покупку
+                      </Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable
                     disabled={busyId === detailItem.id}
                     onPress={() => confirmDelete(detailItem)}
@@ -1365,6 +1456,28 @@ export default function VehicleWishlistScreen() {
                       </Pressable>
                     );
                   })}
+                  {canRepeatWishlistPurchase(wishlistStatusMenuItem) ? (
+                    <Pressable
+                      disabled={busyId === wishlistStatusMenuItem.id}
+                      onPress={() => {
+                        const it = wishlistStatusMenuItem;
+                        closeWishlistStatusMenu();
+                        setRepeatPurchaseConfirmItem(it);
+                      }}
+                      style={({ pressed }) => [
+                        styles.wishlistStatusMenuRow,
+                        pressed && !(busyId === wishlistStatusMenuItem.id)
+                          ? styles.wishlistMenuRowPressed
+                          : null,
+                      ]}
+                    >
+                      <MaterialIcons name="add-shopping-cart" size={18} color={PARTS_CART_REF.orange} />
+                      <Text style={[styles.wishlistMenuRowText, styles.wishlistRepeatPurchaseMenuText]}>
+                        Повторить покупку
+                      </Text>
+                      <View style={styles.wishlistStatusMenuSpacer} />
+                    </Pressable>
+                  ) : null}
                   <Pressable
                     onPress={closeWishlistStatusMenu}
                     style={({ pressed }) => [
@@ -1377,6 +1490,98 @@ export default function VehicleWishlistScreen() {
                 </>
               ) : null}
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={repeatPurchaseConfirmItem !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (repeatPurchaseConfirmItem && busyId === repeatPurchaseConfirmItem.id) {
+            return;
+          }
+          setRepeatPurchaseConfirmItem(null);
+        }}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.modalScrimFill}
+            onPress={() => {
+              if (repeatPurchaseConfirmItem && busyId === repeatPurchaseConfirmItem.id) {
+                return;
+              }
+              setRepeatPurchaseConfirmItem(null);
+            }}
+            accessibilityLabel="Закрыть"
+          />
+          <View style={styles.modalCenter} pointerEvents="box-none">
+            {repeatPurchaseConfirmItem ? (
+              <View style={styles.repeatPurchaseModalCard}>
+                <View style={styles.repeatPurchaseModalTitleRow}>
+                  <MaterialIcons name="add-shopping-cart" size={22} color={PARTS_CART_REF.orange} />
+                  <Text style={styles.repeatPurchaseModalTitle}>Повторить покупку</Text>
+                </View>
+                <Text style={styles.repeatPurchaseModalLead}>
+                  Запчасть будет добавлена в корзину замен в раздел «Нужно купить».
+                </Text>
+                <View style={styles.repeatPurchaseModalSummary}>
+                  <Text style={styles.repeatPurchaseModalSummaryTitle}>
+                    {repeatPurchaseConfirmItem.title}
+                  </Text>
+                  <Text style={styles.repeatPurchaseModalSummaryMeta}>
+                    Узел:{" "}
+                    {wishlistNodePathForRow(
+                      nodeTree,
+                      repeatPurchaseConfirmItem.nodeId,
+                      repeatPurchaseConfirmItem.node?.name ?? null
+                    )}
+                  </Text>
+                  <Text style={styles.repeatPurchaseModalSummaryMeta}>
+                    {repeatPurchaseConfirmItem.sku
+                      ? getWishlistItemSkuDisplayLines(repeatPurchaseConfirmItem.sku).primaryLine ?? "—"
+                      : "Без артикула каталога"}
+                    {" · "}
+                    {repeatPurchaseConfirmItem.quantity} шт.
+                  </Text>
+                  {repeatPurchaseConfirmItem.costLabelRu ? (
+                    <Text style={styles.repeatPurchaseModalSummaryCost}>
+                      {repeatPurchaseConfirmItem.costLabelRu}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.repeatPurchaseModalSummaryMeta}>
+                    Статус сейчас: {repeatPurchaseConfirmItem.statusLabelRu}
+                  </Text>
+                </View>
+                <View style={styles.repeatPurchaseModalActions}>
+                  <Pressable
+                    disabled={busyId === repeatPurchaseConfirmItem.id}
+                    onPress={() => setRepeatPurchaseConfirmItem(null)}
+                    style={({ pressed }) => [
+                      styles.repeatPurchaseModalBtnSecondary,
+                      pressed && busyId !== repeatPurchaseConfirmItem.id && styles.detailActionBtnPressed,
+                    ]}
+                  >
+                    <Text style={styles.repeatPurchaseModalBtnSecondaryText}>Отмена</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={busyId === repeatPurchaseConfirmItem.id}
+                    onPress={() => void submitRepeatWishlistPurchase(repeatPurchaseConfirmItem)}
+                    style={({ pressed }) => [
+                      styles.repeatPurchaseModalBtnPrimary,
+                      pressed && busyId !== repeatPurchaseConfirmItem.id && styles.detailActionBtnPressed,
+                    ]}
+                  >
+                    {busyId === repeatPurchaseConfirmItem.id ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.repeatPurchaseModalBtnPrimaryText}>Добавить в корзину</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -1754,6 +1959,28 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     alignItems: "center",
   },
+  /** Статус + опционально «Повторить покупку» в одной строке под ценой. */
+  rowStatusRail: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 5,
+  },
+  statusBtnFlex: {
+    flex: 1,
+    minWidth: 0,
+  },
+  repeatPurchaseRowIconBtn: {
+    width: 34,
+    flexShrink: 0,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: tintRgb(PARTS_CART_REF.orange, 0.35),
+    backgroundColor: tintRgb(PARTS_CART_REF.orange, 0.12),
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 22,
+  },
   statusBtnPressed: { opacity: 0.88 },
   statusBtnText: { fontSize: 9, fontWeight: "800", lineHeight: 12 },
   wishlistMenuCard: {
@@ -1814,6 +2041,101 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: PARTS_CART_REF.textMuted,
+  },
+  wishlistRepeatPurchaseMenuText: {
+    color: PARTS_CART_REF.orange,
+    fontWeight: "700",
+  },
+  repeatPurchaseModalCard: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: PARTS_CART_REF.border,
+    backgroundColor: "#111923",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+  repeatPurchaseModalTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
+  repeatPurchaseModalTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "800",
+    color: PARTS_CART_REF.text,
+  },
+  repeatPurchaseModalLead: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: PARTS_CART_REF.text,
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  repeatPurchaseModalSummary: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: PARTS_CART_REF.border,
+    backgroundColor: "#0b1118",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  repeatPurchaseModalSummaryTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: PARTS_CART_REF.text,
+  },
+  repeatPurchaseModalSummaryMeta: {
+    marginTop: 8,
+    fontSize: 11,
+    fontWeight: "600",
+    color: PARTS_CART_REF.textMuted,
+    lineHeight: 15,
+  },
+  repeatPurchaseModalSummaryCost: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: "800",
+    color: CART_STATUS_COLOR.BOUGHT,
+  },
+  repeatPurchaseModalActions: {
+    marginTop: 18,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  repeatPurchaseModalBtnSecondary: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: PARTS_CART_REF.border,
+    backgroundColor: "transparent",
+    minWidth: 96,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  repeatPurchaseModalBtnSecondaryText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: PARTS_CART_REF.text,
+  },
+  repeatPurchaseModalBtnPrimary: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: PARTS_CART_REF.orange,
+    minWidth: 140,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  repeatPurchaseModalBtnPrimaryText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
   /** Как web `.showMore`. */
   showMoreButton: {
