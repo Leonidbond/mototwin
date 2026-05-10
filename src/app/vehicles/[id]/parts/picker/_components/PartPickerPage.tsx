@@ -147,7 +147,7 @@ export function PartPickerPage({
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [submitPreview, setSubmitPreview] = useState<PickerSubmitPreview | null>(null);
   const [quantityResolutionByDraftId, setQuantityResolutionByDraftId] = useState<
-    Record<string, "setTotal" | "increment" | undefined>
+    Record<string, "addAllFromDraft" | "setQtyToDraft" | undefined>
   >({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addingKitCode, setAddingKitCode] = useState<string | null>(null);

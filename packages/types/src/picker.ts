@@ -90,12 +90,16 @@ export type PickerSubmitPreview = {
   estimatedCurrency: string | null;
 };
 
-/** Разрешение количества при сабмите подбора (см. `quantityUpgrade` в превью). */
+/**
+ * Разрешение количества при сабмите подбора (см. `quantityUpgrade` в превью).
+ * - `addAllFromDraft` — прибавить к строке всё количество из черновика подбора (`existingQty + draftRequestedQty`).
+ * - `setQtyToDraft` — в строке стать ровно `draftRequestedQty` шт. (как «докупить недостающее» до цели из подбора).
+ */
 export type PickerQuantitySubmitResolution = {
   draftId: string;
   existingWishlistItemId: string;
   nodeId: string;
-  mode: "setTotal" | "increment";
+  mode: "addAllFromDraft" | "setQtyToDraft";
   draftRequestedQty: number;
   existingQty: number;
 };

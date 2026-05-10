@@ -10,8 +10,8 @@ export function PickerSubmitPreviewModal(props: {
   isSubmitting: boolean;
   onCancel: () => void;
   onConfirm: () => void;
-  quantityResolutionByDraftId: Record<string, "setTotal" | "increment" | undefined>;
-  onQuantityResolutionChange: (draftId: string, mode: "setTotal" | "increment") => void;
+  quantityResolutionByDraftId: Record<string, "addAllFromDraft" | "setQtyToDraft" | undefined>;
+  onQuantityResolutionChange: (draftId: string, mode: "addAllFromDraft" | "setQtyToDraft") => void;
 }) {
   const canConfirm =
     (props.preview.willAddCount > 0 || props.preview.quantityUpgradeCount > 0) &&
@@ -54,19 +54,18 @@ export function PickerSubmitPreviewModal(props: {
                   <div style={{ marginTop: 8 }}>
                     <p style={{ fontSize: 11, color: pickerColors.textMuted, margin: "0 0 6px" }}>
                       В списке уже {decision.existingQty} шт., в подборе — {decision.draftRequestedQty} шт.
-                      Донакопить {decision.addQty} шт.
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       <ChoiceChip
-                        label={`В списке будет ${decision.draftRequestedQty} шт.`}
-                        selected={props.quantityResolutionByDraftId[decision.draftId] === "setTotal"}
-                        onClick={() => props.onQuantityResolutionChange(decision.draftId, "setTotal")}
+                        label={`Добавить все ${decision.draftRequestedQty} шт. из подбора (всего ${decision.existingQty + decision.draftRequestedQty})`}
+                        selected={props.quantityResolutionByDraftId[decision.draftId] === "addAllFromDraft"}
+                        onClick={() => props.onQuantityResolutionChange(decision.draftId, "addAllFromDraft")}
                         disabled={props.isSubmitting}
                       />
                       <ChoiceChip
-                        label={`Докупить +${decision.addQty} к текущим`}
-                        selected={props.quantityResolutionByDraftId[decision.draftId] === "increment"}
-                        onClick={() => props.onQuantityResolutionChange(decision.draftId, "increment")}
+                        label={`Докупить +${decision.addQty} (в списке ${decision.draftRequestedQty} шт.)`}
+                        selected={props.quantityResolutionByDraftId[decision.draftId] === "setQtyToDraft"}
+                        onClick={() => props.onQuantityResolutionChange(decision.draftId, "setQtyToDraft")}
                         disabled={props.isSubmitting}
                       />
                     </div>

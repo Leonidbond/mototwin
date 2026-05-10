@@ -36,16 +36,15 @@ function buildKitLabel(item: PickerDraftItemKit): string {
  * - Kit → POST wishlist/kits
  */
 export type SubmitPickerDraftOptions = {
-  /** Для строк превью `quantityUpgrade`: как обновить количество в существующей строке wishlist. */
+  /** Для строк превью `quantityUpgrade`: `addAllFromDraft` | `setQtyToDraft` (см. `@mototwin/types`). */
   quantityResolutions?: PickerQuantitySubmitResolution[];
 };
 
 function nextWishlistQtyFromResolution(res: PickerQuantitySubmitResolution): number {
-  if (res.mode === "setTotal") {
-    return Math.max(1, Math.trunc(res.draftRequestedQty));
+  if (res.mode === "addAllFromDraft") {
+    return Math.max(1, Math.trunc(res.existingQty) + Math.trunc(res.draftRequestedQty));
   }
-  const delta = Math.max(0, Math.trunc(res.draftRequestedQty) - Math.trunc(res.existingQty));
-  return Math.max(1, Math.trunc(res.existingQty) + delta);
+  return Math.max(1, Math.trunc(res.draftRequestedQty));
 }
 
 export async function submitPickerDraft(

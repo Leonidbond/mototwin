@@ -337,7 +337,7 @@ export function buildPickerSubmitPreview(
 /** Все строки `quantityUpgrade` в превью имеют выбранный режим в `map`. */
 export function arePickerQuantityResolutionsComplete(
   preview: PickerSubmitPreview,
-  resolutionByDraftId: Record<string, "setTotal" | "increment" | undefined>
+  resolutionByDraftId: Record<string, "addAllFromDraft" | "setQtyToDraft" | undefined>
 ): boolean {
   for (const d of preview.decisions) {
     if (d.kind !== "quantityUpgrade") continue;

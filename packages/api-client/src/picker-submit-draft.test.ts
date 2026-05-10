@@ -256,7 +256,7 @@ describe("submitPickerDraft", () => {
     assert.deepEqual(result.updatedWishlistItemIds, []);
   });
 
-  it("PATCHes wishlist when quantity resolution is set (increment vs setTotal)", async () => {
+  it("PATCHes wishlist when quantity resolution is set (addAllFromDraft vs setQtyToDraft)", async () => {
     const now = new Date().toISOString();
     const draft: PickerDraftCart = {
       vehicleId: "v1",
@@ -309,34 +309,34 @@ describe("submitPickerDraft", () => {
         return { item: { id: itemId } };
       },
     };
-    const inc = await submitPickerDraft(api, draft, {
+    const addAll = await submitPickerDraft(api, draft, {
       quantityResolutions: [
         {
           draftId: "d1",
           existingWishlistItemId: "wl-7",
           nodeId: "node-1",
-          mode: "increment",
+          mode: "addAllFromDraft",
           draftRequestedQty: 3,
           existingQty: 1,
         },
       ],
     });
-    assert.deepEqual(patches[0]?.body, { nodeId: "node-1", quantity: 3 });
-    assert.deepEqual(inc.updatedWishlistItemIds, ["wl-7"]);
+    assert.deepEqual(patches[0]?.body, { nodeId: "node-1", quantity: 4 });
+    assert.deepEqual(addAll.updatedWishlistItemIds, ["wl-7"]);
     patches.length = 0;
-    const setTot = await submitPickerDraft(api, draft, {
+    const toDraft = await submitPickerDraft(api, draft, {
       quantityResolutions: [
         {
           draftId: "d1",
           existingWishlistItemId: "wl-8",
           nodeId: "node-1",
-          mode: "setTotal",
+          mode: "setQtyToDraft",
           draftRequestedQty: 3,
           existingQty: 1,
         },
       ],
     });
     assert.deepEqual(patches[0]?.body, { nodeId: "node-1", quantity: 3 });
-    assert.deepEqual(setTot.updatedWishlistItemIds, ["wl-8"]);
+    assert.deepEqual(toDraft.updatedWishlistItemIds, ["wl-8"]);
   });
 });

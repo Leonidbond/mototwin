@@ -213,7 +213,7 @@ export default function WishlistPickerScreen() {
   const [submitPreviewModalOpen, setSubmitPreviewModalOpen] = useState(false);
   const [submitPreview, setSubmitPreview] = useState<PickerSubmitPreview | null>(null);
   const [quantityResolutionByDraftId, setQuantityResolutionByDraftId] = useState<
-    Record<string, "setTotal" | "increment" | undefined>
+    Record<string, "addAllFromDraft" | "setQtyToDraft" | undefined>
   >({});
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
@@ -938,36 +938,37 @@ export default function WishlistPickerScreen() {
                                 onPress={() =>
                                   setQuantityResolutionByDraftId((prev) => ({
                                     ...prev,
-                                    [decision.draftId]: "setTotal",
+                                    [decision.draftId]: "addAllFromDraft",
                                   }))
                                 }
                                 style={({ pressed }) => [
                                   styles.submitChoiceChip,
-                                  quantityResolutionByDraftId[decision.draftId] === "setTotal" &&
+                                  quantityResolutionByDraftId[decision.draftId] === "addAllFromDraft" &&
                                     styles.submitChoiceChipSelected,
                                   pressed && { opacity: 0.88 },
                                 ]}
                               >
                                 <Text style={styles.submitChoiceChipText}>
-                                  В списке будет {decision.draftRequestedQty} шт.
+                                  Добавить все {decision.draftRequestedQty} шт. (всего{" "}
+                                  {decision.existingQty + decision.draftRequestedQty})
                                 </Text>
                               </Pressable>
                               <Pressable
                                 onPress={() =>
                                   setQuantityResolutionByDraftId((prev) => ({
                                     ...prev,
-                                    [decision.draftId]: "increment",
+                                    [decision.draftId]: "setQtyToDraft",
                                   }))
                                 }
                                 style={({ pressed }) => [
                                   styles.submitChoiceChip,
-                                  quantityResolutionByDraftId[decision.draftId] === "increment" &&
+                                  quantityResolutionByDraftId[decision.draftId] === "setQtyToDraft" &&
                                     styles.submitChoiceChipSelected,
                                   pressed && { opacity: 0.88 },
                                 ]}
                               >
                                 <Text style={styles.submitChoiceChipText}>
-                                  Докупить +{decision.addQty}
+                                  Докупить +{decision.addQty} (в списке {decision.draftRequestedQty} шт.)
                                 </Text>
                               </Pressable>
                             </View>

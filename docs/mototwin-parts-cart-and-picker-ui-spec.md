@@ -1138,7 +1138,7 @@ Success toast:
 Активная «конкурирующая» строка — та же **`vehicleId` + leaf `nodeId` + `skuId`**, статус не **`INSTALLED`**.
 
 - Если в черновике подбора **не больше** штук, чем уже в активной строке → в превью **`duplicate`** (ничего не добавляем и не PATCH-им).
-- Если в черновике **больше** штук, чем в существующей активной строке → **`quantityUpgrade`**: пользователь выбирает способ обновления количества; сабмит делает **`PATCH .../wishlist/[itemId]`** с новым **`quantity`** (см. `buildPickerSubmitPreview`, `submitPickerDraft` с `quantityResolutions`, `updatedWishlistItemIds` в `@mototwin/types`).
+- Если в черновике **больше** штук, чем в существующей активной строке → **`quantityUpgrade`**: либо **`addAllFromDraft`** (`quantity = existing + draft`, весь подбор суммируется с тем, что уже в строке), либо **`setQtyToDraft`** (`quantity = draft`, в строке ровно столько, сколько указано в подборе — «докупить» недостающее). Сабмит: **`PATCH .../wishlist/[itemId]`** (см. `buildPickerSubmitPreview`, `submitPickerDraft` с `quantityResolutions`).
 - Полностью новая позиция (нет совпадения) → **`willAdd`** и **`POST .../wishlist`** как раньше.
 
 ---
