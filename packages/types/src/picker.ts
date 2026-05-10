@@ -63,7 +63,7 @@ export type PickerSubmitDecision =
   | { kind: "duplicate"; draftId: string; label: string; reason: string }
   | { kind: "blocked"; draftId: string; label: string; reason: string }
   | {
-      /** В списке уже есть эта позиция, но количества не хватает — пользователь выбирает, как обновить строку. */
+      /** В списке уже есть эта позиция (тот же узел + SKU) — пользователь выбирает, как обновить количество. */
       kind: "quantityUpgrade";
       draftId: string;
       label: string;
@@ -71,8 +71,10 @@ export type PickerSubmitDecision =
       nodeId: string;
       draftRequestedQty: number;
       existingQty: number;
-      /** Сколько штук не хватает до запрошенного количества (`draftRequestedQty - existingQty`). */
+      /** max(0, draft − existing) — сколько не хватает до «ровно draft» (подпись второго режима). */
       addQty: number;
+      /** max(0, existing − draft) — «запас» в списке над подбором (для подписей; сервер при setQty не уменьшает). */
+      reduceByQty: number;
     };
 
 export type PickerSubmitPreview = {
@@ -80,9 +82,9 @@ export type PickerSubmitPreview = {
   willAddCount: number;
   /** Сумма штук по всем строкам, которые реально добавятся (`willAdd`). */
   willAddTotalPieces: number;
-  /** Строки SKU, где позиция уже в списке, но в подборе запрошено больше штук. */
+  /** Строки SKU, где позиция уже в списке (тот же узел + SKU) — нужен выбор, как обновить количество. */
   quantityUpgradeCount: number;
-  /** Сумма «донакопленных» штук по `quantityUpgrade` (для итога «сколько шт. станет в списке»). */
+  /** Сумма штук из подбора по строкам `quantityUpgrade` (кол-во в черновике по каждой такой строке). */
   quantityUpgradeExtraPieces: number;
   duplicateCount: number;
   blockedCount: number;
@@ -93,7 +95,7 @@ export type PickerSubmitPreview = {
 /**
  * Разрешение количества при сабмите подбора (см. `quantityUpgrade` в превью).
  * - `addAllFromDraft` — прибавить к строке всё количество из черновика подбора (`existingQty + draftRequestedQty`).
- * - `setQtyToDraft` — в строке стать ровно `draftRequestedQty` шт. (как «докупить недостающее» до цели из подбора).
+ * - `setQtyToDraft` — довести количество в строке **до** `draftRequestedQty` шт., но **не уменьшать**: если в списке уже ≥ подбора, строка не меняется (ничего не добавляется).
  */
 export type PickerQuantitySubmitResolution = {
   draftId: string;
@@ -113,4 +115,8 @@ export type PickerSubmitResult = {
   createdWishlistItemIds: string[];
   /** Строки, у которых обновили только количество (без нового POST). */
   updatedWishlistItemIds: string[];
+  /**
+   * Сколько раз режим `setQtyToDraft` завершился без PATCH: в списке уже было не меньше, чем в подборе.
+   */
+  noOpQuantityUpdates?: number;
 };

@@ -338,5 +338,21 @@ describe("submitPickerDraft", () => {
     });
     assert.deepEqual(patches[0]?.body, { nodeId: "node-1", quantity: 3 });
     assert.deepEqual(toDraft.updatedWishlistItemIds, ["wl-8"]);
+    patches.length = 0;
+    const noDecrease = await submitPickerDraft(api, draft, {
+      quantityResolutions: [
+        {
+          draftId: "d1",
+          existingWishlistItemId: "wl-9",
+          nodeId: "node-1",
+          mode: "setQtyToDraft",
+          draftRequestedQty: 3,
+          existingQty: 5,
+        },
+      ],
+    });
+    assert.deepEqual(patches, []);
+    assert.deepEqual(noDecrease.updatedWishlistItemIds, []);
+    assert.equal(noDecrease.noOpQuantityUpdates, 1);
   });
 });

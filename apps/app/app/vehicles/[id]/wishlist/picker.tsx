@@ -40,6 +40,8 @@ import {
   updateSkuDraftItemQuantity,
   vehicleDetailFromApiRecord,
   arePickerQuantityResolutionsComplete,
+  computePickerSubmitPriceEstimate,
+  computePickerSubmitWishlistPieceDelta,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -49,6 +51,7 @@ import type {
   PartWishlistItem,
   PickerDraftCart,
   PickerQuantitySubmitResolution,
+  PickerSubmitDecision,
   PickerSubmitPreview,
   PickerSubmitResult,
   ServiceKitViewModel,
@@ -110,7 +113,8 @@ function submitHasAnySuccess(result: PickerSubmitResult): boolean {
     result.createdWishlistItemIds.length > 0 ||
     result.updatedWishlistItemIds.length > 0 ||
     result.createdSkuIds.length > 0 ||
-    result.createdKitCodes.length > 0
+    result.createdKitCodes.length > 0 ||
+    (result.noOpQuantityUpdates ?? 0) > 0
   );
 }
 
@@ -125,6 +129,10 @@ function formatSubmitResultMessage(result: PickerSubmitResult): string {
       bits.push(`обновлено ${result.updatedWishlistItemIds.length}`);
     }
     lines.push(`В списке покупок: ${bits.join(", ")}.`);
+  } else if ((result.noOpQuantityUpdates ?? 0) > 0) {
+    lines.push(
+      `Количество в списке не менялось (${result.noOpQuantityUpdates}): в подборе не больше, чем уже в строке.`
+    );
   } else if (result.createdSkuIds.length > 0 || result.createdKitCodes.length > 0) {
     lines.push(`SKU: ${result.createdSkuIds.length}, комплекты: ${result.createdKitCodes.length}.`);
   }
@@ -643,6 +651,16 @@ export default function WishlistPickerScreen() {
     (submitPreview.quantityUpgradeCount === 0 ||
       arePickerQuantityResolutionsComplete(submitPreview, quantityResolutionByDraftId));
 
+  const submitPieceDelta = useMemo(() => {
+    if (!submitPreview) return null;
+    return computePickerSubmitWishlistPieceDelta(submitPreview, quantityResolutionByDraftId);
+  }, [submitPreview, quantityResolutionByDraftId]);
+
+  const submitPriceEst = useMemo(() => {
+    if (!submitPreview) return null;
+    return computePickerSubmitPriceEstimate(draft, submitPreview, quantityResolutionByDraftId);
+  }, [draft, submitPreview, quantityResolutionByDraftId]);
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <PickerHeader onBack={() => router.replace(`/vehicles/${vehicleId}/wishlist`)} />
@@ -930,8 +948,15 @@ export default function WishlistPickerScreen() {
                         {decision.kind === "quantityUpgrade" ? (
                           <View style={{ marginTop: 8, gap: 8 }}>
                             <Text style={styles.submitDecisionMeta}>
-                              В списке {decision.existingQty} шт., в подборе {decision.draftRequestedQty} шт.
-                              Не хватает {decision.addQty} шт.
+                              Совпадает со строкой в списке: сейчас{" "}
+                              <Text style={{ fontWeight: "800", color: c.textPrimary }}>
+                                {decision.existingQty}
+                              </Text>{" "}
+                              шт., в подборе —{" "}
+                              <Text style={{ fontWeight: "800", color: c.textPrimary }}>
+                                {decision.draftRequestedQty}
+                              </Text>{" "}
+                              шт. Выберите вариант — ниже появится итог.
                             </Text>
                             <View style={styles.submitChoiceRow}>
                               <Pressable
@@ -949,8 +974,7 @@ export default function WishlistPickerScreen() {
                                 ]}
                               >
                                 <Text style={styles.submitChoiceChipText}>
-                                  Добавить все {decision.draftRequestedQty} шт. (всего{" "}
-                                  {decision.existingQty + decision.draftRequestedQty})
+                                  Прибавить {decision.draftRequestedQty} шт. из подбора к строке
                                 </Text>
                               </Pressable>
                               <Pressable
@@ -968,10 +992,20 @@ export default function WishlistPickerScreen() {
                                 ]}
                               >
                                 <Text style={styles.submitChoiceChipText}>
-                                  Докупить +{decision.addQty} (в списке {decision.draftRequestedQty} шт.)
+                                  {pickerSetQtyChipLabel(decision)}
                                 </Text>
                               </Pressable>
                             </View>
+                            {quantityResolutionByDraftId[decision.draftId] ? (
+                              <View style={styles.submitOutcomeBox}>
+                                <Text style={styles.submitOutcomeText}>
+                                  {pickerQuantityUpgradeOutcomeLine(
+                                    decision,
+                                    quantityResolutionByDraftId[decision.draftId]!
+                                  )}
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
                         ) : null}
                         {decision.kind === "duplicate" || decision.kind === "blocked" ? (
@@ -981,11 +1015,29 @@ export default function WishlistPickerScreen() {
                     </View>
                   ))}
                 </ScrollView>
-                <Text style={styles.submitFooterHint}>
-                  Всего изменений:{" "}
-                  {submitPreview.willAddCount + submitPreview.quantityUpgradeCount} поз.,{" "}
-                  {submitPreview.willAddTotalPieces + submitPreview.quantityUpgradeExtraPieces} шт.
-                </Text>
+                {submitPreview.quantityUpgradeCount > 0 && submitPieceDelta === null ? (
+                  <Text style={styles.submitFooterHint}>
+                    Суммарное изменение количества: укажите варианты для строк со совпадением — затем здесь
+                    отобразится итог.
+                  </Text>
+                ) : submitPieceDelta !== null ? (
+                  <Text style={styles.submitFooterHint}>
+                    Суммарное изменение количества в списке покупок:{" "}
+                    <Text style={{ fontWeight: "800", color: c.textPrimary }}>
+                      {submitPieceDelta >= 0 ? "+" : "−"}
+                      {Math.abs(submitPieceDelta)}
+                    </Text>{" "}
+                    шт. (с учётом выбора).
+                    {submitPriceEst != null && Number.isFinite(submitPriceEst.amount)
+                      ? `\nОриентир по сумме: ≈ ${formatPickerSubmitPriceRu(
+                          submitPriceEst.amount,
+                          submitPriceEst.currency
+                        )}`
+                      : submitPreview.quantityUpgradeCount > 0 && submitPriceEst == null
+                        ? "\nОриентир по сумме — после выбора всех вариантов или при одной валюте по позициям."
+                        : ""}
+                  </Text>
+                ) : null}
               </>
             ) : null}
             <View style={styles.submitModalActions}>
@@ -1038,6 +1090,37 @@ export default function WishlistPickerScreen() {
       />
     </SafeAreaView>
   );
+}
+
+function pickerQuantityUpgradeOutcomeLine(
+  d: Extract<PickerSubmitDecision, { kind: "quantityUpgrade" }>,
+  mode: "addAllFromDraft" | "setQtyToDraft"
+): string {
+  if (mode === "addAllFromDraft") {
+    return `К этой строке прибавится +${d.draftRequestedQty} шт. из подбора. В списке станет ${d.existingQty + d.draftRequestedQty} шт.`;
+  }
+  const dlt = d.draftRequestedQty - d.existingQty;
+  if (dlt > 0) {
+    return `К строке прибавится +${dlt} шт. В списке станет ${d.draftRequestedQty} шт.`;
+  }
+  return "Строка в списке не изменится: в подборе не больше, чем уже есть — ничего не добавим.";
+}
+
+function pickerSetQtyChipLabel(d: Extract<PickerSubmitDecision, { kind: "quantityUpgrade" }>): string {
+  if (d.addQty > 0) {
+    return `В списке ровно ${d.draftRequestedQty} шт. (+${d.addQty})`;
+  }
+  return "Не добавлять (в списке уже не меньше подбора)";
+}
+
+function formatPickerSubmitPriceRu(amount: number, currency: string | null): string {
+  const numFmt = new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+  const cur = currency?.trim().toUpperCase();
+  const sym = cur === "RUB" ? "₽" : cur === "USD" ? "$" : cur === "EUR" ? "€" : cur || "";
+  return sym ? `${numFmt} ${sym}` : numFmt;
 }
 
 function PickerHeader(props: { onBack: () => void }) {
@@ -1342,6 +1425,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,122,0,0.12)",
   },
   submitChoiceChipText: { fontSize: 12, fontWeight: "700", color: c.textPrimary },
+  submitOutcomeBox: {
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: c.cardMuted,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  submitOutcomeText: { fontSize: 12, fontWeight: "600", color: c.textPrimary },
   submitFooterHint: {
     fontSize: 12,
     fontWeight: "600",

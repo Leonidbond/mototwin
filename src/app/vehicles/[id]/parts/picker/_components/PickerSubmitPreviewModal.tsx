@@ -1,11 +1,37 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import type { PickerSubmitPreview } from "@mototwin/types";
-import { arePickerQuantityResolutionsComplete } from "@mototwin/domain";
+import { useMemo, type CSSProperties } from "react";
+import type { PickerDraftCart, PickerSubmitDecision, PickerSubmitPreview } from "@mototwin/types";
+import {
+  arePickerQuantityResolutionsComplete,
+  computePickerSubmitPriceEstimate,
+  computePickerSubmitWishlistPieceDelta,
+} from "@mototwin/domain";
 import { pickerColors } from "./picker-styles";
 
+function quantityUpgradeOutcomeLine(
+  d: Extract<PickerSubmitDecision, { kind: "quantityUpgrade" }>,
+  mode: "addAllFromDraft" | "setQtyToDraft"
+): string {
+  if (mode === "addAllFromDraft") {
+    return `К этой строке прибавится +${d.draftRequestedQty} шт. из подбора. В списке станет ${d.existingQty + d.draftRequestedQty} шт.`;
+  }
+  const dlt = d.draftRequestedQty - d.existingQty;
+  if (dlt > 0) {
+    return `К строке прибавится +${dlt} шт. В списке станет ${d.draftRequestedQty} шт.`;
+  }
+  return "Строка в списке не изменится: в подборе не больше, чем уже есть — ничего не добавим.";
+}
+
+function setQtyChipLabel(d: Extract<PickerSubmitDecision, { kind: "quantityUpgrade" }>): string {
+  if (d.addQty > 0) {
+    return `В списке ровно ${d.draftRequestedQty} шт. (+${d.addQty})`;
+  }
+  return "Не добавлять (в списке уже не меньше подбора)";
+}
+
 export function PickerSubmitPreviewModal(props: {
+  draft: PickerDraftCart;
   preview: PickerSubmitPreview;
   isSubmitting: boolean;
   onCancel: () => void;
@@ -18,8 +44,15 @@ export function PickerSubmitPreviewModal(props: {
     (props.preview.quantityUpgradeCount === 0 ||
       arePickerQuantityResolutionsComplete(props.preview, props.quantityResolutionByDraftId));
 
-  const totalPiecesShown =
-    props.preview.willAddTotalPieces + props.preview.quantityUpgradeExtraPieces;
+  const pieceDelta = useMemo(
+    () => computePickerSubmitWishlistPieceDelta(props.preview, props.quantityResolutionByDraftId),
+    [props.preview, props.quantityResolutionByDraftId]
+  );
+
+  const priceEst = useMemo(
+    () => computePickerSubmitPriceEstimate(props.draft, props.preview, props.quantityResolutionByDraftId),
+    [props.draft, props.preview, props.quantityResolutionByDraftId]
+  );
 
   return (
     <div style={overlayStyle} role="dialog" aria-modal="true" aria-labelledby="submit-preview-title">
@@ -52,23 +85,42 @@ export function PickerSubmitPreviewModal(props: {
                 ) : null}
                 {decision.kind === "quantityUpgrade" ? (
                   <div style={{ marginTop: 8 }}>
-                    <p style={{ fontSize: 11, color: pickerColors.textMuted, margin: "0 0 6px" }}>
-                      В списке уже {decision.existingQty} шт., в подборе — {decision.draftRequestedQty} шт.
+                    <p style={{ fontSize: 11, color: pickerColors.textMuted, margin: "0 0 8px" }}>
+                      Совпадает со строкой в списке: сейчас <strong>{decision.existingQty}</strong> шт., в подборе —{" "}
+                      <strong>{decision.draftRequestedQty}</strong> шт. Выберите вариант — ниже появится итог.
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       <ChoiceChip
-                        label={`Добавить все ${decision.draftRequestedQty} шт. из подбора (всего ${decision.existingQty + decision.draftRequestedQty})`}
+                        label={`Прибавить ${decision.draftRequestedQty} шт. из подбора к строке`}
                         selected={props.quantityResolutionByDraftId[decision.draftId] === "addAllFromDraft"}
                         onClick={() => props.onQuantityResolutionChange(decision.draftId, "addAllFromDraft")}
                         disabled={props.isSubmitting}
                       />
                       <ChoiceChip
-                        label={`Докупить +${decision.addQty} (в списке ${decision.draftRequestedQty} шт.)`}
+                        label={setQtyChipLabel(decision)}
                         selected={props.quantityResolutionByDraftId[decision.draftId] === "setQtyToDraft"}
                         onClick={() => props.onQuantityResolutionChange(decision.draftId, "setQtyToDraft")}
                         disabled={props.isSubmitting}
                       />
                     </div>
+                    {props.quantityResolutionByDraftId[decision.draftId] ? (
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: pickerColors.text,
+                          margin: "10px 0 0",
+                          padding: "8px 10px",
+                          borderRadius: 10,
+                          backgroundColor: pickerColors.surfaceMuted,
+                          border: `1px solid ${pickerColors.border}`,
+                        }}
+                      >
+                        {quantityUpgradeOutcomeLine(
+                          decision,
+                          props.quantityResolutionByDraftId[decision.draftId]!
+                        )}
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
                 {decision.kind === "duplicate" || decision.kind === "blocked" ? (
@@ -81,19 +133,30 @@ export function PickerSubmitPreviewModal(props: {
           ))}
         </ul>
 
-        {props.preview.estimatedTotal != null ? (
+        {props.preview.quantityUpgradeCount > 0 && pieceDelta === null ? (
           <div style={totalStyle}>
-            Итого к изменению: {props.preview.willAddCount + props.preview.quantityUpgradeCount}{" "}
-            {positionsLabel(props.preview.willAddCount + props.preview.quantityUpgradeCount)} в количестве{" "}
-            {totalPiecesShown} шт., ≈ {formatPriceRu(props.preview.estimatedTotal, props.preview.estimatedCurrency)}
+            Суммарное изменение количества в списке: укажите варианты для строк со совпадением — затем здесь
+            отобразится итог.
           </div>
-        ) : (
+        ) : pieceDelta !== null ? (
           <div style={totalStyle}>
-            Итого к изменению: {props.preview.willAddCount + props.preview.quantityUpgradeCount}{" "}
-            {positionsLabel(props.preview.willAddCount + props.preview.quantityUpgradeCount)} в количестве{" "}
-            {totalPiecesShown} шт.
+            Суммарное изменение количества в списке покупок:{" "}
+            <strong>
+              {pieceDelta >= 0 ? "+" : "−"}
+              {Math.abs(pieceDelta)}
+            </strong>{" "}
+            шт. (с учётом выбора).
+            {priceEst != null && Number.isFinite(priceEst.amount) ? (
+              <span style={{ display: "block", marginTop: 6 }}>
+                Ориентир по сумме: ≈ {formatPriceRu(priceEst.amount, priceEst.currency)}
+              </span>
+            ) : props.preview.quantityUpgradeCount > 0 && priceEst == null ? (
+              <span style={{ display: "block", marginTop: 6, fontWeight: 500 }}>
+                Ориентир по сумме — после выбора всех вариантов или при одной валюте по позициям.
+              </span>
+            ) : null}
           </div>
-        )}
+        ) : null}
 
         <div style={actionsStyle}>
           <button
@@ -186,12 +249,6 @@ function DecisionDot({
       aria-hidden
     />
   );
-}
-
-function positionsLabel(n: number): string {
-  if (n === 1) return "позиция";
-  if (n >= 2 && n <= 4) return "позиции";
-  return "позиций";
 }
 
 function formatPriceRu(amount: number, currency: string | null): string {

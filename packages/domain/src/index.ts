@@ -365,6 +365,8 @@ export {
   getDraftTotals,
   buildPickerSubmitPreview,
   arePickerQuantityResolutionsComplete,
+  computePickerSubmitWishlistPieceDelta,
+  computePickerSubmitPriceEstimate,
   type AddSkuToDraftInput,
   type AddKitToDraftInput,
   type BuildPickerSubmitPreviewInput,

@@ -946,6 +946,7 @@ export function PartPickerPage({
 
           {submitPreview ? (
             <PickerSubmitPreviewModal
+              draft={draft}
               preview={submitPreview}
               isSubmitting={isSubmitting}
               quantityResolutionByDraftId={quantityResolutionByDraftId}

@@ -927,19 +927,17 @@ Reasons формируются `buildWhyMatchesReasons(input)` (см. разде
 
 ## 15. Submit preview & flow
 
-### `PickerSubmitPreviewModal` (web) / `PickerSubmitSheet` (mobile)
+### `PickerSubmitPreviewModal` (web) / встроенная модалка в `wishlist/picker.tsx` (Expo)
 
 Открывается по `«Перейти к оформлению»` если draft не пустой.
 
-Содержимое:
+Содержимое (актуальный MVP):
 
 - title: `«Подтвердите состав»`;
-- список draft items, разбитых на:
-  - `«Будет добавлено»` (зелёная иконка);
-  - `«Уже в активном wishlist»` (синяя иконка, будет пропущено);
-  - `«Невозможно добавить»` (красная иконка, с причиной — `«Узел не выбран»` / `«SKU неактивен»`);
-- сводка: `«Будет добавлено: N позиций, ~{total} ₽»`;
-- кнопки: `«Назад»`, primary `«Подтвердить»`.
+- сетка сводки: **Новые позиции** / **Обновить кол-во** / **Уже достаточно** / **Не получится** (счётчики из `PickerSubmitPreview`);
+- список решений по строкам (`PickerSubmitDecision`): **`willAdd`**, **`quantityUpgrade`**, **`duplicate`**, **`blocked`** с причинами;
+- для **`quantityUpgrade`**: два чипа — **`addAllFromDraft`** (прибавить весь объём подбора к строке) и **`setQtyToDraft`** (см. §19: **не уменьшает** количество в списке); после выбора чипа показывается **итог по этой строке**; внизу модалки — **суммарное изменение штук** и ориентир по сумме с учётом выбора (`computePickerSubmitWishlistPieceDelta`, `computePickerSubmitPriceEstimate`);
+- кнопки: `«Назад»`, primary `«Подтвердить»` (disabled, пока для всех `quantityUpgrade` не выбран режим).
 
 При submit:
 
@@ -1068,6 +1066,8 @@ type PickerSubmitResult = {
   warnings: string[];
   createdWishlistItemIds: string[];
   updatedWishlistItemIds: string[];
+  /** Сколько раз setQtyToDraft завершился без PATCH (в списке уже ≥ подбора). */
+  noOpQuantityUpdates?: number;
 };
 ```
 
@@ -1080,6 +1080,10 @@ type PickerSubmitResult = {
 | `formatRideStyleChipRu(profile)` | Формирует строку `«Mixed / Touring»` из `RideProfile` (или `«Стиль езды: не задан»`). |
 | `buildWhyMatchesReasons(input)` | Возвращает 3–4 фразы для `WhyMatchesPanel` по контексту мото и draft. |
 | `addSkuToDraft / addKitToDraft / removeFromDraft / clearDraft / getDraftTotals` | Чистые операции над `PickerDraftCart` (модуль `picker-draft-cart`). |
+| `buildPickerSubmitPreview` | Превью сабмита: `willAdd` / `quantityUpgrade` / `blocked` (и пр.) по draft vs активному wishlist. |
+| `arePickerQuantityResolutionsComplete` | Все строки `quantityUpgrade` имеют выбранный режим в map. |
+| `computePickerSubmitWishlistPieceDelta` | Суммарная дельта штук в wishlist после сабмита с учётом выбранных режимов. |
+| `computePickerSubmitPriceEstimate` | Ориентир по сумме каталога для превью (одна валюта). |
 
 ---
 
@@ -1133,13 +1137,15 @@ Success toast:
 
 ---
 
-## 19. Duplicate logic (и частичное совпадение по количеству)
+## 19. Совпадение узел + SKU (quantity upgrade, без уменьшения списка)
 
-Активная «конкурирующая» строка — та же **`vehicleId` + leaf `nodeId` + `skuId`**, статус не **`INSTALLED`**.
+Активная «конкурирующая» строка — та же **`vehicleId` + leaf `nodeId` + `skuId`**, статус не **`INSTALLED`** (см. `buildPickerSubmitPreview` / `findActiveSkuWishlistMatch` в `@mototwin/domain`).
 
-- Если в черновике подбора **не больше** штук, чем уже в активной строке → в превью **`duplicate`** (ничего не добавляем и не PATCH-им).
-- Если в черновике **больше** штук, чем в существующей активной строке → **`quantityUpgrade`**: либо **`addAllFromDraft`** (`quantity = existing + draft`, весь подбор суммируется с тем, что уже в строке), либо **`setQtyToDraft`** (`quantity = draft`, в строке ровно столько, сколько указано в подборе — «докупить» недостающее). Сабмит: **`PATCH .../wishlist/[itemId]`** (см. `buildPickerSubmitPreview`, `submitPickerDraft` с `quantityResolutions`).
+- При совпадении по **узлу + SKU** превью всегда даёт **`quantityUpgrade`** (в т.ч. если в списке **уже не меньше** штук, чем в подборе — пользователь может **прибавить** подбор к строке).
+- **`addAllFromDraft`**: после `PATCH` **`quantity = existingQty + draftRequestedQty`** (весь объём из подбора добавляется к текущей строке).
+- **`setQtyToDraft`**: целевое **`quantity = max(existingQty, draftRequestedQty)`** — **нельзя уменьшить** количество в списке относительно текущего; если в подборе **меньше или столько же**, чем в строке, **`PATCH` не выполняется**, в результате сабмита увеличивается **`noOpQuantityUpdates`**. Дельта штук и оценка суммы для превью: только **`max(0, draft − existing)`** для этого режима.
 - Полностью новая позиция (нет совпадения) → **`willAdd`** и **`POST .../wishlist`** как раньше.
+- Тип **`duplicate`** в превью зарезервирован под прочие сценарии; для SKU-совпадения по количеству основной путь — **`quantityUpgrade`**.
 
 ---
 
@@ -1196,7 +1202,7 @@ All POST/PATCH input must be validated with Zod.
 2. **Web каркас**: новый маршрут `/vehicles/[id]/parts/picker` с `PartPickerPage`, заглушки секций.
 3. **Web данные**: подключить `getRecommendedSkusForNode`, `getServiceKits`, `getPartSkus`.
 4. **Web draft cart**: реализовать `PickerDraftCartPanel`, `DraftCartItemRow`, кнопки `+` и `Добавить комплект`.
-5. **Web submit flow**: `submitPickerDraft` в `@mototwin/api-client` (`picker-submit-draft.ts`) + `PickerSubmitPreviewModal` (в т.ч. **`quantityUpgrade`** и выбор режима перед **`updateWishlistItem`**), batch POST/PATCH, redirect с подсветкой по **`createdWishlistItemIds` + `updatedWishlistItemIds`**.
+5. **Web submit flow**: `submitPickerDraft` в `@mototwin/api-client` (`picker-submit-draft.ts`) + `PickerSubmitPreviewModal` (в т.ч. **`quantityUpgrade`**, динамический итог, выбор режима; **`PATCH`** только при реальном изменении количества; **`noOpQuantityUpdates`** при `setQtyToDraft` без изменений), batch POST/PATCH, redirect с подсветкой по **`createdWishlistItemIds` + `updatedWishlistItemIds`**.
 6. **Web cleanup**: пункт сайдбара `«Подбор деталей»` и общий `GarageSidebar` обновлены (см. `garage-dashboard-mvp.md`); дальше: переключить оставшиеся точки входа при необходимости, выделить `WishlistItemEditModal` (для edit-only), удалить `PartPickerShell`.
 7. **Web polish**: skeletons, empty/error состояния, `?focus=kits`, стили под референс.
 8. **Mobile (Expo) экран**: `wishlist/picker.tsx` с тем же flow, `MobileDraftCartBar`, submit sheet.

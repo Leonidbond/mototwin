@@ -260,17 +260,8 @@ export function buildPickerSubmitPreview(
       if (matched) {
         const draftQty = pieceCountForDraftSku(item);
         const existingQty = Math.max(1, Math.trunc(Number(matched.quantity) || 1));
-        if (draftQty <= existingQty) {
-          decisions.push({
-            kind: "duplicate",
-            draftId: item.draftId,
-            label,
-            reason: `В списке уже ${existingQty} шт. — не меньше, чем в подборе (${draftQty}).`,
-          });
-          duplicateCount += 1;
-          continue;
-        }
-        const addQty = draftQty - existingQty;
+        const addQty = Math.max(0, draftQty - existingQty);
+        const reduceByQty = Math.max(0, existingQty - draftQty);
         if (!matched.id) {
           decisions.push({
             kind: "blocked",
@@ -290,12 +281,13 @@ export function buildPickerSubmitPreview(
           draftRequestedQty: draftQty,
           existingQty,
           addQty,
+          reduceByQty,
         });
         quantityUpgradeCount += 1;
-        quantityUpgradeExtraPieces += addQty;
+        quantityUpgradeExtraPieces += draftQty;
         const price = item.sku.priceAmount;
         if (price != null && Number.isFinite(price)) {
-          estimatedTotal += price * addQty;
+          estimatedTotal += price * draftQty;
         }
         const c = item.sku.currency?.trim();
         if (c) currencies.add(c);
@@ -344,4 +336,77 @@ export function arePickerQuantityResolutionsComplete(
     if (!resolutionByDraftId[d.draftId]) return false;
   }
   return true;
+}
+
+/**
+ * Суммарное изменение количества в wishlist после сабмита (новые строки + дельты по совпадениям).
+ * `null`, если есть `quantityUpgrade`, но не для всех выбран режим.
+ */
+export function computePickerSubmitWishlistPieceDelta(
+  preview: PickerSubmitPreview,
+  resolutionByDraftId: Record<string, "addAllFromDraft" | "setQtyToDraft" | undefined>
+): number | null {
+  let delta = preview.willAddTotalPieces;
+  if (preview.quantityUpgradeCount === 0) {
+    return delta;
+  }
+  for (const d of preview.decisions) {
+    if (d.kind !== "quantityUpgrade") continue;
+    const mode = resolutionByDraftId[d.draftId];
+    if (!mode) return null;
+    if (mode === "addAllFromDraft") {
+      delta += d.draftRequestedQty;
+    } else {
+      delta += Math.max(0, d.draftRequestedQty - d.existingQty);
+    }
+  }
+  return delta;
+}
+
+/**
+ * Оценка суммы по каталогу с учётом выбранных режимов для `quantityUpgrade`.
+ * `null`, если режимы не выбраны полностью или валюты разнородные.
+ */
+export function computePickerSubmitPriceEstimate(
+  draft: PickerDraftCart,
+  preview: PickerSubmitPreview,
+  resolutionByDraftId: Record<string, "addAllFromDraft" | "setQtyToDraft" | undefined>
+): { amount: number; currency: string | null } | null {
+  if (preview.quantityUpgradeCount > 0 && !arePickerQuantityResolutionsComplete(preview, resolutionByDraftId)) {
+    return null;
+  }
+  let total = 0;
+  const currencies = new Set<string>();
+  for (const item of draft.items) {
+    const dec = preview.decisions.find((x) => x.draftId === item.draftId);
+    if (!dec) continue;
+    if (item.kind === "sku") {
+      if (dec.kind === "willAdd") {
+        total += getSkuLineAmount(item);
+        const c = item.sku.currency?.trim();
+        if (c) currencies.add(c);
+      } else if (dec.kind === "quantityUpgrade") {
+        const mode = resolutionByDraftId[item.draftId]!;
+        const price = item.sku.priceAmount;
+        if (price != null && Number.isFinite(price)) {
+          if (mode === "addAllFromDraft") {
+            total += price * dec.draftRequestedQty;
+          } else {
+            total += price * Math.max(0, dec.draftRequestedQty - dec.existingQty);
+          }
+        }
+        const c = item.sku.currency?.trim();
+        if (c) currencies.add(c);
+      }
+    } else if (item.kind === "kit" && dec.kind === "willAdd") {
+      total += getKitLineAmount(item);
+      const c = getItemCurrency(item);
+      if (c) currencies.add(c);
+    }
+  }
+  if (currencies.size > 1) {
+    return null;
+  }
+  const currency = currencies.size === 1 ? [...currencies][0] ?? null : null;
+  return { amount: total, currency };
 }

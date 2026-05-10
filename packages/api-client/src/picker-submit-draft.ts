@@ -44,7 +44,10 @@ function nextWishlistQtyFromResolution(res: PickerQuantitySubmitResolution): num
   if (res.mode === "addAllFromDraft") {
     return Math.max(1, Math.trunc(res.existingQty) + Math.trunc(res.draftRequestedQty));
   }
-  return Math.max(1, Math.trunc(res.draftRequestedQty));
+  const existing = Math.max(1, Math.trunc(res.existingQty));
+  const draft = Math.max(1, Math.trunc(res.draftRequestedQty));
+  /** Не уменьшаем количество в списке: если в подборе меньше или столько же — остаётся `existing`. */
+  return Math.max(existing, draft);
 }
 
 export async function submitPickerDraft(
@@ -59,6 +62,7 @@ export async function submitPickerDraft(
     warnings: [],
     createdWishlistItemIds: [],
     updatedWishlistItemIds: [],
+    noOpQuantityUpdates: 0,
   };
 
   const resolutionByDraftId = new Map<string, PickerQuantitySubmitResolution>();
@@ -81,12 +85,17 @@ export async function submitPickerDraft(
       const qtyRes = resolutionByDraftId.get(item.draftId);
       if (qtyRes) {
         try {
+          const existingQty = Math.max(1, Math.trunc(qtyRes.existingQty));
           const nextQty = nextWishlistQtyFromResolution(qtyRes);
-          await api.updateWishlistItem(draft.vehicleId, qtyRes.existingWishlistItemId, {
-            nodeId: qtyRes.nodeId,
-            quantity: nextQty,
-          });
-          result.updatedWishlistItemIds.push(qtyRes.existingWishlistItemId);
+          if (qtyRes.mode === "setQtyToDraft" && nextQty === existingQty) {
+            result.noOpQuantityUpdates = (result.noOpQuantityUpdates ?? 0) + 1;
+          } else {
+            await api.updateWishlistItem(draft.vehicleId, qtyRes.existingWishlistItemId, {
+              nodeId: qtyRes.nodeId,
+              quantity: nextQty,
+            });
+            result.updatedWishlistItemIds.push(qtyRes.existingWishlistItemId);
+          }
         } catch (e) {
           const message = e instanceof Error ? e.message : "Не удалось обновить количество";
           result.skipped.push({ kind: "sku", label, reason: message });
