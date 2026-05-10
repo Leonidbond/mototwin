@@ -180,10 +180,15 @@ export default function WishlistPickerScreen() {
     focus?: string;
     skuId?: string;
     kitCode?: string;
+    partsSearch?: string;
+    wishlistItemId?: string;
+    returnTo?: string;
   }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
   const initialNodeId = typeof params.nodeId === "string" ? params.nodeId.trim() : "";
   const initialFocusKits = params.focus === "kits";
+  const initialPartsSearch =
+    typeof params.partsSearch === "string" ? params.partsSearch.trim() : "";
   const apiBaseUrl = getApiBaseUrl();
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
@@ -193,8 +198,8 @@ export default function WishlistPickerScreen() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const bootstrapRef = useRef(false);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialPartsSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialPartsSearch);
   const [skuResults, setSkuResults] = useState<PartSkuViewModel[]>([]);
   const [skuLoading, setSkuLoading] = useState(false);
 
@@ -247,6 +252,14 @@ export default function WishlistPickerScreen() {
     setDraft(createEmptyDraftCart(vehicleId));
     bootstrapRef.current = false;
   }, [vehicleId]);
+
+  useEffect(() => {
+    if (!initialPartsSearch) {
+      return;
+    }
+    setSearchQuery(initialPartsSearch);
+    setDebouncedSearch(initialPartsSearch);
+  }, [initialPartsSearch]);
 
   useEffect(() => {
     let cancelled = false;

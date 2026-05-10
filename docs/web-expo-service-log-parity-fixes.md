@@ -1,6 +1,6 @@
 # Выравнивание журнала обслуживания (Web + Expo)
 
-**Дата:** 2026-04-18 (обновление формы bundle: 2026-05-03; multi wishlist + ссылки журнала: 2026-05; блок «Готово к установке» + `GET …/installable`: 2026-05; ADVANCED-суммы, парсинг сумм, превью «Итого», строки журнала по bundle, линковка расходов: 2026-05-04; **web UI:** страницы `service-events/*` + `ServiceEventForm` + каталог `service-event-form/`: 2026-05-06, 2026-05-08; **web журнал:** рабочие фильтры + `ServiceEventsFilters` расширение + детали «Исполнитель»: 2026-05-10; **шапка журнала:** одна CTA «Добавить ТО»: 2026-05-10; **web детали журнала:** deep link на узлы / расходы / подбор, `partsSearch`, сброс `highlightServiceEventId`/`serviceEventId` после скролла, BASIC без блока «Установленные запчасти», домен `resolveWishlistItemIdForServiceBundleItem`: 2026-05-10)  
+**Дата:** 2026-04-18 (обновление формы bundle: 2026-05-03; multi wishlist + ссылки журнала: 2026-05; блок «Готово к установке» + `GET …/installable`: 2026-05; ADVANCED-суммы, парсинг сумм, превью «Итого», строки журнала по bundle, линковка расходов: 2026-05-04; **web UI:** страницы `service-events/*` + `ServiceEventForm` + каталог `service-event-form/`: 2026-05-06, 2026-05-08; **web журнал:** рабочие фильтры + `ServiceEventsFilters` расширение + детали «Исполнитель»: 2026-05-10; **шапка журнала:** одна CTA «Добавить ТО»: 2026-05-10; **web детали журнала:** deep link на узлы / расходы / подбор, `partsSearch`, сброс `highlightServiceEventId`/`serviceEventId` после скролла, BASIC без блока «Установленные запчасти», домен `resolveWishlistItemIdForServiceBundleItem`: 2026-05-10; **Expo журнал (паритет web):** 2026-05-10 — `JournalTimelineRow` ≈ web `ServiceLogRow`, `MobileEventDetailSheet` ≈ `ServiceLogEventDetails`, query расходов `year` + `serviceEventId` + `highlightExpenseId` + `returnTo`, подбор `wishlist/picker` с `partsSearch`, сброс highlight в URL журнала после скролла)  
 **Цель:** Одинаковый смысл данных и правил отображения журнала на Next.js и Expo при сохранении платформенной вёрстки; **одна модель формы** сервисного события (bundle) на web и в Expo.
 
 ## Общая модель данных
@@ -70,10 +70,11 @@
 - **Фильтр по узлу:** читается из query `nodeIds` (список через запятую, элементы URL-encoded) и `nodeLabel`; баннер с «Сбросить фильтр» делает `router.replace` на маршрут без узла, **сохраняя `paidOnly=1` при необходимости** (`buildVehicleServiceLogHref`). Полный «Сбросить» в блоке фильтров сбрасывает query целиком (узел и расходы).
 - **`paidOnly`:** query `paidOnly=1` или `true`; баннер и чип «Только события с расходами»; сброс только расходов через `router.replace` без `paidOnly`, с сохранением `nodeIds` / `nodeLabel` при активном фильтре по узлу.
 - Активность фильтров/сортировки: `isServiceLogTimelineQueryActive` вместо дублирования условий.
-- Бейджи типа записи: `getServiceLogEventKindBadgeLabel`.
-- Карточка `STATE_UPDATE`: заголовок `mainTitle` и подзаголовок `stateUpdateSubtitle` отдельно (как на web в журнале / деталях).
-- Комментарий: свёртка и «Показать» / «Скрыть» для длинных текстов; то же ограничение длины, что на web.
-- Сервисные карточки: при непустом `wishlistOriginLabelRu` — строка под `mainTitle`; при нескольких wishlist-id в `installedPartsJson` — несколько нажимаемых меток (как на web).
+- **Строка ленты (`JournalTimelineRow`):** паритет с web `ServiceLogRow` — колонка даты (`formatRowDateColumnParts` + пробег), rail / точка / иконка типа (`getRowActionKind`, `getTimelineColors`, `getServiceIconConfig`), карточка с `mainTitle` и второй строкой (`secondaryTitle` или для STATE_UPDATE — `stateUpdateSubtitle` / `compactMetricsLine`), три метрики **Стоимость · Интервал · Исполнитель** (`getCompactCost`, `getIntervalLabel`, `getPerformerLabel`), шеврон; состояния **selected** и **highlight** по аналогии с web. Нет expand-превью bundle в строке: **тап** = выбор + открытие sheet.
+- **Детали (`MobileEventDetailSheet`):** передаются `ServiceLogEntryViewModel` + сырой `ServiceEventItem` + `originWishlistItemIds`; секции и правила видимости по образцу web `ServiceLogEventDetails` (метрики с переходом в расходы при наличии данных, узлы-чипы → дерево, режим BASIC/ADVANCED, моточасы, напоминание, комментарии по bundle, стоимость по статьям, **«Установленные запчасти» только при `ADVANCED`**, исполнитель, источники, список расходов, футер **Редактировать / Удалить / Повторить ТО**).
+- **Навигация из sheet:** расходы — `buildExpensesHrefForServiceEvent` (`year`, `serviceEventId`, опционально `highlightExpenseId`, `returnTo` на журнал с `highlightServiceEventId`); подбор — `buildWishlistPickerHrefFromServiceLog` → `/vehicles/:id/wishlist/picker` с `nodeId` / `wishlistItemId` / `partsSearch` / `returnTo`; узлы — `/vehicles/:id/nodes?nodeId=`; источники wishlist — `buildVehicleWishlistItemHighlightHref` (`wishlist/hrefs.ts`).
+- **Deep link в журнал:** `serviceEventId` или `highlightServiceEventId` — скролл к строке, затем **`router.replace`** без этих параметров (остальные query сохраняются), по смыслу как на web после `scrollIntoView`.
+- Комментарий в ленте: при необходимости свёртка по `SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS` (если блок превью ещё используется в других местах экрана); основной полный текст — в sheet.
 
 ## Намеренные отличия платформ
 
@@ -90,23 +91,61 @@
 
 ## QA (ручная проверка)
 
-На одном и том же наборе данных с backend:
+На одном и том же наборе данных с backend (одна и та же запись на **web** `/vehicles/[id]/service-log` и **Expo** экран журнала):
+
+### Общее (web + Expo)
 
 1. Совпадение чисел в месячных чипах «Обслуживание» / «Обновления состояния» / «Расходы» после одинаковых фильтров.
-2. Фильтры: даты, **мультивыбор узла** (web: модалка + URL), тип записи, поиск по **`serviceType`**, **только расходы (`paidOnly`)**, раскрытые поля (**пробег / сумма / тип работы / исполнитель**); фильтр по узлу из дерева; сочетание узла и `paidOnly`; сброс и отключение **«Сброс»** в дефолтном состоянии. Expo: блок фильтров без модалки узла; тип **`ServiceEventsFilters`** общий с web (в т.ч. расширенные ключи), отдельные контролы под расширенные фильтры на Expo при необходимости выровнять позже.
+2. Фильтры: даты, **мультивыбор узла** (web: модалка + URL), тип записи, поиск по **`serviceType`**, **только расходы (`paidOnly`)**, раскрытые поля (**пробег / сумма / тип работы / исполнитель**); фильтр по узлу из дерева; сочетание узла и `paidOnly`; сброс и отключение **«Сброс»** в дефолтном состоянии. Expo: блок фильтров; тип **`ServiceEventsFilters`** общий с web.
 3. Сортировка по всем полям из списка; порядок внутри месяца согласован с глобальной сортировкой отфильтрованного списка.
-4. Визуальный приоритет: `SERVICE` — основная карточка; `STATE_UPDATE` — приглушённая, мелкий бейдж.
-5. Комментарии > 120 символов: превью и разворот на web и Expo.
-6. Событие с **несколькими** wishlist-id в `installedPartsJson`: в журнале (web и Expo) несколько ссылок в parts; каждая открывает нужную позицию.
+4. Визуальный приоритет: `SERVICE` — основная строка/карточка; `STATE_UPDATE` — приглушённая подача заголовка и rail, как на web.
+5. Комментарии > 120 символов: на web — превью и разворот где применимо; на Expo полный текст в sheet.
+6. Событие с **несколькими** wishlist-id в `installedPartsJson`: в деталях (web панель / Expo sheet) несколько ссылок «Источники»; переходы открывают ожидаемые экраны.
 7. Форма нового события: блок **«Готово к установке»** на web и кнопка **«Готово к установке…»** в Expo — одинаковые чипы фильтра, один и тот же ответ **`GET …/installable`**; отметка строки с wishlist+expense не должна удваивать сумму в «Запчасти» по сравнению с отдельной отметкой wishlist и expense.
 8. **ADVANCED:** суммы в payload и превью «Итого» = строки + верх «Запчасти»/«Работа»; при редактировании верхние поля — остаток к сумме строк; ввод с пробелами/NBSP как в `ru-RU` парсится корректно.
-9. В журнале у строк bundle отображаются **`lineCostRu`**, если в данных есть суммы по строкам.
+9. В журнале / деталях у строк bundle отображаются **`lineCostRu`**, если в данных есть суммы по строкам.
 10. Сохранение события с **несколькими** отмеченными чистыми расходами и с **wishlist+expense** не падает на линковке расходов.
+
+### Expo: строка ленты ≈ web `ServiceLogRow`
+
+- [ ] Слева: день + месяц (3 буквы), при валидной дате — год отдельной строкой; строка пробега под датой совпадает по смыслу с web.
+- [ ] Rail и точка: цвета для REPLACE / INSPECT / CLEAN / ADJUST / SERVICE / STATE_UPDATE согласованы с логикой web (`getTimelineColors`).
+- [ ] В карточке: круглая иконка типа, **одна** строка `mainTitle`, вторая строка — для сервиса `secondaryTitle`, для STATE_UPDATE — приглушённый вариант подзаголовка как на web.
+- [ ] Три метрики справа от заголовка: **Стоимость** (зелёный акцент при ненулевой), **Интервал** (напоминание км/ч/дата), **Исполнитель** (SELF/SERVICE/OTHER).
+- [ ] Шеврон справа; выбранная строка — рамка/фон **selected**; подсветка из URL — **highlight** на точке без конфликта с selected.
+- [ ] Тап по строке открывает sheet и выделяет строку; **нет** разворота bundle внутри строки.
+
+### Expo: sheet ≈ web `ServiceLogEventDetails`
+
+- [ ] Шапка: иконка типа, заголовок, подзаголовок; бейдж «Выполнено» / «Обновление состояния».
+- [ ] Сетка метрик: дата, пробег, интервал, стоимость; тап по стоимости ведёт в расходы при наличии события и (расходов или суммы), как на web.
+- [ ] **Узлы:** чипы по уникальным узлам из bundle или якорь события; тап → `/vehicles/:id/nodes?nodeId=…`.
+- [ ] **Режим записи:** BASIC / ADVANCED с поясняющим текстом.
+- [ ] **Моточасы** и **Следующее напоминание** — показываются, если есть данные во view model / raw event.
+- [ ] **Комментарии по работам** — только строки bundle с непустым `comment`.
+- [ ] **Стоимость по статьям** — при наличии `partsCostLabel` / `laborCostLabel`; тап → расходы по событию.
+- [ ] **Установленные запчасти** — только для **ADVANCED** и не STATE_UPDATE; строки кликабельны (wishlist id → picker/query; иначе узел + `partsSearch` в picker).
+- [ ] **Исполнитель:** тип + примечание; для SERVICE отдельная строка «Название сервиса».
+- [ ] **Источники:** несколько wishlist-id → несколько кнопок; тап → список покупок с подсветкой позиции.
+- [ ] **Расходы:** список с суммами; строка → расходы с `highlightExpenseId`; заголовок «итого» → список по событию.
+- [ ] Футер: **Редактировать**, **Удалить**, **Повторить ТО** (для STATE_UPDATE — только «Закрыть»); закрытие sheet снимает выделение строки.
+
+### Expo: навигация и query
+
+- [ ] Открыть журнал с `?serviceEventId=` или `?highlightServiceEventId=` — скролл к записи, затем **исчезновение** этих параметров из URL при сохранении `nodeIds`, `paidOnly`, `month`, `expandExpenses`, `returnNodeId`, …
+- [ ] Из sheet → **Расходы:** в URL есть `year`, `serviceEventId`, при клике по строке расхода — `highlightExpenseId`; **«Назад»** с `returnTo` возвращает на журнал с подсветкой события (`highlightServiceEventId` в `returnTo`).
+- [ ] На экране расходов список отфильтрован по `serviceEventId`; карточка с `highlightExpenseId` подсвечена; через ~450 ms параметр `highlightExpenseId` снимается с URL, фильтр по событию остаётся.
+- [ ] Из sheet → **Подбор** (`wishlist/picker`): при передаче `partsSearch` поле поиска в picker предзаполнено; `returnTo` присутствует в query (обработка «назад» из picker в приложении может дорабатываться отдельно).
+
+### Копируемый чеклист
+
+Полный пошаговый сценарий для одного прогона — в отдельном файле **[service-log-expo-manual-qa.md](./service-log-expo-manual-qa.md)**.
 
 ## Проверки в репозитории
 
-- `npx tsc --noEmit`
-- `npx eslint` на изменённых файлах страницы ТС, экрана журнала Expo и `packages/domain` (service-log / service-log-view-models / index).
+- `npx tsc --noEmit -p apps/app` (Expo)
+- `npx tsc --noEmit` (корень монорепо, если настроен)
+- `npx eslint` на изменённых файлах: `apps/app/app/vehicles/[id]/service-log.tsx`, `apps/app/app/vehicles/[id]/expenses.tsx`, `apps/app/app/vehicles/[id]/wishlist/picker.tsx`, `packages/domain` (service-log / service-log-view-models).
 
 ---
 

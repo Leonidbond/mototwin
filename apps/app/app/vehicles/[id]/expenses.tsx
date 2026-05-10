@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -59,6 +59,21 @@ const categoryColors: Record<ExpenseCategory, string> = {
 
 function todayYmd(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function readSearchParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+}
+
+function safeVehicleRelativePath(raw: string): string | null {
+  const t = raw.trim();
+  if (!t.startsWith("/vehicles/") || t.includes("://")) {
+    return null;
+  }
+  return t;
 }
 
 function formatTotals(rows: ExpenseAmountByCurrency[]): string {
@@ -136,10 +151,31 @@ export default function VehicleExpensesScreen() {
   const { width } = useWindowDimensions();
   const isMobileLayout = width < 720;
   const scrollViewRef = useRef<ScrollView>(null);
-  const params = useLocalSearchParams<{ id: string; nodeId?: string; year?: string; returnNodeId?: string }>();
+  const params = useLocalSearchParams<{
+    id: string;
+    nodeId?: string;
+    year?: string;
+    returnNodeId?: string;
+    serviceEventId?: string;
+    highlightExpenseId?: string;
+    returnTo?: string;
+  }>();
   const vehicleId = String(params.id ?? "");
   const targetNodeId = typeof params.nodeId === "string" ? params.nodeId : "";
   const returnNodeId = typeof params.returnNodeId === "string" ? params.returnNodeId : "";
+  const filterServiceEventId = readSearchParam(params.serviceEventId)?.trim() ?? "";
+  const highlightExpenseId = readSearchParam(params.highlightExpenseId)?.trim() ?? "";
+  const returnToRaw = readSearchParam(params.returnTo) ?? "";
+  const returnToPath = useMemo(() => {
+    if (!returnToRaw.trim()) {
+      return "";
+    }
+    try {
+      return safeVehicleRelativePath(decodeURIComponent(returnToRaw)) ?? "";
+    } catch {
+      return safeVehicleRelativePath(returnToRaw) ?? "";
+    }
+  }, [returnToRaw]);
   const requestedYear = typeof params.year === "string" ? Number.parseInt(params.year, 10) : NaN;
   const selectedYear = Number.isFinite(requestedYear) ? requestedYear : new Date().getFullYear();
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
@@ -210,10 +246,48 @@ export default function VehicleExpensesScreen() {
     return Array.from(months.entries()).map(([key, label]) => ({ key, label })).sort((a, b) => b.key.localeCompare(a.key));
   }, [expenses]);
 
+  const expensesHrefWithoutHighlightExpense = useMemo(() => {
+    const q = new URLSearchParams();
+    q.set("year", String(selectedYear));
+    if (targetNodeId) {
+      q.set("nodeId", targetNodeId);
+    }
+    if (returnNodeId) {
+      q.set("returnNodeId", returnNodeId);
+    }
+    if (filterServiceEventId) {
+      q.set("serviceEventId", filterServiceEventId);
+    }
+    if (returnToRaw.trim()) {
+      q.set("returnTo", returnToRaw.trim());
+    }
+    return `/vehicles/${vehicleId}/expenses?${q.toString()}`;
+  }, [
+    vehicleId,
+    selectedYear,
+    targetNodeId,
+    returnNodeId,
+    filterServiceEventId,
+    returnToRaw,
+  ]);
+
+  useEffect(() => {
+    if (!highlightExpenseId) {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      router.replace(expensesHrefWithoutHighlightExpense);
+    }, 450);
+    return () => clearTimeout(timeoutId);
+  }, [highlightExpenseId, router, expensesHrefWithoutHighlightExpense]);
+
   const scopedExpenses = useMemo(() => {
     const nodeIds = targetNodeId ? collectNodeAndDescendantIds(nodeTree, targetNodeId) : null;
     const query = searchQuery.trim().toLowerCase();
     return expenses.filter((expense) => {
+      if (filterServiceEventId && expense.serviceEventId !== filterServiceEventId) {
+        return false;
+      }
       if (nodeIds && (!expense.nodeId || !nodeIds.has(expense.nodeId))) return false;
       if (installStatusFilter !== "ALL" && expense.installStatus !== installStatusFilter) return false;
       if (categoryFilter !== "ALL" && expense.category !== categoryFilter) return false;
@@ -232,7 +306,17 @@ export default function VehicleExpensesScreen() {
       }
       return true;
     });
-  }, [categoryFilter, currencyFilter, expenses, installStatusFilter, monthFilters, nodeTree, searchQuery, targetNodeId]);
+  }, [
+    categoryFilter,
+    currencyFilter,
+    expenses,
+    filterServiceEventId,
+    installStatusFilter,
+    monthFilters,
+    nodeTree,
+    searchQuery,
+    targetNodeId,
+  ]);
 
   const toggleMonthFilter = useCallback((monthKey: string) => {
     setMonthFilters((prev) =>
@@ -383,6 +467,10 @@ export default function VehicleExpensesScreen() {
       <ScreenHeader
         title="Расходы"
         onBack={() => {
+          if (returnToPath) {
+            router.replace(returnToPath);
+            return;
+          }
           if (returnNodeId) {
             router.replace(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeId)}`);
             return;
@@ -615,7 +703,13 @@ export default function VehicleExpensesScreen() {
                   </View>
                 ) : null}
                 {scopedExpenses.map((expense) => (
-                  <View key={expense.id} style={styles.eventCard}>
+                  <View
+                    key={expense.id}
+                    style={[
+                      styles.eventCard,
+                      highlightExpenseId && expense.id === highlightExpenseId ? styles.eventCardHighlighted : null,
+                    ]}
+                  >
                     <Text style={styles.eventMeta}>
                       {new Date(expense.expenseDate).toLocaleDateString("ru-RU")} · {expenseCategoryLabelsRu[expense.category]} · {getInstallationStatusLabel(expense)}
                     </Text>
@@ -1260,6 +1354,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900",
     textAlign: "right",
+  },
+  eventCardHighlighted: {
+    borderColor: c.primaryAction,
+    borderWidth: 1,
+    shadowColor: c.primaryAction,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 2,
   },
   eventCard: {
     borderRadius: 16,
