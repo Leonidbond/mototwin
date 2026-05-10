@@ -72,6 +72,8 @@ export const radiusScale = {
   sm: 6,
   md: 8,
   lg: 12,
+  /** Outer journal / details card radius (service-log ref ~18px). */
+  xl: 18,
   pill: 999,
 } as const;
 

@@ -22,6 +22,22 @@ Service Log is now page/screen-first UX on both clients:
 
 Service Log modal is no longer the primary UX entry point.
 
+### Dense operational journal UX
+
+Web and Expo now use the journal as a dense operational index first:
+
+- collapsed web rows use a 6-zone layout: timeline rail/status dot, date/metrics, title/meta, up to two chips, cost, and action affordance;
+- collapsed mobile rows target a 64–76px feed item with title/cost first and date/node/mileage/chips second;
+- full bundle rows, comments, wishlist origin, expense details, and lifecycle actions are shown only in contextual details: sticky panel on desktop, inline preview + bottom sheet on Expo;
+- `serviceEventId` / `highlightServiceEventId` still scrolls to the row and opens the event details after create/edit or when returning from installed parts;
+- `STATE_UPDATE` rows stay visually muted and compact, with full before/after lines inside details/sheet;
+- `paidOnly=1` keeps cost/expense context visually active in toolbar and detail summaries.
+
+Platform layout:
+
+- **Web:** `/vehicles/[id]/service-log` is rendered inside the vehicle shell with `GarageSidebar`. On desktop the journal uses a reference-style master-detail layout: sticky header/toolbar, dense grouped timeline on the left, and a sticky right details panel. On narrower viewports details open inline under the selected row.
+- **Expo:** `vehicles/[id]/service-log` keeps `GarageBottomNav`; service rows are ultra-compact feed rows. Tapping a row expands a short preview/actions area, while **Подробнее** opens an 85–92% bottom sheet with full details.
+
 Supported route/query params:
 
 - `paidOnly=1` — pre-enables paid-only filter

@@ -3,6 +3,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,7 +29,6 @@ import {
   getServiceLogEventKindBadgeLabel,
   getWishlistItemIdsFromInstalledPartsJson,
   isServiceLogTimelineQueryActive,
-  SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
@@ -134,221 +134,246 @@ function ServiceCard({
   entry,
   isHighlighted,
   originWishlistItemIds,
-  isCommentExpanded,
-  onToggleComment,
+  isExpanded,
+  onToggle,
   onOpenWishlistOrigin,
   onRepeat,
   onEdit,
   onDelete,
+  onOpenDetails,
 }: {
   entry: ServiceLogEntryViewModel;
   isHighlighted: boolean;
   originWishlistItemIds: string[];
-  isCommentExpanded: boolean;
-  onToggleComment: () => void;
+  isExpanded: boolean;
+  onToggle: () => void;
   onOpenWishlistOrigin: (wishlistItemId: string) => void;
   onRepeat: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onOpenDetails: () => void;
 }) {
-  const comment = entry.comment;
-  const commentLong =
-    comment != null && comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS;
+  const cost = getMobileCompactCost(entry);
+  const primaryNode = entry.nodeChips[0] ?? entry.expoServiceNodeLabel ?? entry.secondaryTitle;
+  const extraNodeCount = Math.max(0, entry.nodeChips.length - 1);
 
   return (
-    <View style={[styles.eventCard, styles.serviceCard, isHighlighted && styles.eventCardHighlighted]}>
-      <View style={styles.eventKindBadge}>
-        <Text style={styles.eventKindText}>
-          {getServiceLogEventKindBadgeLabel(entry.eventKind)}
-        </Text>
-      </View>
-      <View style={styles.serviceCardHeaderRow}>
-        <Text style={styles.eventTitle}>{entry.mainTitle}</Text>
-        <View style={styles.rowActionsTop}>
-          <ActionIconButton
-            onPress={onRepeat}
-            accessibilityLabel="Повторить сервисное событие с актуальными пробегом и моточасами"
-            variant="subtle"
-            icon={<MaterialIcons name="autorenew" size={15} color={c.textSecondary} />}
-          />
-          <ActionIconButton
-            onPress={onEdit}
-            accessibilityLabel="Редактировать сервисное событие"
-            variant="subtle"
-            icon={<MaterialIcons name="edit" size={15} color={c.textSecondary} />}
-          />
-          <ActionIconButton
-            onPress={onDelete}
-            accessibilityLabel="Удалить сервисное событие"
-            variant="danger"
-            icon={<MaterialIcons name="delete-outline" size={15} color={c.error} />}
-          />
-        </View>
-      </View>
-      {entry.wishlistOriginLabelRu ? (
-        originWishlistItemIds.length > 0 ? (
-          <View style={styles.wishlistOriginRow}>
-            {originWishlistItemIds.length === 1 ? (
-              <Pressable onPress={() => onOpenWishlistOrigin(originWishlistItemIds[0])} hitSlop={8}>
-                <Text style={[styles.wishlistOriginLabel, styles.wishlistOriginLink]}>
-                  {entry.wishlistOriginLabelRu}
-                </Text>
-              </Pressable>
-            ) : (
-              <>
-                <Text style={styles.wishlistOriginLabel}>{`${entry.wishlistOriginLabelRu}:`}</Text>
-                <View style={styles.wishlistOriginLinksRow}>
-                  {originWishlistItemIds.map((wlId, idx) => (
-                    <Pressable key={wlId} onPress={() => onOpenWishlistOrigin(wlId)} hitSlop={6}>
-                      <Text style={[styles.wishlistOriginLabel, styles.wishlistOriginLink]}>
-                        {idx + 1}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </>
-            )}
-          </View>
-        ) : (
-          <Text style={styles.wishlistOriginLabel}>{entry.wishlistOriginLabelRu}</Text>
-        )
-      ) : null}
-      <View style={styles.bundleBadgeRow}>
-        <View style={styles.bundleModeBadge}>
-          <Text style={styles.bundleModeBadgeText}>{entry.modeBadgeRu}</Text>
-        </View>
-        {entry.nodeCount > 1 ? (
-          <Text style={styles.bundleNodeCount}>{`${entry.nodeCount} узлов`}</Text>
-        ) : null}
-      </View>
-      {entry.nodeChips.length > 0 ? (
-        <View style={styles.bundleChipsRow}>
-          {entry.nodeChips.slice(0, 4).map((chip, idx) => (
-            <View key={`${entry.id}.chip.${idx}.${chip}`} style={styles.bundleChip}>
-              <Text style={styles.bundleChipText}>{chip}</Text>
+    <Pressable
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.eventCard,
+        styles.serviceCard,
+        styles.compactEventCard,
+        isExpanded && styles.eventCardExpanded,
+        isHighlighted && styles.eventCardHighlighted,
+        pressed && styles.cardPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: isExpanded }}
+    >
+      <View style={styles.compactRow}>
+        <View style={styles.compactDotService} />
+        <View style={styles.compactMain}>
+          <View style={styles.compactTopLine}>
+            <Text style={styles.compactDate}>{entry.dateLabel}</Text>
+            <View style={styles.compactBadge}>
+              <Text style={styles.compactBadgeText}>{entry.modeBadgeRu}</Text>
             </View>
-          ))}
-          {entry.nodeChips.length > 4 ? (
-            <Text style={styles.bundleNodeCount}>{`+${entry.nodeChips.length - 4}`}</Text>
-          ) : null}
-        </View>
-      ) : null}
-      {entry.bundleItemsSummary.length > 0 &&
-      (entry.mode === "ADVANCED" || entry.bundleItemsSummary.some((it) => it.partName || it.sku)) ? (
-        <View style={styles.bundleItemsList}>
-          {entry.bundleItemsSummary.map((it) => (
-            <Text key={it.id} style={styles.bundleItemLine}>
-              <Text style={styles.bundleItemAction}>{it.actionLabelRu}</Text>
-              <Text> · {it.nodeName}</Text>
-              {it.partName ? <Text> · {it.partName}</Text> : null}
-              {it.sku ? <Text style={styles.bundleItemMuted}>{` · SKU ${it.sku}`}</Text> : null}
-              {it.quantity != null ? <Text>{` · ×${it.quantity}`}</Text> : null}
-              {it.lineCostRu ? (
-                <Text style={styles.bundleItemMuted}>{` · ${it.lineCostRu}`}</Text>
-              ) : null}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-      <Text style={styles.eventNode}>{entry.secondaryTitle}</Text>
-      <View style={styles.eventMeta}>
-        <Text style={styles.eventMetaText}>{entry.dateLabel}</Text>
-        <Text style={styles.eventMetaDot}>·</Text>
-        <Text style={styles.eventMetaText}>{entry.compactMetricsLine}</Text>
-      </View>
-      {comment ? (
-        <View style={styles.commentBlock}>
-          <Text style={styles.eventComment}>
-            {isCommentExpanded || !commentLong
-              ? comment
-              : `${comment.slice(0, SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS)}...`}
+          </View>
+          <Text style={styles.compactTitle} numberOfLines={1}>
+            {entry.mainTitle}
           </Text>
-          {commentLong ? (
-            <Pressable onPress={onToggleComment} hitSlop={6}>
-              <Text style={styles.commentToggle}>
-                {isCommentExpanded ? "Скрыть" : "Показать"}
-              </Text>
+          <Text style={styles.compactMeta} numberOfLines={1}>
+            {entry.compactMetricsLine} · {entry.nodeCount > 1 ? `${entry.nodeCount} узлов` : primaryNode}
+            {extraNodeCount > 0 ? ` · +${extraNodeCount}` : ""}
+          </Text>
+        </View>
+        <View style={styles.compactTrailing}>
+          {cost ? (
+            <Text style={styles.compactCost} numberOfLines={1}>
+              {cost}
+            </Text>
+          ) : null}
+          <MaterialIcons
+            name={isExpanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+            size={22}
+            color={c.textMuted}
+          />
+        </View>
+      </View>
+
+      {isExpanded ? (
+        <View style={styles.expandedDetails}>
+          {entry.wishlistOriginLabelRu ? (
+            originWishlistItemIds.length > 0 ? (
+              <View style={styles.wishlistOriginRow}>
+                {originWishlistItemIds.length === 1 ? (
+                  <Pressable onPress={() => onOpenWishlistOrigin(originWishlistItemIds[0])} hitSlop={8}>
+                    <Text style={[styles.wishlistOriginLabel, styles.wishlistOriginLink]}>
+                      {entry.wishlistOriginLabelRu}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <>
+                    <Text style={styles.wishlistOriginLabel}>{`${entry.wishlistOriginLabelRu}:`}</Text>
+                    <View style={styles.wishlistOriginLinksRow}>
+                      {originWishlistItemIds.map((wlId, idx) => (
+                        <Pressable key={wlId} onPress={() => onOpenWishlistOrigin(wlId)} hitSlop={6}>
+                          <Text style={[styles.wishlistOriginLabel, styles.wishlistOriginLink]}>
+                            {idx + 1}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </View>
+            ) : (
+              <Text style={styles.wishlistOriginLabel}>{entry.wishlistOriginLabelRu}</Text>
+            )
+          ) : null}
+          {entry.bundleItemsSummary.length > 0 ? (
+            <View style={styles.bundleItemsList}>
+              {entry.bundleItemsSummary.slice(0, 2).map((it) => (
+                <Text key={it.id} style={styles.bundleItemLine}>
+                  <Text style={styles.bundleItemAction}>{it.actionLabelRu}</Text>
+                  <Text> · {it.nodeName}</Text>
+                  {it.partName ? <Text> · {it.partName}</Text> : null}
+                  {it.sku ? <Text style={styles.bundleItemMuted}>{` · SKU ${it.sku}`}</Text> : null}
+                  {it.quantity != null ? <Text>{` · ×${it.quantity}`}</Text> : null}
+                  {it.lineCostRu ? <Text style={styles.bundleItemMuted}>{` · ${it.lineCostRu}`}</Text> : null}
+                </Text>
+              ))}
+              {entry.bundleItemsSummary.length > 2 ? (
+                <Text style={styles.bundleItemMuted}>+{entry.bundleItemsSummary.length - 2} позиций в деталях</Text>
+              ) : null}
+            </View>
+          ) : null}
+          {entry.comment ? (
+            <View style={styles.commentBlock}>
+              <Text style={styles.eventComment} numberOfLines={2}>{entry.comment}</Text>
+            </View>
+          ) : null}
+          {entry.totalCostLabel || entry.partsCostLabel || entry.laborCostLabel ? (
+            <View style={styles.bundleCostsRow}>
+              {entry.partsCostLabel ? <Text style={styles.bundleCostMuted}>{entry.partsCostLabel}</Text> : null}
+              {entry.laborCostLabel ? <Text style={styles.bundleCostMuted}>{entry.laborCostLabel}</Text> : null}
+              {entry.totalCostLabel ? <Text style={styles.eventCost}>{entry.totalCostLabel}</Text> : null}
+            </View>
+          ) : null}
+          <View style={styles.rowActionsExpanded}>
+            <Pressable onPress={onOpenDetails} style={styles.detailsButton}>
+              <Text style={styles.detailsButtonText}>Подробнее</Text>
             </Pressable>
-          ) : null}
+            <ActionIconButton
+              onPress={onRepeat}
+              accessibilityLabel="Повторить сервисное событие с актуальными пробегом и моточасами"
+              variant="subtle"
+              icon={<MaterialIcons name="autorenew" size={15} color={c.textSecondary} />}
+            />
+            <ActionIconButton
+              onPress={onEdit}
+              accessibilityLabel="Редактировать сервисное событие"
+              variant="subtle"
+              icon={<MaterialIcons name="edit" size={15} color={c.textSecondary} />}
+            />
+            <ActionIconButton
+              onPress={onDelete}
+              accessibilityLabel="Удалить сервисное событие"
+              variant="danger"
+              icon={<MaterialIcons name="delete-outline" size={15} color={c.error} />}
+            />
+          </View>
         </View>
       ) : null}
-      {entry.totalCostLabel || entry.partsCostLabel || entry.laborCostLabel ? (
-        <View style={styles.bundleCostsRow}>
-          {entry.partsCostLabel ? (
-            <Text style={styles.bundleCostMuted}>{entry.partsCostLabel}</Text>
-          ) : null}
-          {entry.laborCostLabel ? (
-            <Text style={styles.bundleCostMuted}>{entry.laborCostLabel}</Text>
-          ) : null}
-          {entry.totalCostLabel ? (
-            <Text style={styles.eventCost}>{entry.totalCostLabel}</Text>
-          ) : null}
-        </View>
-      ) : entry.costAmount != null && entry.costCurrency ? (
-        <Text style={styles.eventCost}>
-          {entry.costAmount.toLocaleString("ru-RU")} {entry.costCurrency}
-        </Text>
-      ) : null}
-    </View>
+    </Pressable>
   );
+}
+
+function getMobileCompactCost(entry: ServiceLogEntryViewModel): string | null {
+  if (entry.totalCostLabel) return entry.totalCostLabel;
+  if (entry.costAmount != null && entry.costCurrency) {
+    return `${entry.costAmount.toLocaleString("ru-RU")} ${entry.costCurrency}`;
+  }
+  return null;
 }
 
 function StateUpdateCard({
   entry,
   isHighlighted,
-  isCommentExpanded,
-  onToggleComment,
+  isExpanded,
+  onToggle,
+  onOpenDetails,
 }: {
   entry: ServiceLogEntryViewModel;
   isHighlighted: boolean;
-  isCommentExpanded: boolean;
-  onToggleComment: () => void;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onOpenDetails: () => void;
 }) {
-  const comment = entry.comment;
-  const commentLong =
-    comment != null && comment.length > SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS;
-
   return (
-    <View style={[styles.eventCard, styles.stateUpdateCard, isHighlighted && styles.eventCardHighlighted]}>
-      <View style={[styles.eventKindBadge, styles.stateUpdateBadge]}>
-        <Text style={[styles.eventKindText, styles.stateUpdateBadgeText]}>
-          {getServiceLogEventKindBadgeLabel(entry.eventKind)}
-        </Text>
-      </View>
-      <Text style={[styles.eventTitle, styles.stateUpdateMainTitle]}>{entry.mainTitle}</Text>
-      {entry.stateUpdateLines.length > 0 ? (
-        <View style={styles.stateUpdateLines}>
-          {entry.stateUpdateLines.map((line) => (
-            <Text key={`${entry.id}.${line}`} style={styles.stateUpdateSubtitle}>
-              {line}
-            </Text>
-          ))}
-        </View>
-      ) : entry.stateUpdateSubtitle ? (
-        <Text style={styles.stateUpdateSubtitle}>{entry.stateUpdateSubtitle}</Text>
-      ) : null}
-      <View style={styles.eventMeta}>
-        <Text style={styles.eventMetaText}>{entry.dateLabel}</Text>
-        <Text style={styles.eventMetaDot}>·</Text>
-        <Text style={styles.eventMetaText}>{entry.compactMetricsLine}</Text>
-      </View>
-      {comment ? (
-        <View style={styles.commentBlock}>
-          <Text style={[styles.eventComment, styles.stateUpdateComment]}>
-            {isCommentExpanded || !commentLong
-              ? comment
-              : `${comment.slice(0, SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS)}...`}
-          </Text>
-          {commentLong ? (
-            <Pressable onPress={onToggleComment} hitSlop={6}>
-              <Text style={styles.commentToggleMuted}>
-                {isCommentExpanded ? "Скрыть" : "Показать"}
+    <Pressable
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.eventCard,
+        styles.stateUpdateCard,
+        styles.compactEventCard,
+        isExpanded && styles.eventCardExpanded,
+        isHighlighted && styles.eventCardHighlighted,
+        pressed && styles.cardPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: isExpanded }}
+    >
+      <View style={styles.compactRow}>
+        <View style={styles.compactDotState} />
+        <View style={styles.compactMain}>
+          <View style={styles.compactTopLine}>
+            <Text style={styles.compactDate}>{entry.dateLabel}</Text>
+            <View style={[styles.compactBadge, styles.compactBadgeMuted]}>
+              <Text style={[styles.compactBadgeText, styles.compactBadgeTextMuted]}>
+                {getServiceLogEventKindBadgeLabel(entry.eventKind)}
               </Text>
-            </Pressable>
+            </View>
+          </View>
+          <Text style={[styles.compactTitle, styles.stateUpdateMainTitle]} numberOfLines={1}>
+            {entry.mainTitle}
+          </Text>
+          <Text style={styles.compactMeta} numberOfLines={1}>
+            {entry.compactMetricsLine}
+          </Text>
+        </View>
+        <MaterialIcons
+          name={isExpanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+          size={22}
+          color={c.textMuted}
+        />
+      </View>
+
+      {isExpanded ? (
+        <View style={styles.expandedDetails}>
+          {entry.stateUpdateLines.length > 0 ? (
+            <View style={styles.stateUpdateLines}>
+              {entry.stateUpdateLines.map((line) => (
+                <Text key={`${entry.id}.${line}`} style={styles.stateUpdateSubtitle}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          ) : entry.stateUpdateSubtitle ? (
+            <Text style={styles.stateUpdateSubtitle}>{entry.stateUpdateSubtitle}</Text>
           ) : null}
+          {entry.comment ? (
+            <View style={styles.commentBlock}>
+              <Text style={[styles.eventComment, styles.stateUpdateComment]} numberOfLines={2}>{entry.comment}</Text>
+            </View>
+          ) : null}
+          <Pressable onPress={onOpenDetails} style={styles.detailsButton}>
+            <Text style={styles.detailsButtonText}>Подробнее</Text>
+          </Pressable>
         </View>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -358,24 +383,26 @@ function MonthGroup({
   group,
   highlightedServiceEventId,
   wishlistItemIdsByServiceEventId,
-  expandedComments,
+  selectedEventId,
   onEventLayout,
-  onToggleComment,
+  onToggleEvent,
   onOpenWishlistOrigin,
   onEditServiceEvent,
   onRepeatServiceEvent,
   onDeleteServiceEvent,
+  onOpenDetails,
 }: {
   group: ServiceLogMonthGroupViewModel;
   highlightedServiceEventId: string;
   wishlistItemIdsByServiceEventId: Map<string, string[]>;
-  expandedComments: Record<string, boolean>;
+  selectedEventId: string;
   onEventLayout: (entryId: string, y: number) => void;
-  onToggleComment: (entryId: string) => void;
+  onToggleEvent: (entryId: string) => void;
   onOpenWishlistOrigin: (wishlistItemId: string) => void;
   onEditServiceEvent: (entryId: string) => void;
   onRepeatServiceEvent: (entryId: string) => void;
   onDeleteServiceEvent: (entryId: string) => void;
+  onOpenDetails: (entryId: string) => void;
 }) {
   const hasServiceCount = group.summary.serviceCount > 0;
   const hasStateUpdates = group.summary.stateUpdateCount > 0;
@@ -423,6 +450,7 @@ function MonthGroup({
         {group.entries.map((entry) => {
           const isStateUpdate = entry.eventKind === "STATE_UPDATE";
           const isHighlighted = entry.id === highlightedServiceEventId;
+          const isExpanded = entry.id === selectedEventId;
           const originWishlistItemIds = wishlistItemIdsByServiceEventId.get(entry.id) ?? [];
           return (
             <View
@@ -446,20 +474,22 @@ function MonthGroup({
                   <StateUpdateCard
                     entry={entry}
                     isHighlighted={isHighlighted}
-                    isCommentExpanded={Boolean(expandedComments[entry.id])}
-                    onToggleComment={() => onToggleComment(entry.id)}
+                    isExpanded={isExpanded}
+                    onToggle={() => onToggleEvent(entry.id)}
+                    onOpenDetails={() => onOpenDetails(entry.id)}
                   />
                 ) : (
                   <ServiceCard
                     entry={entry}
                     isHighlighted={isHighlighted}
                     originWishlistItemIds={originWishlistItemIds}
-                    isCommentExpanded={Boolean(expandedComments[entry.id])}
-                    onToggleComment={() => onToggleComment(entry.id)}
+                    isExpanded={isExpanded}
+                    onToggle={() => onToggleEvent(entry.id)}
                     onOpenWishlistOrigin={onOpenWishlistOrigin}
                     onRepeat={() => onRepeatServiceEvent(entry.id)}
                     onEdit={() => onEditServiceEvent(entry.id)}
                     onDelete={() => onDeleteServiceEvent(entry.id)}
+                    onOpenDetails={() => onOpenDetails(entry.id)}
                   />
                 )}
               </View>
@@ -467,6 +497,122 @@ function MonthGroup({
           );
         })}
       </View>
+    </View>
+  );
+}
+
+function MobileEventDetailSheet({
+  entry,
+  visible,
+  onClose,
+  onRepeat,
+  onEdit,
+  onDelete,
+}: {
+  entry: ServiceLogEntryViewModel | null;
+  visible: boolean;
+  onClose: () => void;
+  onRepeat: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  if (!entry) {
+    return null;
+  }
+  const isStateUpdate = entry.eventKind === "STATE_UPDATE";
+  const cost = getMobileCompactCost(entry);
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.detailSheetOverlay}>
+        <Pressable style={styles.detailSheetBackdrop} onPress={onClose} />
+        <View style={styles.detailSheet}>
+          <View style={styles.detailSheetHandle} />
+          <View style={styles.detailSheetHeader}>
+            <View style={styles.detailSheetHeaderText}>
+              <Text style={styles.detailSheetKicker}>{getServiceLogEventKindBadgeLabel(entry.eventKind)} · {entry.dateLabel}</Text>
+              <Text style={styles.detailSheetTitle} numberOfLines={2}>{entry.mainTitle}</Text>
+              <Text style={styles.detailSheetSubtitle} numberOfLines={1}>{entry.compactMetricsLine}</Text>
+            </View>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <MaterialIcons name="close" size={22} color={c.textSecondary} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.detailSheetBody}>
+            <View style={styles.detailMetricsGrid}>
+              <DetailMetric label="Дата" value={entry.dateLabel} />
+              <DetailMetric label="Стоимость" value={cost ?? "—"} accent={Boolean(cost)} />
+              <DetailMetric label="Узлы" value={entry.nodeCount > 1 ? `${entry.nodeCount} узлов` : entry.secondaryTitle} />
+              <DetailMetric label="Режим" value={isStateUpdate ? "Состояние" : entry.modeBadgeRu} />
+            </View>
+            {!isStateUpdate ? (
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Работы и детали</Text>
+                {entry.bundleItemsSummary.length > 0 ? (
+                  entry.bundleItemsSummary.map((item) => (
+                    <View key={item.id} style={styles.detailPartRow}>
+                      <View style={styles.detailPartThumb}>
+                        <MaterialIcons name="build" size={16} color={c.textMuted} />
+                      </View>
+                      <View style={styles.detailPartMain}>
+                        <Text style={styles.detailPartTitle} numberOfLines={1}>{item.actionLabelRu} · {item.nodeName}</Text>
+                        <Text style={styles.detailPartMeta} numberOfLines={2}>
+                          {[item.partName, item.sku ? `SKU ${item.sku}` : null, item.quantity != null ? `×${item.quantity}` : null].filter(Boolean).join(" · ") || "Без детали"}
+                        </Text>
+                      </View>
+                      <Text style={styles.detailPartCost}>{item.lineCostRu ?? "—"}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.detailMuted}>Нет детализированных строк.</Text>
+                )}
+              </View>
+            ) : (
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Изменения состояния</Text>
+                {(entry.stateUpdateLines.length > 0 ? entry.stateUpdateLines : [entry.stateUpdateSubtitle]).map((line) =>
+                  line ? <Text key={line} style={styles.detailMuted}>{line}</Text> : null
+                )}
+              </View>
+            )}
+            {entry.comment ? (
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Комментарий</Text>
+                <Text style={styles.detailComment}>{entry.comment}</Text>
+              </View>
+            ) : null}
+          </ScrollView>
+          <View style={styles.detailSheetActions}>
+            {!isStateUpdate ? (
+              <>
+                <Pressable onPress={onRepeat} style={styles.detailAction}>
+                  <Text style={styles.detailActionText}>Повторить</Text>
+                </Pressable>
+                <Pressable onPress={onEdit} style={styles.detailAction}>
+                  <Text style={styles.detailActionText}>Править</Text>
+                </Pressable>
+                <Pressable onPress={onDelete} style={[styles.detailAction, styles.detailActionDanger]}>
+                  <Text style={[styles.detailActionText, styles.detailActionTextDanger]}>Удалить</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Pressable onPress={onClose} style={styles.detailAction}>
+                <Text style={styles.detailActionText}>Закрыть</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function DetailMetric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <View style={[styles.detailMetric, accent && styles.detailMetricAccent]}>
+      <Text style={styles.detailMetricLabel}>{label}</Text>
+      <Text style={[styles.detailMetricValue, accent && styles.detailMetricValueAccent]} numberOfLines={1}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -514,7 +660,8 @@ export default function ServiceLogScreen() {
   const [sortField, setSortField] = useState<ServiceEventsSortField>("eventDate");
   const [sortDirection, setSortDirection] = useState<ServiceEventsSortDirection>("desc");
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
-  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [selectedEventId, setSelectedEventId] = useState(highlightedServiceEventId);
+  const [detailSheetEntryId, setDetailSheetEntryId] = useState("");
   const [actionMessage, setActionMessage] = useState<{
     tone: "success" | "error";
     title: string;
@@ -645,6 +792,23 @@ export default function ServiceLogScreen() {
     }
     return byServiceEventId;
   }, [events]);
+  const flatVisibleEntries = useMemo(
+    () => visibleGroups.flatMap((group) => group.entries),
+    [visibleGroups]
+  );
+  const detailSheetEntry = useMemo(
+    () => flatVisibleEntries.find((entry) => entry.id === detailSheetEntryId) ?? null,
+    [detailSheetEntryId, flatVisibleEntries]
+  );
+  useEffect(() => {
+    if (highlightedServiceEventId) {
+      setSelectedEventId(highlightedServiceEventId);
+      return;
+    }
+    if (selectedEventId && !flatVisibleEntries.some((entry) => entry.id === selectedEventId)) {
+      setSelectedEventId("");
+    }
+  }, [flatVisibleEntries, highlightedServiceEventId, selectedEventId]);
   useEffect(() => {
     if (!highlightedServiceEventId || visibleGroups.length === 0) {
       return;
@@ -1064,7 +1228,7 @@ export default function ServiceLogScreen() {
             group={group}
             highlightedServiceEventId={highlightedServiceEventId}
             wishlistItemIdsByServiceEventId={wishlistItemIdsByServiceEventId}
-            expandedComments={expandedComments}
+            selectedEventId={selectedEventId}
             onEventLayout={(entryId, y) => {
               eventYByIdRef.current[entryId] = y;
             }}
@@ -1074,15 +1238,21 @@ export default function ServiceLogScreen() {
             onOpenWishlistOrigin={(wishlistItemId) =>
               router.push(buildVehicleWishlistItemHighlightHref(vehicleId, wishlistItemId))
             }
-            onToggleComment={(entryId) =>
-              setExpandedComments((prev) => ({
-                ...prev,
-                [entryId]: !prev[entryId],
-              }))
+            onToggleEvent={(entryId) =>
+              setSelectedEventId((current) => (current === entryId ? "" : entryId))
             }
+            onOpenDetails={(entryId) => setDetailSheetEntryId(entryId)}
           />
         ))}
       </KeyboardAwareScrollScreen>
+      <MobileEventDetailSheet
+        entry={detailSheetEntry}
+        visible={Boolean(detailSheetEntry)}
+        onClose={() => setDetailSheetEntryId("")}
+        onRepeat={() => detailSheetEntry ? openRepeatServiceEvent(detailSheetEntry.id) : undefined}
+        onEdit={() => detailSheetEntry ? openEditServiceEvent(detailSheetEntry.id) : undefined}
+        onDelete={() => detailSheetEntry ? openDeleteServiceEventConfirm(detailSheetEntry.id) : undefined}
+      />
       <GarageBottomNav
         activeKey="journal"
         onOpenGarage={() => router.push("/")}
@@ -1611,6 +1781,16 @@ const styles = StyleSheet.create({
     padding: 13,
     marginBottom: 0,
   },
+  compactEventCard: {
+    paddingVertical: 10,
+  },
+  eventCardExpanded: {
+    borderColor: c.primaryAction,
+    backgroundColor: c.cardSubtle,
+  },
+  cardPressed: {
+    opacity: 0.92,
+  },
   eventCardHighlighted: {
     borderColor: c.primaryAction,
     shadowColor: c.primaryAction,
@@ -1628,6 +1808,91 @@ const styles = StyleSheet.create({
   stateUpdateCard: {
     backgroundColor: c.cardMuted,
     borderColor: c.border,
+  },
+  compactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 48,
+  },
+  compactMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  compactTopLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 3,
+  },
+  compactDotService: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: c.timelineServiceBorder,
+    backgroundColor: c.timelineServiceFill,
+  },
+  compactDotState: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: c.timelineStateBorder,
+    backgroundColor: c.timelineStateFill,
+  },
+  compactDate: {
+    fontSize: 11,
+    color: c.textMeta,
+    fontWeight: "600",
+  },
+  compactBadge: {
+    borderWidth: 1,
+    borderColor: c.indigoSoftBorder,
+    borderRadius: 999,
+    backgroundColor: c.serviceBadgeBg,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  compactBadgeMuted: {
+    borderColor: c.borderStrong,
+    backgroundColor: c.divider,
+  },
+  compactBadgeText: {
+    fontSize: 9,
+    color: c.serviceBadgeText,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  compactBadgeTextMuted: {
+    color: c.textMuted,
+  },
+  compactTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: c.textPrimary,
+  },
+  compactMeta: {
+    marginTop: 2,
+    fontSize: 12,
+    color: c.textSecondary,
+  },
+  compactTrailing: {
+    maxWidth: 98,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+  compactCost: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: c.successStrong,
+    marginBottom: 2,
+  },
+  expandedDetails: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.border,
   },
 
   // Kind badge
@@ -1842,6 +2107,212 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     flexShrink: 0,
+  },
+  rowActionsExpanded: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  detailsButton: {
+    minHeight: 30,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: c.primaryAction,
+    backgroundColor: c.card,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: "auto",
+  },
+  detailsButtonText: {
+    color: c.primaryAction,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  detailSheetOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: c.overlayModal,
+  },
+  detailSheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  detailSheet: {
+    maxHeight: "90%",
+    minHeight: "82%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+    overflow: "hidden",
+  },
+  detailSheetHandle: {
+    alignSelf: "center",
+    width: 42,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: c.borderStrong,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  detailSheetHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.border,
+  },
+  detailSheetHeaderText: {
+    flex: 1,
+  },
+  detailSheetKicker: {
+    fontSize: 11,
+    color: c.textMuted,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  detailSheetTitle: {
+    marginTop: 4,
+    fontSize: 18,
+    lineHeight: 23,
+    color: c.textPrimary,
+    fontWeight: "800",
+  },
+  detailSheetSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: c.textSecondary,
+  },
+  detailSheetBody: {
+    padding: 16,
+    paddingBottom: 24,
+    gap: 14,
+  },
+  detailMetricsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  detailMetric: {
+    width: "48%",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+    padding: 10,
+  },
+  detailMetricAccent: {
+    borderColor: c.primaryAction,
+    backgroundColor: c.cardSubtle,
+  },
+  detailMetricLabel: {
+    fontSize: 10,
+    color: c.textMuted,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  detailMetricValue: {
+    marginTop: 4,
+    fontSize: 12,
+    color: c.textPrimary,
+    fontWeight: "800",
+  },
+  detailMetricValueAccent: {
+    color: c.primaryAction,
+  },
+  detailSection: {
+    gap: 8,
+  },
+  detailSectionTitle: {
+    fontSize: 11,
+    color: c.textMuted,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  detailPartRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: c.cardMuted,
+    padding: 10,
+  },
+  detailPartThumb: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: c.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailPartMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  detailPartTitle: {
+    fontSize: 13,
+    color: c.textPrimary,
+    fontWeight: "800",
+  },
+  detailPartMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    color: c.textSecondary,
+    lineHeight: 17,
+  },
+  detailPartCost: {
+    maxWidth: 74,
+    fontSize: 12,
+    color: c.successStrong,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+  detailMuted: {
+    fontSize: 13,
+    color: c.textSecondary,
+    lineHeight: 19,
+  },
+  detailComment: {
+    fontSize: 13,
+    color: c.textSecondary,
+    lineHeight: 20,
+  },
+  detailSheetActions: {
+    flexDirection: "row",
+    gap: 8,
+    padding: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.border,
+    backgroundColor: c.card,
+  },
+  detailAction: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailActionDanger: {
+    borderColor: c.errorBorder,
+  },
+  detailActionText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: c.textPrimary,
+  },
+  detailActionTextDanger: {
+    color: c.error,
   },
   expenseModalOverlay: {
     flex: 1,

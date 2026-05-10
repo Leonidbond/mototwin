@@ -43,3 +43,13 @@ BASE_URL=http://127.0.0.1:3000 npm run qa:service-event-full-smoke
 7. Service-log return: после create/update из журнала есть `feedback`, журнал скроллит к сохранённому событию и подсвечивает его через `serviceEventId`.
 8. Wishlist flow: create из корзины возвращает в wishlist с `wishlistItemId`; установка детали и статусы проверяются серверным smoke.
 9. Edit route: mobile edit остаётся query-route `service-events/new?eventId=...`; отдельный Expo route пока не нужен.
+
+## Ручной service-log compact/details checklist
+
+1. Web desktop: `/vehicles/{id}/service-log` открывается с левым `GarageSidebar`; header около 72px, справа counters/CTA, под ним sticky toolbar около 56px.
+2. Web timeline: строки выглядят как dense operational timeline, а не карточки; проверяются 6 зон — rail/dot, дата+метрики, title/meta, chips, cost, action.
+3. Web details: выбранное событие открыто в правой sticky-панели с metric tiles, компактной таблицей работ/деталей, комментарием и fixed actions.
+4. Web deep link: `serviceEventId` / `highlightServiceEventId` скроллит к событию, выделяет row и раскрывает details; `expandExpenses=1` сохраняет paid-only context и усиливает cost/expense акцент.
+5. Expo: на экране видно больше compact rows; tap раскрывает только short preview/actions, **Подробнее** открывает bottom sheet на большую часть экрана.
+6. Expo sheet: в sheet есть header, metrics, работы/детали, комментарий, lifecycle actions; закрытие по фону/крестику работает.
+7. Visual accents: orange используется для selected/highlight/CTA/paid-only, purple — только для service badge, green — для money/success, `STATE_UPDATE` остаётся muted и ниже по высоте.
