@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildExpenseAnalyticsFromItems,
+  vehicleDetailFromApiRecord,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
   formatExpenseAmountRu,
@@ -28,10 +29,13 @@ import type {
   ExpenseInstallStatus,
   ExpenseItem,
   NodeTreeItem,
+  VehicleDetail,
+  VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../src/api-base-url";
-import { ScreenHeader } from "../../../components/expo-shell/screen-header";
+import { InternalScreenChrome } from "../../../components/expo-shell/internal-screen-chrome";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
+import { GarageVehicleContextPlaque } from "../../../components/garage/GarageVehicleContextPlaque";
 
 const categoryOptions: ExpenseCategory[] = [
   "PART",
@@ -188,6 +192,8 @@ export default function VehicleExpensesScreen() {
   const [isMobileFiltersCollapsed, setIsMobileFiltersCollapsed] = useState(true);
   const [filtersSectionY, setFiltersSectionY] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [vehicleDisplayName, setVehicleDisplayName] = useState("");
+  const [contextVehicleDetail, setContextVehicleDetail] = useState<VehicleDetail | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [busyExpenseId, setBusyExpenseId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -207,13 +213,18 @@ export default function VehicleExpensesScreen() {
     try {
       setIsLoading(true);
       setError("");
+      setContextVehicleDetail(null);
       const client = createApiClient({ baseUrl: getApiBaseUrl() });
       const endpoints = createMotoTwinEndpoints(client);
-      const [result, treeData] = await Promise.all([
+      const [result, treeData, vehicleRes] = await Promise.all([
         endpoints.getExpenses({ vehicleId, year: selectedYear }),
         targetNodeId ? endpoints.getNodeTree(vehicleId) : Promise.resolve({ nodeTree: [] as NodeTreeItem[] }),
+        endpoints.getVehicleDetail(vehicleId),
       ]);
       setNodeTree(treeData.nodeTree ?? []);
+      setVehicleDisplayName(vehicleRes.vehicle?.displayName?.trim() || "Мотоцикл");
+      const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
+      setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
       setExpenses(result.expenses);
       setYears(result.years ?? []);
     } catch (requestError) {
@@ -464,8 +475,19 @@ export default function VehicleExpensesScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScreenHeader
+      <InternalScreenChrome
+        crumbs={[
+          { label: "Мой гараж", href: "/" },
+          { label: vehicleDisplayName || "Мотоцикл", href: `/vehicles/${vehicleId}` },
+          { label: "Расходы" },
+        ]}
         title="Расходы"
+        subtitle="Техническая стоимость владения: обслуживание, запчасти и ремонт."
+        belowNavRow={
+          contextVehicleDetail ? (
+            <GarageVehicleContextPlaque vehicle={contextVehicleDetail} currentVehicleId={vehicleId} />
+          ) : null
+        }
         onBack={() => {
           if (returnToPath) {
             router.replace(returnToPath);
@@ -477,18 +499,14 @@ export default function VehicleExpensesScreen() {
           }
           router.push(`/vehicles/${vehicleId}`);
         }}
+        actions={
+          <Pressable onPress={() => setShowAddForm((prev) => !prev)} style={styles.chromeAddExpenseBtn}>
+            <Text style={styles.chromeAddExpenseBtnText}>{showAddForm ? "Скрыть форму" : "+ Добавить"}</Text>
+          </Pressable>
+        }
       />
       <ScrollView ref={scrollViewRef} contentContainerStyle={styles.content}>
         <View style={styles.headerCard}>
-          <View style={styles.headerTop}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Расходы</Text>
-              <Text style={styles.subtitle}>Техническая стоимость владения: обслуживание, запчасти и ремонт.</Text>
-            </View>
-            <Pressable onPress={() => setShowAddForm((prev) => !prev)} style={styles.addButton}>
-              <Text style={styles.addButtonText}>+ Добавить</Text>
-            </Pressable>
-          </View>
           {isMobileLayout ? (
             <ChipRow>
               {years.length > 0 ? (
@@ -949,32 +967,16 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
-  headerTop: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  title: {
-    color: c.textPrimary,
-    fontSize: 28,
-    fontWeight: "900",
-  },
-  subtitle: {
-    marginTop: 4,
-    color: c.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  addButton: {
-    borderRadius: 14,
+  chromeAddExpenseBtn: {
+    borderRadius: 12,
     backgroundColor: c.primaryAction,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
-  addButtonText: {
+  chromeAddExpenseBtnText: {
     color: c.onPrimaryAction,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: "800",
   },
   filterRow: {
     flexDirection: "row",

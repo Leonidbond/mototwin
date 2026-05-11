@@ -47,8 +47,8 @@ import {
   buildVehicleServiceLogEventHref,
   buildVehicleWishlistNewHref,
 } from "../../../../components/vehicle-wishlist/hrefs";
-import { ScreenHeader } from "../../../../components/expo-shell/screen-header";
-import { CompactVehicleContextRow } from "../../../../components/expo-shell/vehicles/CompactVehicleContextRow";
+import { InternalScreenChrome } from "../../../../components/expo-shell/internal-screen-chrome";
+import { GarageVehicleContextPlaque } from "../../../../components/garage/GarageVehicleContextPlaque";
 
 type PartsStatusFilter = PartWishlistItemStatus | "ALL";
 const INITIAL_VISIBLE_COUNT = 10;
@@ -172,11 +172,6 @@ function formatSummaryAmountRubCompact(amount: number): string {
     return "—";
   }
   return `${formatExpenseAmountRu(amount)} ₽`;
-}
-
-function formatYearOdometerLine(vehicle: VehicleDetail): string {
-  const year = vehicle.modelVariant?.year ?? vehicle.year;
-  return `${year || "—"} · ${vehicle.odometer.toLocaleString("ru-RU")} км`;
 }
 
 /** Как web `PartsCartPage`: повтор для заказано / куплено / установлено при привязке к узлу. */
@@ -494,11 +489,6 @@ export default function VehicleWishlistScreen() {
     () => (vehicle ? buildVehicleDetailViewModel(vehicle) : null),
     [vehicle]
   );
-  const vehicleSubtitleLine = useMemo(
-    () => (vehicle ? formatYearOdometerLine(vehicle) : ""),
-    [vehicle]
-  );
-
   useEffect(() => {
     if (!highlightedWishlistItemId || items.length === 0 || !vehicleId) {
       return;
@@ -828,18 +818,23 @@ export default function VehicleWishlistScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScreenHeader title="Корзина замен и расходников" />
+      <InternalScreenChrome
+        crumbs={[
+          { label: "Мой гараж", href: "/" },
+          {
+            label: vehicle && vehicleCardVm ? vehicleCardVm.displayName : "Мотоцикл",
+            href: `/vehicles/${vehicleId}`,
+          },
+          { label: "Корзина замен" },
+        ]}
+        title="Корзина замен и расходников"
+        belowNavRow={
+          vehicle ? (
+            <GarageVehicleContextPlaque vehicle={vehicle} currentVehicleId={vehicleId} />
+          ) : null
+        }
+      />
       <View style={styles.mainColumn}>
-        {vehicle && vehicleCardVm ? (
-          <CompactVehicleContextRow
-            style={styles.vehicleContextRow}
-            vehicle={vehicle}
-            title={vehicleCardVm.displayName}
-            subtitle={vehicleSubtitleLine}
-            onPress={() => router.push(`/vehicles/${vehicleId}`)}
-          />
-        ) : null}
-
         <Text style={styles.pageSubtitle}>Список запчастей и расходников</Text>
 
         <ScrollView
@@ -1651,10 +1646,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: c.textMuted,
     lineHeight: 18,
-  },
-  vehicleContextRow: {
-    marginHorizontal: 16,
-    marginBottom: 8,
   },
   sectionHint: {
     fontSize: 12,

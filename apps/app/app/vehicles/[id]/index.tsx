@@ -111,7 +111,8 @@ import {
 import { StatusExplanationModal } from "../../../components/vehicle-detail/status-explanation-modal";
 import { ActionIconButton } from "../../../components/expo-shell/action-icon-button";
 import { AppScreenHelpBar } from "../../../components/expo-shell/app-screen-help-bar";
-import { ScreenHeader } from "../../../components/expo-shell/screen-header";
+import { InternalScreenChrome } from "../../../components/expo-shell/internal-screen-chrome";
+import { GarageVehicleContextPlaque } from "../../../components/garage/GarageVehicleContextPlaque";
 import { HelpTriggerButton } from "../../../src/components/app-help-fab";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import adventureTouringSilhouette from "../../../../../images/Motocycles/adventure_touring.png";
@@ -1907,8 +1908,14 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       >
         {isNodeTreePage ? (
           <>
-            <ScreenHeader
+            <InternalScreenChrome
+              crumbs={[
+                { label: "Мой гараж", href: "/" },
+                { label: detailViewModel.displayName, href: `/vehicles/${vehicleId}` },
+                { label: "Дерево узлов" },
+              ]}
               title="Дерево узлов"
+              belowNavRow={<GarageVehicleContextPlaque vehicle={vehicle} currentVehicleId={vehicleId} />}
               onBack={() => {
                 if (router.canGoBack()) {
                   router.back();

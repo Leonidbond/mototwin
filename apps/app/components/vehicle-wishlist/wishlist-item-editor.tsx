@@ -33,6 +33,8 @@ import {
   partWishlistStatusLabelsRu,
   validatePartWishlistFormValues,
   isWishlistTransitionToInstalled,
+  vehicleDetailFromApiRecord,
+  buildVehicleDetailViewModel,
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
 } from "@mototwin/domain";
 import type {
@@ -43,10 +45,13 @@ import type {
   PartWishlistFormValues,
   PartWishlistItem,
   PartWishlistItemStatus,
+  VehicleDetail,
+  VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../src/api-base-url";
-import { ScreenHeader } from "../expo-shell/screen-header";
+import { InternalScreenChrome } from "../expo-shell/internal-screen-chrome";
+import { GarageVehicleContextPlaque } from "../garage/GarageVehicleContextPlaque";
 import { buildServiceEventNewFromWishlistHref } from "./hrefs";
 import { MobileNodePickerModal } from "../vehicle-detail/mobile-node-picker-modal";
 
@@ -87,6 +92,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
   const [recommendationsError, setRecommendationsError] = useState("");
   const wishlistSkuSearchGen = useRef(0);
   const [loadedWishlistItem, setLoadedWishlistItem] = useState<PartWishlistItem | null>(null);
+  const [contextVehicleDetail, setContextVehicleDetail] = useState<VehicleDetail | null>(null);
 
   const costLinePreviewRu = useMemo(() => {
     const qtyRaw = form.quantity.trim();
@@ -118,6 +124,10 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
     (): PartRecommendationGroup[] => buildPartRecommendationGroupsForDisplay(recommendations),
     [recommendations]
   );
+  const vehicleCrumbLabel = useMemo(
+    () => (contextVehicleDetail ? buildVehicleDetailViewModel(contextVehicleDetail).displayName : "Мотоцикл"),
+    [contextVehicleDetail]
+  );
 
   const load = useCallback(async () => {
     if (!vehicleId) {
@@ -129,6 +139,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
     try {
       setIsLoading(true);
       setLoadError("");
+      setContextVehicleDetail(null);
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
       const itemIdSafe = itemId.trim();
@@ -137,10 +148,13 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
         setIsLoading(false);
         return;
       }
-      const [tree, wishlist] = await Promise.all([
+      const [tree, wishlist, vehicleRes] = await Promise.all([
         endpoints.getNodeTree(vehicleId),
         endpoints.getVehicleWishlist(vehicleId),
+        endpoints.getVehicleDetail(vehicleId),
       ]);
+      const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
+      setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
       const nodes = tree.nodeTree ?? [];
       setNodeTreeOptions(
         flattenNodeTreeToSelectOptions(nodes).map((option) => ({
@@ -372,7 +386,20 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScreenHeader title="Редактирование позиции" />
+      <InternalScreenChrome
+        crumbs={[
+          { label: "Мой гараж", href: "/" },
+          { label: vehicleCrumbLabel, href: `/vehicles/${vehicleId}` },
+          { label: "Корзина замен", href: `/vehicles/${vehicleId}/wishlist` },
+          { label: "Позиция" },
+        ]}
+        title="Редактирование позиции"
+        belowNavRow={
+          contextVehicleDetail ? (
+            <GarageVehicleContextPlaque vehicle={contextVehicleDetail} currentVehicleId={vehicleId} />
+          ) : null
+        }
+      />
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}
         behavior={Platform.OS === "ios" ? "padding" : "height"}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,13 +16,24 @@ import {
   normalizeAddServiceEventPayload,
   normalizeEditServiceEventPayload,
   parseExpenseAmountInputToNumberOrNull,
+  vehicleDetailFromApiRecord,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import type { AddServiceEventFormValues, NodeTreeItem, PartWishlistItem } from "@mototwin/types";
+import type {
+  AddServiceEventFormValues,
+  NodeTreeItem,
+  PartWishlistItem,
+  VehicleDetail,
+  VehicleDetailApiRecord,
+} from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
-import { ScreenHeader } from "../../../../components/expo-shell/screen-header";
+import {
+  InternalScreenChrome,
+  type InternalScreenCrumb,
+} from "../../../../components/expo-shell/internal-screen-chrome";
 import { BasicServiceEventBundleForm } from "../../../../components/vehicle-detail/basic-service-event-bundle-form";
+import { GarageVehicleContextPlaque } from "../../../../components/garage/GarageVehicleContextPlaque";
 
 export default function NewServiceEventScreen() {
   const router = useRouter();
@@ -76,11 +87,42 @@ export default function NewServiceEventScreen() {
   const [bundleSessionKey, setBundleSessionKey] = useState(0);
   const [currentVehicleOdometer, setCurrentVehicleOdometer] = useState<number | null>(null);
   const [currentVehicleEngineHours, setCurrentVehicleEngineHours] = useState<number | null>(null);
+  const [vehicleDisplayName, setVehicleDisplayName] = useState("");
+  const [contextVehicleDetail, setContextVehicleDetail] = useState<VehicleDetail | null>(null);
 
   const isEditMode = editingEventId.length > 0;
   const isRepeatMode = !isEditMode && repeatFromId.length > 0;
 
   const clearError = useCallback(() => setError(""), []);
+
+  const headerCrumbs = useMemo((): InternalScreenCrumb[] => {
+    const bike = vehicleDisplayName || "Мотоцикл";
+    const crumbs: InternalScreenCrumb[] = [
+      { label: "Мой гараж", href: "/" },
+      { label: bike, href: `/vehicles/${vehicleId}` },
+    ];
+    const fromWishlist =
+      source === "wishlist" ||
+      wishlistItemIdParam.length > 0 ||
+      wlIdFromQuery.trim().length > 0;
+    if (fromWishlist) {
+      crumbs.push({ label: "Корзина", href: `/vehicles/${vehicleId}/wishlist` });
+    } else if (source === "service-log") {
+      crumbs.push({ label: "Журнал", href: `/vehicles/${vehicleId}/service-log` });
+    }
+    crumbs.push({
+      label: isEditMode ? "Редактирование" : isRepeatMode ? "Повтор записи" : "Новое событие",
+    });
+    return crumbs;
+  }, [
+    vehicleDisplayName,
+    vehicleId,
+    source,
+    wishlistItemIdParam,
+    wlIdFromQuery,
+    isEditMode,
+    isRepeatMode,
+  ]);
 
   useEffect(() => {
     const load = async () => {
@@ -93,6 +135,7 @@ export default function NewServiceEventScreen() {
       try {
         setIsLoading(true);
         setError("");
+        setContextVehicleDetail(null);
         const defaultCurrency = DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
@@ -106,6 +149,9 @@ export default function NewServiceEventScreen() {
         setNodeTree(nextTree);
 
         const v = vehicleData.vehicle;
+        setVehicleDisplayName(v?.displayName?.trim() || "Мотоцикл");
+        const rawV = v as VehicleDetailApiRecord | null | undefined;
+        setContextVehicleDetail(rawV ? vehicleDetailFromApiRecord(rawV) : null);
         const vehicleOdometer = v?.odometer ?? null;
         const vehicleEngineHours = v?.engineHours ?? null;
         const todayYmd = getTodayDateYmdLocal();
@@ -334,9 +380,15 @@ export default function NewServiceEventScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScreenHeader
+      <InternalScreenChrome
+        crumbs={headerCrumbs}
         title={
           isEditMode ? "Редактировать сервисное событие" : "Добавить сервисное событие"
+        }
+        belowNavRow={
+          contextVehicleDetail ? (
+            <GarageVehicleContextPlaque vehicle={contextVehicleDetail} currentVehicleId={vehicleId} />
+          ) : null
         }
       />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>

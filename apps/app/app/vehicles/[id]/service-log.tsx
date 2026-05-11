@@ -19,6 +19,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import type {
   NodeTreeItem,
+  VehicleDetail,
+  VehicleDetailApiRecord,
   ServiceActionType,
   ServiceEventItem,
   ServiceEventsFilters,
@@ -32,6 +34,7 @@ import type {
 } from "@mototwin/types";
 import {
   buildServiceLogTimelineProps,
+  vehicleDetailFromApiRecord,
   expenseCategoryLabelsRu,
   filterLeafOptionsUnderTopNodeAncestors,
   filterPaidServiceEvents,
@@ -50,7 +53,8 @@ import {
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../../components/expo-shell/keyboard-aware-scroll-screen";
-import { ScreenHeader } from "../../../components/expo-shell/screen-header";
+import { InternalScreenChrome } from "../../../components/expo-shell/internal-screen-chrome";
+import { GarageVehicleContextPlaque } from "../../../components/garage/GarageVehicleContextPlaque";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import { buildVehicleWishlistItemHighlightHref } from "../../../components/vehicle-wishlist/hrefs";
 import { MobileNodePickerModal, type MobileNodePickerOption } from "../../../components/vehicle-detail/mobile-node-picker-modal";
@@ -1027,6 +1031,8 @@ export default function ServiceLogScreen() {
   } | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [vehicleDisplayName, setVehicleDisplayName] = useState("");
+  const [contextVehicleDetail, setContextVehicleDetail] = useState<VehicleDetail | null>(null);
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
   const [datePickField, setDatePickField] = useState<null | "from" | "to">(null);
@@ -1073,6 +1079,7 @@ export default function ServiceLogScreen() {
     const leafOptions = getLeafNodeOptions(nodeTree);
     return leafOptions.map((leaf) => ({
       id: leaf.id,
+      code: leaf.code,
       name: leaf.name,
       level: leaf.level,
       pathLabel: nodeAncestorPathLabelRu(nodeTree, leaf.id),
@@ -1196,16 +1203,21 @@ export default function ServiceLogScreen() {
       try {
         setIsLoading(true);
         setError("");
+        setContextVehicleDetail(null);
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
-        const [data, treeRes, topRes] = await Promise.all([
+        const [data, treeRes, topRes, vehicleRes] = await Promise.all([
           endpoints.getServiceEvents(vehicleId),
           endpoints.getNodeTree(vehicleId),
           endpoints.getTopServiceNodes(),
+          endpoints.getVehicleDetail(vehicleId),
         ]);
         setEvents(data.serviceEvents ?? []);
         setNodeTree(treeRes.nodeTree ?? []);
         setTopServiceNodes(topRes.nodes ?? []);
+        setVehicleDisplayName(vehicleRes.vehicle?.displayName?.trim() || "Мотоцикл");
+        const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
+        setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
       } catch (err) {
         console.error(err);
         setError("Не удалось загрузить журнал обслуживания.");
@@ -1445,8 +1457,18 @@ export default function ServiceLogScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScreenHeader
+      <InternalScreenChrome
+        crumbs={[
+          { label: "Мой гараж", href: "/" },
+          { label: vehicleDisplayName || "Мотоцикл", href: `/vehicles/${vehicleId}` },
+          { label: "Журнал обслуживания" },
+        ]}
         title="Журнал обслуживания"
+        belowNavRow={
+          contextVehicleDetail ? (
+            <GarageVehicleContextPlaque vehicle={contextVehicleDetail} currentVehicleId={vehicleId} />
+          ) : null
+        }
         onBack={() => {
           if (returnOrigin === "attention") {
             const q = new URLSearchParams({ returnFocus: "attention" });
@@ -1467,25 +1489,18 @@ export default function ServiceLogScreen() {
           router.replace(`/vehicles/${vehicleId}`);
         }}
       />
+      <View style={styles.journalToolbarBelow}>
+        <Pressable
+          style={({ pressed }) => [styles.journalAddButton, pressed && styles.addButtonPressed]}
+          onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
+        >
+          <Text style={styles.addButtonText}>Добавить сервисное событие</Text>
+        </Pressable>
+      </View>
       <KeyboardAwareScrollScreen
         contentContainerStyle={styles.scrollContent}
         scrollViewRef={scrollRef}
       >
-        <View style={styles.topActionsRow}>
-          <Pressable
-            style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-            onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
-          >
-            <Text style={styles.addButtonText}>Добавить сервисное событие</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.expensesButton, pressed && styles.expensesButtonPressed]}
-            onPress={() => router.push(`/vehicles/${vehicleId}/expenses`)}
-          >
-            <Text style={styles.expensesButtonText}>Статистика расходов</Text>
-          </Pressable>
-        </View>
-
         {actionMessage ? (
           <View
             style={[
@@ -2009,12 +2024,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
-  addButton: {
-    flex: 1,
+  journalToolbarBelow: {
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
+  journalAddButton: {
     backgroundColor: c.primaryAction,
     borderRadius: 12,
-    minHeight: 42,
-    paddingHorizontal: 10,
+    minHeight: 44,
+    paddingHorizontal: 14,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2023,31 +2041,6 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: c.onPrimaryAction,
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  expensesButton: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    backgroundColor: c.card,
-    minHeight: 42,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  topActionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 14,
-  },
-  expensesButtonPressed: {
-    opacity: 0.9,
-  },
-  expensesButtonText: {
-    color: c.textPrimary,
     fontSize: 13,
     fontWeight: "700",
     textAlign: "center",

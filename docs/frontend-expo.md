@@ -26,9 +26,12 @@ Defined in `apps/app/app/_layout.tsx`:
 - `vehicles/[id]/wishlist/*` — полный список покупок, picker, редактирование позиции
 
 Переиспользуемые экранные блоки вынесены из `app/**` в **`apps/app/components/`**:
-- `expo-shell/` — `ScreenHeader`, `KeyboardAwareScrollScreen`, `ActionIconButton`, контекст ТС и т.п.
+- `expo-shell/` — `ScreenHeader`, **`InternalScreenChrome`** (крошки + заголовок + опциональные действия), `KeyboardAwareScrollScreen`, `ActionIconButton`, контекст ТС и т.п.
+- `garage/` — **`GarageVehicleContextPlaque`**: компактная плашка мотоцикла под крошками (слот `belowNavRow` у `InternalScreenChrome`), переход на дашборд ТС по тапу, смена мотоцикла из гаража с сохранением хвоста маршрута (паритет с web `SidebarVehiclePlaque` / `GarageSidebar`). Хелпер пути: `apps/app/src/garage-vehicle-route.ts` (`replaceVehicleIdInPath`). Для query при смене ТС используется **`useGlobalSearchParams`** (в этой версии Expo Router **`useSearchParams` из пакета не экспортируется**).
 - `vehicle-detail/` — bundle-форма сервисного события, `MobileNodePickerModal`, модалки статуса
 - `vehicle-wishlist/` — блоки picker/корзины, редактор позиции, href-хелперы
+
+**Где подключён `InternalScreenChrome` + плашка:** дерево узлов (`vehicles/[id]/index` в режиме nodes), журнал, расходы, корзина замен, подбор (`wishlist/picker`), форма ТО (`service-events/new`), редактор позиции wishlist. Простые экраны (`ScreenHeader` без крошек) — профиль, свалка, добавление мото и т.д.
 
 ## 3. Main Expo flows
 
@@ -114,6 +117,7 @@ Defined in `apps/app/app/_layout.tsx`:
   - `getMonthlyCostLabel`
 - Supports filters/sort with collapsible toolbar (default collapsed)
 - Distinguishes `SERVICE` vs `STATE_UPDATE`
+- Шапка: **`InternalScreenChrome`**; кнопка **«Добавить сервисное событие»** — отдельной полосой **под** заголовком (не в одной строке с заголовком). Кнопка перехода к экрану расходов из шапки журнала убрана (расходы доступны из нижней навигации и сценариев карточек).
 - Action to `vehicles/[id]/service-events/new`
 
 ### 3.5 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `components/vehicle-detail/basic-service-event-bundle-form.tsx`)
@@ -136,7 +140,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - **Deep link из журнала** (`wishlistItemId` и др. через `vehicles/[id]/parts.tsx`): после фокуса на строке и открытия детальной панели экран **не** делает `router.replace` на `/vehicles/[id]/wishlist` без query — иначе срабатывает повторный `useFocusEffect` → `load()`, возможен сброс состояния и скачок фильтра **«Установленные» → «Все»**. Поведение согласовано с комментарием у `applyWishlistRowFocus`: лишняя смена URL не нужна для стабильного UI.
 - **Repeat purchase** from the cart matches web `PartsCartPage`: confirmation modal, `createWishlistItem` with `NEEDED`, comment suffix «Повтор из корзины замен», no cost copy, then filter to NEEDED. Фокус на новую строку (**`applyWishlistRowFocus`**) вызывается **после** закрытия системного **`Alert`** (кнопка «OK»), чтобы не совмещать **`Modal`** детали и **`Alert`** в одном кадре — иначе на React Native возможен «пустой» экран и подвисание. Перед показом модалки подтверждения «Повторить покупку» вызывается **`openRepeatPurchaseConfirm`**: закрыть лист детали / меню статуса, затем **`InteractionManager.runAfterInteractions`** — иначе второй **`Modal`** поверх первого часто не отображается.
 - Сценарий **`picked=`** после подбора: сначала показывается **`Alert` «Готово»**; **`router.replace`** (сброс query) и открытие листа детали со скроллом выполняются **в `onPress` «OK»** — та же причина (избежать конфликта Modal + Alert и отмены таймеров при смене URL до показа алерта).
-- **Picker** (`vehicles/[id]/wishlist/picker.tsx`): при добавлении SKU или комплекта в черновик **автоматически открывается нижний лист корзины** (`PickerDraftCartSheet`), чтобы сразу менять количество без лишнего тапа по бару корзины. Модалка превью сабмита как на web (`quantityUpgrade`: **`addAllFromDraft`** / **`setQtyToDraft`** с теми же правилами **`max(existing, draft)`** и **`noOpQuantityUpdates`**); **`submitPickerDraft`**; редирект с **`picked=`**.
+- **Picker** (`vehicles/[id]/wishlist/picker.tsx`): при добавлении SKU или комплекта в черновик **автоматически открывается нижний лист корзины** (`PickerDraftCartSheet`), чтобы сразу менять количество без лишнего тапа по бару корзины. Модалка превью сабмита как на web (`quantityUpgrade`: **`addAllFromDraft`** / **`setQtyToDraft`** с теми же правилами **`max(existing, draft)`** и **`noOpQuantityUpdates`**); **`submitPickerDraft`**; редирект с **`picked=`**. Бар черновика **`PickerDraftCartBar`** с `placement="inline"` стоит **под шапкой** (сразу под `InternalScreenChrome`), чтобы не перекрывать **`GarageBottomNav`** внизу экрана.
 
 ## 4. Expo-specific technical notes
 

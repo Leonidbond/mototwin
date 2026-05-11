@@ -39,15 +39,23 @@ export function PickerDraftCartBar(props: {
   bottomInset: number;
   onCheckout: () => void;
   onOpenSheet: () => void;
+  /** `inline` — сразу под шапкой; `footer` — закреплено у нижнего края экрана */
+  placement?: "footer" | "inline";
 }) {
+  const placement = props.placement ?? "footer";
   const totals = useMemo(() => getDraftTotals(props.draft), [props.draft]);
   const isEmpty = props.draft.items.length === 0;
   const positionsText = isEmpty
     ? "Корзина пуста"
     : `Корзина (${totals.positionsCount} ${positionsLabel(totals.positionsCount)})`;
 
+  const barStyle =
+    placement === "inline"
+      ? [styles.bar, styles.barInline, { paddingBottom: 8 }]
+      : [styles.bar, { paddingBottom: 10 + props.bottomInset }];
+
   return (
-    <View style={[styles.bar, { paddingBottom: 10 + props.bottomInset }]}>
+    <View style={barStyle}>
       <Pressable
         onPress={isEmpty ? undefined : props.onOpenSheet}
         disabled={isEmpty}
@@ -274,6 +282,12 @@ const styles = StyleSheet.create({
     backgroundColor: c.card,
     borderTopWidth: 1,
     borderTopColor: c.borderStrong,
+  },
+  barInline: {
+    borderTopWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: c.borderStrong,
+    paddingTop: 8,
   },
   left: {
     flex: 1,

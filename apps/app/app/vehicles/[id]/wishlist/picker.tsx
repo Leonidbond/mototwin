@@ -31,7 +31,6 @@ import {
   createEmptyDraftCart,
   filterActiveWishlistItems,
   filterLeafOptionsUnderTopNodeAncestors,
-  formatRideStyleChipRu,
   getLeafNodeOptions,
   getNodePathItemViewModelsByNodeId,
   getOrderedTopNodeIdsPresentInNodeTree,
@@ -60,9 +59,10 @@ import type {
   VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
+import { InternalScreenChrome } from "../../../../components/expo-shell/internal-screen-chrome";
 import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
 import { GarageBottomNav } from "../../../../components/garage/GarageBottomNav";
-import { CompactVehicleContextRow } from "../../../../components/expo-shell/vehicles/CompactVehicleContextRow";
+import { GarageVehicleContextPlaque } from "../../../../components/garage/GarageVehicleContextPlaque";
 import { PickerNodeCtaBar } from "../../../../components/vehicle-wishlist/picker-node-cta";
 import { PickerRecommendationsSection } from "../../../../components/vehicle-wishlist/picker-recommendations-section";
 import { PickerSearchResultsSection } from "../../../../components/vehicle-wishlist/picker-search-results-section";
@@ -152,14 +152,6 @@ function formatSubmitResultMessage(result: PickerSubmitResult): string {
     }
   }
   return lines.join("\n");
-}
-
-function formatYearOdometerLine(vehicle: VehicleDetail): string {
-  const year = vehicle.modelVariant?.year ?? vehicle.year;
-  const odometerLabel = vehicle.odometer.toLocaleString("ru-RU");
-  const ride = formatRideStyleChipRu(vehicle.rideProfile);
-  const base = `${year || "—"} · ${odometerLabel} км`;
-  return ride ? `${base} · ${ride}` : base;
 }
 
 function vehicleDisplayName(vehicle: VehicleDetail | null): string {
@@ -648,25 +640,6 @@ export default function WishlistPickerScreen() {
     ]);
   }, []);
 
-  if (!vehicleId) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <PickerHeader onBack={() => router.back()} />
-        <Text style={styles.muted}>Не удалось определить мотоцикл.</Text>
-      </SafeAreaView>
-    );
-  }
-
-  const showSearchResults = debouncedSearch.length >= 2;
-  const vehicleName = vehicleDisplayName(vehicle);
-  const vehicleSubtitle = vehicle ? formatYearOdometerLine(vehicle) : "";
-
-  const canConfirmPickerSubmit =
-    submitPreview != null &&
-    (submitPreview.willAddCount > 0 || submitPreview.quantityUpgradeCount > 0) &&
-    (submitPreview.quantityUpgradeCount === 0 ||
-      arePickerQuantityResolutionsComplete(submitPreview, quantityResolutionByDraftId));
-
   const submitPieceDelta = useMemo(() => {
     if (!submitPreview) return null;
     return computePickerSubmitWishlistPieceDelta(submitPreview, quantityResolutionByDraftId);
@@ -677,14 +650,62 @@ export default function WishlistPickerScreen() {
     return computePickerSubmitPriceEstimate(draft, submitPreview, quantityResolutionByDraftId);
   }, [draft, submitPreview, quantityResolutionByDraftId]);
 
+  if (!vehicleId) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <InternalScreenChrome
+          crumbs={[{ label: "Мой гараж", href: "/" }, { label: "Подбор детали" }]}
+          title="Подбор детали"
+          onBack={() => router.back()}
+          showHelp={false}
+        />
+        <Text style={styles.muted}>Не удалось определить мотоцикл.</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const showSearchResults = debouncedSearch.length >= 2;
+  const vehicleName = vehicleDisplayName(vehicle);
+
+  const canConfirmPickerSubmit =
+    submitPreview != null &&
+    (submitPreview.willAddCount > 0 || submitPreview.quantityUpgradeCount > 0) &&
+    (submitPreview.quantityUpgradeCount === 0 ||
+      arePickerQuantityResolutionsComplete(submitPreview, quantityResolutionByDraftId));
+
+  const scrollBottomPad = 24 + 72 + insets.bottom;
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      <PickerHeader onBack={() => router.replace(`/vehicles/${vehicleId}/wishlist`)} />
+      <InternalScreenChrome
+        crumbs={[
+          { label: "Мой гараж", href: "/" },
+          { label: vehicleName, href: `/vehicles/${vehicleId}` },
+          { label: "Корзина замен", href: `/vehicles/${vehicleId}/wishlist` },
+          { label: "Подбор детали" },
+        ]}
+        title="Подбор детали"
+        onBack={() => router.replace(`/vehicles/${vehicleId}/wishlist`)}
+        showHelp={false}
+        belowNavRow={
+          vehicle ? (
+            <GarageVehicleContextPlaque vehicle={vehicle} currentVehicleId={vehicleId} />
+          ) : null
+        }
+      />
+      <PickerDraftCartBar
+        draft={draft}
+        isSubmitting={submitting}
+        bottomInset={0}
+        placement="inline"
+        onCheckout={openSubmit}
+        onOpenSheet={() => setDraftSheetOpen(true)}
+      />
       <View style={styles.flex}>
         <KeyboardAwareScrollScreen
           scrollViewRef={scrollRef}
-          keyboardVerticalOffset={insets.top + 52}
-          contentContainerStyle={styles.scrollContent}
+          keyboardVerticalOffset={insets.top + 140}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
           scrollViewProps={{
             onScrollBeginDrag: () => Keyboard.dismiss(),
           }}
@@ -698,17 +719,6 @@ export default function WishlistPickerScreen() {
             </View>
           ) : (
             <>
-              {vehicle ? (
-                <CompactVehicleContextRow
-                  vehicle={vehicle}
-                  title={vehicleName}
-                  subtitle={vehicleSubtitle}
-                  silhouetteWidth={64}
-                  silhouetteHeight={42}
-                  onPress={() => router.push(`/vehicles/${vehicleId}`)}
-                />
-              ) : null}
-
               <PickerNodeCtaBar
                 hasSelectedNode={Boolean(selectedNodeId)}
                 nodeName={selectedNodeName}
@@ -815,14 +825,6 @@ export default function WishlistPickerScreen() {
             </>
           )}
         </KeyboardAwareScrollScreen>
-
-        <PickerDraftCartBar
-          draft={draft}
-          isSubmitting={submitting}
-          bottomInset={0}
-          onCheckout={openSubmit}
-          onOpenSheet={() => setDraftSheetOpen(true)}
-        />
 
         <GarageBottomNav
           onOpenGarage={goGarage}
@@ -1139,26 +1141,6 @@ function formatPickerSubmitPriceRu(amount: number, currency: string | null): str
   return sym ? `${numFmt} ${sym}` : numFmt;
 }
 
-function PickerHeader(props: { onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable
-        onPress={props.onBack}
-        accessibilityRole="button"
-        accessibilityLabel="Назад"
-        hitSlop={10}
-        style={({ pressed }) => [styles.headerBack, pressed && { opacity: 0.8 }]}
-      >
-        <MaterialIcons name="chevron-left" size={26} color={c.textPrimary} />
-      </Pressable>
-      <Text style={styles.headerTitle} numberOfLines={1}>
-        Подбор детали
-      </Text>
-      <View style={styles.headerRightSpacer} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.canvas },
   flex: { flex: 1 },
@@ -1167,31 +1149,6 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 24,
     gap: 14,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    backgroundColor: c.canvas,
-  },
-  headerBack: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 17,
-    fontWeight: "800",
-    color: c.textPrimary,
-  },
-  headerRightSpacer: {
-    width: 40,
-    height: 40,
   },
   searchRow: {
     flexDirection: "row",
