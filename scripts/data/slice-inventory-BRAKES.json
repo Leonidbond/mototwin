@@ -1,0 +1,47 @@
+[
+  {
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 0,
+    "outRel": "by-label/BRAKES/BRAKES-Зад-перед-тормоз-разделы-s000.png"
+  },
+  {
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 1,
+    "outRel": "by-label/BRAKES/BRAKES-Зад-перед-тормоз-разделы-s001.png"
+  },
+  {
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 2,
+    "outRel": "by-label/BRAKES/BRAKES-Зад-перед-тормоз-разделы-s002.png"
+  },
+  {
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 3,
+    "outRel": "by-label/BRAKES/BRAKES-Зад-перед-тормоз-разделы-s003.png"
+  },
+  {
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 4,
+    "outRel": "by-label/BRAKES/BRAKES-Зад-перед-тормоз-разделы-s004.png"
+  },
+  {
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 5,
+    "outRel": "by-label/BRAKES/BRAKES-Зад-перед-тормоз-разделы-s005.png"
+  },
+  {
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 6,
+    "outRel": "by-label/BRAKES/BRAKES-Зад-перед-тормоз-разделы-s006.png"
+  },
+  {
+    "sourceRel": "BRAKES/Тормоз + ABS.png",
+    "sliceIndex": 0,
+    "outRel": "by-label/BRAKES/тормоза.png"
+  },
+  {
+    "sourceRel": "BRAKES/Тормоз + ABS.png",
+    "sliceIndex": 1,
+    "outRel": "by-label/BRAKES/abs-датчики-abs.png"
+  }
+]

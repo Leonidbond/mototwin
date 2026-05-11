@@ -8,7 +8,6 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createApiClient,
@@ -37,6 +36,7 @@ import {
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import type {
   NodeTreeItem,
   PartRecommendationViewModel,
@@ -421,6 +421,7 @@ export function PartPickerPage({
     const leaves = getLeafNodeOptions(nodeTree);
     return leaves.map((opt) => ({
       id: opt.id,
+      code: opt.code,
       name: opt.name,
       pathLabel: nodeAncestorPathLabelRu(nodeTree, opt.id),
     }));
@@ -651,6 +652,20 @@ export function PartPickerPage({
     }
   }, [submitPreview, quantityResolutionByDraftId, draft, vehicleId, router]);
 
+  const vehicleLabelForCrumbs = vehicle
+    ? vehicle.nickname || `${vehicle.brandName} ${vehicle.modelName}`
+    : "Мотоцикл";
+
+  const pickerBreadcrumbs = useMemo(
+    () => [
+      { label: "Гараж", href: "/garage" },
+      { label: vehicleLabelForCrumbs, href: `/vehicles/${encodeURIComponent(vehicleId)}` },
+      { label: "Корзина", href: `/vehicles/${encodeURIComponent(vehicleId)}/parts` },
+      { label: "Подбор" },
+    ],
+    [vehicleId, vehicleLabelForCrumbs]
+  );
+
   const showSearchResults = debouncedSearch.trim().length >= 2;
   const centerLoading = vehicleLoading || nodeTreeLoading;
   const hasLeafNodes = leafPickerOptions.length > 0;
@@ -714,16 +729,13 @@ export function PartPickerPage({
 
           {!vehicleError ? (
             <>
-              <div style={topBarStyle}>
-                <Link
-                  href={`/vehicles/${encodeURIComponent(vehicleId)}/parts`}
-                  className="no-underline"
-                  style={backLinkStyle}
-                >
-                  ← К корзине
-                </Link>
-                <h1 style={pageTitleStyle}>Подбор детали</h1>
-              </div>
+              <InternalPageChrome
+                variant="garageDark"
+                onBack={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts`)}
+                backLabel="Назад к корзине"
+                breadcrumbs={pickerBreadcrumbs}
+                title="Подбор детали"
+              />
 
               {nodeTreeError ? (
                 <div style={{ ...bannerBaseStyle, ...bannerVariantStyle("error") }}>{nodeTreeError}</div>
@@ -770,6 +782,7 @@ export function PartPickerPage({
                         <NodeChip
                           nodeName={nodeNameForUi}
                           nodePath={nodePathLabel}
+                          nodeCode={selectedPathVm?.at(-1)?.code ?? null}
                           onClick={() => setNodePickerOpen(true)}
                         />
                         <ResetSelectionChip
@@ -994,35 +1007,6 @@ function bannerVariantStyle(kind: PickerBannerState["kind"]): CSSProperties {
     color: productSemanticColors.successText,
   };
 }
-
-const topBarStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 14,
-  marginBottom: 8,
-  minWidth: 0,
-  width: "100%",
-};
-
-const backLinkStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 600,
-  color: productSemanticColors.textSecondary,
-  flexShrink: 0,
-};
-
-const pageTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 26,
-  fontWeight: 800,
-  color: productSemanticColors.textPrimary,
-  letterSpacing: -0.3,
-  minWidth: 0,
-  flex: 1,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-};
 
 const mutedBoxStyle: CSSProperties = {
   padding: 24,

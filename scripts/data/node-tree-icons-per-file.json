@@ -1,22 +1,57 @@
 {
-  "2 Топливная система + разделы.png": {
+  "FUEL/2 Топливная система + разделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 68, "y1": 205, "gapMerge": 50, "minArea": 700, "pad": 12 },
-      { "kind": "cc_strip", "y0": 315, "y1": 455, "gapMerge": 28, "minArea": 350, "pad": 12 },
-      { "kind": "cc_strip", "y0": 658, "y1": 815, "gapMerge": 40, "minArea": 350, "pad": 12 }
+      {
+        "kind": "cc_strip",
+        "y0": 68,
+        "y1": 205,
+        "gapMerge": 50,
+        "minArea": 700,
+        "pad": 12
+      },
+      {
+        "kind": "cc_strip",
+        "y0": 315,
+        "y1": 455,
+        "gapMerge": 28,
+        "minArea": 350,
+        "pad": 12
+      },
+      {
+        "kind": "cc_strip",
+        "y0": 658,
+        "y1": 815,
+        "gapMerge": 40,
+        "minArea": 350,
+        "pad": 12
+      }
     ]
   },
-  "1 Двигатель/0 Двигатель + 1 Верх двигателя+ разделы.png": {
+  "ENGINE/0 Двигатель + 1 Верх двигателя+ разделы.png": {
     "bg": "gray",
     "inkMin": 96,
     "steps": [
-      { "kind": "cc_strip", "y0": 215, "y1": 395, "gapMerge": 22, "minArea": 450, "pad": 12 },
-      { "kind": "cc_strip", "y0": 582, "y1": 738, "gapMerge": 45, "minArea": 280, "pad": 12 }
+      {
+        "kind": "cc_strip",
+        "y0": 215,
+        "y1": 395,
+        "gapMerge": 22,
+        "minArea": 450,
+        "pad": 12
+      },
+      {
+        "kind": "cc_strip",
+        "y0": 582,
+        "y1": 738,
+        "gapMerge": 45,
+        "minArea": 280,
+        "pad": 12
+      }
     ]
   },
-  "1 Двигатель/2 ГРМ + разделы.png": {
+  "ENGINE/2 ГРМ + разделы.png": {
     "bg": "gray",
     "inkMin": 96,
     "steps": [
@@ -30,30 +65,90 @@
       }
     ]
   },
-  "1 Двигатель/3-7 заголовки Низ двиг : смазка : сцеп : кпп : зап двиг.png": {
+  "ENGINE/3-7 заголовки Низ двиг : смазка : сцеп : кпп : зап двиг.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "equal_cols", "y0": 332, "y1": 520, "cols": 5, "pad": 32 }
+      {
+        "kind": "equal_cols",
+        "y0": 332,
+        "y1": 520,
+        "cols": 5,
+        "pad": 32
+      }
     ]
   },
-  "1 Двигатель/3-7 разделы Низ двиг : смазка : сцеп : кпп : зап двиг ВСЕ.png": {
+  "ENGINE/3-7 разделы Низ двиг : смазка : сцеп : кпп : зап двиг ВСЕ.png": {
     "bg": "gray",
     "inkMin": 96,
     "steps": [
-      { "kind": "cc_region", "left": 24, "top": 150, "width": 500, "height": 360, "gapMerge": 18, "minArea": 120, "pad": 10 },
-      { "kind": "cc_region", "left": 518, "top": 150, "width": 500, "height": 360, "gapMerge": 14, "minArea": 90, "pad": 10 },
-      { "kind": "cc_region", "left": 1012, "top": 150, "width": 500, "height": 360, "gapMerge": 16, "minArea": 100, "pad": 10 },
-      { "kind": "cc_region", "left": 80, "top": 520, "width": 660, "height": 360, "gapMerge": 20, "minArea": 120, "pad": 10 },
-      { "kind": "cc_region", "left": 780, "top": 520, "width": 700, "height": 360, "gapMerge": 22, "minArea": 120, "pad": 10 }
+      {
+        "kind": "cc_region",
+        "left": 24,
+        "top": 150,
+        "width": 500,
+        "height": 360,
+        "gapMerge": 18,
+        "minArea": 120,
+        "pad": 10
+      },
+      {
+        "kind": "cc_region",
+        "left": 518,
+        "top": 150,
+        "width": 500,
+        "height": 360,
+        "gapMerge": 14,
+        "minArea": 90,
+        "pad": 10
+      },
+      {
+        "kind": "cc_region",
+        "left": 1012,
+        "top": 150,
+        "width": 500,
+        "height": 360,
+        "gapMerge": 16,
+        "minArea": 100,
+        "pad": 10
+      },
+      {
+        "kind": "cc_region",
+        "left": 80,
+        "top": 520,
+        "width": 660,
+        "height": 360,
+        "gapMerge": 20,
+        "minArea": 120,
+        "pad": 10
+      },
+      {
+        "kind": "cc_region",
+        "left": 780,
+        "top": 520,
+        "width": 700,
+        "height": 360,
+        "gapMerge": 22,
+        "minArea": 120,
+        "pad": 10
+      }
     ]
   },
-  "1 Двигатель/8 Крепление двигателя: опоры.png": {
+  "ENGINE/8 Крепление двигателя: опоры.png": {
     "bg": "black",
     "inkMin": 88,
-    "steps": [{ "kind": "cc_strip", "y0": 0, "y1": 1253, "gapMerge": 80, "minArea": 800, "pad": 16 }]
+    "steps": [
+      {
+        "kind": "cc_strip",
+        "y0": 0,
+        "y1": 1253,
+        "gapMerge": 80,
+        "minArea": 800,
+        "pad": 16
+      }
+    ]
   },
-  "3 Впуск воздуха + разделы.png": {
+  "INTAKE/3 Впуск воздуха + разделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
@@ -89,133 +184,400 @@
       }
     ]
   },
-  "4 Охлаждение + разделы.png": {
+  "COOLING/4 Охлаждение + разделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 62, "y1": 220, "gapMerge": 60, "minArea": 500, "pad": 12 },
-      { "kind": "cc_strip", "y0": 250, "y1": 420, "gapMerge": 200, "minArea": 400, "pad": 12 },
-      { "kind": "equal_cols", "y0": 452, "y1": 775, "cols": 6, "pad": 30 }
+      {
+        "kind": "cc_strip",
+        "y0": 62,
+        "y1": 220,
+        "gapMerge": 60,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "cc_strip",
+        "y0": 250,
+        "y1": 420,
+        "gapMerge": 200,
+        "minArea": 400,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 452,
+        "y1": 775,
+        "cols": 6,
+        "pad": 30
+      }
     ]
   },
-  "5 Выпуск + разделы.png": {
+  "EXHAUST/5 Выпуск + разделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 100, "y1": 270, "gapMerge": 50, "minArea": 400, "pad": 12 },
-      { "kind": "equal_cols", "y0": 302, "y1": 710, "cols": 5, "pad": 36 }
+      {
+        "kind": "cc_strip",
+        "y0": 100,
+        "y1": 270,
+        "gapMerge": 50,
+        "minArea": 400,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 302,
+        "y1": 710,
+        "cols": 5,
+        "pad": 36
+      }
     ]
   },
-  "6 Электрика + подразделы.png": {
+  "ELECTRICS/6 Электрика + подразделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 38, "y1": 165, "gapMerge": 45, "minArea": 200, "pad": 10 },
-      { "kind": "cc_strip", "y0": 200, "y1": 500, "gapMerge": 16, "minArea": 180, "pad": 10 },
-      { "kind": "cc_strip", "y0": 520, "y1": 880, "gapMerge": 14, "minArea": 160, "pad": 10 }
+      {
+        "kind": "cc_strip",
+        "y0": 38,
+        "y1": 165,
+        "gapMerge": 45,
+        "minArea": 200,
+        "pad": 10
+      },
+      {
+        "kind": "cc_strip",
+        "y0": 200,
+        "y1": 500,
+        "gapMerge": 16,
+        "minArea": 180,
+        "pad": 10
+      },
+      {
+        "kind": "cc_strip",
+        "y0": 520,
+        "y1": 880,
+        "gapMerge": 14,
+        "minArea": 160,
+        "pad": 10
+      }
     ]
   },
-  "7 Рама и кузов + разделы ВАР 1.png": {
+  "CHASSIS/7 Рама и кузов + разделы ВАР 1.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 72, "y1": 220, "gapMerge": 50, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 248, "y1": 500, "cols": 7, "pad": 22 },
-      { "kind": "equal_cols", "y0": 512, "y1": 798, "cols": 6, "pad": 24 }
+      {
+        "kind": "cc_strip",
+        "y0": 72,
+        "y1": 220,
+        "gapMerge": 50,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 248,
+        "y1": 500,
+        "cols": 7,
+        "pad": 22
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 512,
+        "y1": 798,
+        "cols": 6,
+        "pad": 24
+      }
     ]
   },
-  "8 Рулевое + подразделы.png": {
+  "STEERING/8 Рулевое + подразделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 100, "y1": 235, "gapMerge": 55, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 268, "y1": 515, "cols": 4, "pad": 34 },
-      { "kind": "equal_cols", "y0": 538, "y1": 805, "cols": 3, "pad": 52 }
+      {
+        "kind": "cc_strip",
+        "y0": 100,
+        "y1": 235,
+        "gapMerge": 55,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 268,
+        "y1": 515,
+        "cols": 4,
+        "pad": 34
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 538,
+        "y1": 805,
+        "cols": 3,
+        "pad": 52
+      }
     ]
   },
-  "9 Подвеска + разделы ВАР 1.png": {
+  "SUSPENSION/9 Подвеска + разделы ВАР 1.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 76, "y1": 188, "gapMerge": 55, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 248, "y1": 478, "cols": 6, "pad": 36 },
-      { "kind": "equal_cols", "y0": 502, "y1": 738, "cols": 5, "pad": 44 }
+      {
+        "kind": "cc_strip",
+        "y0": 76,
+        "y1": 188,
+        "gapMerge": 55,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 248,
+        "y1": 478,
+        "cols": 6,
+        "pad": 36
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 502,
+        "y1": 738,
+        "cols": 5,
+        "pad": 44
+      }
     ]
   },
-  "10 Колеса : шины + разделы  ВАР 1.png": {
+  "WHEELS/10 Колеса : шины + разделы  ВАР 1.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 58, "y1": 275, "gapMerge": 55, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 288, "y1": 575, "cols": 4, "pad": 36 },
-      { "kind": "equal_cols", "y0": 598, "y1": 875, "cols": 2, "pad": 140 }
+      {
+        "kind": "cc_strip",
+        "y0": 58,
+        "y1": 275,
+        "gapMerge": 55,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 288,
+        "y1": 575,
+        "cols": 4,
+        "pad": 36
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 598,
+        "y1": 875,
+        "cols": 2,
+        "pad": 140
+      }
     ]
   },
-  "11 Резина:камеры + разделы.png": {
+  "TIRES/11 Резина:камеры + разделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 125, "y1": 320, "gapMerge": 60, "minArea": 600, "pad": 12 },
-      { "kind": "cc_strip", "y0": 340, "y1": 700, "gapMerge": 30, "minArea": 350, "pad": 12 }
+      {
+        "kind": "cc_strip",
+        "y0": 125,
+        "y1": 320,
+        "gapMerge": 60,
+        "minArea": 600,
+        "pad": 12
+      },
+      {
+        "kind": "cc_strip",
+        "y0": 340,
+        "y1": 700,
+        "gapMerge": 30,
+        "minArea": 350,
+        "pad": 12
+      }
     ]
   },
-  "12 Тормоза/Зад:перед тормоз + разделы.png": {
+  "BRAKES/Зад:перед тормоз + разделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 58, "y1": 235, "gapMerge": 50, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 252, "y1": 515, "cols": 3, "pad": 48 },
-      { "kind": "equal_cols", "y0": 532, "y1": 825, "cols": 3, "pad": 48 }
+      {
+        "kind": "cc_strip",
+        "y0": 58,
+        "y1": 235,
+        "gapMerge": 50,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 252,
+        "y1": 515,
+        "cols": 3,
+        "pad": 48
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 532,
+        "y1": 825,
+        "cols": 3,
+        "pad": 48
+      }
     ]
   },
-  "12 Тормоза/Тормоз + ABS.png": {
-    "bg": "black",
-    "inkMin": 88,
-    "steps": [{ "kind": "cc_strip", "y0": 340, "y1": 620, "gapMerge": 200, "minArea": 400, "pad": 12 }]
-  },
-  "13 Привод + разделы.png": {
+  "BRAKES/Тормоз + ABS.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 88, "y1": 235, "gapMerge": 55, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 258, "y1": 525, "cols": 4, "pad": 36 },
-      { "kind": "equal_cols", "y0": 548, "y1": 818, "cols": 3, "pad": 52 }
+      {
+        "kind": "cc_strip",
+        "y0": 340,
+        "y1": 620,
+        "gapMerge": 200,
+        "minArea": 400,
+        "pad": 12
+      }
     ]
   },
-  "14 Органы управления + разделы.png": {
+  "DRIVETRAIN/13 Привод + разделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 110, "y1": 250, "gapMerge": 55, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 272, "y1": 525, "cols": 4, "pad": 34 },
-      { "kind": "equal_cols", "y0": 548, "y1": 818, "cols": 3, "pad": 52 }
+      {
+        "kind": "cc_strip",
+        "y0": 88,
+        "y1": 235,
+        "gapMerge": 55,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 258,
+        "y1": 525,
+        "cols": 4,
+        "pad": 36
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 548,
+        "y1": 818,
+        "cols": 3,
+        "pad": 52
+      }
     ]
   },
-  "Колеса : шины + разделы  ВАР 2..png": {
+  "CONTROLS/14 Органы управления + разделы.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 58, "y1": 265, "gapMerge": 55, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 285, "y1": 565, "cols": 4, "pad": 36 },
-      { "kind": "equal_cols", "y0": 588, "y1": 875, "cols": 2, "pad": 140 }
+      {
+        "kind": "cc_strip",
+        "y0": 110,
+        "y1": 250,
+        "gapMerge": 55,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 272,
+        "y1": 525,
+        "cols": 4,
+        "pad": 34
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 548,
+        "y1": 818,
+        "cols": 3,
+        "pad": 52
+      }
     ]
   },
-  "Подвеска + разделы ВАР 2.png": {
+  "WHEELS/Колеса : шины + разделы  ВАР 2..png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 72, "y1": 188, "gapMerge": 55, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 248, "y1": 478, "cols": 6, "pad": 36 },
-      { "kind": "equal_cols", "y0": 502, "y1": 738, "cols": 5, "pad": 44 }
+      {
+        "kind": "cc_strip",
+        "y0": 58,
+        "y1": 265,
+        "gapMerge": 55,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 285,
+        "y1": 565,
+        "cols": 4,
+        "pad": 36
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 588,
+        "y1": 875,
+        "cols": 2,
+        "pad": 140
+      }
     ]
   },
-  "Рама и кузов + разделы ВАР 2.png": {
+  "SUSPENSION/Подвеска + разделы ВАР 2.png": {
     "bg": "black",
     "inkMin": 88,
     "steps": [
-      { "kind": "cc_strip", "y0": 92, "y1": 235, "gapMerge": 55, "minArea": 500, "pad": 12 },
-      { "kind": "equal_cols", "y0": 252, "y1": 505, "cols": 7, "pad": 22 },
-      { "kind": "equal_cols", "y0": 518, "y1": 798, "cols": 6, "pad": 24 }
+      {
+        "kind": "cc_strip",
+        "y0": 72,
+        "y1": 188,
+        "gapMerge": 55,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 248,
+        "y1": 478,
+        "cols": 6,
+        "pad": 36
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 502,
+        "y1": 738,
+        "cols": 5,
+        "pad": 44
+      }
+    ]
+  },
+  "CHASSIS/Рама и кузов + разделы ВАР 2.png": {
+    "bg": "black",
+    "inkMin": 88,
+    "steps": [
+      {
+        "kind": "cc_strip",
+        "y0": 92,
+        "y1": 235,
+        "gapMerge": 55,
+        "minArea": 500,
+        "pad": 12
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 252,
+        "y1": 505,
+        "cols": 7,
+        "pad": 22
+      },
+      {
+        "kind": "equal_cols",
+        "y0": 518,
+        "y1": 798,
+        "cols": 6,
+        "pad": 24
+      }
     ]
   }
 }

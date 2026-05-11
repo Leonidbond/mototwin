@@ -1,19 +1,12 @@
 "use client";
 
-import { NodePickerModal } from "../../node-picker/NodePickerModal";
-
-export type LeafSelectOption = {
-  id: string;
-  name: string;
-  level: number;
-  pathLabel?: string;
-};
+import { NodePickerModal, type SharedNodePickerOption } from "../../node-picker/NodePickerModal";
 
 export type AddNodeSheetProps = {
   open: boolean;
   onClose: () => void;
-  options: LeafSelectOption[];
-  topOptions?: LeafSelectOption[];
+  options: SharedNodePickerOption[];
+  topOptions?: SharedNodePickerOption[];
   /** Already-used node ids — excluded from selection. */
   usedNodeIds: Set<string>;
   onConfirm: (nodeIds: string[]) => void;

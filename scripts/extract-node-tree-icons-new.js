@@ -2,7 +2,8 @@
  * Per-source-file icon extraction using connected components + horizontal merge.
  *
  * Spec: `scripts/data/node-tree-icons-per-file.json` (one entry per PNG under
- * `images/node-tree-icons-new/`). Step kinds:
+ * `images/node-tree-icons-new/`). Sources are grouped by taxonomy root: ENGINE/,
+ * FUEL/, INTAKE/, … (see repo layout). Step kinds:
  *   - `cc_strip` / `cc_region`: connected components + horizontal merge
  *   - `equal_cols`: fixed column grid for a horizontal band (y0..y1)
  *
@@ -11,6 +12,9 @@
  * using keys `relativePath|sliceIndex` (global index per file).
  *
  * Run: `node scripts/extract-node-tree-icons-new.js`
+ * Labeled (OCR caption under icon → filename): `node scripts/extract-node-tree-icons-new.js --labeled`
+ * Partial labeled (one taxonomy folder, does not wipe global by-label):
+ *   `node scripts/extract-node-tree-icons-new.js --labeled --subdir=BRAKES`
  */
 
 const fs = require("fs");
@@ -22,11 +26,23 @@ const SRC_DIR = path.join(ROOT, "images", "node-tree-icons-new");
 const SPEC_PATH = path.join(__dirname, "data", "node-tree-icons-per-file.json");
 const KEY_MAP_PATH = path.join(__dirname, "data", "node-tree-icons-new-keys.json");
 const OUT_DIR = path.join(ROOT, "images", "node-tree-icons", "from-design");
+const LABELED = process.argv.includes("--labeled");
+const SUBDIR_ARG = process.argv.find((a) => a.startsWith("--subdir="));
+const SUBDIR = SUBDIR_ARG
+  ? SUBDIR_ARG.slice("--subdir=".length).trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "")
+  : null;
+
 const INVENTORY_PATH = path.join(
   ROOT,
   "scripts",
   "data",
-  "slice-inventory.json"
+  SUBDIR ? `slice-inventory-${SUBDIR}.json` : "slice-inventory.json"
+);
+const LABEL_MANIFEST_PATH = path.join(
+  ROOT,
+  "scripts",
+  "data",
+  SUBDIR ? `extracted-label-manifest-${SUBDIR}.json` : "extracted-label-manifest.json"
 );
 
 const OUTPUT_MAX = 512;
@@ -202,6 +218,73 @@ function cropRgbaRect(rgba, srcW, left, top, width, height) {
     rgba.copy(out, dy, sy, sy + width * 4);
   }
   return out;
+}
+
+/** OCR often returns junk for short caption strips — use positional slug instead */
+function isLikelyGarbageCaption(raw) {
+  const t = String(raw || "").trim();
+  if (!t) return true;
+  const letters = t.replace(/[^a-zA-Zа-яА-ЯёЁ]/g, "");
+  if (letters.length <= 1 && t.length <= 4) return true;
+  if (!letters.length) return true;
+  if (/^[а-яё]$/i.test(t)) return true;
+  if (!/[а-яё]/i.test(t) && /^[a-z.\s]+$/i.test(t) && t.replace(/\s/g, "").length <= 5)
+    return true;
+  return false;
+}
+
+/** OCR-friendly slug from recognized caption text */
+function slugifyLabel(text) {
+  const s = (text || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9а-яё_-]+/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+  return s || "unknown";
+}
+
+/**
+ * Split cell: top ~74% pictogram, bottom ~26% caption strip (design layout).
+ * Optionally nudge split using sparse ink row in the band 65–90% height.
+ */
+function splitIconCaptionRgba(rgba, w, h) {
+  const counts = new Uint32Array(h);
+  for (let y = 0; y < h; y++) {
+    let n = 0;
+    const o0 = y * w * 4;
+    for (let x = 0; x < w; x++) {
+      if (rgba[o0 + x * 4 + 3] > ALPHA_THRESH) n++;
+    }
+    counts[y] = n;
+  }
+  let maxC = 0;
+  for (let y = 0; y < h; y++) if (counts[y] > maxC) maxC = counts[y];
+  let splitY = Math.floor(h * 0.74);
+  const yLow = Math.max(2, Math.floor(h * 0.58));
+  const yHigh = Math.min(h - 3, Math.floor(h * 0.88));
+  let minC = 1e9;
+  for (let y = yLow; y < yHigh; y++) {
+    if (counts[y] < minC) {
+      minC = counts[y];
+      splitY = y;
+    }
+  }
+  if (minC > Math.max(6, maxC * 0.14)) splitY = Math.floor(h * 0.74);
+  splitY = Math.max(Math.floor(h * 0.55), Math.min(h - 4, splitY));
+  const iconH = splitY;
+  const capH = h - splitY;
+  const iconBuf = Buffer.alloc(w * iconH * 4);
+  for (let y = 0; y < iconH; y++) {
+    rgba.copy(iconBuf, y * w * 4, y * w * 4, (y + 1) * w * 4);
+  }
+  const capBuf = Buffer.alloc(w * capH * 4);
+  for (let y = 0; y < capH; y++) {
+    rgba.copy(capBuf, y * w * 4, (splitY + y) * w * 4, (splitY + y + 1) * w * 4);
+  }
+  return { iconBuf, iconW: w, iconH, capBuf, capW: w, capH, splitY };
 }
 
 /**
@@ -701,6 +784,53 @@ function bboxAlpha(rgba, w, h) {
   return { left, top, width: right - left + 1, height: bottom - top + 1 };
 }
 
+/** Post-process cropped RGBA (icon only) → PNG buffer */
+async function rgbaBufferToFinalPng(rgbaBuf, rw, rh) {
+  const cleaned = trimEdgeArtifacts(rgbaBuf, rw, rh);
+  if (cleaned.width < 2 || cleaned.height < 2) return null;
+  pruneStrictUnreachableFromBelow(cleaned.buf, cleaned.width, cleaned.height);
+  pruneDebrisHalo(cleaned.buf, cleaned.width, cleaned.height);
+  removeDisconnectedDebris(cleaned.buf, cleaned.width, cleaned.height);
+  pruneOpaqueAboveMainStrict(cleaned.buf, cleaned.width, cleaned.height);
+  shaveShallowEdgeColumns(cleaned.buf, cleaned.width, cleaned.height);
+  pruneDebrisHalo(cleaned.buf, cleaned.width, cleaned.height);
+  const bb2 = bboxAlpha(cleaned.buf, cleaned.width, cleaned.height);
+  if (!bb2) return null;
+  const finalBuf = cropRgbaRect(
+    cleaned.buf,
+    cleaned.width,
+    bb2.left,
+    bb2.top,
+    bb2.width,
+    bb2.height
+  );
+  const { data: resized, info: rz } = await sharp(finalBuf, {
+    raw: { width: bb2.width, height: bb2.height, channels: 4 },
+  })
+    .resize({
+      width: OUTPUT_MAX,
+      height: OUTPUT_MAX,
+      fit: "inside",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const rww = rz.width;
+  const rhh = rz.height;
+  pruneOpaqueAboveMainStrict(resized, rww, rhh);
+  pruneOpaqueBelowMainStrict(resized, rww, rhh);
+  pruneDebrisHalo(resized, rww, rhh);
+  const bb3 = bboxAlpha(resized, rww, rhh);
+  if (!bb3) return null;
+  const outBuf = cropRgbaRect(resized, rww, bb3.left, bb3.top, bb3.width, bb3.height);
+  return sharp(outBuf, {
+    raw: { width: bb3.width, height: bb3.height, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+}
+
 async function extractBoxToPng(
   absPath,
   channels,
@@ -739,60 +869,161 @@ async function extractBoxToPng(
       cropped[di + 3] = rgba[si + 3];
     }
   }
-  const cleaned = trimEdgeArtifacts(cropped, bb.width, bb.height);
-  if (cleaned.width < 2 || cleaned.height < 2) return null;
-  pruneStrictUnreachableFromBelow(cleaned.buf, cleaned.width, cleaned.height);
-  pruneDebrisHalo(cleaned.buf, cleaned.width, cleaned.height);
-  removeDisconnectedDebris(cleaned.buf, cleaned.width, cleaned.height);
-  pruneOpaqueAboveMainStrict(cleaned.buf, cleaned.width, cleaned.height);
-  shaveShallowEdgeColumns(cleaned.buf, cleaned.width, cleaned.height);
-  pruneDebrisHalo(cleaned.buf, cleaned.width, cleaned.height);
-  const bb2 = bboxAlpha(cleaned.buf, cleaned.width, cleaned.height);
-  if (!bb2) return null;
-  const finalBuf = cropRgbaRect(
-    cleaned.buf,
-    cleaned.width,
-    bb2.left,
-    bb2.top,
-    bb2.width,
-    bb2.height
-  );
-  const { data: resized, info: rz } = await sharp(finalBuf, {
-    raw: { width: bb2.width, height: bb2.height, channels: 4 },
-  })
-    .resize({
-      width: OUTPUT_MAX,
-      height: OUTPUT_MAX,
-      fit: "inside",
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    })
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const rw = rz.width;
-  const rh = rz.height;
-  pruneOpaqueAboveMainStrict(resized, rw, rh);
-  pruneOpaqueBelowMainStrict(resized, rw, rh);
-  pruneDebrisHalo(resized, rw, rh);
-  const bb3 = bboxAlpha(resized, rw, rh);
-  if (!bb3) return null;
-  const outBuf = cropRgbaRect(resized, rw, bb3.left, bb3.top, bb3.width, bb3.height);
-  return sharp(outBuf, {
-    raw: { width: bb3.width, height: bb3.height, channels: 4 },
-  })
-    .png()
-    .toBuffer();
+  return rgbaBufferToFinalPng(cropped, bb.width, bb.height);
 }
 
-function equalColumnBoxes(fullWidth, fullHeight, y0, y1, cols, pad) {
-  const inner = fullWidth - 2 * pad;
+/**
+ * Full cell → split caption (OCR) + icon; returns PNG + label metadata.
+ */
+async function extractBoxToPngLabeled(
+  channels,
+  fullWidth,
+  fullData,
+  box,
+  bgMax,
+  ocrWorker
+) {
+  const bw = box.maxX - box.minX + 1;
+  const bh = box.maxY - box.minY + 1;
+  const raw = Buffer.alloc(bw * bh * 3);
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const gx = box.minX + x;
+      const gy = box.minY + y;
+      const si = (gy * fullWidth + gx) * channels;
+      const di = (y * bw + x) * 3;
+      raw[di] = fullData[si];
+      raw[di + 1] = fullData[si + 1];
+      raw[di + 2] = fullData[si + 2];
+    }
+  }
+  const rgba = rgbToRgbaTransparent(raw, bw, bh, bgMax);
+  const split = splitIconCaptionRgba(rgba, bw, bh);
+  let rawText = "";
+  if (ocrWorker && split.capH > 6 && split.capW > 4) {
+    try {
+      const capH2 = Math.max(split.capH, 14);
+      const capW2 = Math.max(split.capW, 8);
+      const ocrInput = await sharp(split.capBuf, {
+        raw: { width: split.capW, height: split.capH, channels: 4 },
+      })
+        .png()
+        .flatten({ background: { r: 0, g: 0, b: 0 } })
+        .greyscale()
+        .normalize()
+        .negate()
+        .sharpen()
+        .resize({
+          width: Math.min(1200, Math.max(capW2 * 4, 160)),
+          height: Math.min(280, Math.max(capH2 * 4, 48)),
+          fit: "fill",
+        })
+        .png()
+        .toBuffer();
+      const {
+        data: { text },
+      } = await ocrWorker.recognize(ocrInput, {
+        tessedit_pageseg_mode: "7",
+      });
+      rawText = (text || "").replace(/\n+/g, " ").trim();
+    } catch (e) {
+      process.stderr.write(`OCR warn: ${e.message}\n`);
+    }
+  }
+  const slugBase = slugifyLabel(rawText);
+  const png = await rgbaBufferToFinalPng(split.iconBuf, split.iconW, split.iconH);
+  if (!png) return null;
+  return {
+    png,
+    slug: slugBase,
+    rawLabel: rawText,
+    splitY: split.splitY,
+  };
+}
+
+/**
+ * OCR on caption strip only (for equal_cols tall cells where split+icon pipeline fails).
+ */
+async function ocrCaptionMetaForBox(
+  channels,
+  fullWidth,
+  fullData,
+  box,
+  bgMax,
+  ocrWorker
+) {
+  const bw = box.maxX - box.minX + 1;
+  const bh = box.maxY - box.minY + 1;
+  const raw = Buffer.alloc(bw * bh * 3);
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const gx = box.minX + x;
+      const gy = box.minY + y;
+      const si = (gy * fullWidth + gx) * channels;
+      const di = (y * bw + x) * 3;
+      raw[di] = fullData[si];
+      raw[di + 1] = fullData[si + 1];
+      raw[di + 2] = fullData[si + 2];
+    }
+  }
+  const rgba = rgbToRgbaTransparent(raw, bw, bh, bgMax);
+  const split = splitIconCaptionRgba(rgba, bw, bh);
+  let rawText = "";
+  if (ocrWorker && split.capH > 6 && split.capW > 4) {
+    try {
+      const capH2 = Math.max(split.capH, 14);
+      const capW2 = Math.max(split.capW, 8);
+      const ocrInput = await sharp(split.capBuf, {
+        raw: { width: split.capW, height: split.capH, channels: 4 },
+      })
+        .png()
+        .flatten({ background: { r: 0, g: 0, b: 0 } })
+        .greyscale()
+        .normalize()
+        .negate()
+        .sharpen()
+        .resize({
+          width: Math.min(1200, Math.max(capW2 * 4, 160)),
+          height: Math.min(280, Math.max(capH2 * 4, 48)),
+          fit: "fill",
+        })
+        .png()
+        .toBuffer();
+      const {
+        data: { text },
+      } = await ocrWorker.recognize(ocrInput, {
+        tessedit_pageseg_mode: "7",
+      });
+      rawText = (text || "").replace(/\n+/g, " ").trim();
+    } catch (e) {
+      process.stderr.write(`OCR warn: ${e.message}\n`);
+    }
+  }
+  return {
+    rawLabel: rawText,
+    slug: slugifyLabel(rawText),
+    splitY: split.splitY,
+  };
+}
+
+function equalColumnBoxes(fullWidth, fullHeight, y0, y1, cols, pad, step) {
+  const regionLeft = step?.regionLeft;
+  const regionWidth = step?.regionWidth;
+  const left0 =
+    typeof regionLeft === "number"
+      ? regionLeft
+      : pad;
+  const inner =
+    typeof regionWidth === "number"
+      ? regionWidth
+      : fullWidth - 2 * pad;
   const cw = inner / cols;
   const boxes = [];
   for (let c = 0; c < cols; c++) {
-    const left = Math.round(pad + c * cw);
+    const left = Math.round(left0 + c * cw);
     const right = Math.min(
       fullWidth - 1,
-      Math.round(pad + (c + 1) * cw) - 1
+      Math.round(left0 + (c + 1) * cw) - 1
     );
     boxes.push({
       minX: left,
@@ -812,7 +1043,8 @@ async function processStep(
   channels,
   step,
   inkMin,
-  bgMax
+  bgMax,
+  ocrWorker
 ) {
   if (step.kind === "equal_cols") {
     const pad = step.pad ?? 40;
@@ -822,19 +1054,48 @@ async function processStep(
       step.y0,
       step.y1,
       step.cols,
-      pad
+      pad,
+      step
     );
     const bufs = [];
     for (const box of boxes) {
-      const buf = await extractBoxToPng(
-        absPath,
-        channels,
-        fullWidth,
-        fullData,
-        box,
-        bgMax
-      );
-      if (buf) bufs.push(buf);
+      if (LABELED && ocrWorker) {
+        /** Tall grid cells: full-box icon pipeline + separate caption OCR (split icon path often yields empty). */
+        const buf = await extractBoxToPng(
+          absPath,
+          channels,
+          fullWidth,
+          fullData,
+          box,
+          bgMax
+        );
+        if (buf) {
+          const cap = await ocrCaptionMetaForBox(
+            channels,
+            fullWidth,
+            fullData,
+            box,
+            bgMax,
+            ocrWorker
+          );
+          bufs.push({
+            png: buf,
+            slug: cap.slug,
+            rawLabel: cap.rawLabel,
+            splitY: cap.splitY,
+          });
+        }
+      } else {
+        const buf = await extractBoxToPng(
+          absPath,
+          channels,
+          fullWidth,
+          fullData,
+          box,
+          bgMax
+        );
+        if (buf) bufs.push(buf);
+      }
     }
     return bufs;
   }
@@ -876,15 +1137,27 @@ async function processStep(
 
   const bufs = [];
   for (const box of filtered) {
-    const buf = await extractBoxToPng(
-      absPath,
-      channels,
-      fullWidth,
-      fullData,
-      box,
-      bgMax
-    );
-    if (buf) bufs.push(buf);
+    if (LABELED && ocrWorker) {
+      const lab = await extractBoxToPngLabeled(
+        channels,
+        fullWidth,
+        fullData,
+        box,
+        bgMax,
+        ocrWorker
+      );
+      if (lab) bufs.push(lab);
+    } else {
+      const buf = await extractBoxToPng(
+        absPath,
+        channels,
+        fullWidth,
+        fullData,
+        box,
+        bgMax
+      );
+      if (buf) bufs.push(buf);
+    }
   }
   return bufs;
 }
@@ -898,10 +1171,38 @@ async function main() {
   const byKeyDir = path.join(OUT_DIR, "by-key");
   fs.mkdirSync(byKeyDir, { recursive: true });
 
+  let ocrWorker = null;
+  if (LABELED) {
+    const { createWorker } = await import("tesseract.js");
+    ocrWorker = await createWorker("rus+eng");
+  }
+
   let total = 0;
-  const files = walkPngs(SRC_DIR).sort();
   /** @type {{ sourceRel: string, sliceIndex: number, outRel: string }[]} */
   const sliceInventory = [];
+  /** @type {{ slug: string, rawLabel: string, sourceRel: string, sliceIndex: number, splitY: number }[]} */
+  const labelManifest = [];
+  const slugUsage = new Map();
+
+  const byLabelDir = SUBDIR
+    ? path.join(OUT_DIR, "by-label", SUBDIR)
+    : path.join(OUT_DIR, "by-label");
+  if (LABELED) {
+    fs.mkdirSync(byLabelDir, { recursive: true });
+    for (const f of fs.readdirSync(byLabelDir)) {
+      if (f.endsWith(".png")) fs.unlinkSync(path.join(byLabelDir, f));
+    }
+  }
+
+  let files = walkPngs(SRC_DIR).sort();
+  if (SUBDIR) {
+    const prefix = `${SUBDIR.replace(/\\/g, "/")}/`;
+    files = files.filter((abs) => {
+      const rel = path.relative(SRC_DIR, abs).split(path.sep).join("/");
+      return rel.startsWith(prefix);
+    });
+    process.stdout.write(`--subdir=${SUBDIR}: ${files.length} PNG source(s)\n`);
+  }
 
   for (const abs of files) {
     const rel = path.relative(SRC_DIR, abs);
@@ -918,7 +1219,7 @@ async function main() {
       dir === "." || dir === "" ? "root" : slugifySegment(dir) || "root";
     const stem = slugifySegment(path.basename(rel));
     const outDir = path.join(OUT_DIR, section, stem);
-    fs.mkdirSync(outDir, { recursive: true });
+    if (!LABELED) fs.mkdirSync(outDir, { recursive: true });
 
     const { data, info } = await sharp(abs)
       .ensureAlpha()
@@ -939,27 +1240,61 @@ async function main() {
         channels,
         step,
         inkMin,
-        bgMax
+        bgMax,
+        ocrWorker
       );
-      for (const buf of bufs) {
-        const name = `slice-${String(sliceIdx).padStart(3, "0")}.png`;
-        await fs.promises.writeFile(path.join(outDir, name), buf);
-        total++;
-        const outRel = path
-          .join(section, stem, name)
-          .split(path.sep)
-          .join("/");
-        sliceInventory.push({
-          sourceRel: rel.split(path.sep).join("/"),
-          sliceIndex: sliceIdx,
-          outRel,
-        });
+      for (const item of bufs) {
+        if (LABELED && item && typeof item === "object" && item.png) {
+          let slug = item.slug || "unknown";
+          if (
+            slug === "unknown" ||
+            !(item.rawLabel && String(item.rawLabel).trim()) ||
+            isLikelyGarbageCaption(item.rawLabel)
+          ) {
+            slug = `${section}-${stem}-s${String(sliceIdx).padStart(3, "0")}`;
+          }
+          const n = slugUsage.get(slug) || 0;
+          slugUsage.set(slug, n + 1);
+          if (n > 0) slug = `${slug}-${n + 1}`;
+          const outName = `${slug}.png`;
+          await fs.promises.writeFile(path.join(byLabelDir, outName), item.png);
+          total++;
+          const outRel = path
+            .join("by-label", ...(SUBDIR ? [SUBDIR, outName] : [outName]))
+            .split(path.sep)
+            .join("/");
+          sliceInventory.push({
+            sourceRel: rel.split(path.sep).join("/"),
+            sliceIndex: sliceIdx,
+            outRel,
+          });
+          labelManifest.push({
+            slug,
+            rawLabel: item.rawLabel || "",
+            sourceRel: rel.split(path.sep).join("/"),
+            sliceIndex: sliceIdx,
+            splitY: item.splitY,
+          });
+        } else if (item && Buffer.isBuffer(item)) {
+          const name = `slice-${String(sliceIdx).padStart(3, "0")}.png`;
+          await fs.promises.writeFile(path.join(outDir, name), item);
+          total++;
+          const outRel = path
+            .join(section, stem, name)
+            .split(path.sep)
+            .join("/");
+          sliceInventory.push({
+            sourceRel: rel.split(path.sep).join("/"),
+            sliceIndex: sliceIdx,
+            outRel,
+          });
 
-        const mapKey = `${rel}|${sliceIdx}`;
-        const key = keyMap[mapKey];
-        if (key) {
-          const safe = key.replace(/[^a-z0-9-]/gi, "-");
-          await fs.promises.writeFile(path.join(byKeyDir, `${safe}.png`), buf);
+          const mapKey = `${rel}|${sliceIdx}`;
+          const key = keyMap[mapKey];
+          if (key) {
+            const safe = key.replace(/[^a-z0-9-]/gi, "-");
+            await fs.promises.writeFile(path.join(byKeyDir, `${safe}.png`), item);
+          }
         }
         sliceIdx++;
       }
@@ -967,12 +1302,25 @@ async function main() {
   }
 
   fs.writeFileSync(INVENTORY_PATH, JSON.stringify(sliceInventory, null, 2));
+  if (LABELED) {
+    fs.writeFileSync(LABEL_MANIFEST_PATH, JSON.stringify(labelManifest, null, 2));
+    process.stdout.write(
+      `Wrote ${labelManifest.length} labeled icons to ${path.relative(ROOT, byLabelDir)}/\n`
+    );
+    process.stdout.write(
+      `Wrote ${path.relative(ROOT, LABEL_MANIFEST_PATH)} (OCR captions)\n`
+    );
+  }
   process.stdout.write(
-    `Wrote ${total} slices to ${path.relative(ROOT, OUT_DIR)}/ (${files.length} sources)\n`
+    `Wrote ${total} outputs to ${path.relative(ROOT, OUT_DIR)}/ (${files.length} sources)\n`
   );
   process.stdout.write(
     `Wrote ${sliceInventory.length} entries to ${path.relative(ROOT, INVENTORY_PATH)}\n`
   );
+
+  if (ocrWorker) {
+    await ocrWorker.terminate().catch(() => {});
+  }
 }
 
 main().catch((e) => {

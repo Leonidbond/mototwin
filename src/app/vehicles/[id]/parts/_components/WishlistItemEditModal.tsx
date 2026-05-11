@@ -18,7 +18,13 @@ import { NodePickerModal } from "../../_components/node-picker/NodePickerModal";
 const RADIUS_MODAL = 24;
 const RADIUS_INNER = 14;
 
-export type WishlistNodeSelectOption = { id: string; name: string; level: number; pathLabel?: string };
+export type WishlistNodeSelectOption = {
+  id: string;
+  code: string;
+  name: string;
+  level: number;
+  pathLabel?: string;
+};
 
 export type WishlistItemEditModalProps = {
   isOpen: boolean;

@@ -49,6 +49,11 @@ function main() {
   ) as Record<string, string>;
 
   const errors: string[] = [];
+  if (Object.keys(mapping).length === 0) {
+    console.log("SKIP — node-code-icon-source.json is empty (no built node icons)");
+    process.exit(0);
+  }
+
   if (Object.keys(mapping).length !== taxonomy.length) {
     errors.push(
       `mapping size ${Object.keys(mapping).length} !== taxonomy ${taxonomy.length}`

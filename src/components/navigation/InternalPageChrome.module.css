@@ -1,0 +1,355 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.navBlock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.navLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.navEnd {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.backBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  transition: opacity 0.15s ease;
+}
+
+.backBtn:hover {
+  opacity: 0.9;
+}
+
+.backBtn:focus-visible {
+  outline: 2px solid var(--ipc-focus, rgba(59, 130, 246, 0.7));
+  outline-offset: 2px;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+  font-size: 12px;
+  line-height: 1.35;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.crumbItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.crumbSep {
+  flex-shrink: 0;
+  opacity: 0.55;
+  user-select: none;
+}
+
+.crumbLink {
+  text-decoration: none;
+  min-width: 0;
+}
+
+.crumbLink:hover {
+  text-decoration: underline;
+}
+
+.crumbCurrent {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleBlock {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.titleStack {
+  min-width: 0;
+  flex: 1;
+}
+
+.title {
+  margin: 0;
+}
+
+.subtitle {
+  margin: 0;
+}
+
+.titleActions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.titleBlockActionsBelow {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.titleBlockActionsBelow .titleStack {
+  flex: none;
+  width: 100%;
+}
+
+.titleActionsBelow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.belowTitle {
+  margin-top: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.titleExtra {
+  margin-top: 8px;
+  width: 100%;
+}
+
+/* ─── garageDark (корзина / подбор / форма ТО) ─── */
+.variantGarageDark {
+  --ipc-focus: rgba(251, 146, 60, 0.45);
+}
+
+.variantGarageDark .navBlock {
+  padding: 6px 0 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  margin-bottom: 4px;
+}
+
+.variantGarageDark .backBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  background: #0b1118;
+  color: #9ca3af;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+}
+
+.variantGarageDark .crumbs {
+  color: #94a3b8;
+}
+
+.variantGarageDark .crumbLink {
+  color: #cbd5e1;
+}
+
+.variantGarageDark .crumbCurrent {
+  color: #f3f4f6;
+  font-weight: 600;
+}
+
+.variantGarageDark .titleBlock {
+  align-items: center;
+  padding-bottom: 0;
+}
+
+.variantGarageDark .title {
+  color: #f3f4f6;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.variantGarageDark .subtitle {
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 16px;
+  margin-top: 2px;
+}
+
+/* ─── journalRef (журнал обслуживания) ─── */
+.variantJournalRef .navBlock {
+  padding: 6px 0 6px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  margin-bottom: 2px;
+}
+
+.variantJournalRef .backBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: transparent;
+  color: #f1f5f9;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.variantJournalRef .crumbs {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.variantJournalRef .crumbLink {
+  color: #cbd5e1;
+}
+
+.variantJournalRef .crumbCurrent {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.variantJournalRef .title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: #f8fafc;
+}
+
+.variantJournalRef .subtitle {
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.35;
+}
+
+.variantJournalRef .titleBlock {
+  align-items: center;
+  padding: 0 0 10px;
+}
+
+/* ─── expenses (страница затрат): блок 1 как garageDark, заголовок ниже свой ─── */
+.variantExpenses {
+  --ipc-focus: rgba(251, 146, 60, 0.45);
+}
+
+.variantExpenses .navBlock {
+  padding: 8px 0 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  margin-bottom: 8px;
+}
+
+.variantExpenses .backBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  background: #0b1118;
+  color: #9ca3af;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+}
+
+.variantExpenses .crumbs {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.variantExpenses .crumbLink {
+  color: #cbd5e1;
+}
+
+.variantExpenses .crumbCurrent {
+  color: #f3f4f6;
+  font-weight: 600;
+}
+
+.variantExpenses .title {
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 850;
+  margin-top: 4px;
+  color: #f8fafc;
+}
+
+.variantExpenses .subtitle {
+  font-size: 13px;
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.variantExpenses .titleBlock {
+  padding: 0 0 4px;
+}
+
+/* ─── garageTokens (дерево узлов в общем гаражном canvas) ─── */
+.variantGarageTokens .navBlock {
+  padding: 4px 0 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  margin-bottom: 6px;
+}
+
+.variantGarageTokens .backBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: transparent;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.variantGarageTokens .crumbs {
+  font-size: 12px;
+}
+
+.variantGarageTokens .crumbLink {
+  text-decoration: none;
+}
+
+.variantGarageTokens .crumbCurrent {
+  font-weight: 600;
+}
+
+.variantGarageTokens.omitTitleBand .navBlock {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 6px;
+}

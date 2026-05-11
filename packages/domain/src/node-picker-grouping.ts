@@ -30,7 +30,13 @@ export function nodePickerGroupHeadingRu(groupKey: string): string {
   return groupKey === NODE_PICKER_OTHER_GROUP_KEY ? "Прочее" : groupKey;
 }
 
-export type NodePickerGroupableOption = { id: string; name: string; pathLabel?: string };
+export type NodePickerGroupableOption = {
+  id: string;
+  name: string;
+  pathLabel?: string;
+  /** When set, pickers can show catalog node icon */
+  code?: string;
+};
 
 /**
  * Groups leaf options by top path segment for modal headings.

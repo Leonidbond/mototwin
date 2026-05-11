@@ -2,13 +2,17 @@
 
 import { groupNodePickerOptionsByTopLevel, nodePickerGroupHeadingRu } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
+import Image from "next/image";
 import { useMemo, useState, type CSSProperties } from "react";
+import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 
 export type SharedNodePickerOption = {
   id: string;
   name: string;
   pathLabel?: string;
   level?: number;
+  /** Catalog code — when set, row shows tree icon */
+  code?: string;
 };
 
 export type NodePickerModalProps = {
@@ -162,6 +166,7 @@ export function NodePickerModal({
                 {items.map((opt) => {
                   const disabled = disabledIds?.has(opt.id) ?? false;
                   const active = mode === "multi" ? localSelected.has(opt.id) : (selectedIds?.has(opt.id) ?? false);
+                  const rowIconSrc = opt.code ? getNodeTreeIconWebSrc(opt.code, opt.name) : "";
                   return (
                     <button
                       key={opt.id}
@@ -181,6 +186,27 @@ export function NodePickerModal({
                       {mode === "multi" ? (
                         <span style={checkboxStyle(active)} aria-hidden>
                           {active ? "✓" : ""}
+                        </span>
+                      ) : null}
+                      {rowIconSrc ? (
+                        <span
+                          style={{
+                            flex: "0 0 auto",
+                            width: 28,
+                            height: 28,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          aria-hidden
+                        >
+                          <Image
+                            src={rowIconSrc}
+                            alt=""
+                            width={24}
+                            height={24}
+                            className="object-contain"
+                          />
                         </span>
                       ) : null}
                       <div style={{ minWidth: 0, flex: 1 }}>

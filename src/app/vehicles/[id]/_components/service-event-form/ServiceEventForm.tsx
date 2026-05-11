@@ -28,6 +28,7 @@ import {
 import { productSemanticColors } from "@mototwin/design-tokens";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { InternalPageChrome, type InternalPageBreadcrumb } from "@/components/navigation/InternalPageChrome";
 import partsCartPageStyles from "../../parts/_components/PartsCartPage.module.css";
 import type {
   AddServiceEventFormValues,
@@ -241,6 +242,8 @@ export type ServiceEventFormProps = {
   pageChrome?: "default" | "partsCart";
   /** Подзаголовок под заголовком в chrome `partsCart`. Для создания по умолчанию пусто. */
   pageSubtitle?: string;
+  /** Крошки для `pageChrome="partsCart"`; при пустом массиве подставляется базовая цепочка. */
+  pageBreadcrumbs?: InternalPageBreadcrumb[];
 };
 
 type ServiceEventFormInnerProps = Omit<ServiceEventFormProps, "resetKey">;
@@ -264,6 +267,7 @@ function ServiceEventFormInner({
   contextHint,
   pageChrome = "default",
   pageSubtitle,
+  pageBreadcrumbs = [],
 }: ServiceEventFormInnerProps) {
   const [form, setForm] = useState<AddServiceEventFormValues>(() => cloneAddServiceEventForm(initialForm));
   const [localValidationError, setLocalValidationError] = useState("");
@@ -432,6 +436,7 @@ function ServiceEventFormInner({
     () =>
       leafNodeOptions.map((option) => ({
         id: option.id,
+        code: option.code,
         name: option.name,
         level: option.level,
         pathLabel: nodeBreadcrumbRu(nodeTree, option.id),
@@ -1613,42 +1618,44 @@ function ServiceEventFormInner({
     </div>
   ) : null;
 
+  const partsCartCrumbs: InternalPageBreadcrumb[] =
+    pageBreadcrumbs.length > 0
+      ? pageBreadcrumbs
+      : [
+          { label: "Гараж", href: "/garage" },
+          { label: "Мотоцикл", href: `/vehicles/${vehicleId}` },
+          { label: "Журнал", href: `/vehicles/${vehicleId}/service-log` },
+          { label: editingServiceEventId ? "Редактирование" : "Новое ТО" },
+        ];
+
   if (pageChrome === "partsCart") {
     return (
       <div
         className={partsCartPageStyles.root}
         style={{
-          gridTemplateColumns: "minmax(0, 1fr)",
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
           maxWidth: 1500,
           width: "100%",
           marginInline: "auto",
           background: SERVICE_EVENT_PARTS_UI.canvas,
         }}
       >
-        <main className={`${partsCartPageStyles.mainColumn} ${partsCartPageStyles.mainColumnServiceEvent}`}>
-          <header
-            className={partsCartPageStyles.headerServiceEvent}
-            style={{ gridTemplateColumns: "28px minmax(0, 1fr)", alignItems: "start" }}
-          >
-            <button
-              type="button"
-              onClick={onCancel}
-              className={partsCartPageStyles.backButton}
-              aria-label="Назад"
-            >
-              ←
-            </button>
-            <div className={partsCartPageStyles.headerServiceEventText}>
-              <h1 className={partsCartPageStyles.title}>{resolvedTitle}</h1>
-              <div className="flex w-full flex-wrap items-center justify-between gap-2">
-                <div className="min-w-[220px] flex-1">{serviceEventModeControl}</div>
-                <div className="shrink-0">{serviceEventActions}</div>
-              </div>
-              {resolvedSubtitle.trim() ? (
-                <p className={partsCartPageStyles.subtitle}>{resolvedSubtitle}</p>
-              ) : null}
-            </div>
-          </header>
+        <main
+          className={`${partsCartPageStyles.mainColumn} ${partsCartPageStyles.mainColumnServiceEvent} min-h-0 flex-1`}
+        >
+          <InternalPageChrome
+            variant="garageDark"
+            onBack={onCancel}
+            breadcrumbs={partsCartCrumbs}
+            title={resolvedTitle}
+            belowTitle={serviceEventModeControl}
+            subtitle={resolvedSubtitle.trim() ? resolvedSubtitle : undefined}
+            actions={serviceEventActions}
+          />
 
           {contextHint ? (
             <div className={partsCartPageStyles.historyBox}>
@@ -1659,10 +1666,9 @@ function ServiceEventFormInner({
           ) : null}
 
           <section
-            className={`${partsCartPageStyles.listPanel} flex min-h-0 flex-1 flex-col`}
+            className={`${partsCartPageStyles.listPanel} flex min-h-0 min-w-0 flex-1 flex-col`}
             aria-label="Форма сервисного события"
             style={{
-              minHeight: "calc(100vh - 84px)",
               border: 0,
               borderRadius: 0,
               background: "transparent",

@@ -1,13 +1,16 @@
 import { groupNodePickerOptionsByTopLevel, nodePickerGroupHeadingRu } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import type { ImageSourcePropType } from "react-native";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { getNodeTreeIconAsset } from "../../../../src/node-tree-icons";
 
 export type MobileNodePickerOption = {
   id: string;
   name: string;
   pathLabel?: string;
   level?: number;
+  code?: string;
 };
 
 type MobileNodePickerModalProps = {
@@ -104,6 +107,9 @@ export function MobileNodePickerModal({
                   <Text style={styles.groupHeading}>{nodePickerGroupHeadingRu(groupKey)}</Text>
                   {items.map((option) => {
                     const active = multi ? multiSelected.has(option.id) : selectedId === option.id;
+                    const rowAsset = option.code
+                      ? (getNodeTreeIconAsset(option.code, option.name) as ImageSourcePropType | null)
+                      : null;
                     return (
                       <Pressable
                         key={option.id}
@@ -122,17 +128,32 @@ export function MobileNodePickerModal({
                           resetAndClose();
                         }}
                       >
-                        <View style={styles.rowHeader}>
-                          <Text style={[styles.rowTitle, active && styles.rowTitleActive]}>
-                            {option.name}
-                          </Text>
-                          {multi ? (
-                            <Text style={[styles.check, active && styles.checkActive]}>
-                              {active ? "✓" : ""}
-                            </Text>
+                        <View style={styles.rowBody}>
+                          {rowAsset ? (
+                            // eslint-disable-next-line jsx-a11y/alt-text -- decorative; row has name/path labels
+                            <Image
+                              source={rowAsset}
+                              style={styles.rowIcon}
+                              resizeMode="contain"
+                              accessibilityIgnoresInvertColors
+                              accessible={false}
+                              importantForAccessibility="no-hide-descendants"
+                            />
                           ) : null}
+                          <View style={styles.rowTextCol}>
+                            <View style={styles.rowHeader}>
+                              <Text style={[styles.rowTitle, active && styles.rowTitleActive]}>
+                                {option.name}
+                              </Text>
+                              {multi ? (
+                                <Text style={[styles.check, active && styles.checkActive]}>
+                                  {active ? "✓" : ""}
+                                </Text>
+                              ) : null}
+                            </View>
+                            {option.pathLabel ? <Text style={styles.path}>{option.pathLabel}</Text> : null}
+                          </View>
                         </View>
-                        {option.pathLabel ? <Text style={styles.path}>{option.pathLabel}</Text> : null}
                       </Pressable>
                     );
                   })}
@@ -244,6 +265,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 6,
     backgroundColor: c.cardSubtle,
+  },
+  rowBody: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  rowIcon: {
+    width: 28,
+    height: 28,
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  rowTextCol: {
+    flex: 1,
+    minWidth: 0,
   },
   rowHeader: {
     flexDirection: "row",

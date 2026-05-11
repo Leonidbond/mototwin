@@ -70,6 +70,7 @@ import { productSemanticColors, statusSemanticTokens, statusTextLabelsRu } from 
 import { ACTION_SVG_BODIES, type ActionIconKey } from "@mototwin/icons";
 import { TopNodeIcon } from "@/components/icons/top-nodes";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
 import { PartsCartPage, type PartsAdvancedFilterState } from "./parts/_components/PartsCartPage";
@@ -1866,6 +1867,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     () =>
       flattenNodeTreeToSelectOptions(nodeTree).map((option) => ({
         id: option.id,
+        code: option.code,
         name: option.name,
         level: option.level,
         pathLabel: nodeAncestorPathLabelRu(nodeTree, option.id),
@@ -2566,6 +2568,20 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     router.push(fallbackHref);
   };
+
+  const nodeTreeBreadcrumbs = useMemo(() => {
+    if (!vehicle || !vehicleId) {
+      return [{ label: "Гараж", href: "/garage" }, { label: "Дерево узлов" }];
+    }
+    return [
+      { label: "Гараж", href: "/garage" },
+      {
+        label: vehicle.nickname || `${vehicle.brandName} ${vehicle.modelName}`,
+        href: `/vehicles/${vehicleId}`,
+      },
+      { label: "Дерево узлов" },
+    ];
+  }, [vehicle, vehicleId]);
 
   const clearPartsNodeUrlFilter = useCallback(() => {
     const q = new URLSearchParams(searchParams.toString());
@@ -4994,14 +5010,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
           <section
             style={{
-              display: "grid",
+              display: pageView === "nodeTree" ? "flex" : "grid",
+              flexDirection: pageView === "nodeTree" ? "column" : undefined,
               gap: pageView === "partsSelection" ? 0 : 12,
               padding: pageView === "partsSelection" ? 0 : "10px 18px 24px 16px",
               maxWidth: pageView === "partsSelection" ? "none" : 1420,
               width: "100%",
               minWidth: 0,
               justifySelf: pageView === "partsSelection" ? "stretch" : "center",
-              minHeight: pageView === "partsSelection" ? "100vh" : undefined,
+              minHeight:
+                pageView === "partsSelection" || pageView === "nodeTree" ? "100vh" : undefined,
               backgroundColor: pageView === "partsSelection" ? "#070B10" : undefined,
             }}
           >
@@ -5050,41 +5068,47 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
             ) : null}
 
             {!isLoading && !error && vehicle && pageView === "nodeTree" ? (
-              <div style={{ display: "grid", gap: 10, padding: "0 8px" }}>
-                <div className="flex h-8 items-center justify-between gap-3 text-xs" style={{ color: productSemanticColors.textSecondary }}>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => navigateBackWithFallback(`/vehicles/${vehicleId}`)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-[10px] transition"
-                      style={{ color: productSemanticColors.textSecondary }}
-                      aria-label="Назад"
-                    >
-                      ←
-                    </button>
-                    <span>Гараж</span>
-                    <span>/</span>
-                    <span style={{ color: productSemanticColors.textPrimary }}>{vehicle.nickname || vehicle.modelName}</span>
-                    <span>/</span>
-                    <span>Дерево узлов</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="hidden h-8 min-w-[220px] items-center gap-2 rounded-[10px] border px-3 text-xs lg:flex"
-                      style={{
-                        backgroundColor: productSemanticColors.cardSubtle,
-                        borderColor: productSemanticColors.borderStrong,
-                        color: productSemanticColors.textMuted,
-                      }}
-                    >
-                      ⌕ <span>Поиск узла...</span><span className="ml-auto">⌘K</span>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  flex: 1,
+                  minHeight: 0,
+                  gap: 10,
+                  padding: "0 8px",
+                }}
+              >
+                <InternalPageChrome
+                  variant="garageTokens"
+                  omitTitleBand
+                  onBack={() => navigateBackWithFallback(`/vehicles/${vehicleId}`)}
+                  breadcrumbs={nodeTreeBreadcrumbs}
+                  navRowEnd={
+                    <div className="flex items-center gap-3 text-xs" style={{ color: productSemanticColors.textSecondary }}>
+                      <div
+                        className="hidden h-8 min-w-[220px] items-center gap-2 rounded-[10px] border px-3 text-xs lg:flex"
+                        style={{
+                          backgroundColor: productSemanticColors.cardSubtle,
+                          borderColor: productSemanticColors.borderStrong,
+                          color: productSemanticColors.textMuted,
+                        }}
+                      >
+                        ⌕ <span>Поиск узла...</span>
+                        <span className="ml-auto">⌘K</span>
+                      </div>
+                      <span>♡</span>
+                      <span
+                        className="rounded-full px-2 py-1"
+                        style={{
+                          backgroundColor: productSemanticColors.cardMuted,
+                          color: productSemanticColors.textPrimary,
+                        }}
+                      >
+                        AK
+                      </span>
                     </div>
-                    <span>♡</span>
-                    <span className="rounded-full px-2 py-1" style={{ backgroundColor: productSemanticColors.cardMuted, color: productSemanticColors.textPrimary }}>
-                      AK
-                    </span>
-                  </div>
-                </div>
+                  }
+                />
                 <div
                   className="grid gap-4"
                   style={{
@@ -5092,7 +5116,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     alignItems: "stretch",
                     minWidth: 0,
                     minHeight: 0,
-                    height: "calc(100vh - 72px)",
+                    flex: 1,
                     overflow: "hidden",
                   }}
                 >

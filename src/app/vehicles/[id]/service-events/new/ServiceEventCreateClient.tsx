@@ -56,6 +56,7 @@ export function ServiceEventCreateClient() {
   const [resetKey, setResetKey] = useState(0);
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [vehicleDisplayName, setVehicleDisplayName] = useState("Мотоцикл");
 
   const bumpForm = useCallback((next: AddServiceEventFormValues) => {
     setInitialForm(next);
@@ -75,6 +76,13 @@ export function ServiceEventCreateClient() {
         ]);
         if (cancelled) return;
         const vehicle = detail.vehicle;
+        if (vehicle) {
+          const nm =
+            vehicle.nickname?.trim() ||
+            `${vehicle.brand.name} ${vehicle.model.name}`.trim() ||
+            "Мотоцикл";
+          setVehicleDisplayName(nm);
+        }
         setVehicleOdometer(vehicle?.odometer ?? null);
         setVehicleEngineHours(vehicle?.engineHours ?? null);
         const treeItems = tree.nodeTree ?? [];
@@ -178,6 +186,16 @@ export function ServiceEventCreateClient() {
     router.push(decodedReturnTo);
   }, [decodedReturnTo, router]);
 
+  const serviceEventPageBreadcrumbs = useMemo(
+    () => [
+      { label: "Гараж", href: "/garage" },
+      { label: vehicleDisplayName, href: `/vehicles/${vehicleId}` },
+      { label: "Журнал", href: `/vehicles/${vehicleId}/service-log` },
+      { label: "Новое ТО" },
+    ],
+    [vehicleDisplayName, vehicleId]
+  );
+
   const onSubmit = useCallback(
     async (form: AddServiceEventFormValues) => {
       try {
@@ -261,6 +279,7 @@ export function ServiceEventCreateClient() {
               odometerInputMax={vehicleOdometer}
               contextHint={contextHint}
               pageChrome="partsCart"
+              pageBreadcrumbs={serviceEventPageBreadcrumbs}
             />
           </div>
         ) : null}

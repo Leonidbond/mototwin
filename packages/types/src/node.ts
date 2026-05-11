@@ -69,6 +69,8 @@ export type SelectedNodePath = NodePathItem[];
 
 export type FlattenedNodeSelectOption = {
   id: string;
+  /** Catalog node code (same as API `NodeTreeItem.code`) for icons / mapping */
+  code: string;
   parentId: string | null;
   name: string;
   level: number;

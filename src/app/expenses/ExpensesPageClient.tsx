@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
-import { BackButton } from "@/components/navigation/BackButton";
+import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildExpenseAnalyticsFromItems,
@@ -534,6 +534,21 @@ export function ExpensesPageClient(props: {
     router.push("/garage");
   }
 
+  const expenseBreadcrumbs = useMemo(() => {
+    const crumbs: Array<{ label: string; href?: string }> = [{ label: "Гараж", href: "/garage" }];
+    if (effectiveVehicleId) {
+      const v = vehicles.find((x) => x.id === effectiveVehicleId);
+      crumbs.push({
+        label: v ? getVehicleLabel(v) : "Мотоцикл",
+        href: `/vehicles/${effectiveVehicleId}`,
+      });
+      crumbs.push({ label: "Затраты" });
+    } else {
+      crumbs.push({ label: "Расходы" });
+    }
+    return crumbs;
+  }, [effectiveVehicleId, vehicles]);
+
   function resetFilters() {
     setFilters({
       vehicleId: effectiveVehicleId,
@@ -596,36 +611,40 @@ export function ExpensesPageClient(props: {
       >
         <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
         <section style={contentStyle}>
-          <header style={headerStyle}>
-            <div>
-              <BackButton onClick={navigateBack} />
-              <h1 style={titleStyle}>{props.title}</h1>
-              <p style={subtitleStyle}>{props.subtitle}</p>
-              {nodeIdFromQuery ? (
+          <InternalPageChrome
+            variant="expenses"
+            onBack={navigateBack}
+            breadcrumbs={expenseBreadcrumbs}
+            title={props.title}
+            subtitle={props.subtitle}
+            titleExtra={
+              nodeIdFromQuery ? (
                 <p style={scopePillStyle}>Фильтр из дерева: выбранный узел и все дочерние узлы</p>
-              ) : null}
-            </div>
-            <div style={headerControlsStyle}>
-              {!props.vehicleId ? (
-                <select value={filters.vehicleId} onChange={(event) => setFilters((prev) => ({ ...prev, vehicleId: event.target.value }))} style={controlStyle}>
-                  <option value="">Все мотоциклы</option>
-                  {vehicles.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>{getVehicleLabel(vehicle)}</option>
-                  ))}
+              ) : null
+            }
+            actions={
+              <>
+                {!props.vehicleId ? (
+                  <select value={filters.vehicleId} onChange={(event) => setFilters((prev) => ({ ...prev, vehicleId: event.target.value }))} style={controlStyle}>
+                    <option value="">Все мотоциклы</option>
+                    {vehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>{getVehicleLabel(vehicle)}</option>
+                    ))}
+                  </select>
+                ) : null}
+                <select value={selectedYear} onChange={(event) => setSelectedYear(Number(event.target.value))} style={controlStyle}>
+                  {yearOptions.map((year) => <option key={year} value={year}>Сезон {year}</option>)}
                 </select>
-              ) : null}
-              <select value={selectedYear} onChange={(event) => setSelectedYear(Number(event.target.value))} style={controlStyle}>
-                {yearOptions.map((year) => <option key={year} value={year}>Сезон {year}</option>)}
-              </select>
-              <select value={filters.monthKey} onChange={(event) => setFilters((prev) => ({ ...prev, monthKey: event.target.value }))} style={controlStyle}>
-                <option value="">Все месяцы</option>
-                {monthOptions.map((month) => <option key={month.key} value={month.key}>{month.label}</option>)}
-              </select>
-              <button type="button" onClick={() => setShowAddForm((prev) => !prev)} style={primaryButtonStyle}>
-                + Добавить расход
-              </button>
-            </div>
-          </header>
+                <select value={filters.monthKey} onChange={(event) => setFilters((prev) => ({ ...prev, monthKey: event.target.value }))} style={controlStyle}>
+                  <option value="">Все месяцы</option>
+                  {monthOptions.map((month) => <option key={month.key} value={month.key}>{month.label}</option>)}
+                </select>
+                <button type="button" onClick={() => setShowAddForm((prev) => !prev)} style={primaryButtonStyle}>
+                  + Добавить расход
+                </button>
+              </>
+            }
+          />
 
           {error ? <StateCard isError>{error}</StateCard> : null}
 
@@ -1125,26 +1144,6 @@ const contentStyle: CSSProperties = {
   justifySelf: "center",
 };
 
-const headerStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  justifyContent: "space-between",
-  gap: 16,
-};
-
-const titleStyle: CSSProperties = {
-  margin: "4px 0 0",
-  fontSize: 30,
-  lineHeight: 1.1,
-  fontWeight: 850,
-};
-
-const subtitleStyle: CSSProperties = {
-  margin: "6px 0 0",
-  color: c.textSecondary,
-  fontSize: 13,
-};
-
 const scopePillStyle: CSSProperties = {
   display: "inline-flex",
   margin: "10px 0 0",
@@ -1154,13 +1153,6 @@ const scopePillStyle: CSSProperties = {
   background: "rgba(37,99,235,0.10)",
   color: c.textSecondary,
   fontSize: 12,
-};
-
-const headerControlsStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  justifyContent: "flex-end",
-  gap: 8,
 };
 
 const controlStyle: CSSProperties = {

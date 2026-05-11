@@ -34,6 +34,7 @@ export function ServiceEventEditClient() {
   const [resetKey, setResetKey] = useState(0);
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [vehicleDisplayName, setVehicleDisplayName] = useState("Мотоцикл");
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +49,13 @@ export function ServiceEventEditClient() {
         ]);
         if (cancelled) return;
         const vehicle = detail.vehicle;
+        if (vehicle) {
+          const nm =
+            vehicle.nickname?.trim() ||
+            `${vehicle.brand.name} ${vehicle.model.name}`.trim() ||
+            "Мотоцикл";
+          setVehicleDisplayName(nm);
+        }
         setVehicleOdometer(vehicle?.odometer ?? null);
         setVehicleEngineHours(vehicle?.engineHours ?? null);
         setNodeTree(tree.nodeTree ?? []);
@@ -90,6 +98,16 @@ export function ServiceEventEditClient() {
   const onCancel = useCallback(() => {
     router.push(decodedReturnTo);
   }, [decodedReturnTo, router]);
+
+  const serviceEventPageBreadcrumbs = useMemo(
+    () => [
+      { label: "Гараж", href: "/garage" },
+      { label: vehicleDisplayName, href: `/vehicles/${vehicleId}` },
+      { label: "Журнал", href: `/vehicles/${vehicleId}/service-log` },
+      { label: "Редактирование" },
+    ],
+    [vehicleDisplayName, vehicleId]
+  );
 
   const onSubmit = useCallback(
     async (form: AddServiceEventFormValues) => {
@@ -162,6 +180,7 @@ export function ServiceEventEditClient() {
               odometerInputMax={vehicleOdometer}
               pageChrome="partsCart"
               pageSubtitle="Измените данные события и сохраните обновлённую запись в журнале."
+              pageBreadcrumbs={serviceEventPageBreadcrumbs}
             />
           </div>
         ) : null}

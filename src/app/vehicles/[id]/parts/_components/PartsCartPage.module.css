@@ -2,13 +2,24 @@
   min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 344px;
-  gap: 16px;
+  /* Две строки по высоте контента — без лишней пустоты под шапкой от 1fr */
+  grid-template-rows: auto auto;
+  align-content: start;
+  gap: 8px;
   padding: 14px 14px 16px 16px;
   background: #070b10;
   color: #f3f4f6;
 }
 
+.chromeRow {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-width: 0;
+}
+
 .mainColumn {
+  grid-column: 1;
+  grid-row: 2;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -616,6 +627,8 @@
 }
 
 .detail {
+  grid-column: 2;
+  grid-row: 2;
   min-width: 0;
   align-self: start;
   position: sticky;
@@ -899,9 +912,22 @@
 @media (max-width: 860px) {
   .root {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+  }
+
+  .chromeRow {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .mainColumn {
+    grid-column: 1;
+    grid-row: 2;
   }
 
   .detail {
+    grid-column: 1;
+    grid-row: 3;
     position: static;
     max-height: none;
   }

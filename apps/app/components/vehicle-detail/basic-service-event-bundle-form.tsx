@@ -396,6 +396,7 @@ export function BasicServiceEventBundleForm({
     () =>
       leafOptions.map((o) => ({
         id: o.id,
+        code: o.code,
         name: o.name,
         level: o.level,
         pathLabel: nodeAncestorPathLabelRu(nodeTree, o.id),

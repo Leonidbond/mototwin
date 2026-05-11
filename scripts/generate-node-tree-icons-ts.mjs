@@ -21,6 +21,35 @@ function normalizeNodeTreeIconKey(value) {
     .replace(/^-|-$/g, "");
 }
 
+function writeEmptyIconsModule() {
+  const body = `declare const require: (path: string) => unknown;
+
+export type NodeTreeIconAsset = unknown;
+
+/** Placeholder until node-code-icon-source.json + nodes/*.png are restored */
+const NODE_TREE_ICON_PLACEHOLDER: NodeTreeIconAsset = require("../images/node-tree-icons/node-tree-icon-placeholder.png");
+
+export function getNodeTreeIconAsset(_code: string, _name = ""): NodeTreeIconAsset {
+  return NODE_TREE_ICON_PLACEHOLDER;
+}
+
+export function getNodeTreeIconWebSrc(_code: string, _name = ""): string {
+  const asset = NODE_TREE_ICON_PLACEHOLDER as {
+    default?: { src?: string };
+    src?: string;
+  };
+  return asset.src ?? asset.default?.src ?? "";
+}
+`;
+  fs.writeFileSync(OUT, body);
+  fs.writeFileSync(
+    path.join(ROOT, "images/node-tree-icons/manifest.json"),
+    "{}\n"
+  );
+  console.log("Wrote", path.relative(ROOT, OUT), "(no PNG entries)");
+  console.log("Wrote images/node-tree-icons/manifest.json (empty)");
+}
+
 function main() {
   const mapping = JSON.parse(fs.readFileSync(MAP, "utf8"));
   const codes = Object.keys(mapping).sort((a, b) => {
@@ -28,6 +57,11 @@ function main() {
     const kb = normalizeNodeTreeIconKey(b);
     return ka.localeCompare(kb);
   });
+
+  if (codes.length === 0) {
+    writeEmptyIconsModule();
+    return;
+  }
 
   const lines = [];
   lines.push(`declare const require: (path: string) => unknown;`);

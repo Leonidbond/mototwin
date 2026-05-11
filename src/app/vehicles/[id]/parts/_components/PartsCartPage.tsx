@@ -23,6 +23,7 @@ import type {
   PartWishlistItemViewModel,
   PartWishlistStatusGroupViewModel,
 } from "@mototwin/types";
+import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { PARTS_CART_REF } from "./parts-cart-reference-theme";
 import styles from "./PartsCartPage.module.css";
 
@@ -308,6 +309,7 @@ function DetailActionIcon({
 
 export function PartsCartPage(props: PartsCartPageProps) {
   const {
+    vehicleDisplayName,
     onNavigateBack,
     nodeTree,
     vehicleId,
@@ -355,6 +357,15 @@ export function PartsCartPage(props: PartsCartPageProps) {
   const pickedHighlightSet = useMemo(
     () => new Set(pickedHighlightWishlistItemIds),
     [pickedHighlightWishlistItemIds]
+  );
+
+  const cartBreadcrumbs = useMemo(
+    () => [
+      { label: "Гараж", href: "/garage" },
+      { label: vehicleDisplayName, href: `/vehicles/${encodeURIComponent(vehicleId)}` },
+      { label: "Корзина" },
+    ],
+    [vehicleDisplayName, vehicleId]
   );
 
   const [deleteConfirmItemId, setDeleteConfirmItemId] = useState<string | null>(null);
@@ -657,34 +668,37 @@ export function PartsCartPage(props: PartsCartPageProps) {
 
   return (
     <div className={styles.root}>
+      <div className={styles.chromeRow}>
+        <InternalPageChrome
+          variant="garageDark"
+          onBack={onNavigateBack}
+          breadcrumbs={cartBreadcrumbs}
+          title="Корзина замен и расходников"
+          subtitle="Список запчастей и расходников для вашего мотоцикла."
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts/picker?focus=kits`)
+                }
+                className={styles.secondaryAction}
+              >
+                <span aria-hidden>▣</span>
+                <span>Добавить комплект</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts/picker`)}
+                className={styles.primaryAction}
+              >
+                + Добавить позицию
+              </button>
+            </>
+          }
+        />
+      </div>
       <main className={styles.mainColumn}>
-        <header className={styles.header}>
-          <button type="button" onClick={onNavigateBack} className={styles.backButton} aria-label="Назад">←</button>
-          <div>
-            <h1 className={styles.title}>Корзина замен и расходников</h1>
-            <p className={styles.subtitle}>Список запчастей и расходников для вашего мотоцикла.</p>
-          </div>
-          <div className={styles.headerActions}>
-            <button
-              type="button"
-              onClick={() =>
-                router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts/picker?focus=kits`)
-              }
-              className={styles.secondaryAction}
-            >
-              <span aria-hidden>▣</span>
-              <span>Добавить комплект</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts/picker`)}
-              className={styles.primaryAction}
-            >
-              + Добавить позицию
-            </button>
-          </div>
-        </header>
-
         {wishlistNotice ? <p className="text-[12px]" style={{ color: productSemanticColors.error }}>{wishlistNotice}</p> : null}
 
         {wishlistViewModels.length > 0 ? (

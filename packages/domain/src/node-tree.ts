@@ -13,6 +13,7 @@ export function flattenNodeTreeToSelectOptions(
     const nextPath = [...path, node.id];
     const current: FlattenedNodeSelectOption = {
       id: node.id,
+      code: node.code,
       parentId,
       name: node.name,
       level: node.level,

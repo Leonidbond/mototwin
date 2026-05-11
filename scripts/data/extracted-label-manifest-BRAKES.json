@@ -1,0 +1,65 @@
+[
+  {
+    "slug": "BRAKES-Зад-перед-тормоз-разделы-s000",
+    "rawLabel": "No",
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 0,
+    "splitY": 131
+  },
+  {
+    "slug": "BRAKES-Зад-перед-тормоз-разделы-s001",
+    "rawLabel": "VU",
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 1,
+    "splitY": 209
+  },
+  {
+    "slug": "BRAKES-Зад-перед-тормоз-разделы-s002",
+    "rawLabel": "or",
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 2,
+    "splitY": 213
+  },
+  {
+    "slug": "BRAKES-Зад-перед-тормоз-разделы-s003",
+    "rawLabel": "UY",
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 3,
+    "splitY": 195
+  },
+  {
+    "slug": "BRAKES-Зад-перед-тормоз-разделы-s004",
+    "rawLabel": "",
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 4,
+    "splitY": 172
+  },
+  {
+    "slug": "BRAKES-Зад-перед-тормоз-разделы-s005",
+    "rawLabel": "\\",
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 5,
+    "splitY": 255
+  },
+  {
+    "slug": "BRAKES-Зад-перед-тормоз-разделы-s006",
+    "rawLabel": "(0]",
+    "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
+    "sliceIndex": 6,
+    "splitY": 171
+  },
+  {
+    "slug": "тормоза",
+    "rawLabel": "Тормоза",
+    "sourceRel": "BRAKES/Тормоз + ABS.png",
+    "sliceIndex": 0,
+    "splitY": 192
+  },
+  {
+    "slug": "abs-датчики-abs",
+    "rawLabel": "ABS / датчики ABS",
+    "sourceRel": "BRAKES/Тормоз + ABS.png",
+    "sliceIndex": 1,
+    "splitY": 148
+  }
+]

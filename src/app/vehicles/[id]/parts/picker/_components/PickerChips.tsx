@@ -1,6 +1,8 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import Image from "next/image";
+import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 import { pickerColors } from "./picker-styles";
 
 const chipBaseStyle: CSSProperties = {
@@ -71,9 +73,13 @@ export function VehicleChip(props: {
 export function NodeChip(props: {
   nodeName: string | null;
   nodePath: string | null;
+  /** Catalog node code — shows design tree icon when set */
+  nodeCode?: string | null;
   onClick?: () => void;
 }) {
   const placeholder = !props.nodeName;
+  const iconSrc =
+    props.nodeCode && props.nodeName ? getNodeTreeIconWebSrc(props.nodeCode, props.nodeName) : "";
   return (
     <button type="button" style={chipBaseInteractiveStyle} onClick={props.onClick}>
       <div
@@ -88,10 +94,16 @@ export function NodeChip(props: {
           justifyContent: "center",
           color: pickerColors.textMuted,
           fontSize: 18,
+          position: "relative",
+          overflow: "hidden",
         }}
         aria-hidden
       >
-        ⚙
+        {iconSrc ? (
+          <Image src={iconSrc} alt="" width={30} height={30} className="object-contain" />
+        ) : (
+          "⚙"
+        )}
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontSize: 11, color: pickerColors.textMuted, fontWeight: 600, letterSpacing: 0.4 }}>
