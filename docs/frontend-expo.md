@@ -4,6 +4,14 @@
 
 Документ описывает текущие реализованные экраны Expo в `apps/app/app/**`.
 
+### Запуск Metro / Expo CLI
+
+Проект приложения — пакет **`@mototwin/app`** (`apps/app`), в нём `package.json` с `"main": "expo-router/entry"`.
+
+- Из **корня** репозитория: `npm run mobile:dev` или `npm run expo -- start` (скрипт `expo` проксирует CLI в workspace).
+- Из **`apps/app`**: `npx expo start`.
+- **`npx expo` из корня** без workspace приводит к стандартному `expo/AppEntry.js` и ошибке «Unable to resolve module ../../App» — так запускать не нужно.
+
 ## 2. Route map (Expo Router)
 
 Defined in `apps/app/app/_layout.tsx`:

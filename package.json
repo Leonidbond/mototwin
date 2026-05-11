@@ -23,7 +23,8 @@
     "mobile:dev:tunnel": "npm run dev:tunnel --workspace @mototwin/app",
     "mobile:android": "npm run android --workspace @mototwin/app",
     "mobile:ios": "npm run ios --workspace @mototwin/app",
-    "mobile:web": "npm run web --workspace @mototwin/app"
+    "mobile:web": "npm run web --workspace @mototwin/app",
+    "expo": "npm exec --workspace=@mototwin/app -- expo"
   },
   "dependencies": {
     "@mototwin/api-client": "*",
@@ -49,7 +50,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
-    "expo": "54.0.33",
     "expo-router": "~6.0.23",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
