@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
   getUserSettingsStorageKey,

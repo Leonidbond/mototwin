@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { DEFAULT_DEV_USER_EMAIL, DEV_USER_STORAGE_KEY } from "@mototwin/types";
 import { normalizeDevUserEmail } from "@mototwin/domain";
 

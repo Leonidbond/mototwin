@@ -34,7 +34,6 @@
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "dotenv": "^17.4.2",
-    "expo": "^45.0.8",
     "next": "^16.2.6",
     "pg": "^8.20.0",
     "prisma": "^6.19.3",
@@ -50,8 +49,13 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "expo": "54.0.33",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "expo": "54.0.33",
+    "expo-modules-core": "3.0.29"
   }
 }
