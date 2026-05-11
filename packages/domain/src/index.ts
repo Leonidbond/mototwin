@@ -90,6 +90,7 @@ export {
 export {
   filterPaidServiceExpenseEvents,
   buildExpenseAnalyticsFromItems,
+  buildExpenseCategoryDonutSegmentsForExpenses,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
   groupExpensesByCurrency,
@@ -98,6 +99,7 @@ export {
   groupExpensesByNode,
   buildExpenseSummaryFromServiceEvents,
   formatExpenseAmountRu,
+  partSkuListPriceToBundlePartCostInput,
   stripLocaleMoneyGroupingSeparators,
   parseExpenseAmountInputToNumberOrNull,
   getCurrentExpenseYear,
@@ -200,6 +202,13 @@ export {
   normalizeAddMotorcyclePayload,
   validateAddMotorcycleFormValues,
 } from "./forms";
+export {
+  SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX,
+  SERVICE_EVENT_TEMPLATE_SELECT_USER_PREFIX,
+  buildUserServiceEventTemplateTitle,
+  stripAddServiceEventFormValuesForUserTemplate,
+  addServiceEventFormValuesFromUserTemplateJson,
+} from "./user-service-event-form-template";
 export {
   buildGarageCardProps,
   filterMeaningfulGarageSpecHighlights,

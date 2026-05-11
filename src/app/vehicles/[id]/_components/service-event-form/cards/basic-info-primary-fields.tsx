@@ -1,8 +1,18 @@
 "use client";
 
-import { ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH, ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH } from "@mototwin/domain";
+import {
+  ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH,
+  ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH,
+  SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX,
+  SERVICE_EVENT_TEMPLATE_SELECT_USER_PREFIX,
+} from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
-import type { AddServiceEventFormValues, ServiceBundleTemplateWire, ServicePerformedBy } from "@mototwin/types";
+import type {
+  AddServiceEventFormValues,
+  ServiceBundleTemplateWire,
+  ServicePerformedBy,
+  UserServiceEventFormTemplateWire,
+} from "@mototwin/types";
 import { type RefObject, type CSSProperties, type ReactNode } from "react";
 import {
   FIELD_IN_STACK,
@@ -83,21 +93,24 @@ function requiredFieldStyle(isMissing: boolean): CSSProperties {
 
 function TemplateSelectField({
   bundleTemplates,
+  userTemplates,
   bundleTemplatesLoadError,
-  selectedBundleTemplateId,
-  onSelectBundleTemplate,
+  userTemplatesLoadError,
+  templateSelectValue,
+  onTemplateSelectValueChange,
   onOpenTemplateContents,
-  onApplyTemplate,
   templateLabel,
 }: {
   bundleTemplates: ServiceBundleTemplateWire[];
+  userTemplates: UserServiceEventFormTemplateWire[];
   bundleTemplatesLoadError: string;
-  selectedBundleTemplateId: string;
-  onSelectBundleTemplate: (id: string) => void;
+  userTemplatesLoadError: string;
+  templateSelectValue: string;
+  onTemplateSelectValueChange: (value: string) => void;
   onOpenTemplateContents: () => void;
-  onApplyTemplate: (templateId: string) => void;
   templateLabel: ReactNode;
 }) {
+  const canInspectSystemTemplate = templateSelectValue.startsWith(SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <div className="flex min-h-[18px] items-center justify-between gap-2 sm:gap-3">
@@ -106,7 +119,7 @@ function TemplateSelectField({
         </span>
         <button
           type="button"
-          disabled={!selectedBundleTemplateId}
+          disabled={!canInspectSystemTemplate}
           onClick={onOpenTemplateContents}
           className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[11px] font-bold leading-none outline-none transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           style={{
@@ -122,13 +135,9 @@ function TemplateSelectField({
       </div>
       <div className="relative">
         <select
-          value={selectedBundleTemplateId}
+          value={templateSelectValue}
           onChange={(e) => {
-            const id = e.target.value;
-            onSelectBundleTemplate(id);
-            if (id) {
-              onApplyTemplate(id);
-            }
+            onTemplateSelectValueChange(e.target.value);
           }}
           style={{
             ...FIELD_IN_STACK,
@@ -139,11 +148,24 @@ function TemplateSelectField({
           className={FOCUS_RING}
         >
           <option value="">— не выбран —</option>
-          {bundleTemplates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.title}
-            </option>
-          ))}
+          {userTemplates.length > 0 ? (
+            <optgroup label="Мои шаблоны">
+              {userTemplates.map((t) => (
+                <option key={t.id} value={`${SERVICE_EVENT_TEMPLATE_SELECT_USER_PREFIX}${t.id}`}>
+                  {t.title}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
+          {bundleTemplates.length > 0 ? (
+            <optgroup label="Стандартные">
+              {bundleTemplates.map((t) => (
+                <option key={t.id} value={`${SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX}${t.id}`}>
+                  {t.title}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
         </select>
         <span
           className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
@@ -160,6 +182,11 @@ function TemplateSelectField({
           {bundleTemplatesLoadError}
         </p>
       ) : null}
+      {userTemplatesLoadError ? (
+        <p className="mt-1 text-xs" style={{ color: productSemanticColors.error }}>
+          {userTemplatesLoadError}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -170,10 +197,11 @@ export type BasicInfoPrimaryFieldsProps = {
   form: AddServiceEventFormValues;
   bundleTemplates: ServiceBundleTemplateWire[];
   bundleTemplatesLoadError: string;
-  selectedBundleTemplateId: string;
-  onSelectBundleTemplate: (id: string) => void;
+  userTemplates: UserServiceEventFormTemplateWire[];
+  userTemplatesLoadError: string;
+  templateSelectValue: string;
+  onTemplateSelectValueChange: (value: string) => void;
   onOpenTemplateContents: () => void;
-  onApplyTemplate: (templateId: string) => void;
   eventDateMaxYmd?: string;
   odometerInputMax?: number | null;
   onPatch: (patch: Partial<AddServiceEventFormValues>) => void;
@@ -196,10 +224,11 @@ export function BasicInfoPrimaryFields({
   form,
   bundleTemplates,
   bundleTemplatesLoadError,
-  selectedBundleTemplateId,
-  onSelectBundleTemplate,
+  userTemplates,
+  userTemplatesLoadError,
+  templateSelectValue,
+  onTemplateSelectValueChange,
   onOpenTemplateContents,
-  onApplyTemplate,
   eventDateMaxYmd,
   odometerInputMax,
   onPatch,
@@ -247,11 +276,12 @@ export function BasicInfoPrimaryFields({
         {showTemplate ? (
           <TemplateSelectField
             bundleTemplates={bundleTemplates}
+            userTemplates={userTemplates}
             bundleTemplatesLoadError={bundleTemplatesLoadError}
-            selectedBundleTemplateId={selectedBundleTemplateId}
-            onSelectBundleTemplate={onSelectBundleTemplate}
+            userTemplatesLoadError={userTemplatesLoadError}
+            templateSelectValue={templateSelectValue}
+            onTemplateSelectValueChange={onTemplateSelectValueChange}
             onOpenTemplateContents={onOpenTemplateContents}
-            onApplyTemplate={onApplyTemplate}
             templateLabel={
               <>
                 Шаблон <span style={{ color: SERVICE_EVENT_PARTS_UI.textSubtle, fontWeight: 400 }}>(опционально)</span>

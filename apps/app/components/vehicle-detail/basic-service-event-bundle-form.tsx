@@ -8,10 +8,12 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH,
   ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH,
+  addServiceEventFormValuesFromUserTemplateJson,
   applyExpenseInstallToAddFormRow,
   buildAddServiceEventCostBreakdownLines,
   createEmptyBundleItemFormValues,
@@ -21,6 +23,7 @@ import {
   getOrderedTopNodeIdsPresentInNodeTree,
   nodeAncestorPathLabelRu,
   formatExpenseAmountRu,
+  partSkuListPriceToBundlePartCostInput,
   getServiceActionTypeLabelRu,
   mergeServiceBundleTemplateIntoAddFormValues,
   mergeWishlistItemIntoAddFormValues,
@@ -29,6 +32,7 @@ import {
   removeWishlistItemFromAddFormValues,
   revertExpenseInstallFormPatch,
   SERVICE_ACTION_TYPE_OPTIONS,
+  stripAddServiceEventFormValuesForUserTemplate,
   validateAddServiceEventFormValuesMobile,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
@@ -43,8 +47,28 @@ import type {
   ServiceBundleTemplateWire,
   ServicePerformedBy,
   TopServiceNodeItem,
+  UserServiceEventFormTemplateWire,
 } from "@mototwin/types";
 import { MobileNodePickerModal } from "./mobile-node-picker-modal";
+
+/** Палитра панели узлов — как `SERVICE_EVENT_PARTS_UI` на web (`service-event-form/styles.ts`). */
+const SE = {
+  surface: "#0d141c",
+  surfaceElevated: "#101720",
+  surfaceControl: "#0b1118",
+  border: "#1f2937",
+  borderSubtle: "#253140",
+  orange: "#ff6b00",
+  text: "#f3f4f6",
+  textMuted: "#9ca3af",
+} as const;
+
+const BUNDLE_INDEX_ICONS: (keyof typeof MaterialIcons.glyphMap)[] = [
+  "opacity",
+  "view-headline",
+  "inventory-2",
+  "offline-bolt",
+];
 import {
   ServiceEventCard,
   ServiceEventModeSegment,
@@ -52,8 +76,6 @@ import {
   SummaryFooter,
   ToggleRow,
 } from "./service-event-mobile/ServiceEventMobileShell";
-
-type FlatOption = ReturnType<typeof flattenNodeTreeToSelectOptions>[number];
 
 function cloneForm(src: AddServiceEventFormValues): AddServiceEventFormValues {
   return {
@@ -94,7 +116,7 @@ function clearNodeOrRemoveRowAt(form: AddServiceEventFormValues, index: number):
 
 function appendEmptyItem(form: AddServiceEventFormValues): AddServiceEventFormValues {
   const next = createEmptyBundleItemFormValues({
-    actionType: form.mode === "BASIC" ? form.commonActionType : "SERVICE",
+    actionType: form.mode === "BASIC" ? form.commonActionType : "REPLACE",
   });
   return { ...form, items: [...form.items, next] };
 }
@@ -113,7 +135,7 @@ function appendNodeItems(form: AddServiceEventFormValues, nodeIds: string[]): Ad
         ...items,
         createEmptyBundleItemFormValues({
           nodeId,
-          actionType: form.mode === "BASIC" ? form.commonActionType : "SERVICE",
+          actionType: form.mode === "BASIC" ? form.commonActionType : "REPLACE",
         }),
       ];
     }
@@ -263,10 +285,6 @@ function pickSkuPartNumberOrFallback(sku: PartSkuViewModel, fallback: string): s
   return first || fallback;
 }
 
-function optionLabel(option: FlatOption): string {
-  return `${"— ".repeat(Math.max(0, option.level - 1))}${option.name}`;
-}
-
 function parseIntegerInput(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
@@ -295,6 +313,10 @@ export type BasicServiceEventBundleFormProps = {
   onClearSubmitError: () => void;
   onSubmit: (form: AddServiceEventFormValues) => Promise<void>;
   isEditMode: boolean;
+  /** Подсказка под режимом формы (например отложенная установка из wishlist). */
+  contextHint?: string;
+  /** Блок «Что будет после сохранения» как на web `PostSaveExplainer`. По умолчанию включён. */
+  showPostSaveExplainer?: boolean;
 };
 
 export function BasicServiceEventBundleForm({
@@ -310,6 +332,8 @@ export function BasicServiceEventBundleForm({
   onClearSubmitError,
   onSubmit,
   isEditMode,
+  contextHint,
+  showPostSaveExplainer = true,
 }: BasicServiceEventBundleFormProps) {
   const [form, setForm] = useState(() => cloneForm(initialForm));
   const [localError, setLocalError] = useState("");
@@ -338,6 +362,12 @@ export function BasicServiceEventBundleForm({
   const [bundleTemplates, setBundleTemplates] = useState<ServiceBundleTemplateWire[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [bundleTemplatesErr, setBundleTemplatesErr] = useState("");
+  const [userTemplates, setUserTemplates] = useState<UserServiceEventFormTemplateWire[]>([]);
+  const [userTemplatesErr, setUserTemplatesErr] = useState("");
+  const [saveUserTemplateOpen, setSaveUserTemplateOpen] = useState(false);
+  const [saveUserTemplateName, setSaveUserTemplateName] = useState("");
+  const [saveUserTemplateBusy, setSaveUserTemplateBusy] = useState(false);
+  const [saveUserTemplateErr, setSaveUserTemplateErr] = useState("");
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [templateInspect, setTemplateInspect] = useState<ServiceBundleTemplateWire | null>(null);
   const [installableModalOpen, setInstallableModalOpen] = useState(false);
@@ -381,6 +411,15 @@ export function BasicServiceEventBundleForm({
     [leafPickerRows, nodeTree, topNodeIds]
   );
   const leafIds = useMemo(() => new Set(leafOptions.map((o) => o.id)), [leafOptions]);
+
+  const selectedUnitsCount = useMemo(
+    () => form.items.filter((it) => it.nodeId.trim()).length,
+    [form.items]
+  );
+  const hasFreeNodesForBundle = useMemo(
+    () => leafOptions.some((o) => !form.items.some((it) => it.nodeId.trim() === o.id)),
+    [leafOptions, form.items]
+  );
 
   useEffect(() => {
     setCurrentVehicleOdometer(vehicleOdometer);
@@ -495,6 +534,27 @@ export function BasicServiceEventBundleForm({
         if (!cancelled) {
           setBundleTemplates([]);
           setBundleTemplatesErr("Не удалось загрузить шаблоны.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setUserTemplatesErr("");
+    const client = createApiClient({ baseUrl: apiBaseUrl });
+    const endpoints = createMotoTwinEndpoints(client);
+    void endpoints
+      .getUserServiceEventFormTemplates()
+      .then((res) => {
+        if (!cancelled) setUserTemplates(res.templates ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUserTemplates([]);
+          setUserTemplatesErr("Не удалось загрузить ваши шаблоны.");
         }
       });
     return () => {
@@ -864,6 +924,19 @@ export function BasicServiceEventBundleForm({
     await onSubmit(form);
   };
 
+  const applyUserFormTemplate = useCallback(
+    (tpl: UserServiceEventFormTemplateWire) => {
+      const next = addServiceEventFormValuesFromUserTemplateJson(tpl.form);
+      if (!next) {
+        setLocalError("Не удалось применить шаблон.");
+        return;
+      }
+      updateForm(() => next);
+      setTemplateModalOpen(false);
+    },
+    [updateForm]
+  );
+
   const combinedError = localError || submitError;
 
   const nodePickerOptions =
@@ -901,16 +974,35 @@ export function BasicServiceEventBundleForm({
         }}
       />
 
+      {contextHint ? (
+        <View style={styles.contextHintBox}>
+          <Text style={styles.contextHintText}>{contextHint}</Text>
+        </View>
+      ) : null}
+
       <ServiceEventCard title="1. Основная информация">
       {!isEditMode ? (
         <View style={{ marginBottom: 8, gap: 8 }}>
           {bundleTemplatesErr ? <Text style={styles.err}>{bundleTemplatesErr}</Text> : null}
-          <Pressable
-            onPress={() => setTemplateModalOpen(true)}
-            style={({ pressed }) => [styles.templatePickBtn, pressed && styles.pressed]}
-          >
-            <Text style={styles.templatePickBtnTxt}>Шаблон комплекса…</Text>
-          </Pressable>
+          {userTemplatesErr ? <Text style={styles.err}>{userTemplatesErr}</Text> : null}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            <Pressable
+              onPress={() => {
+                setSaveUserTemplateErr("");
+                setSaveUserTemplateName(form.title.trim());
+                setSaveUserTemplateOpen(true);
+              }}
+              style={({ pressed }) => [styles.templatePickBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.templatePickBtnTxt}>Сохранить шаблон</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setTemplateModalOpen(true)}
+              style={({ pressed }) => [styles.templatePickBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.templatePickBtnTxt}>Шаблон комплекса…</Text>
+            </Pressable>
+          </View>
         </View>
       ) : null}
 
@@ -1013,104 +1105,161 @@ export function BasicServiceEventBundleForm({
       </ServiceEventCard>
 
       <ServiceEventCard
-        title="2. Узлы, включенные в событие"
+        title="2. Узлы и работы"
+        subtitle={`Выбрано узлов: ${selectedUnitsCount}`}
         right={
-          <View style={styles.nodesHeaderRight}>
+          <View style={styles.bundleHeaderActions}>
             {form.mode === "ADVANCED" && !isEditMode ? (
               <Pressable
                 onPress={() => setInstallableModalOpen(true)}
-                style={({ pressed }) => [styles.headerActionButton, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.bundleInstallableBtn, pressed && styles.pressed]}
               >
-                <Text style={styles.headerActionText}>Готово к установке</Text>
+                <MaterialIcons name="add" size={16} color={SE.text} />
+                <Text style={styles.bundleInstallableBtnText}>Готово к установке</Text>
+                {installableEntries.length > 0 ? (
+                  <View style={styles.bundleCountBadge}>
+                    <Text style={styles.bundleCountBadgeText}>{installableEntries.length}</Text>
+                  </View>
+                ) : null}
               </Pressable>
             ) : null}
-            <Text style={styles.selectedCount}>Выбрано: {form.items.filter((it) => it.nodeId.trim()).length}</Text>
+            {hasFreeNodesForBundle ? (
+              <Pressable
+                onPress={() => setMultiNodePickerOpen(true)}
+                style={({ pressed }) => [styles.bundleAddNodeBtn, pressed && styles.pressed]}
+              >
+                <MaterialIcons name="add" size={16} color={SE.orange} />
+                <Text style={styles.bundleAddNodeBtnText}>Добавить узел</Text>
+              </Pressable>
+            ) : null}
           </View>
         }
       >
-      {form.mode === "BASIC" ? (
-        <View style={styles.block}>
-          <Text style={styles.label}>Тип работы для всех узлов</Text>
-          <Pressable
-            onPress={() => setActionPickerOpen(true)}
-            style={({ pressed }) => [styles.inputLike, pressed && styles.pressed]}
-          >
-            <Text style={styles.inputLikeText}>
-              {SERVICE_ACTION_TYPE_OPTIONS.find((o) => o.value === form.commonActionType)?.label ??
-                form.commonActionType}
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
-      {form.mode === "BASIC" ? (
-        <View
-          style={{
-            marginBottom: 10,
-            borderLeftWidth: 4,
-            borderLeftColor: c.primaryAction,
-            paddingLeft: 10,
-            paddingVertical: 8,
-            backgroundColor: c.cardSubtle,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={[styles.muted, { lineHeight: 18 }]}>
-            Режим «Быстро»: один тип работы на все узлы, суммы по деталям и работе — в разделе «3. Стоимость» ниже.
-          </Text>
-        </View>
-      ) : null}
-
-      {form.items.map((row, rowIndex) => (
-        <View key={row.key} style={styles.itemCard}>
-          <View style={styles.itemHeaderRow}>
-            <Text style={styles.label}>{`Узел ${rowIndex + 1}`}</Text>
-          </View>
-          <View style={styles.nodeActionRow}>
-            <View style={styles.nodePickShell}>
+        <View style={styles.bundlePanel}>
+          {form.mode === "BASIC" ? (
+            <View style={styles.bundleCommonActionRow}>
+              <Text style={styles.bundleFieldLabel}>Тип работы</Text>
               <Pressable
-                onPress={() => setNodePicker({ rowIndex })}
-                style={({ pressed }) => [
-                  styles.inputLike,
-                  styles.nodePickInput,
-                  pressed && styles.pressed,
-                ]}
+                onPress={() => setActionPickerOpen(true)}
+                style={({ pressed }) => [styles.bundleSelectLike, pressed && styles.pressed]}
               >
-                <Text style={styles.inputLikeText} numberOfLines={2}>
-                  {(() => {
-                    const id = row.nodeId.trim();
-                    if (!id) return "Выберите узел";
-                    const opt = leafOptions.find((o) => o.id === id);
-                    return opt ? optionLabel(opt) : id;
-                  })()}
+                <Text style={styles.bundleSelectLikeText} numberOfLines={1}>
+                  {SERVICE_ACTION_TYPE_OPTIONS.find((o) => o.value === form.commonActionType)?.label ??
+                    form.commonActionType}
                 </Text>
               </Pressable>
-              {row.nodeId.trim() ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Удалить узел из события"
-                  onPress={() => updateForm((prev) => clearNodeOrRemoveRowAt(prev, rowIndex))}
-                  style={styles.removeIconButton}
-                >
-                  <Text style={styles.removeIconText}>×</Text>
-                </Pressable>
-              ) : null}
             </View>
-
-            {form.mode === "ADVANCED" ? (
-              <Pressable
-                onPress={() => setActionRowPicker(rowIndex)}
-                style={({ pressed }) => [styles.actionMiniButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.actionMiniText} numberOfLines={1}>
-                  {SERVICE_ACTION_TYPE_OPTIONS.find((o) => o.value === row.actionType)?.label ??
-                    row.actionType}
+          ) : null}
+          {form.mode === "BASIC" ? (
+            <View style={styles.bundleFastBanner}>
+              <View style={styles.bundleFastBannerIcon}>
+                <MaterialIcons name="bolt" size={18} color={SE.orange} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.bundleFastBannerTitle}>Быстрый режим</Text>
+                <Text style={styles.bundleFastBannerSub}>
+                  Выбраны узлы и указана общая стоимость. Статусы узлов будут обновлены.
                 </Text>
-              </Pressable>
-            ) : null}
-          </View>
+              </View>
+            </View>
+          ) : null}
+
+          {form.items.map((row, rowIndex) => {
+            const nodeIdTrim = row.nodeId.trim();
+            const nodeOpt = leafOptions.find((o) => o.id === nodeIdTrim);
+            const nodeTitle = nodeOpt?.name ?? `Узел ${rowIndex + 1}`;
+            const crumb = nodeIdTrim ? nodeAncestorPathLabelRu(nodeTree, row.nodeId) : "";
+            const hasNode = Boolean(nodeIdTrim);
+            const canRemoveRow = form.items.length > 1;
+            const rowActionLabelBasic = getServiceActionTypeLabelRu(form.commonActionType);
+            const indexIcon = BUNDLE_INDEX_ICONS[rowIndex % BUNDLE_INDEX_ICONS.length] ?? "circle";
+
+            return (
+              <View key={row.key}>
+                <View
+                  style={[
+                    styles.bundleNodeRow,
+                    {
+                      borderBottomColor: hasNode ? SE.borderSubtle : SE.orange,
+                    },
+                  ]}
+                >
+                  <View style={styles.bundleIndexBadge}>
+                    <MaterialIcons name={indexIcon} size={18} color={SE.orange} />
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      if (!hasNode) setNodePicker({ rowIndex });
+                    }}
+                    disabled={hasNode}
+                    style={({ pressed }) => [
+                      styles.bundleNodeMainPress,
+                      !hasNode && pressed && styles.pressed,
+                    ]}
+                  >
+                    <View style={styles.bundleNodeTextCol}>
+                      <Text
+                        style={[styles.bundleNodeTitle, !hasNode && styles.bundleNodeTitleEmpty]}
+                        numberOfLines={1}
+                      >
+                        {hasNode ? nodeTitle : "Выберите узел"}
+                      </Text>
+                      <Text style={styles.bundleNodeCrumb} numberOfLines={1}>
+                        {!hasNode ? "Узел не выбран" : crumb || ""}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  {form.mode === "BASIC" ? (
+                    <Text style={styles.bundleRowActionLabel} numberOfLines={2}>
+                      {rowActionLabelBasic}
+                    </Text>
+                  ) : (
+                    <Pressable
+                      onPress={() => setActionRowPicker(rowIndex)}
+                      style={({ pressed }) => [styles.bundleRowActionPick, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.bundleRowActionPickText} numberOfLines={1}>
+                        {SERVICE_ACTION_TYPE_OPTIONS.find((o) => o.value === row.actionType)?.label ??
+                          row.actionType}
+                      </Text>
+                    </Pressable>
+                  )}
+                  <View style={styles.bundleRowTail}>
+                    {hasNode ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Очистить узел"
+                        onPress={() => updateForm((prev) => clearNodeOrRemoveRowAt(prev, rowIndex))}
+                        style={({ pressed }) => [styles.bundleClearBtn, pressed && styles.pressed]}
+                      >
+                        <MaterialIcons name="close" size={16} color={SE.textMuted} />
+                      </Pressable>
+                    ) : (
+                      <View style={styles.bundleClearBtnPlaceholder} />
+                    )}
+                    {canRemoveRow ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Удалить строку"
+                        onPress={() => updateForm((prev) => removeItemAt(prev, rowIndex))}
+                        style={({ pressed }) => [styles.bundleDeleteRowBtn, pressed && styles.pressed]}
+                      >
+                        <MaterialIcons name="delete-outline" size={18} color="#ef4444" />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
 
           {form.mode === "ADVANCED" ? (
-            <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }}>
+            <View
+              style={{
+                marginTop: 0,
+                paddingTop: 12,
+                paddingBottom: 4,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: SE.borderSubtle,
+              }}
+            >
               <Field label="Наименование запчасти">
                 <TextInput
                   value={row.partName}
@@ -1151,9 +1300,11 @@ export function BasicServiceEventBundleForm({
                               Math.max(0, prev.items.length - 1)
                             );
                             const r = prev.items[idx];
+                            const partCostFromSku = partSkuListPriceToBundlePartCostInput(sku);
                             return patchItemAt(prev, idx, {
                               sku: pn || r?.sku?.trim() || "",
                               partName: sku.canonicalName?.trim() || r?.partName?.trim() || "",
+                              ...(partCostFromSku ? { partCost: partCostFromSku } : {}),
                             });
                           })
                         }
@@ -1213,18 +1364,12 @@ export function BasicServiceEventBundleForm({
               </Field>
             </View>
           ) : null}
+              </View>
+            );
+          })}
 
-        </View>
-      ))}
-
-      {freeNodePickerRows.length > 0 ? (
-        <Pressable onPress={() => setMultiNodePickerOpen(true)} style={styles.addNodeBtn}>
-          <Text style={styles.addNodeBtnText}>+ Добавить узел</Text>
-        </Pressable>
-      ) : null}
-
-      {costBreakdownLines.parts || costBreakdownLines.labor || costBreakdownLines.total ? (
-        <View style={styles.unitsTotalsBar}>
+          {costBreakdownLines.parts || costBreakdownLines.labor || costBreakdownLines.total ? (
+        <View style={styles.unitsTotalsBarInBundle}>
           <Text style={styles.unitsTotalsTitle}>Итого по узлам</Text>
           <View style={styles.unitsTotalsRow}>
             {costBreakdownLines.parts ? (
@@ -1243,7 +1388,7 @@ export function BasicServiceEventBundleForm({
           </View>
         </View>
       ) : null}
-
+        </View>
       </ServiceEventCard>
 
       <ServiceEventCard title="3. Стоимость">
@@ -1380,6 +1525,32 @@ export function BasicServiceEventBundleForm({
 
       {combinedError ? <Text style={styles.err}>{combinedError}</Text> : null}
 
+      {showPostSaveExplainer ? (
+        <View style={styles.postSaveSection}>
+          <Text style={styles.postSaveTitle}>Что будет после сохранения</Text>
+          <View style={styles.postSaveGrid}>
+            <View style={styles.postSaveCard}>
+              <Text style={styles.postSaveCardTitle}>Обновим состояние выбранных узлов</Text>
+              <Text style={styles.postSaveCardSub}>
+                Статусы узлов будут пересчитаны по пробегу и регламенту.
+              </Text>
+            </View>
+            <View style={styles.postSaveCard}>
+              <Text style={styles.postSaveCardTitle}>Пересчитаем регламенты и напоминания</Text>
+              <Text style={styles.postSaveCardSub}>
+                Сроки следующего обслуживания будут обновлены для выбранных узлов.
+              </Text>
+            </View>
+            <View style={styles.postSaveCard}>
+              <Text style={styles.postSaveCardTitle}>Добавим событие в журнал обслуживания</Text>
+              <Text style={styles.postSaveCardSub}>
+                Событие появится в истории с деталями и стоимостью.
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       <SummaryFooter
         partsLine={costBreakdownLines.parts}
         laborLine={costBreakdownLines.labor}
@@ -1407,6 +1578,26 @@ export function BasicServiceEventBundleForm({
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Шаблон комплекса</Text>
             <ScrollView style={{ maxHeight: 420 }}>
+              {userTemplates.length > 0 ? (
+                <Text style={[styles.modalRowText, { marginBottom: 6, opacity: 0.85 }]}>
+                  Мои шаблоны
+                </Text>
+              ) : null}
+              {userTemplates.map((tpl) => (
+                <View key={tpl.id} style={styles.modalRow}>
+                  <Pressable
+                    onPress={() => applyUserFormTemplate(tpl)}
+                    style={({ pressed }) => [pressed && styles.pressed]}
+                  >
+                    <Text style={styles.modalRowText}>{tpl.title}</Text>
+                  </Pressable>
+                </View>
+              ))}
+              {bundleTemplates.length > 0 ? (
+                <Text style={[styles.modalRowText, { marginTop: userTemplates.length ? 12 : 0, marginBottom: 6, opacity: 0.85 }]}>
+                  Стандартные
+                </Text>
+              ) : null}
               {bundleTemplates.map((tpl) => (
                 <View key={tpl.id} style={styles.modalRow}>
                   <Pressable
@@ -1489,6 +1680,75 @@ export function BasicServiceEventBundleForm({
             <Pressable onPress={() => setTemplateInspect(null)} style={styles.modalClose}>
               <Text style={styles.modalCloseTxt}>Закрыть</Text>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={saveUserTemplateOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !saveUserTemplateBusy && setSaveUserTemplateOpen(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => !saveUserTemplateBusy && setSaveUserTemplateOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Сохранить как шаблон</Text>
+            <Text style={[styles.muted, { marginBottom: 8 }]}>
+              В название будет добавлен режим: быстрый или подробный.
+            </Text>
+            <Text style={styles.label}>Название (необязательно)</Text>
+            <TextInput
+              value={saveUserTemplateName}
+              onChangeText={setSaveUserTemplateName}
+              style={styles.input}
+              maxLength={200}
+              editable={!saveUserTemplateBusy}
+              placeholder="Например: сезонное ТО"
+            />
+            {saveUserTemplateErr ? <Text style={styles.err}>{saveUserTemplateErr}</Text> : null}
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
+              <Pressable
+                onPress={() => !saveUserTemplateBusy && setSaveUserTemplateOpen(false)}
+                style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}
+              >
+                <Text style={styles.modalCloseTxt}>Отмена</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (saveUserTemplateBusy) return;
+                  setSaveUserTemplateBusy(true);
+                  setSaveUserTemplateErr("");
+                  const client = createApiClient({ baseUrl: apiBaseUrl });
+                  const endpoints = createMotoTwinEndpoints(client);
+                  const snapshot = stripAddServiceEventFormValuesForUserTemplate(form);
+                  void endpoints
+                    .createUserServiceEventFormTemplate({
+                      baseTitle: saveUserTemplateName.trim() || null,
+                      formSnapshot: snapshot,
+                    })
+                    .then((res) => {
+                      const tpl = res.template;
+                      setUserTemplates((prev) => [tpl, ...prev.filter((t) => t.id !== tpl.id)]);
+                      setSaveUserTemplateOpen(false);
+                    })
+                    .catch((err: unknown) => {
+                      setSaveUserTemplateErr(
+                        err instanceof Error && err.message.trim()
+                          ? err.message.trim()
+                          : "Не удалось сохранить шаблон."
+                      );
+                    })
+                    .finally(() => {
+                      setSaveUserTemplateBusy(false);
+                    });
+                }}
+                style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}
+              >
+                <Text style={[styles.modalCloseTxt, { color: SE.orange, fontWeight: "700" }]}>
+                  {saveUserTemplateBusy ? "Сохраняем…" : "Сохранить"}
+                </Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1955,6 +2215,221 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: c.primaryAction,
   },
+  bundlePanel: {
+    marginHorizontal: -4,
+    marginTop: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: SE.border,
+    backgroundColor: SE.surface,
+  },
+  bundleHeaderActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 8,
+  },
+  bundleInstallableBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: SE.surfaceElevated,
+  },
+  bundleInstallableBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: SE.text,
+  },
+  bundleCountBadge: {
+    minWidth: 28,
+    height: 24,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: SE.orange,
+  },
+  bundleCountBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: c.onPrimaryAction,
+  },
+  bundleAddNodeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: SE.orange,
+    backgroundColor: "transparent",
+  },
+  bundleAddNodeBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: SE.orange,
+  },
+  bundleCommonActionRow: {
+    flexDirection: "column",
+    gap: 8,
+    marginBottom: 12,
+  },
+  bundleFieldLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: SE.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  bundleSelectLike: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: SE.border,
+    backgroundColor: SE.surfaceControl,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  bundleSelectLikeText: {
+    fontSize: 14,
+    color: SE.text,
+    fontWeight: "600",
+  },
+  bundleFastBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: SE.surfaceElevated,
+  },
+  bundleFastBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: SE.surface,
+  },
+  bundleFastBannerTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: SE.text,
+  },
+  bundleFastBannerSub: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 16,
+    color: SE.textMuted,
+  },
+  bundleNodeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  bundleIndexBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: SE.surfaceElevated,
+  },
+  bundleNodeMainPress: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 2,
+  },
+  bundleNodeTextCol: {
+    minWidth: 0,
+  },
+  bundleNodeTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: SE.text,
+  },
+  bundleNodeTitleEmpty: {
+    color: SE.orange,
+  },
+  bundleNodeCrumb: {
+    marginTop: 2,
+    fontSize: 11,
+    color: SE.textMuted,
+  },
+  bundleRowActionLabel: {
+    width: 100,
+    flexShrink: 0,
+    textAlign: "right",
+    fontSize: 11,
+    fontWeight: "600",
+    color: SE.textMuted,
+  },
+  bundleRowActionPick: {
+    maxWidth: 118,
+    flexShrink: 0,
+    minHeight: 36,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: SE.border,
+    backgroundColor: SE.surfaceControl,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bundleRowActionPickText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: SE.orange,
+  },
+  bundleRowTail: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  bundleClearBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: SE.border,
+    backgroundColor: SE.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bundleClearBtnPlaceholder: {
+    width: 32,
+    height: 32,
+  },
+  bundleDeleteRowBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: SE.border,
+    backgroundColor: SE.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unitsTotalsBarInBundle: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: SE.borderSubtle,
+    backgroundColor: SE.surfaceElevated,
+    borderRadius: 12,
+    padding: 10,
+  },
   unitsTotalsBar: {
     borderWidth: 1,
     borderColor: c.borderStrong,
@@ -2211,5 +2686,53 @@ const styles = StyleSheet.create({
   primaryActionText: {
     color: c.onPrimaryAction,
     fontWeight: "800",
+  },
+  contextHintBox: {
+    marginTop: 4,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+  },
+  contextHintText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: c.textSecondary,
+  },
+  postSaveSection: {
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  postSaveTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: c.textPrimary,
+    marginBottom: 10,
+  },
+  postSaveGrid: {
+    gap: 10,
+  },
+  postSaveCard: {
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: c.cardMuted,
+  },
+  postSaveCardTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textPrimary,
+    lineHeight: 16,
+  },
+  postSaveCardSub: {
+    marginTop: 6,
+    fontSize: 11,
+    lineHeight: 15,
+    color: c.textSecondary,
   },
 });

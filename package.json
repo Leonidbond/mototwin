@@ -24,6 +24,9 @@
     "mobile:android": "npm run android --workspace @mototwin/app",
     "mobile:ios": "npm run ios --workspace @mototwin/app",
     "mobile:web": "npm run web --workspace @mototwin/app",
+    "icons:extract-node-tree-new": "node scripts/extract-node-tree-icons-new.js",
+    "icons:audit-node-tree": "tsx scripts/audit-node-tree-icons.ts",
+    "icons:rebuild-node-tree-from-design": "node scripts/extract-node-tree-icons-new.js && node scripts/build-node-code-icon-source.mjs && node scripts/sync-node-icons-from-slices.mjs && node scripts/generate-node-tree-icons-ts.mjs",
     "expo": "npm exec --workspace=@mototwin/app -- expo"
   },
   "dependencies": {

@@ -2,6 +2,7 @@
 
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  addServiceEventFormValuesFromUserTemplateJson,
   applyExpenseInstallToAddFormRow,
   buildAddServiceEventCostBreakdownLines,
   createEmptyBundleItemFormValues,
@@ -9,6 +10,7 @@ import {
   filterLeafOptionsUnderTopNodeAncestors,
   flattenNodeTreeToSelectOptions,
   formatExpenseAmountRu,
+  partSkuListPriceToBundlePartCostInput,
   getServiceActionTypeLabelRu,
   getOrderedTopNodeIdsPresentInNodeTree,
   mergeServiceBundleTemplateIntoAddFormValues,
@@ -18,6 +20,9 @@ import {
   removeWishlistItemFromAddFormValues,
   revertExpenseInstallFormPatch,
   SERVICE_ACTION_TYPE_OPTIONS,
+  SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX,
+  SERVICE_EVENT_TEMPLATE_SELECT_USER_PREFIX,
+  stripAddServiceEventFormValuesForUserTemplate,
   validateAddServiceEventFormValues,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
@@ -34,6 +39,7 @@ import type {
   ServiceActionType,
   ServiceBundleTemplateWire,
   TopServiceNodeItem,
+  UserServiceEventFormTemplateWire,
 } from "@mototwin/types";
 
 import { ServiceEventModeControl } from "./ServiceEventModeControl";
@@ -279,7 +285,13 @@ function ServiceEventFormInner({
 
   const [bundleTemplates, setBundleTemplates] = useState<ServiceBundleTemplateWire[]>([]);
   const [bundleTemplatesLoadError, setBundleTemplatesLoadError] = useState("");
-  const [selectedBundleTemplateId, setSelectedBundleTemplateId] = useState("");
+  const [templateSelection, setTemplateSelection] = useState("");
+  const [userTemplates, setUserTemplates] = useState<UserServiceEventFormTemplateWire[]>([]);
+  const [userTemplatesLoadError, setUserTemplatesLoadError] = useState("");
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [saveTemplateNameDraft, setSaveTemplateNameDraft] = useState("");
+  const [saveTemplateBusy, setSaveTemplateBusy] = useState(false);
+  const [saveTemplateError, setSaveTemplateError] = useState("");
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
 
   const [installableEntries, setInstallableEntries] = useState<InstallableForServiceEventEntry[]>([]);
@@ -520,10 +532,13 @@ function ServiceEventFormInner({
     return `0 ${currencySuffix(form.currency)}`;
   }, [serviceEventCostTotalPreview, form.currency]);
 
-  const selectedBundleTemplate = useMemo(
-    () => bundleTemplates.find((t) => t.id === selectedBundleTemplateId) ?? null,
-    [bundleTemplates, selectedBundleTemplateId]
-  );
+  const selectedBundleTemplate = useMemo(() => {
+    if (!templateSelection.startsWith(SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX)) {
+      return null;
+    }
+    const id = templateSelection.slice(SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX.length);
+    return bundleTemplates.find((t) => t.id === id) ?? null;
+  }, [bundleTemplates, templateSelection]);
 
   const filteredInstallableEntries = useMemo(() => {
     const used = new Set(form.items.map((it) => it.nodeId.trim()).filter(Boolean));
@@ -745,6 +760,25 @@ function ServiceEventFormInner({
 
   useEffect(() => {
     let cancelled = false;
+    setUserTemplatesLoadError("");
+    void api
+      .getUserServiceEventFormTemplates()
+      .then((res) => {
+        if (!cancelled) setUserTemplates(res.templates ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUserTemplates([]);
+          setUserTemplatesLoadError("Не удалось загрузить ваши шаблоны.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     void api
       .getTopServiceNodes()
       .then((res) => {
@@ -796,9 +830,11 @@ function ServiceEventFormInner({
             ? 0
             : Math.min(Math.max(0, skuSearchRowIndex), Math.max(0, prev.items.length - 1));
         const row = prev.items[idx];
+        const partCostFromSku = partSkuListPriceToBundlePartCostInput(sku);
         return patchItemAt(prev, idx, {
           sku: pickSkuPartNumberOrFallback(sku, row?.sku?.trim() ?? ""),
           partName: sku.canonicalName?.trim() || row?.partName?.trim() || "",
+          ...(partCostFromSku ? { partCost: partCostFromSku } : {}),
         });
       });
     },
@@ -861,7 +897,7 @@ function ServiceEventFormInner({
     [editingUnitRowIndex, updateForm]
   );
 
-  const onApplyTemplate = useCallback(
+  const applySystemBundleTemplate = useCallback(
     (templateId: string) => {
       const tpl = bundleTemplates.find((t) => t.id === templateId);
       if (!tpl) return;
@@ -890,6 +926,67 @@ function ServiceEventFormInner({
     },
     [bundleTemplates, leafNodeIdsSet, onClearSubmitError, updateForm]
   );
+
+  const applyUserTemplateById = useCallback(
+    (templateId: string) => {
+      const tpl = userTemplates.find((t) => t.id === templateId);
+      if (!tpl) return;
+      const next = addServiceEventFormValuesFromUserTemplateJson(tpl.form);
+      if (!next) {
+        setLocalValidationError("Не удалось применить сохранённый шаблон.");
+        return;
+      }
+      updateForm(() => next);
+      queueMicrotask(() => {
+        setLocalValidationError("");
+        onClearSubmitError();
+      });
+    },
+    [onClearSubmitError, updateForm, userTemplates]
+  );
+
+  const onTemplateSelectValueChange = useCallback(
+    (value: string) => {
+      setTemplateSelection(value);
+      if (!value) return;
+      if (value.startsWith(SERVICE_EVENT_TEMPLATE_SELECT_USER_PREFIX)) {
+        applyUserTemplateById(value.slice(SERVICE_EVENT_TEMPLATE_SELECT_USER_PREFIX.length));
+      } else if (value.startsWith(SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX)) {
+        applySystemBundleTemplate(value.slice(SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX.length));
+      }
+    },
+    [applySystemBundleTemplate, applyUserTemplateById]
+  );
+
+  const openSaveTemplateModal = useCallback(() => {
+    setSaveTemplateError("");
+    setSaveTemplateNameDraft(form.title.trim());
+    setSaveTemplateOpen(true);
+  }, [form.title]);
+
+  const confirmSaveUserTemplate = useCallback(async () => {
+    setSaveTemplateBusy(true);
+    setSaveTemplateError("");
+    try {
+      const snapshot = stripAddServiceEventFormValuesForUserTemplate(form);
+      const res = await api.createUserServiceEventFormTemplate({
+        baseTitle: saveTemplateNameDraft.trim() || null,
+        formSnapshot: snapshot,
+      });
+      const tpl = res.template;
+      setUserTemplates((prev) => [tpl, ...prev.filter((t) => t.id !== tpl.id)]);
+      setSaveTemplateOpen(false);
+      setTemplateSelection(`${SERVICE_EVENT_TEMPLATE_SELECT_USER_PREFIX}${tpl.id}`);
+    } catch (err) {
+      setSaveTemplateError(
+        err instanceof Error && err.message.trim()
+          ? err.message.trim()
+          : "Не удалось сохранить шаблон."
+      );
+    } finally {
+      setSaveTemplateBusy(false);
+    }
+  }, [form, saveTemplateNameDraft]);
 
   const save = async () => {
     const validation = validateAddServiceEventFormValues(form, {
@@ -923,8 +1020,10 @@ function ServiceEventFormInner({
       isEditing={Boolean(editingServiceEventId)}
       bundleTemplates={bundleTemplates}
       bundleTemplatesLoadError={bundleTemplatesLoadError}
-      selectedBundleTemplateId={selectedBundleTemplateId}
-      onSelectBundleTemplate={setSelectedBundleTemplateId}
+      userTemplates={userTemplates}
+      userTemplatesLoadError={userTemplatesLoadError}
+      templateSelectValue={templateSelection}
+      onTemplateSelectValueChange={onTemplateSelectValueChange}
       onOpenTemplateContents={() => setTemplateContentsOpen(true)}
       eventDateMaxYmd={eventDateMaxYmd}
       odometerInputMax={currentVehicleOdometer ?? odometerInputMax}
@@ -936,7 +1035,6 @@ function ServiceEventFormInner({
       vehicleStateSuccess={vehicleStateSuccess}
       onOdometerBlur={() => void maybeUpdateVehicleStateFromEventMetrics()}
       onEngineHoursBlur={() => void maybeUpdateVehicleStateFromEventMetrics()}
-      onApplyTemplate={onApplyTemplate}
       commentTextareaRef={commentTextareaRef}
     />
   );
@@ -1245,6 +1343,20 @@ function ServiceEventFormInner({
       : "Сохранить событие";
   const serviceEventActions = (
     <div className="flex flex-wrap items-center justify-end gap-2">
+      {editingServiceEventId ? null : (
+        <button
+          type="button"
+          onClick={openSaveTemplateModal}
+          className="inline-flex h-9 min-w-[9rem] items-center justify-center rounded-lg border px-3 text-xs font-bold leading-none transition hover:opacity-90"
+          style={{
+            borderColor: SERVICE_EVENT_PARTS_UI.border,
+            backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+            color: SERVICE_EVENT_PARTS_UI.text,
+          }}
+        >
+          Сохранить как шаблон
+        </button>
+      )}
       <button
         type="button"
         onClick={onCancel}
@@ -1397,6 +1509,110 @@ function ServiceEventFormInner({
     </div>
   ) : null;
 
+  const saveUserTemplateModal = saveTemplateOpen ? (
+    <div
+      className="fixed inset-0 z-[72] flex items-center justify-center px-4 py-6"
+      style={{ backgroundColor: "rgba(3, 7, 18, 0.72)" }}
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !saveTemplateBusy) {
+          setSaveTemplateOpen(false);
+        }
+      }}
+    >
+      <div
+        className="rounded-2xl border p-4 shadow-2xl sm:p-5"
+        style={{
+          width: "min(420px, calc(100vw - 32px))",
+          backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
+          borderColor: SERVICE_EVENT_PARTS_UI.border,
+          color: SERVICE_EVENT_PARTS_UI.text,
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Сохранить шаблон формы"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-base font-semibold tracking-tight">Сохранить как шаблон</p>
+            <p className="mt-1 text-xs leading-snug" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
+              В название будет добавлен текущий режим заполнения: быстрый или подробный.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => !saveTemplateBusy && setSaveTemplateOpen(false)}
+            disabled={saveTemplateBusy}
+            aria-label="Закрыть"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              borderColor: SERVICE_EVENT_PARTS_UI.border,
+              backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+              color: SERVICE_EVENT_PARTS_UI.textMuted,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <label className="mt-4 flex flex-col gap-1.5 text-xs font-medium" style={{ color: SERVICE_EVENT_PARTS_UI.text }}>
+          Название (необязательно)
+          <input
+            value={saveTemplateNameDraft}
+            onChange={(e) => setSaveTemplateNameDraft(e.target.value)}
+            maxLength={200}
+            disabled={saveTemplateBusy}
+            placeholder="Например: сезонное ТО"
+            className="rounded-lg border px-3 py-2 text-sm outline-none"
+            style={{
+              borderColor: SERVICE_EVENT_PARTS_UI.border,
+              backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceControl,
+              color: SERVICE_EVENT_PARTS_UI.text,
+            }}
+          />
+        </label>
+
+        {saveTemplateError ? (
+          <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>
+            {saveTemplateError}
+          </p>
+        ) : null}
+
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setSaveTemplateOpen(false)}
+            disabled={saveTemplateBusy}
+            className="inline-flex h-9 min-w-[7rem] items-center justify-center rounded-lg border px-4 text-xs font-bold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              borderColor: SERVICE_EVENT_PARTS_UI.border,
+              backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+              color: SERVICE_EVENT_PARTS_UI.text,
+            }}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={() => void confirmSaveUserTemplate()}
+            disabled={saveTemplateBusy}
+            className="inline-flex h-9 min-w-[9rem] items-center justify-center rounded-lg border px-4 text-xs font-bold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
+            style={{
+              borderColor: SERVICE_EVENT_PARTS_UI.orange,
+              backgroundColor: SERVICE_EVENT_PARTS_UI.orange,
+              color: "#fff",
+            }}
+          >
+            {saveTemplateBusy ? "Сохраняем…" : "Сохранить"}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   if (pageChrome === "partsCart") {
     return (
       <div
@@ -1520,6 +1736,7 @@ function ServiceEventFormInner({
             onToggleEntry={toggleInstallableEntry}
           />
           {vehicleStateConfirmModal}
+          {saveUserTemplateModal}
         </main>
       </div>
     );
@@ -1643,6 +1860,7 @@ function ServiceEventFormInner({
         onToggleEntry={toggleInstallableEntry}
       />
       {vehicleStateConfirmModal}
+      {saveUserTemplateModal}
     </div>
   );
 }

@@ -10,8 +10,8 @@ import {
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
   getCurrentExpenseMonthKey,
-  getExpenseCategoryLabelRu,
   getExpenseMonthKeyFromIso,
+  buildExpenseCategoryDonutSegmentsForExpenses,
   getVehicleSilhouetteClassLabel,
   getNodeTightUiDisplayName,
   partWishlistStatusLabelsRu,
@@ -228,7 +228,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
   const currentMonthExpenses = expenseItems.filter(
     (expense) => getExpenseMonthKeyFromIso(expense.expenseDate) === currentExpenseMonthKey
   );
-  const monthlyChart = buildCurrentMonthExpenseChart(currentMonthExpenses);
+  const monthlyChart = buildExpenseCategoryDonutSegmentsForExpenses(currentMonthExpenses);
   const currentMonthTotalsLabel = formatExpenseTotalsFromRows(
     expenseAnalytics.byMonth.find((month) => month.key === currentExpenseMonthKey)?.totalsByCurrency ?? []
   );
@@ -666,24 +666,30 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
             </MutedText>
           ) : null}
           {!isServiceEventsLoading && !serviceEventsError ? (
-            <div className={styles.recentEventsList}>
-              {recentEvents.length === 0 ? (
+            recentEvents.length === 0 ? (
+              <div className={styles.recentEventsList}>
                 <EmptyStateBlock
                   title="Пока нет сервисных записей"
                   details="После первого ТО или расхода здесь появятся последние события."
                 />
-              ) : (
-                recentEvents.map((event) => (
+              </div>
+            ) : (
+              <div
+                className={styles.recentEventsScroll}
+                role="region"
+                aria-label="Последние события. Прокрутите список, чтобы увидеть до 10 записей."
+              >
+                {recentEvents.map((event) => (
                   <RecentEventRow key={event.id} event={event} onOpen={() => props.onOpenServiceLogEvent(event.id)} />
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )
           ) : null}
         </Card>
 
         <Card padding="md">
           <SectionHeader
-            title={`Расходы за ${capitalizeFirst(currentExpenseMonthLabel)}`}
+            title="Расходы"
             trailing={
               <Button variant="ghost" size="sm" onClick={props.onOpenExpenseDetails}>
                 Все расходы
@@ -691,62 +697,128 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
             }
           />
 
-          {isExpensesLoading ? <MutedText style={{ marginTop: 14 }}>Считаем расходы...</MutedText> : null}
+          {isExpensesLoading ? <MutedText style={{ marginTop: 8 }}>Считаем расходы...</MutedText> : null}
           {!isExpensesLoading && expensesError ? (
-            <MutedText style={{ marginTop: 14, color: productSemanticColors.error }}>
+            <MutedText style={{ marginTop: 8, color: productSemanticColors.error }}>
               {expensesError}
             </MutedText>
           ) : null}
 
           {!isExpensesLoading && !expensesError ? (
             <>
-              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 18 }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ color: productSemanticColors.textPrimary, fontSize: 18, fontWeight: 700 }}>
-                    {currentMonthTotalsLabel}
-                  </div>
-                  <MutedText style={{ marginTop: 4 }}>
-                    {monthlyChart.totalCount > 0
-                      ? `${monthlyChart.totalCount} ${pluralizeRu(monthlyChart.totalCount, ["расход", "расхода", "расходов"])} за месяц`
-                      : "Расходов за месяц пока нет"}
-                  </MutedText>
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) 1px minmax(0, 1fr)",
+                  alignItems: "stretch",
+                  borderRadius: 12,
+                  border: `1px solid ${productSemanticColors.border}`,
+                  backgroundColor: productSemanticColors.cardSubtle,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    minWidth: 0,
+                    padding: "6px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
                   <div
                     style={{
-                      marginTop: 12,
-                      borderTop: `1px solid ${productSemanticColors.border}`,
-                      paddingTop: 10,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "baseline",
+                      gap: "4px 8px",
+                      color: productSemanticColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      lineHeight: 1.25,
                     }}
                   >
-                    <MutedText>За сезон {currentExpenseYear}</MutedText>
-                    <div style={{ marginTop: 3, color: productSemanticColors.textPrimary, fontSize: 18, fontWeight: 700 }}>
-                      {seasonTotalsLabel}
-                    </div>
-                    <MutedText style={{ marginTop: 2 }}>
-                      {expenseAnalytics.selectedYearExpenseCount > 0
-                        ? `${expenseAnalytics.selectedYearExpenseCount} ${pluralizeRu(expenseAnalytics.selectedYearExpenseCount, ["расход", "расхода", "расходов"])}`
-                        : "Сезонных расходов пока нет"}
-                    </MutedText>
+                    <span style={{ color: productSemanticColors.textMuted, fontSize: 11, fontWeight: 500 }}>
+                      Месяц
+                    </span>
+                    <span>{capitalizeFirst(currentExpenseMonthLabel)}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{currentMonthTotalsLabel}</span>
+                    <span style={{ color: productSemanticColors.textMuted, fontSize: 11, fontWeight: 500 }}>
+                      {monthlyChart.totalCount > 0
+                        ? `· ${monthlyChart.totalCount} ${pluralizeRu(monthlyChart.totalCount, ["расход", "расхода", "расходов"])}`
+                        : "· нет записей"}
+                    </span>
                   </div>
                 </div>
-                <DonutChart segments={monthlyChart.segments} />
+                <div aria-hidden style={{ backgroundColor: productSemanticColors.border, margin: "4px 0" }} />
+                <div
+                  style={{
+                    minWidth: 0,
+                    padding: "6px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "baseline",
+                      gap: "4px 8px",
+                      color: productSemanticColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    <span style={{ color: productSemanticColors.textMuted, fontSize: 11, fontWeight: 500 }}>
+                      Сезон
+                    </span>
+                    <span>{currentExpenseYear}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{seasonTotalsLabel}</span>
+                    <span style={{ color: productSemanticColors.textMuted, fontSize: 11, fontWeight: 500 }}>
+                      {expenseAnalytics.selectedYearExpenseCount > 0
+                        ? `· ${expenseAnalytics.selectedYearExpenseCount} ${pluralizeRu(expenseAnalytics.selectedYearExpenseCount, ["расход", "расхода", "расходов"])}`
+                        : "· нет записей"}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
-                {monthlyChart.segments.length > 0 ? (
-                  monthlyChart.segments.map((segment) => (
-                    <LegendRow
-                      key={segment.label}
-                      color={segment.color}
-                      label={segment.label}
-                      value={`${formatExpenseAmountRu(segment.amount)} ${segment.currency}`}
-                    />
-                  ))
-                ) : (
-                  <EmptyStateBlock
-                    title="Нет данных для диаграммы"
-                    details="Добавьте расход, и здесь появится распределение по категориям."
-                  />
-                )}
+              <div
+                style={{
+                  marginTop: 8,
+                  paddingTop: 8,
+                  borderTop: `1px solid ${productSemanticColors.border}`,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, marginBottom: 6 }}>
+                  <MutedText style={{ fontSize: 11, lineHeight: "14px", flexShrink: 0 }}>
+                    По категориям · {capitalizeFirst(currentExpenseMonthLabel)}
+                  </MutedText>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                  <div style={{ flexShrink: 0, lineHeight: 0 }}>
+                    <DonutChart segments={monthlyChart.segments} size={76} />
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1, display: "grid", gap: 4 }}>
+                    {monthlyChart.segments.length > 0 ? (
+                      monthlyChart.segments.map((segment) => (
+                        <LegendRow
+                          key={segment.label}
+                          color={segment.color}
+                          label={segment.label}
+                          value={`${formatExpenseAmountRu(segment.amount)} ${segment.currency}`}
+                          compact
+                        />
+                      ))
+                    ) : (
+                      <MutedText style={{ fontSize: 12, lineHeight: 1.35 }}>
+                        Нет расходов за месяц — добавьте запись, чтобы увидеть категории.
+                      </MutedText>
+                    )}
+                  </div>
+                </div>
               </div>
             </>
           ) : null}
@@ -1692,23 +1764,29 @@ function StatusPill({ status }: { status: NodeStatus | null }) {
   );
 }
 
-function LegendRow(props: { color: string; label: string; value: string }) {
+function LegendRow(props: { color: string; label: string; value: string; compact?: boolean }) {
+  const compact = props.compact ?? false;
+  const fontSize = compact ? 12 : 13;
+  const swatch = compact ? 7 : 10;
+  const gap = compact ? 6 : 10;
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-      <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 10 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: compact ? 8 : 12 }}>
+      <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap }}>
         <span
           aria-hidden
           style={{
-            width: 10,
-            height: 10,
+            width: swatch,
+            height: swatch,
             borderRadius: 999,
             backgroundColor: props.color,
             flexShrink: 0,
           }}
         />
-        <span style={{ color: productSemanticColors.textSecondary, fontSize: 13 }}>{props.label}</span>
+        <span style={{ color: productSemanticColors.textSecondary, fontSize, lineHeight: compact ? "15px" : undefined }}>
+          {props.label}
+        </span>
       </div>
-      <span style={{ color: productSemanticColors.textPrimary, fontSize: 13, fontWeight: 600 }}>
+      <span style={{ color: productSemanticColors.textPrimary, fontSize, fontWeight: 600, flexShrink: 0 }}>
         {props.value}
       </span>
     </div>
@@ -1717,14 +1795,16 @@ function LegendRow(props: { color: string; label: string; value: string }) {
 
 function DonutChart(props: {
   segments: Array<{ label: string; amount: number; color: string; currency: string }>;
+  size?: number;
 }) {
+  const size = props.size ?? 104;
   const total = props.segments.reduce((sum, segment) => sum + segment.amount, 0);
   if (total <= 0) {
     return (
       <div
         style={{
-          width: 104,
-          height: 104,
+          width: size,
+          height: size,
           borderRadius: 999,
           border: `1px solid ${productSemanticColors.border}`,
           backgroundColor: productSemanticColors.cardSubtle,
@@ -1736,7 +1816,7 @@ function DonutChart(props: {
   const circumference = 2 * Math.PI * 44;
 
   return (
-    <svg width="104" height="104" viewBox="0 0 124 124" aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 124 124" aria-hidden>
       <circle cx="62" cy="62" r="44" fill="none" stroke={productSemanticColors.cardSubtle} strokeWidth="18" />
       {props.segments.map((segment, index) => {
         const length = (segment.amount / total) * circumference;
@@ -1891,7 +1971,7 @@ function getRecentEvents(events: ServiceEventItem[]): ServiceEventItem[] {
   return [...events]
     .filter((event) => (event.eventKind ?? "SERVICE") !== "STATE_UPDATE")
     .sort((left, right) => new Date(right.eventDate).getTime() - new Date(left.eventDate).getTime())
-    .slice(0, 4);
+    .slice(0, 10);
 }
 
 function buildRideReadiness(summary: AttentionSummaryViewModel): {
@@ -1917,33 +1997,6 @@ function buildRideReadiness(summary: AttentionSummaryViewModel): {
     title: "Можно ехать, критичных замечаний нет",
     details: "Все ключевые узлы сейчас в нормальном состоянии.",
     tone: "OK",
-  };
-}
-
-function buildCurrentMonthExpenseChart(expenses: ExpenseItem[]) {
-  const byCategory = new Map<string, { amount: number; currency: string }>();
-  for (const expense of expenses) {
-    const label = getExpenseCategoryLabelRu(expense.category);
-    const currency = expense.currency.trim() || "RUB";
-    const bucket = byCategory.get(label) ?? { amount: 0, currency };
-    bucket.amount += expense.amount;
-    byCategory.set(label, bucket);
-  }
-
-  const colors = ["#F97316", "#60A5FA", "#38BDF8", "#FBBF24"];
-  const segments = Array.from(byCategory.entries())
-    .map(([label, value], index) => ({
-      label,
-      amount: value.amount,
-      currency: value.currency,
-      color: colors[index % colors.length],
-    }))
-    .sort((left, right) => right.amount - left.amount)
-    .slice(0, 4);
-
-  return {
-    totalCount: expenses.length,
-    segments,
   };
 }
 

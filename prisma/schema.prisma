@@ -133,8 +133,24 @@ model User {
   settings     UserSettings?
   vehicles     Vehicle[]
   garages      Garage[]
+  serviceEventFormTemplates UserServiceEventFormTemplate[]
 
   @@map("users")
+}
+
+model UserServiceEventFormTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  mode      String
+  formJson  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_service_event_form_templates")
 }
 
 model UserSettings {

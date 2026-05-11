@@ -25,6 +25,8 @@ import type {
 import type { UserSettings } from "./user-settings";
 import type { NodeTreeItem, TopServiceNodeItem } from "./node";
 import type { ServiceBundleTemplateWire } from "./service-bundle-template";
+import type { AddServiceEventFormValues } from "./forms";
+import type { ServiceEventMode } from "./service-event";
 
 /** Backend often returns `{ error: string }` on 4xx/5xx. */
 export type MotoTwinApiErrorBody = {
@@ -130,6 +132,29 @@ export type BrandsResponse = {
 
 export type ServiceBundleTemplatesResponse = {
   templates: ServiceBundleTemplateWire[];
+};
+
+/** User-saved «add service event» form template (per account). */
+export type UserServiceEventFormTemplateWire = {
+  id: string;
+  title: string;
+  mode: ServiceEventMode;
+  updatedAt: string;
+  form: AddServiceEventFormValues;
+};
+
+export type UserServiceEventFormTemplatesResponse = {
+  templates: UserServiceEventFormTemplateWire[];
+};
+
+export type CreateUserServiceEventFormTemplateBody = {
+  /** Optional name fragment; final title always includes quick/detailed mode. */
+  baseTitle?: string | null;
+  formSnapshot: AddServiceEventFormValues;
+};
+
+export type CreateUserServiceEventFormTemplateResponse = {
+  template: UserServiceEventFormTemplateWire;
 };
 
 export type ModelsResponse = {

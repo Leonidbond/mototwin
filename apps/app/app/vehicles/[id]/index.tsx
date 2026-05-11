@@ -27,13 +27,15 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import Svg, { Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildAttentionSummaryFromNodeTree,
   getCurrentExpenseMonthKey,
   getExpenseMonthKeyFromIso,
-  buildExpenseSummaryFromServiceEvents,
+  buildExpenseAnalyticsFromItems,
+  buildExpenseCategoryDonutSegmentsForExpenses,
   buildNodeTreeSectionProps,
   buildNodeContextViewModel,
   buildNodeSearchResultActions,
@@ -67,7 +69,6 @@ import {
 import type {
   AttentionItemViewModel,
   ExpenseItem,
-  ExpenseSummaryViewModel,
   NodeSnoozeOption,
   NodeContextViewModel,
   NodeStatus,
@@ -1694,7 +1695,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       if (nextStatus === "INSTALLED") {
         persistNodeTreeReturnState(item.nodeId);
         closeNodeContextModal();
-        router.push(buildServiceEventNewFromWishlistHref(vehicleId, item));
+        router.push(buildServiceEventNewFromWishlistHref(vehicleId, item, { pendingInstall: true }));
         return;
       }
       try {
@@ -1811,31 +1812,27 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       },
     ]);
   }, [apiBaseUrl, isMovingToTrash, router, vehicleId]);
-  const expenseSummaryMonthTotals = useMemo(() => {
-    const currentMonthKey = getCurrentExpenseMonthKey();
-    const byCurrency = new Map<string, { total: number; count: number }>();
-    for (const expense of yearExpenses) {
-      if (getExpenseMonthKeyFromIso(expense.expenseDate) !== currentMonthKey) continue;
-      const currency = expense.currency.trim();
-      const prev = byCurrency.get(currency) ?? { total: 0, count: 0 };
-      byCurrency.set(currency, { total: prev.total + expense.amount, count: prev.count + 1 });
-    }
-    return Array.from(byCurrency.entries())
-      .map(([currency, row]) => ({
-        currency,
-        totalAmount: row.total,
-        paidEventCount: row.count,
-      }))
-      .sort((a, b) => a.currency.localeCompare(b.currency, "en"));
-  }, [yearExpenses]);
-  const expenseSummary = useMemo(
-    () => buildExpenseSummaryFromServiceEvents(serviceEvents),
-    [serviceEvents]
-  );
-  const expenseSummaryForCard = useMemo(
-    () => ({ ...expenseSummary, currentMonthTotalsByCurrency: expenseSummaryMonthTotals }),
-    [expenseSummary, expenseSummaryMonthTotals]
-  );
+  /** Сводка расходов на дашборде: те же правила, что на вебе ({@link buildExpenseAnalyticsFromItems}). */
+  const dashboardVehicleExpenses = useMemo(() => {
+    const monthKey = getCurrentExpenseMonthKey();
+    const analytics = buildExpenseAnalyticsFromItems(yearExpenses, currentExpenseYear);
+    const monthLabel =
+      analytics.byMonth.find((m) => m.key === monthKey)?.label ??
+      new Date().toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+    const currentMonthExpenses = yearExpenses.filter(
+      (expense) => getExpenseMonthKeyFromIso(expense.expenseDate) === monthKey
+    );
+    const monthlyChart = buildExpenseCategoryDonutSegmentsForExpenses(currentMonthExpenses);
+    const currentMonthTotalsByCurrency =
+      analytics.byMonth.find((m) => m.key === monthKey)?.totalsByCurrency ?? [];
+    return {
+      monthLabel,
+      monthlyChart,
+      currentMonthTotalsLabel: formatExpenseTotals(currentMonthTotalsByCurrency),
+      seasonTotalsLabel: formatExpenseTotals(analytics.selectedYearTotalsByCurrency),
+      seasonExpenseCount: analytics.selectedYearExpenseCount,
+    };
+  }, [yearExpenses, currentExpenseYear]);
 
   if (isLoading) {
     return (
@@ -2295,7 +2292,12 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
           </DashboardSection>
 
           <ExpenseDashboardCard
-            summary={expenseSummaryForCard}
+            monthLabel={dashboardVehicleExpenses.monthLabel}
+            currentMonthTotalsLabel={dashboardVehicleExpenses.currentMonthTotalsLabel}
+            seasonTotalsLabel={dashboardVehicleExpenses.seasonTotalsLabel}
+            seasonYear={currentExpenseYear}
+            monthlyChart={dashboardVehicleExpenses.monthlyChart}
+            seasonExpenseCount={dashboardVehicleExpenses.seasonExpenseCount}
             onPress={() => router.push(`/vehicles/${vehicleId}/expenses`)}
           />
 
@@ -3353,31 +3355,128 @@ function RecentDashboardEventRow({ event, onOpen }: { event: ServiceEventItem; o
   );
 }
 
-function ExpenseDashboardCard({
-  summary,
-  onPress,
-}: {
-  summary: ExpenseSummaryViewModel;
+function ExpenseCategoryDonutMobile(props: {
+  segments: Array<{ label: string; amount: number; color: string; currency: string }>;
+  size?: number;
+}) {
+  const size = props.size ?? 76;
+  const total = props.segments.reduce((sum, segment) => sum + segment.amount, 0);
+  const circumference = 2 * Math.PI * 44;
+  if (total <= 0) {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: c.border,
+          backgroundColor: c.cardSubtle,
+        }}
+      />
+    );
+  }
+  return (
+    <Svg width={size} height={size} viewBox="0 0 124 124">
+      <Circle cx={62} cy={62} r={44} fill="none" stroke={c.cardSubtle} strokeWidth={18} />
+      {props.segments.map((segment, index) => {
+        const length = (segment.amount / total) * circumference;
+        const currentOffset = props.segments
+          .slice(0, index)
+          .reduce((sum, current) => sum + (current.amount / total) * circumference, 0);
+        return (
+          <Circle
+            key={segment.label}
+            cx={62}
+            cy={62}
+            r={44}
+            fill="none"
+            stroke={segment.color}
+            strokeWidth={18}
+            strokeDasharray={`${length} ${circumference}`}
+            strokeDashoffset={-currentOffset}
+            strokeLinecap="round"
+            transform="rotate(-90 62 62)"
+          />
+        );
+      })}
+      <Circle cx={62} cy={62} r={28} fill={c.card} />
+    </Svg>
+  );
+}
+
+function ExpenseDashboardCard(props: {
+  monthLabel: string;
+  currentMonthTotalsLabel: string;
+  seasonTotalsLabel: string;
+  seasonYear: number;
+  monthlyChart: { totalCount: number; segments: Array<{ label: string; amount: number; color: string; currency: string }> };
+  seasonExpenseCount: number;
   onPress: () => void;
 }) {
-  const currentMonth = formatExpenseTotals(summary.currentMonthTotalsByCurrency);
-  const total = formatExpenseTotals(summary.totalsByCurrency);
+  const monthCountLine =
+    props.monthlyChart.totalCount > 0
+      ? `· ${props.monthlyChart.totalCount} ${pluralizeRu(props.monthlyChart.totalCount, ["расход", "расхода", "расходов"])}`
+      : "· нет записей";
+  const seasonCountLine =
+    props.seasonExpenseCount > 0
+      ? `· ${props.seasonExpenseCount} ${pluralizeRu(props.seasonExpenseCount, ["расход", "расхода", "расходов"])}`
+      : "· нет записей";
+
   return (
-    <DashboardSection title={`Расходы за ${capitalizeFirst(summary.currentMonthLabel)}`} actionLabel="Детали" onActionPress={onPress}>
-      <Pressable onPress={onPress} style={({ pressed }) => [styles.expenseDashboardPressable, pressed && styles.dashboardHeaderActionPressed]}>
-        <View style={styles.expenseDashboardIcon}>
-          <MaterialIcons name="account-balance-wallet" size={24} color={c.primaryAction} />
+    <DashboardSection title="Расходы" actionLabel="Детали" onActionPress={props.onPress}>
+      <Pressable
+        onPress={props.onPress}
+        style={({ pressed }) => [styles.expenseDashboardPressable, pressed && styles.dashboardHeaderActionPressed]}
+      >
+        <View style={styles.vehicleExpenseBar}>
+          <View style={styles.vehicleExpenseBarHalf}>
+            <View style={styles.vehicleExpenseBarInner}>
+              <Text style={styles.vehicleExpenseBarMuted}>Месяц</Text>
+              <Text style={styles.vehicleExpenseBarStrong}>{capitalizeFirst(props.monthLabel)}</Text>
+              <Text style={styles.vehicleExpenseBarAmount}>{props.currentMonthTotalsLabel}</Text>
+              <Text style={styles.vehicleExpenseBarMuted}>{monthCountLine}</Text>
+            </View>
+          </View>
+          <View style={styles.vehicleExpenseBarDivider} />
+          <View style={styles.vehicleExpenseBarHalf}>
+            <View style={styles.vehicleExpenseBarInner}>
+              <Text style={styles.vehicleExpenseBarMuted}>Сезон</Text>
+              <Text style={styles.vehicleExpenseBarStrong}>{props.seasonYear}</Text>
+              <Text style={styles.vehicleExpenseBarAmount}>{props.seasonTotalsLabel}</Text>
+              <Text style={styles.vehicleExpenseBarMuted}>{seasonCountLine}</Text>
+            </View>
+          </View>
         </View>
-        <View style={styles.expenseDashboardTextCol}>
-          <Text style={styles.expenseDashboardValue}>{currentMonth}</Text>
-          <Text style={styles.expenseDashboardMeta}>
-            Всего: {total} · {summary.paidEventCount} {pluralizeRu(summary.paidEventCount, ["запись", "записи", "записей"])}
+
+        <View style={styles.vehicleExpenseCategories}>
+          <Text style={styles.vehicleExpenseCategoriesTitle}>
+            По категориям · {capitalizeFirst(props.monthLabel)}
           </Text>
-          {summary.latestPaidEvent ? (
-            <Text style={styles.expenseDashboardLatest} numberOfLines={1}>
-              Последнее: {summary.latestPaidEvent.serviceType}
-            </Text>
-          ) : null}
+          <View style={styles.vehicleExpenseCategoriesRow}>
+            <ExpenseCategoryDonutMobile segments={props.monthlyChart.segments} size={76} />
+            <View style={styles.vehicleExpenseLegendCol}>
+              {props.monthlyChart.segments.length > 0 ? (
+                props.monthlyChart.segments.map((segment) => (
+                  <View key={segment.label} style={styles.vehicleExpenseLegendRow}>
+                    <View style={styles.vehicleExpenseLegendLeft}>
+                      <View style={[styles.vehicleExpenseLegendSwatch, { backgroundColor: segment.color }]} />
+                      <Text style={styles.vehicleExpenseLegendLabel} numberOfLines={1}>
+                        {segment.label}
+                      </Text>
+                    </View>
+                    <Text style={styles.vehicleExpenseLegendValue} numberOfLines={1}>
+                      {formatExpenseAmountRu(segment.amount)} {segment.currency}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.vehicleExpenseLegendEmpty}>
+                  Нет расходов за месяц — добавьте запись, чтобы увидеть категории.
+                </Text>
+              )}
+            </View>
+          </View>
         </View>
       </Pressable>
     </DashboardSection>
@@ -3559,7 +3658,7 @@ function getVehicleSilhouetteSource(vehicle: VehicleDetail): ImageSourcePropType
   return SILHOUETTE_SRC[key] ?? SILHOUETTE_SRC.naked_roadster;
 }
 
-function formatExpenseTotals(rows: ExpenseSummaryViewModel["totalsByCurrency"]) {
+function formatExpenseTotals(rows: ReadonlyArray<{ totalAmount: number; currency: string }>) {
   if (rows.length === 0) {
     return "0";
   }
@@ -4243,43 +4342,117 @@ const styles = StyleSheet.create({
     color: c.textMuted,
   },
   expenseDashboardPressable: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 0,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: c.border,
     backgroundColor: c.cardMuted,
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
   },
-  expenseDashboardIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(249, 115, 22, 0.14)",
+  vehicleExpenseBar: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(249, 115, 22, 0.35)",
+    borderColor: c.border,
+    backgroundColor: c.cardSubtle,
+    overflow: "hidden",
   },
-  expenseDashboardTextCol: {
+  vehicleExpenseBarHalf: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    justifyContent: "center",
+  },
+  vehicleExpenseBarDivider: {
+    width: 1,
+    marginVertical: 4,
+    backgroundColor: c.border,
+  },
+  vehicleExpenseBarInner: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    columnGap: 8,
+    rowGap: 4,
+  },
+  vehicleExpenseBarMuted: {
+    fontSize: 11,
+    color: c.textMuted,
+    fontWeight: "500",
+  },
+  vehicleExpenseBarStrong: {
+    fontSize: 13,
+    color: c.textPrimary,
+    fontWeight: "600",
+  },
+  vehicleExpenseBarAmount: {
+    fontSize: 15,
+    color: c.textPrimary,
+    fontWeight: "700",
+  },
+  vehicleExpenseCategories: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+  },
+  vehicleExpenseCategoriesTitle: {
+    fontSize: 11,
+    color: c.textMuted,
+    marginBottom: 6,
+    lineHeight: 14,
+  },
+  vehicleExpenseCategoriesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minWidth: 0,
+  },
+  vehicleExpenseLegendCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  vehicleExpenseLegendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  vehicleExpenseLegendLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     flex: 1,
     minWidth: 0,
   },
-  expenseDashboardValue: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: c.textPrimary,
+  vehicleExpenseLegendSwatch: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    flexShrink: 0,
   },
-  expenseDashboardMeta: {
-    marginTop: 4,
-    fontSize: 12,
-    color: c.textMuted,
-  },
-  expenseDashboardLatest: {
-    marginTop: 4,
+  vehicleExpenseLegendLabel: {
     fontSize: 12,
     color: c.textSecondary,
+    flex: 1,
+    minWidth: 0,
+  },
+  vehicleExpenseLegendValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textPrimary,
+    flexShrink: 0,
+  },
+  vehicleExpenseLegendEmpty: {
+    fontSize: 12,
+    color: c.textMuted,
+    lineHeight: 17,
   },
   partsDashboardMeta: {
     marginTop: 2,

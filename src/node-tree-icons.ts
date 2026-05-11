@@ -2,153 +2,184 @@ declare const require: (path: string) => unknown;
 
 export type NodeTreeIconAsset = unknown;
 
-const NODE_TREE_ICON_BY_KEY: Record<string, NodeTreeIconAsset> = {
-  "engine-service": require("../images/node-tree-icons/engine-service.png"),
-  "engine-lube-oil": require("../images/node-tree-icons/engine-lube-oil.png"),
-  "engine-lube-filter": require("../images/node-tree-icons/engine-lube-filter.png"),
-  "electrics-ignition-spark": require("../images/node-tree-icons/electrics-ignition-spark.png"),
-  "intake-fuel": require("../images/node-tree-icons/intake-fuel.png"),
-  "intake-filter": require("../images/node-tree-icons/intake-filter.png"),
-  "fuel-lines": require("../images/node-tree-icons/fuel-lines.png"),
-  "fuel-pump": require("../images/node-tree-icons/fuel-pump.png"),
-  "fuel-carb": require("../images/node-tree-icons/fuel-carb.png"),
-  "fuel-efi": require("../images/node-tree-icons/fuel-efi.png"),
-  cooling: require("../images/node-tree-icons/cooling.png"),
-  "cooling-liquid-coolant": require("../images/node-tree-icons/cooling-liquid-coolant.png"),
-  "cooling-liquid-radiator": require("../images/node-tree-icons/cooling-liquid-radiator.png"),
-  "cooling-liquid-pump": require("../images/node-tree-icons/cooling-liquid-pump.png"),
-  "cooling-liquid-hoses": require("../images/node-tree-icons/cooling-liquid-hoses.png"),
-  "cooling-liquid-thermostat": require("../images/node-tree-icons/cooling-liquid-thermostat.png"),
-  exhaust: require("../images/node-tree-icons/exhaust.png"),
-  "exhaust-header": require("../images/node-tree-icons/exhaust-header.png"),
-  "exhaust-muffler": require("../images/node-tree-icons/exhaust-muffler.png"),
-  brakes: require("../images/node-tree-icons/brakes.png"),
-  "brakes-abs": require("../images/node-tree-icons/brakes-abs.png"),
-  "brakes-front-caliper": require("../images/node-tree-icons/brakes-front-caliper.png"),
-  "brakes-front-pads": require("../images/node-tree-icons/brakes-front-pads.png"),
-  "brakes-front-disc": require("../images/node-tree-icons/brakes-front-disc.png"),
-  "brakes-rear-caliper": require("../images/node-tree-icons/brakes-rear-caliper.png"),
-  "brakes-rear-pads": require("../images/node-tree-icons/brakes-rear-pads.png"),
-  "brakes-rear-disc": require("../images/node-tree-icons/brakes-rear-disc.png"),
-  "brakes-fluid": require("../images/node-tree-icons/brakes-fluid.png"),
-  "chain-drive": require("../images/node-tree-icons/chain-drive.png"),
-  "drivetrain-chain": require("../images/node-tree-icons/drivetrain-chain.png"),
-  "drivetrain-front-sprocket": require("../images/node-tree-icons/drivetrain-front-sprocket.png"),
-  "drivetrain-rear-sprocket": require("../images/node-tree-icons/drivetrain-rear-sprocket.png"),
-  "drivetrain-chain-guide": require("../images/node-tree-icons/drivetrain-chain-guide.png"),
-  "drivetrain-swingarm-slider": require("../images/node-tree-icons/drivetrain-swingarm-slider.png"),
-  "drivetrain-tensioners": require("../images/node-tree-icons/drivetrain-tensioners.png"),
-  tires: require("../images/node-tree-icons/tires.png"),
-  "tires-front": require("../images/node-tree-icons/tires-front.png"),
-  "tires-rear": require("../images/node-tree-icons/tires-rear.png"),
-  "tires-rimlock": require("../images/node-tree-icons/tires-rimlock.png"),
-  wheels: require("../images/node-tree-icons/wheels.png"),
-  "wheels-front-spokes": require("../images/node-tree-icons/wheels-front-spokes.png"),
-  "wheels-front-bearings": require("../images/node-tree-icons/wheels-front-bearings.png"),
-  "wheels-rear-spokes": require("../images/node-tree-icons/wheels-rear-spokes.png"),
-  "wheels-rear-bearings": require("../images/node-tree-icons/wheels-rear-bearings.png"),
-  "front-suspension": require("../images/node-tree-icons/front-suspension.png"),
-  "suspension-front-fork": require("../images/node-tree-icons/suspension-front-fork.png"),
-  "suspension-front-seals": require("../images/node-tree-icons/suspension-front-seals.png"),
-  "suspension-front-bushings": require("../images/node-tree-icons/suspension-front-bushings.png"),
-  "suspension-front-oil": require("../images/node-tree-icons/suspension-front-oil.png"),
-  "rear-suspension": require("../images/node-tree-icons/rear-suspension.png"),
-  "suspension-rear-shock": require("../images/node-tree-icons/suspension-rear-shock.png"),
-  "suspension-rear-linkage": require("../images/node-tree-icons/suspension-rear-linkage.png"),
-  "suspension-rear-swingarm": require("../images/node-tree-icons/suspension-rear-swingarm.png"),
-  "suspension-rear-bearings": require("../images/node-tree-icons/suspension-rear-bearings.png"),
-  electrics: require("../images/node-tree-icons/electrics.png"),
-  "electrics-battery": require("../images/node-tree-icons/electrics-battery.png"),
-  "electrics-fuses": require("../images/node-tree-icons/electrics-fuses.png"),
-  "electrics-charging": require("../images/node-tree-icons/electrics-charging.png"),
-  "electrics-ignition": require("../images/node-tree-icons/electrics-ignition.png"),
-  "electrics-wiring": require("../images/node-tree-icons/electrics-wiring.png"),
-  "electrics-lights": require("../images/node-tree-icons/electrics-lights.png"),
-  controls: require("../images/node-tree-icons/controls.png"),
-  "controls-throttle": require("../images/node-tree-icons/controls-throttle.png"),
-  "controls-clutch": require("../images/node-tree-icons/controls-clutch.png"),
-  "controls-front-brake": require("../images/node-tree-icons/controls-front-brake.png"),
-  "controls-rear-brake": require("../images/node-tree-icons/controls-rear-brake.png"),
-  "controls-shifter": require("../images/node-tree-icons/controls-shifter.png"),
-  "controls-footpeg": require("../images/node-tree-icons/controls-footpeg.png"),
-  "controls-cables": require("../images/node-tree-icons/controls-cables.png"),
-  steering: require("../images/node-tree-icons/steering.png"),
-  "steering-handlebar": require("../images/node-tree-icons/steering-handlebar.png"),
-  "steering-grips": require("../images/node-tree-icons/steering-grips.png"),
-  "steering-headset": require("../images/node-tree-icons/steering-headset.png"),
-  "steering-headset-bearings": require("../images/node-tree-icons/steering-headset-bearings.png"),
-  "steering-triples": require("../images/node-tree-icons/steering-triples.png"),
-  "body-protection": require("../images/node-tree-icons/body-protection.png"),
-  "chassis-seat": require("../images/node-tree-icons/chassis-seat.png"),
-  "chassis-plastics": require("../images/node-tree-icons/chassis-plastics.png"),
-  "chassis-protection": require("../images/node-tree-icons/chassis-protection.png"),
-  "chassis-protection-skid": require("../images/node-tree-icons/chassis-protection-skid.png"),
-  "chassis-protection-radiator": require("../images/node-tree-icons/chassis-protection-radiator.png"),
-};
-
-const NODE_TREE_ICON_ALIASES: Record<string, string> = {
-  engine: "engine-service",
-  "engine-service": "engine-service",
-  "engine-lube": "engine-service",
-  "engine-lubrication": "engine-service",
-  intake: "intake-fuel",
-  fuel: "intake-fuel",
-  drivetrain: "chain-drive",
-  chain: "chain-drive",
-  "chain-drive": "chain-drive",
-  suspension: "front-suspension",
-  "suspension-front": "front-suspension",
-  "suspension-rear": "rear-suspension",
-  "rear-suspension": "rear-suspension",
-  "front-suspension": "front-suspension",
-  body: "body-protection",
-  chassis: "body-protection",
+/** One asset per catalog node (see scripts/data/node-code-icon-source.json). */
+const NODE_TREE_ICON_BY_CODE: Record<string, NodeTreeIconAsset> = {
+  "brakes": require("../images/node-tree-icons/nodes/brakes.png"),
+  "brakes-abs": require("../images/node-tree-icons/nodes/brakes-abs.png"),
+  "brakes-fluid": require("../images/node-tree-icons/nodes/brakes-fluid.png"),
+  "brakes-front": require("../images/node-tree-icons/nodes/brakes-front.png"),
+  "brakes-front-caliper": require("../images/node-tree-icons/nodes/brakes-front-caliper.png"),
+  "brakes-front-disc": require("../images/node-tree-icons/nodes/brakes-front-disc.png"),
+  "brakes-front-line": require("../images/node-tree-icons/nodes/brakes-front-line.png"),
+  "brakes-front-master": require("../images/node-tree-icons/nodes/brakes-front-master.png"),
+  "brakes-front-pads": require("../images/node-tree-icons/nodes/brakes-front-pads.png"),
+  "brakes-rear": require("../images/node-tree-icons/nodes/brakes-rear.png"),
+  "brakes-rear-caliper": require("../images/node-tree-icons/nodes/brakes-rear-caliper.png"),
+  "brakes-rear-disc": require("../images/node-tree-icons/nodes/brakes-rear-disc.png"),
+  "brakes-rear-line": require("../images/node-tree-icons/nodes/brakes-rear-line.png"),
+  "brakes-rear-master": require("../images/node-tree-icons/nodes/brakes-rear-master.png"),
+  "brakes-rear-pads": require("../images/node-tree-icons/nodes/brakes-rear-pads.png"),
+  "chassis": require("../images/node-tree-icons/nodes/chassis.png"),
+  "chassis-frame": require("../images/node-tree-icons/nodes/chassis-frame.png"),
+  "chassis-mounts": require("../images/node-tree-icons/nodes/chassis-mounts.png"),
+  "chassis-plastics": require("../images/node-tree-icons/nodes/chassis-plastics.png"),
+  "chassis-plastics-fenders": require("../images/node-tree-icons/nodes/chassis-plastics-fenders.png"),
+  "chassis-plastics-fork-guards": require("../images/node-tree-icons/nodes/chassis-plastics-fork-guards.png"),
+  "chassis-plastics-handguards": require("../images/node-tree-icons/nodes/chassis-plastics-handguards.png"),
+  "chassis-plastics-side": require("../images/node-tree-icons/nodes/chassis-plastics-side.png"),
+  "chassis-protection": require("../images/node-tree-icons/nodes/chassis-protection.png"),
+  "chassis-protection-frame": require("../images/node-tree-icons/nodes/chassis-protection-frame.png"),
+  "chassis-protection-radiator": require("../images/node-tree-icons/nodes/chassis-protection-radiator.png"),
+  "chassis-protection-skid": require("../images/node-tree-icons/nodes/chassis-protection-skid.png"),
+  "chassis-seat": require("../images/node-tree-icons/nodes/chassis-seat.png"),
+  "chassis-subframe": require("../images/node-tree-icons/nodes/chassis-subframe.png"),
+  "controls": require("../images/node-tree-icons/nodes/controls.png"),
+  "controls-cables": require("../images/node-tree-icons/nodes/controls-cables.png"),
+  "controls-clutch": require("../images/node-tree-icons/nodes/controls-clutch.png"),
+  "controls-footpeg": require("../images/node-tree-icons/nodes/controls-footpeg.png"),
+  "controls-front-brake": require("../images/node-tree-icons/nodes/controls-front-brake.png"),
+  "controls-rear-brake": require("../images/node-tree-icons/nodes/controls-rear-brake.png"),
+  "controls-shifter": require("../images/node-tree-icons/nodes/controls-shifter.png"),
+  "controls-throttle": require("../images/node-tree-icons/nodes/controls-throttle.png"),
+  "cooling": require("../images/node-tree-icons/nodes/cooling.png"),
+  "cooling-air": require("../images/node-tree-icons/nodes/cooling-air.png"),
+  "cooling-liquid": require("../images/node-tree-icons/nodes/cooling-liquid.png"),
+  "cooling-liquid-coolant": require("../images/node-tree-icons/nodes/cooling-liquid-coolant.png"),
+  "cooling-liquid-expansion": require("../images/node-tree-icons/nodes/cooling-liquid-expansion.png"),
+  "cooling-liquid-hoses": require("../images/node-tree-icons/nodes/cooling-liquid-hoses.png"),
+  "cooling-liquid-pump": require("../images/node-tree-icons/nodes/cooling-liquid-pump.png"),
+  "cooling-liquid-radiator": require("../images/node-tree-icons/nodes/cooling-liquid-radiator.png"),
+  "cooling-liquid-thermostat": require("../images/node-tree-icons/nodes/cooling-liquid-thermostat.png"),
+  "drivetrain": require("../images/node-tree-icons/nodes/drivetrain.png"),
+  "drivetrain-chain": require("../images/node-tree-icons/nodes/drivetrain-chain.png"),
+  "drivetrain-chain-guide": require("../images/node-tree-icons/nodes/drivetrain-chain-guide.png"),
+  "drivetrain-front-sprocket": require("../images/node-tree-icons/nodes/drivetrain-front-sprocket.png"),
+  "drivetrain-guard": require("../images/node-tree-icons/nodes/drivetrain-guard.png"),
+  "drivetrain-rear-sprocket": require("../images/node-tree-icons/nodes/drivetrain-rear-sprocket.png"),
+  "drivetrain-swingarm-slider": require("../images/node-tree-icons/nodes/drivetrain-swingarm-slider.png"),
+  "drivetrain-tensioners": require("../images/node-tree-icons/nodes/drivetrain-tensioners.png"),
+  "electrics": require("../images/node-tree-icons/nodes/electrics.png"),
+  "electrics-battery": require("../images/node-tree-icons/nodes/electrics-battery.png"),
+  "electrics-charging": require("../images/node-tree-icons/nodes/electrics-charging.png"),
+  "electrics-charging-regulator": require("../images/node-tree-icons/nodes/electrics-charging-regulator.png"),
+  "electrics-charging-stator": require("../images/node-tree-icons/nodes/electrics-charging-stator.png"),
+  "electrics-dash": require("../images/node-tree-icons/nodes/electrics-dash.png"),
+  "electrics-dash-neutral": require("../images/node-tree-icons/nodes/electrics-dash-neutral.png"),
+  "electrics-dash-speed": require("../images/node-tree-icons/nodes/electrics-dash-speed.png"),
+  "electrics-fuses": require("../images/node-tree-icons/nodes/electrics-fuses.png"),
+  "electrics-horn": require("../images/node-tree-icons/nodes/electrics-horn.png"),
+  "electrics-ignition": require("../images/node-tree-icons/nodes/electrics-ignition.png"),
+  "electrics-ignition-cdi-ecu": require("../images/node-tree-icons/nodes/electrics-ignition-cdi-ecu.png"),
+  "electrics-ignition-coil": require("../images/node-tree-icons/nodes/electrics-ignition-coil.png"),
+  "electrics-ignition-spark": require("../images/node-tree-icons/nodes/electrics-ignition-spark.png"),
+  "electrics-lights": require("../images/node-tree-icons/nodes/electrics-lights.png"),
+  "electrics-lights-head": require("../images/node-tree-icons/nodes/electrics-lights-head.png"),
+  "electrics-lights-tail": require("../images/node-tree-icons/nodes/electrics-lights-tail.png"),
+  "electrics-lights-turn": require("../images/node-tree-icons/nodes/electrics-lights-turn.png"),
+  "electrics-sensors": require("../images/node-tree-icons/nodes/electrics-sensors.png"),
+  "electrics-wiring": require("../images/node-tree-icons/nodes/electrics-wiring.png"),
+  "engine": require("../images/node-tree-icons/nodes/engine.png"),
+  "engine-bottomend": require("../images/node-tree-icons/nodes/engine-bottomend.png"),
+  "engine-bottomend-bearings": require("../images/node-tree-icons/nodes/engine-bottomend-bearings.png"),
+  "engine-bottomend-crank": require("../images/node-tree-icons/nodes/engine-bottomend-crank.png"),
+  "engine-clutch": require("../images/node-tree-icons/nodes/engine-clutch.png"),
+  "engine-clutch-actuation": require("../images/node-tree-icons/nodes/engine-clutch-actuation.png"),
+  "engine-clutch-basket": require("../images/node-tree-icons/nodes/engine-clutch-basket.png"),
+  "engine-clutch-plates": require("../images/node-tree-icons/nodes/engine-clutch-plates.png"),
+  "engine-gearbox": require("../images/node-tree-icons/nodes/engine-gearbox.png"),
+  "engine-gearbox-gears": require("../images/node-tree-icons/nodes/engine-gearbox-gears.png"),
+  "engine-gearbox-shift": require("../images/node-tree-icons/nodes/engine-gearbox-shift.png"),
+  "engine-lube": require("../images/node-tree-icons/nodes/engine-lube.png"),
+  "engine-lube-filter": require("../images/node-tree-icons/nodes/engine-lube-filter.png"),
+  "engine-lube-gaskets": require("../images/node-tree-icons/nodes/engine-lube-gaskets.png"),
+  "engine-lube-oil": require("../images/node-tree-icons/nodes/engine-lube-oil.png"),
+  "engine-lube-pump": require("../images/node-tree-icons/nodes/engine-lube-pump.png"),
+  "engine-mounts": require("../images/node-tree-icons/nodes/engine-mounts.png"),
+  "engine-start": require("../images/node-tree-icons/nodes/engine-start.png"),
+  "engine-start-kick": require("../images/node-tree-icons/nodes/engine-start-kick.png"),
+  "engine-start-starter": require("../images/node-tree-icons/nodes/engine-start-starter.png"),
+  "engine-timing": require("../images/node-tree-icons/nodes/engine-timing.png"),
+  "engine-timing-chain": require("../images/node-tree-icons/nodes/engine-timing-chain.png"),
+  "engine-timing-tensioner": require("../images/node-tree-icons/nodes/engine-timing-tensioner.png"),
+  "engine-topend": require("../images/node-tree-icons/nodes/engine-topend.png"),
+  "engine-topend-cam": require("../images/node-tree-icons/nodes/engine-topend-cam.png"),
+  "engine-topend-cylinder": require("../images/node-tree-icons/nodes/engine-topend-cylinder.png"),
+  "engine-topend-head": require("../images/node-tree-icons/nodes/engine-topend-head.png"),
+  "engine-topend-piston": require("../images/node-tree-icons/nodes/engine-topend-piston.png"),
+  "engine-topend-rings": require("../images/node-tree-icons/nodes/engine-topend-rings.png"),
+  "engine-topend-valves": require("../images/node-tree-icons/nodes/engine-topend-valves.png"),
+  "exhaust": require("../images/node-tree-icons/nodes/exhaust.png"),
+  "exhaust-dbkiller": require("../images/node-tree-icons/nodes/exhaust-dbkiller.png"),
+  "exhaust-header": require("../images/node-tree-icons/nodes/exhaust-header.png"),
+  "exhaust-mounts": require("../images/node-tree-icons/nodes/exhaust-mounts.png"),
+  "exhaust-muffler": require("../images/node-tree-icons/nodes/exhaust-muffler.png"),
+  "exhaust-sensor": require("../images/node-tree-icons/nodes/exhaust-sensor.png"),
+  "fuel": require("../images/node-tree-icons/nodes/fuel.png"),
+  "fuel-carb": require("../images/node-tree-icons/nodes/fuel-carb.png"),
+  "fuel-carb-repair": require("../images/node-tree-icons/nodes/fuel-carb-repair.png"),
+  "fuel-efi": require("../images/node-tree-icons/nodes/fuel-efi.png"),
+  "fuel-efi-injector": require("../images/node-tree-icons/nodes/fuel-efi-injector.png"),
+  "fuel-efi-sensors": require("../images/node-tree-icons/nodes/fuel-efi-sensors.png"),
+  "fuel-efi-throttle": require("../images/node-tree-icons/nodes/fuel-efi-throttle.png"),
+  "fuel-lines": require("../images/node-tree-icons/nodes/fuel-lines.png"),
+  "fuel-pump": require("../images/node-tree-icons/nodes/fuel-pump.png"),
+  "fuel-tank": require("../images/node-tree-icons/nodes/fuel-tank.png"),
+  "intake": require("../images/node-tree-icons/nodes/intake.png"),
+  "intake-airbox": require("../images/node-tree-icons/nodes/intake-airbox.png"),
+  "intake-filter": require("../images/node-tree-icons/nodes/intake-filter.png"),
+  "steering": require("../images/node-tree-icons/nodes/steering.png"),
+  "steering-controls": require("../images/node-tree-icons/nodes/steering-controls.png"),
+  "steering-damper": require("../images/node-tree-icons/nodes/steering-damper.png"),
+  "steering-grips": require("../images/node-tree-icons/nodes/steering-grips.png"),
+  "steering-handlebar": require("../images/node-tree-icons/nodes/steering-handlebar.png"),
+  "steering-headset": require("../images/node-tree-icons/nodes/steering-headset.png"),
+  "steering-headset-bearings": require("../images/node-tree-icons/nodes/steering-headset-bearings.png"),
+  "steering-triples": require("../images/node-tree-icons/nodes/steering-triples.png"),
+  "suspension": require("../images/node-tree-icons/nodes/suspension.png"),
+  "suspension-front": require("../images/node-tree-icons/nodes/suspension-front.png"),
+  "suspension-front-bushings": require("../images/node-tree-icons/nodes/suspension-front-bushings.png"),
+  "suspension-front-fork": require("../images/node-tree-icons/nodes/suspension-front-fork.png"),
+  "suspension-front-oil": require("../images/node-tree-icons/nodes/suspension-front-oil.png"),
+  "suspension-front-seals": require("../images/node-tree-icons/nodes/suspension-front-seals.png"),
+  "suspension-front-springs": require("../images/node-tree-icons/nodes/suspension-front-springs.png"),
+  "suspension-rear": require("../images/node-tree-icons/nodes/suspension-rear.png"),
+  "suspension-rear-bearings": require("../images/node-tree-icons/nodes/suspension-rear-bearings.png"),
+  "suspension-rear-linkage": require("../images/node-tree-icons/nodes/suspension-rear-linkage.png"),
+  "suspension-rear-shock": require("../images/node-tree-icons/nodes/suspension-rear-shock.png"),
+  "suspension-rear-swingarm": require("../images/node-tree-icons/nodes/suspension-rear-swingarm.png"),
+  "tires": require("../images/node-tree-icons/nodes/tires.png"),
+  "tires-front": require("../images/node-tree-icons/nodes/tires-front.png"),
+  "tires-rear": require("../images/node-tree-icons/nodes/tires-rear.png"),
+  "tires-rimlock": require("../images/node-tree-icons/nodes/tires-rimlock.png"),
+  "wheels": require("../images/node-tree-icons/nodes/wheels.png"),
+  "wheels-front": require("../images/node-tree-icons/nodes/wheels-front.png"),
+  "wheels-front-bearings": require("../images/node-tree-icons/nodes/wheels-front-bearings.png"),
+  "wheels-front-hub": require("../images/node-tree-icons/nodes/wheels-front-hub.png"),
+  "wheels-front-rim": require("../images/node-tree-icons/nodes/wheels-front-rim.png"),
+  "wheels-front-spokes": require("../images/node-tree-icons/nodes/wheels-front-spokes.png"),
+  "wheels-rear": require("../images/node-tree-icons/nodes/wheels-rear.png"),
+  "wheels-rear-bearings": require("../images/node-tree-icons/nodes/wheels-rear-bearings.png"),
+  "wheels-rear-hub": require("../images/node-tree-icons/nodes/wheels-rear-hub.png"),
+  "wheels-rear-rim": require("../images/node-tree-icons/nodes/wheels-rear-rim.png"),
+  "wheels-rear-spokes": require("../images/node-tree-icons/nodes/wheels-rear-spokes.png"),
 };
 
 function normalizeNodeTreeIconKey(value: string): string {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[_./\\s]+/g, "-")
+    .replace(/[_./\s]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 }
 
-function pickFallbackKey(key: string, name: string): string {
-  if (key.startsWith("engine")) return "engine-service";
-  if (key.startsWith("brakes")) return "brakes";
-  if (key.startsWith("cooling")) return "cooling";
-  if (key.startsWith("intake") || key.startsWith("fuel")) return "intake-fuel";
-  if (key.startsWith("exhaust")) return "exhaust";
-  if (key.startsWith("drivetrain") || key.startsWith("chain")) return "chain-drive";
-  if (key.startsWith("tires")) return "tires";
-  if (key.startsWith("wheels")) return "wheels";
-  if (key.startsWith("suspension-front")) return "front-suspension";
-  if (key.startsWith("suspension-rear")) return "rear-suspension";
-  if (key.startsWith("suspension")) return "front-suspension";
-  if (key.startsWith("electrics")) return "electrics";
-  if (key.startsWith("controls")) return "controls";
-  if (key.startsWith("steering")) return "steering";
-  if (key.startsWith("body") || key.startsWith("chassis")) return "body-protection";
-  if (name.includes("торм")) return "brakes";
-  if (name.includes("шин")) return "tires";
-  if (name.includes("подвес")) return "front-suspension";
-  if (name.includes("элект")) return "electrics";
-  if (name.includes("рул")) return "steering";
-  return "engine-service";
-}
+const FALLBACK_NODE_ICON_KEY = "engine";
 
-export function getNodeTreeIconAsset(code: string, name = ""): NodeTreeIconAsset {
+export function getNodeTreeIconAsset(code: string, _name = ""): NodeTreeIconAsset {
   const key = normalizeNodeTreeIconKey(code);
-  const direct = NODE_TREE_ICON_BY_KEY[key];
+  const direct = NODE_TREE_ICON_BY_CODE[key];
   if (direct) return direct;
-
-  const alias = NODE_TREE_ICON_ALIASES[key];
-  if (alias && NODE_TREE_ICON_BY_KEY[alias]) {
-    return NODE_TREE_ICON_BY_KEY[alias];
-  }
-
-  return NODE_TREE_ICON_BY_KEY[pickFallbackKey(key, name.toLowerCase())];
+  return NODE_TREE_ICON_BY_CODE[FALLBACK_NODE_ICON_KEY];
 }
 
 export function getNodeTreeIconWebSrc(code: string, name = ""): string {
@@ -158,3 +189,4 @@ export function getNodeTreeIconWebSrc(code: string, name = ""): string {
   };
   return asset.src ?? asset.default?.src ?? "";
 }
+

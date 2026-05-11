@@ -1,7 +1,11 @@
 "use client";
 
 import { mergeServiceBundleTemplateIntoAddFormValues } from "@mototwin/domain";
-import type { AddServiceEventFormValues, ServiceBundleTemplateWire } from "@mototwin/types";
+import type {
+  AddServiceEventFormValues,
+  ServiceBundleTemplateWire,
+  UserServiceEventFormTemplateWire,
+} from "@mototwin/types";
 import type { RefObject } from "react";
 import { SECTION_CARD_STYLE, sectionTitleStyle } from "../styles";
 import { BasicInfoPrimaryFields } from "./basic-info-primary-fields";
@@ -12,8 +16,10 @@ export type BasicInfoCardProps = {
   isEditing: boolean;
   bundleTemplates: ServiceBundleTemplateWire[];
   bundleTemplatesLoadError: string;
-  selectedBundleTemplateId: string;
-  onSelectBundleTemplate: (id: string) => void;
+  userTemplates: UserServiceEventFormTemplateWire[];
+  userTemplatesLoadError: string;
+  templateSelectValue: string;
+  onTemplateSelectValueChange: (value: string) => void;
   onOpenTemplateContents: () => void;
   eventDateMaxYmd?: string;
   odometerInputMax?: number | null;
@@ -25,8 +31,6 @@ export type BasicInfoCardProps = {
   vehicleStateSuccess: string;
   onOdometerBlur: () => void;
   onEngineHoursBlur: () => void;
-  /** Apply template merge result to form. */
-  onApplyTemplate: (templateId: string) => void;
   /** Bound to comment textarea for auto-height. */
   commentTextareaRef: RefObject<HTMLTextAreaElement | null>;
 };
@@ -37,8 +41,10 @@ export function BasicInfoCard({
   isEditing,
   bundleTemplates,
   bundleTemplatesLoadError,
-  selectedBundleTemplateId,
-  onSelectBundleTemplate,
+  userTemplates,
+  userTemplatesLoadError,
+  templateSelectValue,
+  onTemplateSelectValueChange,
   onOpenTemplateContents,
   eventDateMaxYmd,
   odometerInputMax,
@@ -50,7 +56,6 @@ export function BasicInfoCard({
   vehicleStateSuccess,
   onOdometerBlur,
   onEngineHoursBlur,
-  onApplyTemplate,
   commentTextareaRef,
 }: BasicInfoCardProps) {
   const showTemplate = !isEditing;
@@ -67,10 +72,11 @@ export function BasicInfoCard({
         form={form}
         bundleTemplates={bundleTemplates}
         bundleTemplatesLoadError={bundleTemplatesLoadError}
-        selectedBundleTemplateId={selectedBundleTemplateId}
-        onSelectBundleTemplate={onSelectBundleTemplate}
+        userTemplates={userTemplates}
+        userTemplatesLoadError={userTemplatesLoadError}
+        templateSelectValue={templateSelectValue}
+        onTemplateSelectValueChange={onTemplateSelectValueChange}
         onOpenTemplateContents={onOpenTemplateContents}
-        onApplyTemplate={onApplyTemplate}
         eventDateMaxYmd={eventDateMaxYmd}
         odometerInputMax={odometerInputMax}
         onPatch={onPatch}

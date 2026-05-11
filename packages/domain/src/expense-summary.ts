@@ -209,6 +209,48 @@ export function getExpenseYearDateRange(year: number): { dateFrom: string; dateT
   };
 }
 
+const EXPENSE_CATEGORY_DONUT_COLORS = ["#F97316", "#60A5FA", "#38BDF8", "#FBBF24"] as const;
+
+export type ExpenseCategoryDonutSegment = {
+  label: string;
+  amount: number;
+  currency: string;
+  color: string;
+};
+
+/**
+ * Aggregates {@link ExpenseItem} by category (Russian labels) for dashboard donut — top 4 by amount.
+ * Same rules as the vehicle dashboard on web.
+ */
+export function buildExpenseCategoryDonutSegmentsForExpenses(expenses: ExpenseItem[]): {
+  totalCount: number;
+  segments: ExpenseCategoryDonutSegment[];
+} {
+  const byCategory = new Map<string, { amount: number; currency: string }>();
+  for (const expense of expenses) {
+    const label = getExpenseCategoryLabelRu(expense.category);
+    const currency = expense.currency.trim() || "RUB";
+    const bucket = byCategory.get(label) ?? { amount: 0, currency };
+    bucket.amount += expense.amount;
+    byCategory.set(label, bucket);
+  }
+
+  const segments = Array.from(byCategory.entries())
+    .map(([label, value], index) => ({
+      label,
+      amount: value.amount,
+      currency: value.currency,
+      color: EXPENSE_CATEGORY_DONUT_COLORS[index % EXPENSE_CATEGORY_DONUT_COLORS.length],
+    }))
+    .sort((left, right) => right.amount - left.amount)
+    .slice(0, 4);
+
+  return {
+    totalCount: expenses.length,
+    segments,
+  };
+}
+
 export function buildExpenseAnalyticsFromItems(
   expenses: ExpenseItem[],
   selectedYear: number = getCurrentExpenseYear()
@@ -420,6 +462,18 @@ export function formatExpenseAmountRu(amount: number): string {
     maximumFractionDigits: 2,
     minimumFractionDigits: 0,
   }).format(amount);
+}
+
+/**
+ * Цена из каталога (`PartSku.priceAmount`) для поля «Детали» в строке bundle сервисного события.
+ * Формат совпадает с {@link formatExpenseAmountRu}; при отсутствии цены — `null` (поле не трогаем).
+ */
+export function partSkuListPriceToBundlePartCostInput(sku: { priceAmount: number | null }): string | null {
+  const p = sku.priceAmount;
+  if (p == null || !Number.isFinite(p) || p <= 0) {
+    return null;
+  }
+  return formatExpenseAmountRu(p);
 }
 
 /** Разделители групп разрядов, которые даёт `Intl` для `ru-RU` и которые часто вставляют вручную. */

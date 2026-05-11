@@ -20,6 +20,32 @@ const flatNumericInput: CSSProperties = {
   padding: "5px 8px",
   fontSize: "0.75rem",
   lineHeight: 1.25,
+  borderRadius: 6,
+  caretColor: SERVICE_EVENT_PARTS_UI.orange,
+};
+
+/** Поля «название / SKU»: явная рамка, мягкое скругление (курсор не «теряется» в большом radius), заметный caret. */
+const bundlePartLineInputBase: CSSProperties = {
+  width: "100%",
+  minHeight: 36,
+  boxSizing: "border-box",
+  borderRadius: 6,
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: SERVICE_EVENT_PARTS_UI.border,
+  backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceControl,
+  color: SERVICE_EVENT_PARTS_UI.text,
+  padding: "8px 10px",
+  outline: "none",
+  caretColor: SERVICE_EVENT_PARTS_UI.orange,
+};
+
+const bundlePartLineLabel: CSSProperties = {
+  ...LABEL_STYLE,
+  fontSize: "10px",
+  letterSpacing: "0.04em",
+  textTransform: "uppercase" as const,
+  marginBottom: 4,
 };
 
 export function BundleNodePartRow({
@@ -31,9 +57,13 @@ export function BundleNodePartRow({
 }: BundleNodePartRowProps) {
   const isFlat = variant === "flat";
 
+  const partLineInputClass =
+    "w-full transition-[border-color,box-shadow] duration-150 placeholder:text-[#6b7280] " +
+    "focus-visible:border-[#ff6b00] focus-visible:shadow-[0_0_0_2px_rgba(255,107,0,0.22)]";
+
   return (
     <div
-      className={`items-center px-0 ${isFlat ? "py-1" : "py-2 sm:py-2.5"} ${isFlat ? "" : "rounded-xl border px-3 py-2.5"}`}
+      className={`items-start px-0 ${isFlat ? "py-1" : "py-2 sm:py-2.5"} ${isFlat ? "" : "rounded-xl border px-3 py-2.5"}`}
       style={{
         display: "grid",
         gridTemplateColumns: isFlat
@@ -51,7 +81,7 @@ export function BundleNodePartRow({
       }}
     >
       <span
-        className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-md ${
+        className={`inline-flex shrink-0 self-start items-center justify-center overflow-hidden rounded-md ${
           isFlat ? "h-9 w-9" : "h-11 w-11 rounded-lg"
         }`}
         style={{
@@ -74,46 +104,49 @@ export function BundleNodePartRow({
       </span>
 
       <div className="min-w-0 flex-[1.2]">
-        <input
-          value={row.partName}
-          onChange={(e) => onPatch({ partName: e.target.value })}
-          placeholder="Название детали"
-          maxLength={500}
-          style={{
-            ...FIELD_BASE,
-            marginTop: 0,
-            border: "none",
-            backgroundColor: "transparent",
-            padding: "0",
-            fontWeight: 600,
-            fontSize: isFlat ? "0.8125rem" : undefined,
-            lineHeight: isFlat ? 1.25 : undefined,
-          }}
-          className={`${FOCUS_RING} truncate`}
-        />
-        <input
-          value={row.sku}
-          onChange={(e) => onPatch({ sku: e.target.value })}
-          onFocus={onSetSkuRow}
-          placeholder="Артикул (SKU)"
-          maxLength={200}
-          autoComplete="off"
-          style={{
-            ...FIELD_BASE,
-            marginTop: isFlat ? 1 : 2,
-            border: "none",
-            backgroundColor: "transparent",
-            padding: "0",
-            fontSize: isFlat ? "0.6875rem" : "0.75rem",
-            lineHeight: isFlat ? 1.2 : undefined,
-            color: SERVICE_EVENT_PARTS_UI.textMuted,
-          }}
-          className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
-        />
+        <div className="flex min-w-0 flex-col gap-2">
+          <label className="block min-w-0">
+            <span className="block" style={bundlePartLineLabel}>
+              Наименование запчасти
+            </span>
+            <input
+              value={row.partName}
+              onChange={(e) => onPatch({ partName: e.target.value })}
+              placeholder="Введите название или оставьте пустым"
+              maxLength={500}
+              style={{
+                ...bundlePartLineInputBase,
+                fontWeight: 600,
+                fontSize: isFlat ? "0.8125rem" : "0.875rem",
+                lineHeight: 1.35,
+              }}
+              className={`${partLineInputClass} truncate`}
+            />
+          </label>
+          <label className="block min-w-0">
+            <span className="block" style={bundlePartLineLabel}>
+              Артикул (SKU)
+            </span>
+            <input
+              value={row.sku}
+              onChange={(e) => onPatch({ sku: e.target.value })}
+              onFocus={onSetSkuRow}
+              placeholder="Введите артикул или выберите из поиска ниже"
+              maxLength={200}
+              autoComplete="off"
+              style={{
+                ...bundlePartLineInputBase,
+                fontSize: isFlat ? "0.75rem" : "0.8125rem",
+                lineHeight: 1.35,
+              }}
+              className={partLineInputClass}
+            />
+          </label>
+        </div>
       </div>
 
       <label
-        className={`min-w-0 font-medium ${isFlat ? "text-[10px] leading-tight" : "text-[11px]"}`}
+        className={`min-w-0 self-end font-medium ${isFlat ? "text-[10px] leading-tight" : "text-[11px]"}`}
         style={LABEL_STYLE}
       >
         Количество
@@ -122,13 +155,13 @@ export function BundleNodePartRow({
           onChange={(e) => onPatch({ quantity: e.target.value })}
           inputMode="numeric"
           placeholder="1"
-          style={isFlat ? flatNumericInput : { ...FIELD_BASE, marginTop: 4 }}
+          style={isFlat ? flatNumericInput : { ...FIELD_BASE, marginTop: 4, borderRadius: 6, caretColor: SERVICE_EVENT_PARTS_UI.orange }}
           className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
         />
       </label>
 
       <label
-        className={`min-w-0 font-medium ${isFlat ? "text-[10px] leading-tight" : "text-[11px]"}`}
+        className={`min-w-0 self-end font-medium ${isFlat ? "text-[10px] leading-tight" : "text-[11px]"}`}
         style={LABEL_STYLE}
       >
         Цена
@@ -137,7 +170,7 @@ export function BundleNodePartRow({
           onChange={(e) => onPatch({ partCost: e.target.value })}
           inputMode="decimal"
           placeholder="0"
-          style={isFlat ? flatNumericInput : { ...FIELD_BASE, marginTop: 4 }}
+          style={isFlat ? flatNumericInput : { ...FIELD_BASE, marginTop: 4, borderRadius: 6, caretColor: SERVICE_EVENT_PARTS_UI.orange }}
           className={`[&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
         />
       </label>
@@ -146,7 +179,7 @@ export function BundleNodePartRow({
         type="button"
         onClick={onClear}
         aria-label="Очистить деталь"
-        className={`inline-flex shrink-0 items-center justify-center rounded-md border transition hover:opacity-90 ${
+        className={`inline-flex shrink-0 self-end items-center justify-center rounded-md border transition hover:opacity-90 ${
           isFlat ? "h-7 w-7" : "h-8 w-8 rounded-lg"
         }`}
         style={{

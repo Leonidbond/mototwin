@@ -27,6 +27,9 @@ import type {
   MarkExpenseInstalledInput,
   MarkExpenseInstalledResponse,
   ServiceBundleTemplatesResponse,
+  CreateUserServiceEventFormTemplateBody,
+  CreateUserServiceEventFormTemplateResponse,
+  UserServiceEventFormTemplatesResponse,
   ServiceEventsResponse,
   ServiceKitsResponse,
   InstallableForServiceEventResponse,
@@ -360,6 +363,20 @@ export function createMotoTwinEndpoints(client: ApiClient) {
 
     getServiceBundleTemplates() {
       return client.request<ServiceBundleTemplatesResponse>("/api/service-bundle-templates");
+    },
+
+    getUserServiceEventFormTemplates() {
+      return client.request<UserServiceEventFormTemplatesResponse>("/api/user-service-event-templates");
+    },
+
+    createUserServiceEventFormTemplate(input: CreateUserServiceEventFormTemplateBody) {
+      return client.request<CreateUserServiceEventFormTemplateResponse>(
+        "/api/user-service-event-templates",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        }
+      );
     },
 
     getModels(brandId: string) {

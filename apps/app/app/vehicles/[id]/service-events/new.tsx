@@ -33,6 +33,7 @@ export default function NewServiceEventScreen() {
     repeatFrom?: string;
     source?: string;
     wishlistItemId?: string;
+    pendingInstall?: string;
     wlTitle?: string;
     wlQty?: string;
     wlId?: string;
@@ -60,6 +61,9 @@ export default function NewServiceEventScreen() {
     typeof params.wlCurrency === "string" && params.wlCurrency.trim()
       ? params.wlCurrency.trim()
       : null;
+  const pendingInstallRaw = typeof params.pendingInstall === "string" ? params.pendingInstall : "";
+  const wishlistPendingInstall =
+    pendingInstallRaw === "1" || pendingInstallRaw.toLowerCase() === "true";
   const apiBaseUrl = getApiBaseUrl();
 
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
@@ -104,6 +108,7 @@ export default function NewServiceEventScreen() {
         const v = vehicleData.vehicle;
         const vehicleOdometer = v?.odometer ?? null;
         const vehicleEngineHours = v?.engineHours ?? null;
+        const todayYmd = getTodayDateYmdLocal();
         setCurrentVehicleOdometer(vehicleOdometer);
         setCurrentVehicleEngineHours(vehicleEngineHours ?? null);
 
@@ -137,7 +142,7 @@ export default function NewServiceEventScreen() {
           nextForm = createInitialRepeatServiceEventValues(
             sourceEvent,
             { odometer: v.odometer, engineHours: v.engineHours ?? null },
-            { todayDateYmd: getTodayDateYmdLocal() }
+            { todayDateYmd: todayYmd }
           );
         } else if (!isEditMode && !isRepeatMode && source === "wishlist" && wlId.trim() && v) {
           const wish = await endpoints.getVehicleWishlist(vehicleId);
@@ -150,7 +155,7 @@ export default function NewServiceEventScreen() {
           nextForm = createInitialAddServiceEventFromWishlistItem(
             item,
             { odometer: v.odometer, engineHours: v.engineHours ?? null },
-            { todayDateYmd: getTodayDateYmdLocal() }
+            { todayDateYmd: todayYmd }
           );
         } else if (
           !isEditMode &&
@@ -183,7 +188,7 @@ export default function NewServiceEventScreen() {
           nextForm = createInitialAddServiceEventFromWishlistItem(
             synthetic,
             { odometer: v.odometer, engineHours: v.engineHours ?? null },
-            { todayDateYmd: getTodayDateYmdLocal() }
+            { todayDateYmd: todayYmd }
           );
         } else if (
           !isEditMode &&
@@ -202,12 +207,13 @@ export default function NewServiceEventScreen() {
                 odometer: v.odometer,
                 engineHours: v.engineHours ?? null,
               },
-              currentDateYmd: getTodayDateYmdLocal(),
+              currentDateYmd: todayYmd,
             });
             nextForm.currency = defaultCurrency;
           } else {
             nextForm = createInitialAddServiceEventFormValues();
             nextForm.currency = defaultCurrency;
+            nextForm.eventDate = todayYmd;
             nextForm.odometer = vehicleOdometer != null ? String(vehicleOdometer) : "";
             nextForm.engineHours = vehicleEngineHours != null ? String(vehicleEngineHours) : "";
           }
@@ -215,6 +221,7 @@ export default function NewServiceEventScreen() {
           nextForm = createInitialAddServiceEventFormValues();
           nextForm.currency = defaultCurrency;
           if (!isEditMode && v) {
+            nextForm.eventDate = todayYmd;
             nextForm.odometer = vehicleOdometer != null ? String(vehicleOdometer) : "";
             nextForm.engineHours = vehicleEngineHours != null ? String(vehicleEngineHours) : "";
           }
@@ -275,7 +282,7 @@ export default function NewServiceEventScreen() {
       } else {
         const response = await endpoints.createServiceEvent(vehicleId, input);
         savedServiceEventId = response.serviceEvent.id;
-        if (source === "wishlist" && wlId.trim()) {
+        if (wishlistPendingInstall && wlId.trim()) {
           await endpoints.updateWishlistItem(vehicleId, wlId.trim(), {
             status: "INSTALLED",
             nodeId: anchorNodeId,
@@ -298,7 +305,7 @@ export default function NewServiceEventScreen() {
       } else {
         const q = new URLSearchParams({ feedback, refreshed: "1" });
         if (savedServiceEventId) {
-          q.set("serviceEventId", savedServiceEventId);
+          q.set("highlightServiceEventId", savedServiceEventId);
         }
         router.replace(`/vehicles/${vehicleId}/service-log?${q.toString()}`);
       }
@@ -327,7 +334,11 @@ export default function NewServiceEventScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScreenHeader title={isEditMode ? "Редактировать обслуживание" : "Новое сервисное событие"} />
+      <ScreenHeader
+        title={
+          isEditMode ? "Редактировать сервисное событие" : "Добавить сервисное событие"
+        }
+      />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <BasicServiceEventBundleForm
           key={bundleSessionKey}
@@ -343,6 +354,11 @@ export default function NewServiceEventScreen() {
           onClearSubmitError={clearError}
           onSubmit={handleSubmit}
           isEditMode={isEditMode}
+          contextHint={
+            wishlistPendingInstall && wlId.trim()
+              ? "После сохранения позиция будет отмечена как установленная."
+              : undefined
+          }
         />
       </KeyboardAwareScrollScreen>
     </SafeAreaView>

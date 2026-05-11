@@ -42,7 +42,8 @@ export function buildVehicleServiceLogEventHref(vehicleId: string, eventId: stri
 /** Opens Add Service Event with wishlist-driven prefill (query params read in `service-events/new`). */
 export function buildServiceEventNewFromWishlistHref(
   vehicleId: string,
-  item: PartWishlistItem
+  item: PartWishlistItem,
+  options?: { pendingInstall?: boolean }
 ): string {
   const nodeId = item.nodeId?.trim();
   if (!nodeId) {
@@ -56,6 +57,9 @@ export function buildServiceEventNewFromWishlistHref(
     wlQty: String(item.quantity),
     wlId: item.id,
   });
+  if (options?.pendingInstall) {
+    q.set("pendingInstall", "1");
+  }
   if (item.comment?.trim()) {
     q.set("wlComment", item.comment.trim());
   }

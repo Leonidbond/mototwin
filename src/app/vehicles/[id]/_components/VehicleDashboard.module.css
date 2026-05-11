@@ -63,6 +63,35 @@
   min-width: 0;
 }
 
+/* Видно ~3 строки; до 10 событий — вертикальный скролл (высота строки ≈58px + gap 8px). */
+.recentEventsScroll {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  align-content: start;
+  max-height: calc(58px * 3 + 8px * 2);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+  scrollbar-color: rgba(249, 115, 22, 0.55) rgba(255, 255, 255, 0.06);
+}
+
+.recentEventsScroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.recentEventsScroll::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.recentEventsScroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(249, 115, 22, 0.55);
+}
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

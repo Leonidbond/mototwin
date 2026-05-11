@@ -72,17 +72,23 @@ function ModeTile({
 
 export function ServiceEventCard({
   title,
+  subtitle,
   right,
   children,
 }: {
   title: string;
+  /** Подзаголовок под заголовком (как «Выбрано узлов: N» на web). */
+  subtitle?: string;
   right?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <View style={shellStyles.card}>
       <View style={shellStyles.cardHeader}>
-        <Text style={shellStyles.cardTitle}>{title}</Text>
+        <View style={shellStyles.cardTitleBlock}>
+          <Text style={shellStyles.cardTitle}>{title}</Text>
+          {subtitle ? <Text style={shellStyles.cardSubtitle}>{subtitle}</Text> : null}
+        </View>
         {right ? <View style={shellStyles.cardRight}>{right}</View> : null}
       </View>
       {children}
@@ -349,19 +355,30 @@ const shellStyles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10,
     marginBottom: 10,
   },
-  cardTitle: {
+  cardTitleBlock: {
     flex: 1,
+    minWidth: 0,
+  },
+  cardTitle: {
     fontSize: 14,
     fontWeight: "800",
     color: c.textPrimary,
+    letterSpacing: -0.05,
+  },
+  cardSubtitle: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: "600",
+    color: c.textMuted,
   },
   cardRight: {
     flexShrink: 0,
+    maxWidth: "52%",
   },
   toggleRow: {
     minHeight: 50,

@@ -321,7 +321,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
       const res = await endpoints.updateWishlistItem(vehicleId, itemIdSafe, input);
       if (shouldDeferInstalledStatus) {
         if (res.item.nodeId) {
-          router.replace(buildServiceEventNewFromWishlistHref(vehicleId, res.item));
+          router.replace(buildServiceEventNewFromWishlistHref(vehicleId, res.item, { pendingInstall: true }));
         } else {
           Alert.alert("Список покупок", WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT);
           router.replace(`/vehicles/${vehicleId}/wishlist`);
