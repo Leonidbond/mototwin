@@ -3,6 +3,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
+  InteractionManager,
   Modal,
   Pressable,
   PanResponder,
@@ -444,6 +445,18 @@ export default function VehicleWishlistScreen() {
   const closeWishlistStatusMenu = useCallback(() => {
     setWishlistStatusMenuItemId(null);
   }, []);
+
+  /** На RN второй `Modal` поверх листа детали часто не показывается — сначала закрываем другие модалки. */
+  const openRepeatPurchaseConfirm = useCallback(
+    (item: PartWishlistItemViewModel) => {
+      closeWishlistStatusMenu();
+      setDetailItemId(null);
+      InteractionManager.runAfterInteractions(() => {
+        setRepeatPurchaseConfirmItem(item);
+      });
+    },
+    [closeWishlistStatusMenu]
+  );
 
   /** Без смены URL: иначе useFocusEffect снова вызывает load() → isLoading и сброс модалки деталей. */
   const applyWishlistRowFocus = useCallback(
@@ -1063,7 +1076,7 @@ export default function VehicleWishlistScreen() {
                                     disabled={isBusy}
                                     accessibilityRole="button"
                                     accessibilityLabel="Повторить покупку"
-                                    onPress={() => setRepeatPurchaseConfirmItem(item)}
+                                    onPress={() => openRepeatPurchaseConfirm(item)}
                                     style={({ pressed }) => [
                                       styles.repeatPurchaseRowIconBtn,
                                       pressed && !isBusy && styles.statusBtnPressed,
@@ -1352,7 +1365,7 @@ export default function VehicleWishlistScreen() {
                   {canRepeatWishlistPurchase(detailItem) ? (
                     <Pressable
                       disabled={busyId === detailItem.id}
-                      onPress={() => setRepeatPurchaseConfirmItem(detailItem)}
+                      onPress={() => openRepeatPurchaseConfirm(detailItem)}
                       style={({ pressed }) => [
                         styles.detailActionBtn,
                         {
@@ -1499,8 +1512,7 @@ export default function VehicleWishlistScreen() {
                       disabled={busyId === wishlistStatusMenuItem.id}
                       onPress={() => {
                         const it = wishlistStatusMenuItem;
-                        closeWishlistStatusMenu();
-                        setRepeatPurchaseConfirmItem(it);
+                        if (it) openRepeatPurchaseConfirm(it);
                       }}
                       style={({ pressed }) => [
                         styles.wishlistStatusMenuRow,
