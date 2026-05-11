@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { WishlistItemEditor } from "./wishlist-item-editor";
+import { WishlistItemEditor } from "../../../../components/vehicle-wishlist/wishlist-item-editor";
 
 export default function EditWishlistItemScreen() {
   const params = useLocalSearchParams<{ id?: string; itemId?: string }>();

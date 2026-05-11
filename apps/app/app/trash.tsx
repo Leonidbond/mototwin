@@ -6,7 +6,7 @@ import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildTrashedVehicleViewModel } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../src/api-base-url";
-import { ScreenHeader } from "./components/screen-header";
+import { ScreenHeader } from "../components/expo-shell/screen-header";
 
 export default function TrashScreen() {
   const apiBaseUrl = getApiBaseUrl();

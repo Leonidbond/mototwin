@@ -25,7 +25,7 @@
 
 | Компонент | Путь | Назначение |
 |-----------|------|------------|
-| **`MobileNodePickerModal`** | `apps/app/app/vehicles/[id]/_components/mobile-node-picker-modal.tsx` | Одиночный выбор узла; `options`, опционально `topOptions`, `selectedId`, `onSelect`. |
+| **`MobileNodePickerModal`** | `apps/app/components/vehicle-detail/mobile-node-picker-modal.tsx` | Одиночный выбор узла; `options`, опционально `topOptions`, `selectedId`, `onSelect`. |
 
 Тип опции: **`MobileNodePickerOption`** — тот же смысл, что `SharedNodePickerOption` на web.
 

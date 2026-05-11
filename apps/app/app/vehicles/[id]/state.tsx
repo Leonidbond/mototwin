@@ -13,8 +13,8 @@ import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { normalizeVehicleStatePayload, validateVehicleStateFormValues } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
-import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
-import { ScreenHeader } from "../../components/screen-header";
+import { KeyboardAwareScrollScreen } from "../../../components/expo-shell/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../../../components/expo-shell/screen-header";
 
 export default function UpdateVehicleStateScreen() {
   const router = useRouter();

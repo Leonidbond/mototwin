@@ -1,6 +1,6 @@
 # Выравнивание журнала обслуживания (Web + Expo)
 
-**Дата:** 2026-04-18 (обновление формы bundle: 2026-05-03; multi wishlist + ссылки журнала: 2026-05; блок «Готово к установке» + `GET …/installable`: 2026-05; ADVANCED-суммы, парсинг сумм, превью «Итого», строки журнала по bundle, линковка расходов: 2026-05-04; **web UI:** страницы `service-events/*` + `ServiceEventForm` + каталог `service-event-form/`: 2026-05-06, 2026-05-08; **web журнал:** рабочие фильтры + `ServiceEventsFilters` расширение + детали «Исполнитель»: 2026-05-10; **шапка журнала:** одна CTA «Добавить ТО»: 2026-05-10; **web детали журнала:** deep link на узлы / расходы / подбор, `partsSearch`, сброс `highlightServiceEventId`/`serviceEventId` после скролла, BASIC без блока «Установленные запчасти», домен `resolveWishlistItemIdForServiceBundleItem`: 2026-05-10; **Expo журнал (паритет web):** 2026-05-10 — `JournalTimelineRow` ≈ web `ServiceLogRow`, `MobileEventDetailSheet` ≈ `ServiceLogEventDetails`, query расходов `year` + `serviceEventId` + `highlightExpenseId` + `returnTo`, подбор `wishlist/picker` с `partsSearch`, сброс highlight в URL журнала после скролла)  
+**Дата:** 2026-04-18 (обновление формы bundle: 2026-05-03; multi wishlist + ссылки журнала: 2026-05; блок «Готово к установке» + `GET …/installable`: 2026-05; ADVANCED-суммы, парсинг сумм, превью «Итого», строки журнала по bundle, линковка расходов: 2026-05-04; **web UI:** страницы `service-events/*` + `ServiceEventForm` + каталог `service-event-form/`: 2026-05-06, 2026-05-08; **web журнал:** рабочие фильтры + `ServiceEventsFilters` расширение + детали «Исполнитель»: 2026-05-10; **шапка журнала:** одна CTA «Добавить ТО»: 2026-05-10; **web детали журнала:** deep link на узлы / расходы / подбор, `partsSearch`, сброс `highlightServiceEventId`/`serviceEventId` после скролла, BASIC без блока «Установленные запчасти», домен `resolveWishlistItemIdForServiceBundleItem`: 2026-05-10; **Expo журнал (паритет web):** 2026-05-10 — `JournalTimelineRow` ≈ web `ServiceLogRow`, `MobileEventDetailSheet` ≈ `ServiceLogEventDetails`, query расходов `year` + `serviceEventId` + `highlightExpenseId` + `returnTo`, подбор `wishlist/picker` с `partsSearch`, сброс highlight в URL журнала после скролла; **Expo корзина замен из журнала:** после deep link по `wishlistItemId` не вызывается `router.replace` на `/wishlist` без query — иначе повторный `useFocusEffect` → `load()` и сброс фильтра в «Все» / пропажа детали: 2026-05-10)  
 **Цель:** Одинаковый смысл данных и правил отображения журнала на Next.js и Expo при сохранении платформенной вёрстки; **одна модель формы** сервисного события (bundle) на web и в Expo.
 
 ## Общая модель данных
@@ -27,7 +27,7 @@
 ## Форма сервисного события (bundle): web + Expo
 
 - **Web:** общий компонент **`ServiceEventForm`** в **`src/app/vehicles/[id]/_components/service-event-form/`** — те же `AddServiceEventFormValues`, BASIC/ADVANCED, bundle, SKU, **«Готово к установке»** (`getInstallableForServiceEvent`), валидация `validateAddServiceEventFormValues`, `onSubmit`. Страницы **`/vehicles/[id]/service-events/new`** и **`/vehicles/[id]/service-events/[eventId]/edit`**; переходы из **`service-log/page.tsx`** и **`vehicle-detail-client.tsx`** (`router.push` / query `returnTo` и др.). Поведение по шагам — [web-service-event-form.md](./web-service-event-form.md).
-- **Expo:** тот же смысл полей в **`apps/app/app/vehicles/[id]/_components/basic-service-event-bundle-form.tsx`** — та же модалка **«Готово к установке…»** с теми же чипами и **`getInstallableForServiceEvent`**; экран **`service-events/new.tsx`** только загружает дерево/машину/событие, собирает начальные значения доменными хелперами (`createInitialAddServiceEventFromNode`, `FromWishlistItem`, `Edit`, `Repeat`, …), сбрасывает форму через `key` и вызывает `validateAddServiceEventFormValuesMobile` + `normalizeAddServiceEventPayload` / `normalizeEditServiceEventPayload` при сохранении.
+- **Expo:** тот же смысл полей в **`apps/app/components/vehicle-detail/basic-service-event-bundle-form.tsx`** — та же модалка **«Готово к установке…»** с теми же чипами и **`getInstallableForServiceEvent`**; экран **`service-events/new.tsx`** только загружает дерево/машину/событие, собирает начальные значения доменными хелперами (`createInitialAddServiceEventFromNode`, `FromWishlistItem`, `Edit`, `Repeat`, …), сбрасывает форму через `key` и вызывает `validateAddServiceEventFormValuesMobile` + `normalizeAddServiceEventPayload` / `normalizeEditServiceEventPayload` при сохранении.
 
 ### ADVANCED: деньги, превью «Итого», редактирование
 
@@ -41,7 +41,7 @@
 
 ### «Готово к установке»: расходы и строки формы
 
-- **Несколько чистых расходов (`source: "expense"`):** выбор целей для строк bundle разрешается через **`resolveInstallableExpenseTargetRow`** (web `ServiceEventForm`, Expo `basic-service-event-bundle-form`) — второй и следующие расходы не затирают строку 0.
+- **Несколько чистых расходов (`source: "expense"`):** выбор целей для строк bundle разрешается через **`resolveInstallableExpenseTargetRow`** (web `ServiceEventForm`, Expo `components/vehicle-detail/basic-service-event-bundle-form`) — второй и следующие расходы не затирают строку 0.
 - **Связь `ExpenseItem` ↔ событие:** после сохранения события **`linkInstalledExpenseItemsToServiceEvent`** (`src/lib/service-event-expense-links.ts`) идемпотентна относительно расходов, уже привязанных к этому же `serviceEventId` внутри транзакции (после `syncExpenseItemForServiceEvent`), и не требует повторного `update`, если статус уже **INSTALLED**. Это устраняет ложную ошибку вида «Selected expense items are not available for this service event».
 
 ## Web (`src/app/vehicles/[id]/service-log/page.tsx`)
@@ -73,6 +73,7 @@
 - **Строка ленты (`JournalTimelineRow`):** паритет с web `ServiceLogRow` — колонка даты (`formatRowDateColumnParts` + пробег), rail / точка / иконка типа (`getRowActionKind`, `getTimelineColors`, `getServiceIconConfig`), карточка с `mainTitle` и второй строкой (`secondaryTitle` или для STATE_UPDATE — `stateUpdateSubtitle` / `compactMetricsLine`), три метрики **Стоимость · Интервал · Исполнитель** (`getCompactCost`, `getIntervalLabel`, `getPerformerLabel`), шеврон; состояния **selected** и **highlight** по аналогии с web. Нет expand-превью bundle в строке: **тап** = выбор + открытие sheet.
 - **Детали (`MobileEventDetailSheet`):** передаются `ServiceLogEntryViewModel` + сырой `ServiceEventItem` + `originWishlistItemIds`; секции и правила видимости по образцу web `ServiceLogEventDetails` (метрики с переходом в расходы при наличии данных, узлы-чипы → дерево, режим BASIC/ADVANCED, моточасы, напоминание, комментарии по bundle, стоимость по статьям, **«Установленные запчасти» только при `ADVANCED`**, исполнитель, источники, список расходов, футер **Редактировать / Удалить / Повторить ТО**).
 - **Навигация из sheet:** расходы — `buildExpensesHrefForServiceEvent` (`year`, `serviceEventId`, опционально `highlightExpenseId`, `returnTo` на журнал с `highlightServiceEventId`); подбор — `buildWishlistPickerHrefFromServiceLog` → `/vehicles/:id/wishlist/picker` с `nodeId` / `wishlistItemId` / `partsSearch` / `returnTo`; узлы — `/vehicles/:id/nodes?nodeId=`; источники wishlist — `buildVehicleWishlistItemHighlightHref` (`wishlist/hrefs.ts`).
+- **Корзина замен из журнала:** тап «Корзина замен» ведёт на `/vehicles/:id/parts?…` → `parts.tsx` делает `router.replace` на `/vehicles/:id/wishlist` с пробросом `wishlistItemId`, `nodeId`, `partsSearch`, `serviceEventId`, `returnTo`. На `wishlist/index` эффект подсветки по `wishlistItemId` выставляет фильтр по статусу позиции и открывает деталь; **после этого не делается** `router.replace` на URL без query (раньше это снимало параметры, снова вызывало `useFocusEffect` → `load()` и давало визуальный скачок «Установленные» → «Все»). Параметры в адресе могут сохраняться до ухода со экрана — по тому же принципу, что комментарий у `applyWishlistRowFocus`: без лишней смены URL не дергается повторная загрузка списка.
 - **Deep link в журнал:** `serviceEventId` или `highlightServiceEventId` — скролл к строке, затем **`router.replace`** без этих параметров (остальные query сохраняются), по смыслу как на web после `scrollIntoView`.
 - Комментарий в ленте: при необходимости свёртка по `SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS` (если блок превью ещё используется в других местах экрана); основной полный текст — в sheet.
 
@@ -126,7 +127,7 @@
 - [ ] **Стоимость по статьям** — при наличии `partsCostLabel` / `laborCostLabel`; тап → расходы по событию.
 - [ ] **Установленные запчасти** — только для **ADVANCED** и не STATE_UPDATE; строки кликабельны (wishlist id → picker/query; иначе узел + `partsSearch` в picker).
 - [ ] **Исполнитель:** тип + примечание; для SERVICE отдельная строка «Название сервиса».
-- [ ] **Источники:** несколько wishlist-id → несколько кнопок; тап → список покупок с подсветкой позиции.
+- [ ] **Источники:** несколько wishlist-id → несколько кнопок; тап → список покупок с подсветкой позиции; фильтр остаётся по статусу позиции (например «Установленные»), деталь открыта, **без** мигания в «Все» и закрытия детали.
 - [ ] **Расходы:** список с суммами; строка → расходы с `highlightExpenseId`; заголовок «итого» → список по событию.
 - [ ] Футер: **Редактировать**, **Удалить**, **Повторить ТО** (для STATE_UPDATE — только «Закрыть»); закрытие sheet снимает выделение строки.
 
@@ -145,7 +146,7 @@
 
 - `npx tsc --noEmit -p apps/app` (Expo)
 - `npx tsc --noEmit` (корень монорепо, если настроен)
-- `npx eslint` на изменённых файлах: `apps/app/app/vehicles/[id]/service-log.tsx`, `apps/app/app/vehicles/[id]/expenses.tsx`, `apps/app/app/vehicles/[id]/wishlist/picker.tsx`, `packages/domain` (service-log / service-log-view-models).
+- `npx eslint` на изменённых файлах: `apps/app/app/vehicles/[id]/service-log.tsx`, `apps/app/app/vehicles/[id]/expenses.tsx`, `apps/app/app/vehicles/[id]/wishlist/picker.tsx`, `apps/app/app/vehicles/[id]/wishlist/index.tsx`, `packages/domain` (service-log / service-log-view-models).
 
 ---
 

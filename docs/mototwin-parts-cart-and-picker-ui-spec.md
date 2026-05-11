@@ -1267,17 +1267,14 @@ src/app/vehicles/[id]/parts/_components/part-picker-utils.ts  # перенест
 ### Expo (Mobile)
 
 ```txt
-apps/app/app/vehicles/[id]/wishlist/picker.tsx               # новый экран picker (single-page)
-apps/app/app/vehicles/[id]/wishlist/index.tsx                # точка входа (+ Добавить деталь → /picker)
-apps/app/app/vehicles/[id]/wishlist/new.tsx                  # станет Redirect на /picker
-apps/app/app/vehicles/[id]/wishlist/[itemId].tsx             # edit-only режим
-apps/app/app/vehicles/[id]/wishlist/wishlist-item-editor.tsx # упрощается до edit-only
-apps/app/app/vehicles/[id]/index.tsx                         # точки входа из дашборда + дерева
+apps/app/app/vehicles/[id]/wishlist/picker.tsx       # экран picker (single-page)
+apps/app/app/vehicles/[id]/wishlist/index.tsx        # «Корзина замен», сводка и список
+apps/app/app/vehicles/[id]/parts.tsx                 # алиас маршрута → wishlist (паритет web /parts)
+apps/app/app/vehicles/[id]/wishlist/[itemId].tsx     # edit-only экран (импортирует редактор из components)
+apps/app/app/vehicles/[id]/index.tsx                 # точки входа из дашборда + дерева
 
-apps/app/app/components/wishlist/picker/MobilePickerHeader.tsx
-apps/app/app/components/wishlist/picker/VehiclePickerCard.tsx
-apps/app/app/components/wishlist/picker/MobileDraftCartBar.tsx
-apps/app/app/components/wishlist/picker/MobilePickerSubmitSheet.tsx
+apps/app/components/vehicle-wishlist/                # секции picker, черновая корзина, редактор позиции, hrefs
+apps/app/components/expo-shell/                      # ScreenHeader, KeyboardAwareScrollScreen, контекст ТС, …
 ```
 
 ### Shared packages

@@ -17,7 +17,7 @@ import {
   readUserLocalSettingsForIdentity,
   writeUserLocalSettingsForIdentity,
 } from "../src/ui-user-local-settings";
-import { ScreenHeader } from "./components/screen-header";
+import { ScreenHeader } from "../components/expo-shell/screen-header";
 
 function buildProfileData(selectedDevUserEmail: string) {
   const option = getDevUserOptions().find((item) => item.email === selectedDevUserEmail);

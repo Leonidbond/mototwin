@@ -31,8 +31,8 @@ import type {
   VehicleRideProfile,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../src/api-base-url";
-import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
-import { ScreenHeader } from "../../components/screen-header";
+import { KeyboardAwareScrollScreen } from "../../../components/expo-shell/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../../../components/expo-shell/screen-header";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 
 const USAGE_TYPES = RIDE_USAGE_TYPE_OPTIONS as Array<{ value: RideUsageType; label: string }>;

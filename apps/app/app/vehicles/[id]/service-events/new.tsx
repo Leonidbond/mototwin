@@ -20,9 +20,9 @@ import {
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { AddServiceEventFormValues, NodeTreeItem, PartWishlistItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
-import { KeyboardAwareScrollScreen } from "../../../components/keyboard-aware-scroll-screen";
-import { ScreenHeader } from "../../../components/screen-header";
-import { BasicServiceEventBundleForm } from "../_components/basic-service-event-bundle-form";
+import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../../../../components/expo-shell/screen-header";
+import { BasicServiceEventBundleForm } from "../../../../components/vehicle-detail/basic-service-event-bundle-form";
 
 export default function NewServiceEventScreen() {
   const router = useRouter();

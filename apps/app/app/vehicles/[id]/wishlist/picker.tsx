@@ -60,19 +60,19 @@ import type {
   VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
-import { KeyboardAwareScrollScreen } from "../../../components/keyboard-aware-scroll-screen";
+import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
 import { GarageBottomNav } from "../../../../components/garage/GarageBottomNav";
-import { CompactVehicleContextRow } from "../../../components/vehicles/CompactVehicleContextRow";
-import { PickerNodeCtaBar } from "./picker-node-cta";
-import { PickerRecommendationsSection } from "./picker-recommendations-section";
-import { PickerSearchResultsSection } from "./picker-search-results-section";
-import { PickerKitsSection } from "./picker-kits-section";
+import { CompactVehicleContextRow } from "../../../../components/expo-shell/vehicles/CompactVehicleContextRow";
+import { PickerNodeCtaBar } from "../../../../components/vehicle-wishlist/picker-node-cta";
+import { PickerRecommendationsSection } from "../../../../components/vehicle-wishlist/picker-recommendations-section";
+import { PickerSearchResultsSection } from "../../../../components/vehicle-wishlist/picker-search-results-section";
+import { PickerKitsSection } from "../../../../components/vehicle-wishlist/picker-kits-section";
 import {
   PickerDraftCartBar,
   PickerDraftCartSheet,
-} from "./picker-draft-cart-bar";
-import { PickerWhyMatchesPanel } from "./picker-why-matches-panel";
-import { MobileNodePickerModal } from "../_components/mobile-node-picker-modal";
+} from "../../../../components/vehicle-wishlist/picker-draft-cart-bar";
+import { PickerWhyMatchesPanel } from "../../../../components/vehicle-wishlist/picker-why-matches-panel";
+import { MobileNodePickerModal } from "../../../../components/vehicle-detail/mobile-node-picker-modal";
 
 function skuFromRecommendation(rec: PartRecommendationViewModel): PartSkuViewModel {
   const now = new Date().toISOString();
@@ -521,6 +521,7 @@ export default function WishlistPickerScreen() {
       }
       const sku = skuFromRecommendation(rec);
       setDraft((d) => addSkuToDraft(d, { sku, nodeId: selectedNodeId, source: "recommendation" }));
+      setDraftSheetOpen(true);
     },
     [selectedNodeId]
   );
@@ -533,6 +534,7 @@ export default function WishlistPickerScreen() {
         return;
       }
       setDraft((d) => addSkuToDraft(d, { sku, nodeId, source: "search" }));
+      setDraftSheetOpen(true);
     },
     [selectedNodeId]
   );
@@ -540,6 +542,7 @@ export default function WishlistPickerScreen() {
   const onAddKit = useCallback(
     (kit: ServiceKitViewModel) => {
       setDraft((d) => addKitToDraft(d, { kit, contextNodeId: selectedNodeId }));
+      setDraftSheetOpen(true);
     },
     [selectedNodeId]
   );

@@ -10,7 +10,7 @@
 const React = require("react");
 // Bypass our own shim: resolve the real react-native from node_modules.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const RN = require("react-native/index");
+const RN = require("react-native");
 
 function resolveInterFamily(weight) {
   const w = weight == null ? "400" : String(weight);

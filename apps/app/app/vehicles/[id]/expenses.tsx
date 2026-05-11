@@ -30,7 +30,7 @@ import type {
   NodeTreeItem,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../src/api-base-url";
-import { ScreenHeader } from "../../components/screen-header";
+import { ScreenHeader } from "../../../components/expo-shell/screen-header";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 
 const categoryOptions: ExpenseCategory[] = [

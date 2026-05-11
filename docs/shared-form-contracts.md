@@ -38,7 +38,7 @@ Stable **`value`** enums plus **Russian labels** (aligned with web onboarding / 
 ## Where it is wired
 
 - **Web:** `src/app/vehicles/[id]/page.tsx` (state, profile и обёртка карточки), `src/app/onboarding/page.tsx` (create vehicle + shared ride selects). **Сервисное событие (bundle):** `src/app/vehicles/[id]/_components/service-event-form/` — **`ServiceEventForm`** на маршрутах `service-events/new` и `service-events/[eventId]/edit`, навигация из `service-log/page.tsx` и `vehicle-detail-client.tsx`. Подробное поведение UI — [web-service-event-form.md](./web-service-event-form.md).
-- **Expo:** `apps/app/app/vehicles/new.tsx`, `vehicles/[id]/state.tsx`, `vehicles/[id]/profile.tsx`. **Сервисное событие (bundle):** `vehicles/[id]/_components/basic-service-event-bundle-form.tsx` + экран `vehicles/[id]/service-events/new.tsx`.
+- **Expo:** `apps/app/app/vehicles/new.tsx`, `vehicles/[id]/state.tsx`, `vehicles/[id]/profile.tsx`. **Сервисное событие (bundle):** `apps/app/components/vehicle-detail/basic-service-event-bundle-form.tsx` + экран `vehicles/[id]/service-events/new.tsx`.
 
 ## Parity notes
 

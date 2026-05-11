@@ -45,10 +45,10 @@ import type {
   PartWishlistItemStatus,
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import { getApiBaseUrl } from "../../../../src/api-base-url";
-import { ScreenHeader } from "../../../components/screen-header";
+import { getApiBaseUrl } from "../../src/api-base-url";
+import { ScreenHeader } from "../expo-shell/screen-header";
 import { buildServiceEventNewFromWishlistHref } from "./hrefs";
-import { MobileNodePickerModal } from "../_components/mobile-node-picker-modal";
+import { MobileNodePickerModal } from "../vehicle-detail/mobile-node-picker-modal";
 
 type WishlistItemEditorProps = {
   vehicleId: string;

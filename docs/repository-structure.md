@@ -35,7 +35,7 @@ src/
 
 ```text
 apps/app/
-  app/
+  app/                      # Expo Router routes only (thin screens)
     _layout.tsx
     index.tsx
     vehicles/new.tsx
@@ -44,6 +44,12 @@ apps/app/
     vehicles/[id]/service-events/new.tsx
     vehicles/[id]/state.tsx
     vehicles/[id]/profile.tsx
+    vehicles/[id]/parts.tsx
+    vehicles/[id]/wishlist/**
+  components/               # shared RN UI used by routes (not router entries)
+    expo-shell/
+    vehicle-detail/
+    vehicle-wishlist/
   src/
     api-base-url.ts         # backend base URL resolution for Expo
 ```

@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import type {
+  NodeTreeItem,
   ServiceActionType,
   ServiceEventItem,
   ServiceEventsFilters,
@@ -24,23 +28,33 @@ import type {
   ServiceLogEntryViewModel,
   ServiceLogMonthGroupViewModel,
   ServiceLogNodeFilter,
+  TopServiceNodeItem,
 } from "@mototwin/types";
 import {
   buildServiceLogTimelineProps,
   expenseCategoryLabelsRu,
+  filterLeafOptionsUnderTopNodeAncestors,
   filterPaidServiceEvents,
+  findNodeTreeItemById,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
+  getLeafNodeOptions,
+  getOrderedTopNodeIdsPresentInNodeTree,
+  getTodayDateYmdLocal,
   getWishlistItemIdsFromInstalledPartsJson,
   isServiceLogTimelineQueryActive,
+  nodeAncestorPathLabelRu,
   resolveWishlistItemIdForServiceBundleItem,
+  SERVICE_ACTION_TYPE_OPTIONS,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getApiBaseUrl } from "../../../src/api-base-url";
-import { KeyboardAwareScrollScreen } from "../../components/keyboard-aware-scroll-screen";
-import { ScreenHeader } from "../../components/screen-header";
+import { KeyboardAwareScrollScreen } from "../../../components/expo-shell/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../../../components/expo-shell/screen-header";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
-import { buildVehicleWishlistItemHighlightHref } from "./wishlist/hrefs";
+import { buildVehicleWishlistItemHighlightHref } from "../../../components/vehicle-wishlist/hrefs";
+import { MobileNodePickerModal, type MobileNodePickerOption } from "../../../components/vehicle-detail/mobile-node-picker-modal";
+import { ServiceLogActionGlyph, type ServiceLogGlyphKind } from "../../../components/vehicle-detail/service-log-action-glyph";
 
 function readSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) {
@@ -130,6 +144,47 @@ export function buildVehicleServiceLogHref(
     q.push(`returnAttentionNodeId=${encodeURIComponent(options.returnAttentionNodeId)}`);
   }
   return `/vehicles/${vehicleId}/service-log${q.length ? `?${q.join("&")}` : ""}`;
+}
+
+function buildMultiNodeLabel(nodeTree: NodeTreeItem[], ids: string[]): string {
+  if (ids.length === 0) return "";
+  const names = ids.map((id) => findNodeTreeItemById(nodeTree, id)?.name ?? id);
+  if (names.length === 1) return names[0] ?? "";
+  if (names.length === 2) return `${names[0]}, ${names[1]}`;
+  return `${names[0]}, ${names[1]} +${names.length - 2}`;
+}
+
+function localDateToYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function periodToolbarLabelRu(dateFrom: string, dateTo: string): string {
+  const a = dateFrom.trim();
+  const b = dateTo.trim();
+  if (!a && !b) return "Все время";
+  const left = a ? formatIsoCalendarDateRu(`${a}T12:00:00`) : "…";
+  const right = b ? formatIsoCalendarDateRu(`${b}T12:00:00`) : "…";
+  return `${left} – ${right}`;
+}
+
+function parseYmdToLocalDate(ymd: string): Date {
+  const t = ymd.trim();
+  if (t.length >= 10) {
+    const y = Number(t.slice(0, 4));
+    const mo = Number(t.slice(5, 7)) - 1;
+    const day = Number(t.slice(8, 10));
+    if (Number.isFinite(y) && Number.isFinite(mo) && Number.isFinite(day)) {
+      return new Date(y, mo, day);
+    }
+  }
+  const today = getTodayDateYmdLocal();
+  const y = Number(today.slice(0, 4));
+  const mo = Number(today.slice(5, 7)) - 1;
+  const day = Number(today.slice(8, 10));
+  return new Date(y, mo, day);
 }
 
 // ─── Паритет с web `ServiceLogRow` (хелперы + строка ленты) ────────────────────
@@ -283,41 +338,6 @@ function getRowActionKind(entry: ServiceLogEntryViewModel, event: ServiceEventIt
   return "SERVICE";
 }
 
-function rowActionMaterialIcon(kind: ServiceRowActionKind): keyof typeof MaterialIcons.glyphMap {
-  if (kind === "STATE_UPDATE") return "more-horiz";
-  if (kind === "REPLACE") return "build";
-  if (kind === "INSPECT") return "search";
-  if (kind === "CLEAN") return "cleaning-services";
-  if (kind === "ADJUST") return "tune";
-  return "handyman";
-}
-
-function JournalRowMetric({
-  icon,
-  value,
-  label,
-  accent,
-}: {
-  icon: keyof typeof MaterialIcons.glyphMap;
-  value: string;
-  label: string;
-  accent?: boolean;
-}) {
-  return (
-    <View style={styles.journalRowMetric}>
-      <MaterialIcons name={icon} size={14} color="rgba(248,250,252,0.78)" style={styles.journalRowMetricIcon} />
-      <View style={styles.journalRowMetricText}>
-        <Text style={[styles.journalRowMetricValue, accent && styles.journalRowMetricValueAccent]} numberOfLines={1}>
-          {value}
-        </Text>
-        <Text style={styles.journalRowMetricLabel} numberOfLines={1}>
-          {label}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 function JournalTimelineRow({
   entry,
   event,
@@ -337,10 +357,6 @@ function JournalTimelineRow({
 }) {
   const isStateUpdate = entry.eventKind === "STATE_UPDATE";
   const actionKind = getRowActionKind(entry, event);
-  const iconCfg = getServiceIconConfig(actionKind);
-  const cost = getCompactCost(entry);
-  const intervalLabel = getIntervalLabel(event);
-  const performerLabel = getPerformerLabel(event?.performedBy);
   const dateParts = formatRowDateColumnParts(event?.eventDate ?? "", entry.dateLabel);
   const timelineBase = getTimelineColors(actionKind);
   const railLineColor = isSelected ? "rgba(249,115,22,0.5)" : timelineBase.rail;
@@ -348,10 +364,9 @@ function JournalTimelineRow({
   const dotBorder = isSelected ? c.primaryAction : timelineBase.dotBorder;
   const glyphColor =
     isSelected ? "#ffffff" : actionKind === "STATE_UPDATE" ? "rgba(226,232,240,0.85)" : timelineBase.dotBorder;
-  const mi = rowActionMaterialIcon(actionKind);
-  const secondaryLine = isStateUpdate
+  const nodeOrSubtitleLine = isStateUpdate
     ? (entry.stateUpdateSubtitle ?? entry.compactMetricsLine)
-    : entry.secondaryTitle;
+    : (entry.expoServiceNodeLabel ?? entry.secondaryTitle);
 
   return (
     <Pressable
@@ -386,7 +401,7 @@ function JournalTimelineRow({
               isHighlighted && !isSelected ? styles.journalDotHighlightRing : null,
             ]}
           >
-            <MaterialIcons name={mi} size={10} color={glyphColor} />
+            <ServiceLogActionGlyph kind={actionKind as ServiceLogGlyphKind} size={10} color={glyphColor} />
           </View>
         </View>
         <View
@@ -397,25 +412,19 @@ function JournalTimelineRow({
         >
           <View style={styles.journalCardInner}>
             <View style={styles.journalTitleBlock}>
-              <View style={[styles.journalTypeIcon, { backgroundColor: iconCfg.bg }]}>
-                <MaterialIcons name={mi} size={18} color={iconCfg.iconColor} />
-              </View>
               <View style={styles.journalTitleTexts}>
                 <Text
                   style={[styles.journalMainTitle, isStateUpdate && styles.journalMainTitleState]}
-                  numberOfLines={1}
+                  numberOfLines={2}
                 >
                   {entry.mainTitle}
                 </Text>
-                <Text style={styles.journalSubtitle} numberOfLines={1}>
-                  {secondaryLine}
+                <Text style={styles.journalSubtitle} numberOfLines={2}>
+                  {nodeOrSubtitleLine}
                 </Text>
               </View>
             </View>
-            <JournalRowMetric icon="payments" value={cost ?? "—"} label="Стоимость" accent={Boolean(cost)} />
-            <JournalRowMetric icon="schedule" value={intervalLabel} label="Интервал" />
-            <JournalRowMetric icon="person" value={performerLabel} label="Исполнитель" />
-            <MaterialIcons name="chevron-right" size={20} color={isSelected ? c.primaryAction : "rgba(148,163,184,0.55)"} />
+            <MaterialIcons name="chevron-right" size={18} color={isSelected ? c.primaryAction : "rgba(148,163,184,0.55)"} />
           </View>
         </View>
       </View>
@@ -454,7 +463,8 @@ function buildExpensesHrefForServiceEvent(
   return `/vehicles/${vehicleId}/expenses?${q.toString()}`;
 }
 
-function buildWishlistPickerHrefFromServiceLog(
+/** Как web `openPartsSelectionFromLog`: «Корзина замен» → `/parts`, не подбор в wishlist/picker. */
+function buildPartsCartHrefFromServiceLog(
   vehicleId: string,
   eventId: string,
   opts: { wishlistItemId?: string; nodeId?: string; partsSearch?: string }
@@ -470,7 +480,7 @@ function buildWishlistPickerHrefFromServiceLog(
     q.set("partsSearch", opts.partsSearch.trim());
   }
   q.set("returnTo", encodeURIComponent(serviceLogHighlightReturnPath(vehicleId, eventId)));
-  return `/vehicles/${vehicleId}/wishlist/picker?${q.toString()}`;
+  return `/vehicles/${vehicleId}/parts?${q.toString()}`;
 }
 
 // ─── Month group ──────────────────────────────────────────────────────────────
@@ -660,7 +670,6 @@ function MobileEventDetailSheet({
   }
   const detailNodes = getDetailPanelNodeRows(entry, event);
   const fullReminderText = formatFullServiceReminder(event);
-  const mi = rowActionMaterialIcon(actionKind);
   const subtitleLine = isStateUpdate ? (entry.stateUpdateSubtitle ?? "") : entry.secondaryTitle;
 
   return (
@@ -672,7 +681,7 @@ function MobileEventDetailSheet({
           <View style={styles.detailSheetHeader}>
             <View style={styles.detailSheetHeaderRow}>
               <View style={[styles.journalTypeIcon, { backgroundColor: iconCfg.bg }]}>
-                <MaterialIcons name={mi} size={18} color={iconCfg.iconColor} />
+                <ServiceLogActionGlyph kind={actionKind as ServiceLogGlyphKind} size={18} color={iconCfg.iconColor} />
               </View>
               <View style={styles.detailSheetHeaderText}>
                 <Text style={styles.detailSheetTitle} numberOfLines={2}>
@@ -696,15 +705,35 @@ function MobileEventDetailSheet({
           </View>
           <ScrollView contentContainerStyle={styles.detailSheetBody}>
             <View style={styles.detailMetricsGrid}>
-              <DetailMetric label="Дата" value={entry.dateLabel} />
-              <DetailMetric label="Пробег" value={entry.odometerValue} />
-              <DetailMetric label="Интервал" value={intervalLabel} />
+              <View style={styles.detailMetricsRow3}>
+                <View style={styles.detailMetricCellThird}>
+                  <DetailMetric label="Дата" value={entry.dateLabel} containerStyle={styles.detailMetricFill} />
+                </View>
+                <View style={styles.detailMetricCellThird}>
+                  <DetailMetric label="Пробег" value={entry.odometerValue} containerStyle={styles.detailMetricFill} />
+                </View>
+                <View style={styles.detailMetricCellThird}>
+                  <DetailMetric label="Интервал" value={intervalLabel} containerStyle={styles.detailMetricFill} />
+                </View>
+              </View>
               {!isStateUpdate && event && (linkedExpenses.length > 0 || Boolean(cost)) ? (
-                <Pressable onPress={() => onOpenExpenses()}>
-                  <DetailMetric label="Стоимость" value={cost ?? "—"} accent={Boolean(cost)} />
+                <Pressable onPress={() => onOpenExpenses()} style={styles.detailMetricCostRow}>
+                  <DetailMetric
+                    label="Стоимость"
+                    value={cost ?? "—"}
+                    accent={Boolean(cost)}
+                    containerStyle={styles.detailMetricFill}
+                  />
                 </Pressable>
               ) : (
-                <DetailMetric label="Стоимость" value={cost ?? "—"} accent={Boolean(cost)} />
+                <View style={styles.detailMetricCostRow}>
+                  <DetailMetric
+                    label="Стоимость"
+                    value={cost ?? "—"}
+                    accent={Boolean(cost)}
+                    containerStyle={styles.detailMetricFill}
+                  />
+                </View>
               )}
             </View>
 
@@ -919,9 +948,19 @@ function MobileEventDetailSheet({
   );
 }
 
-function DetailMetric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+function DetailMetric({
+  label,
+  value,
+  accent = false,
+  containerStyle,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  containerStyle?: ViewStyle;
+}) {
   return (
-    <View style={[styles.detailMetric, accent && styles.detailMetricAccent]}>
+    <View style={[styles.detailMetric, containerStyle, accent && styles.detailMetricAccent]}>
       <Text style={styles.detailMetricLabel}>{label}</Text>
       <Text style={[styles.detailMetricValue, accent && styles.detailMetricValueAccent]} numberOfLines={1}>
         {value}
@@ -986,6 +1025,11 @@ export default function ServiceLogScreen() {
     title: string;
     details?: string;
   } | null>(null);
+  const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [nodePickerOpen, setNodePickerOpen] = useState(false);
+  const [periodModalOpen, setPeriodModalOpen] = useState(false);
+  const [datePickField, setDatePickField] = useState<null | "from" | "to">(null);
 
   const apiBaseUrl = getApiBaseUrl();
   const scrollRef = useRef<ScrollView | null>(null);
@@ -1002,6 +1046,87 @@ export default function ServiceLogScreen() {
     () => parsePaidOnlyFromParams(params.paidOnly),
     [params.paidOnly]
   );
+
+  const expandExpensesFromParams = useMemo(
+    () => readSearchParam(params.expandExpenses) === "1" || readSearchParam(params.expandExpenses) === "true",
+    [params.expandExpenses]
+  );
+
+  const monthQueryParam =
+    typeof params.month === "string" && params.month.trim() ? params.month : undefined;
+
+  const serviceLogNavOptions = useMemo(
+    () => ({
+      expandExpenses: expandExpensesFromParams ? true as const : undefined,
+      month: monthQueryParam,
+      returnNodeId: returnNodeId || undefined,
+      returnOrigin:
+        returnOrigin === "node-tree" || returnOrigin === "attention"
+          ? (returnOrigin as "node-tree" | "attention")
+          : undefined,
+      returnAttentionNodeId: returnAttentionNodeId || undefined,
+    }),
+    [expandExpensesFromParams, monthQueryParam, returnNodeId, returnOrigin, returnAttentionNodeId]
+  );
+
+  const leafRowsForNodePicker = useMemo((): MobileNodePickerOption[] => {
+    const leafOptions = getLeafNodeOptions(nodeTree);
+    return leafOptions.map((leaf) => ({
+      id: leaf.id,
+      name: leaf.name,
+      level: leaf.level,
+      pathLabel: nodeAncestorPathLabelRu(nodeTree, leaf.id),
+    }));
+  }, [nodeTree]);
+
+  const orderedTopNodeIdsForPicker = useMemo(
+    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
+    [nodeTree, topServiceNodes]
+  );
+
+  const topLeafRowsForNodePicker = useMemo(
+    () => filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafRowsForNodePicker, orderedTopNodeIdsForPicker),
+    [nodeTree, leafRowsForNodePicker, orderedTopNodeIdsForPicker]
+  );
+
+  const applyPeriodPreset = useCallback((kind: "month" | "quarter" | "year" | "all") => {
+    if (kind === "all") {
+      setFilters((p) => ({ ...p, dateFrom: "", dateTo: "" }));
+      return;
+    }
+    const todayYmd = getTodayDateYmdLocal();
+    const y = Number(todayYmd.slice(0, 4));
+    const mo = Number(todayYmd.slice(5, 7)) - 1;
+    const day = Number(todayYmd.slice(8, 10));
+    const today = new Date(y, mo, day);
+    let from = new Date(today);
+    if (kind === "month") {
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+    } else if (kind === "quarter") {
+      from = new Date(today);
+      from.setMonth(from.getMonth() - 3);
+    } else {
+      from = new Date(today.getFullYear(), 0, 1);
+    }
+    setFilters((p) => ({
+      ...p,
+      dateFrom: localDateToYmd(from),
+      dateTo: todayYmd,
+    }));
+  }, []);
+
+  const applyNodePickerSelection = useCallback(
+    (nodeIds: string[]) => {
+      const nextFilter: ServiceLogNodeFilter | null =
+        nodeIds.length === 0
+          ? null
+          : { nodeIds, displayLabel: buildMultiNodeLabel(nodeTree, nodeIds) };
+      router.replace(buildVehicleServiceLogHref(vehicleId, nextFilter, paidOnlyActive, serviceLogNavOptions));
+      setNodePickerOpen(false);
+    },
+    [nodeTree, paidOnlyActive, router, serviceLogNavOptions, vehicleId]
+  );
+
   useEffect(() => {
     const feedback = typeof params.feedback === "string" ? params.feedback : "";
     if (!feedback) {
@@ -1022,6 +1147,7 @@ export default function ServiceLogScreen() {
     }
     router.replace(
       buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, paidOnlyActive, {
+        ...serviceLogNavOptions,
         serviceEventId: highlightedServiceEventId || undefined,
       })
     );
@@ -1030,6 +1156,7 @@ export default function ServiceLogScreen() {
     paidOnlyActive,
     nodeSubtreeFilter,
     router,
+    serviceLogNavOptions,
     vehicleId,
     highlightedServiceEventId,
   ]);
@@ -1071,10 +1198,14 @@ export default function ServiceLogScreen() {
         setError("");
         const client = createApiClient({ baseUrl: apiBaseUrl });
         const endpoints = createMotoTwinEndpoints(client);
-        const [data] = await Promise.all([
+        const [data, treeRes, topRes] = await Promise.all([
           endpoints.getServiceEvents(vehicleId),
+          endpoints.getNodeTree(vehicleId),
+          endpoints.getTopServiceNodes(),
         ]);
         setEvents(data.serviceEvents ?? []);
+        setNodeTree(treeRes.nodeTree ?? []);
+        setTopServiceNodes(topRes.nodes ?? []);
       } catch (err) {
         console.error(err);
         setError("Не удалось загрузить журнал обслуживания.");
@@ -1132,30 +1263,9 @@ export default function ServiceLogScreen() {
     () => (detailSheetEntryId ? (serviceEventById.get(detailSheetEntryId) ?? null) : null),
     [detailSheetEntryId, serviceEventById]
   );
-  const expandExpensesFromParams =
-    readSearchParam(params.expandExpenses) === "1" || readSearchParam(params.expandExpenses) === "true";
   const serviceLogHrefWithoutHighlight = useMemo(
-    () =>
-      buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, paidOnlyActive, {
-        expandExpenses: expandExpensesFromParams ? true : undefined,
-        month: typeof params.month === "string" && params.month.trim() ? params.month : undefined,
-        returnNodeId: returnNodeId || undefined,
-        returnOrigin:
-          returnOrigin === "node-tree" || returnOrigin === "attention"
-            ? (returnOrigin as "node-tree" | "attention")
-            : undefined,
-        returnAttentionNodeId: returnAttentionNodeId || undefined,
-      }),
-    [
-      vehicleId,
-      nodeSubtreeFilter,
-      paidOnlyActive,
-      expandExpensesFromParams,
-      params.month,
-      returnNodeId,
-      returnOrigin,
-      returnAttentionNodeId,
-    ]
+    () => buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, paidOnlyActive, serviceLogNavOptions),
+    [vehicleId, nodeSubtreeFilter, paidOnlyActive, serviceLogNavOptions]
   );
   useEffect(() => {
     if (highlightedServiceEventId) {
@@ -1227,32 +1337,31 @@ export default function ServiceLogScreen() {
     });
     setSortField("eventDate");
     setSortDirection("desc");
-    router.replace(`/vehicles/${vehicleId}/service-log`);
-  };
-
-  const clearNodeSubtreeFilter = () => {
-    router.replace(buildVehicleServiceLogHref(vehicleId, null, paidOnlyActive));
-  };
-
-  const clearPaidOnlyFilter = () => {
-    router.replace(
-      buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, false)
-    );
+    setPeriodModalOpen(false);
+    setDatePickField(null);
+    router.replace(buildVehicleServiceLogHref(vehicleId, null, false, serviceLogNavOptions));
   };
 
   const togglePaidOnlyFilter = () => {
     router.replace(
-      buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, !paidOnlyActive)
+      buildVehicleServiceLogHref(vehicleId, nodeSubtreeFilter, !paidOnlyActive, serviceLogNavOptions)
     );
   };
 
+  const closeDetailSheet = useCallback(() => {
+    setDetailSheetEntryId("");
+    setSelectedEventId("");
+  }, []);
+
   const openEditServiceEvent = (eventId: string) => {
+    closeDetailSheet();
     router.push(
       `/vehicles/${vehicleId}/service-events/new?source=service-log&eventId=${encodeURIComponent(eventId)}`
     );
   };
 
   const openRepeatServiceEvent = (eventId: string) => {
+    closeDetailSheet();
     router.push(
       `/vehicles/${vehicleId}/service-events/new?source=service-log&repeatFrom=${encodeURIComponent(eventId)}`
     );
@@ -1277,6 +1386,7 @@ export default function ServiceLogScreen() {
                 setError("");
                 const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
                 await endpoints.deleteServiceEvent(vehicleId, eventId);
+                closeDetailSheet();
                 await load();
                 setActionMessage({
                   tone: "success",
@@ -1397,43 +1507,72 @@ export default function ServiceLogScreen() {
           </View>
         ) : null}
 
-        {nodeSubtreeFilter ? (
-          <View style={styles.nodeFilterBanner}>
-            <Text style={styles.nodeFilterBannerText}>
-              <Text style={styles.nodeFilterBannerStrong}>Фильтр по узлу: </Text>
-              {nodeSubtreeFilter.displayLabel}
-            </Text>
-            <Pressable
-              onPress={clearNodeSubtreeFilter}
-              style={({ pressed }) => [
-                styles.nodeFilterClearButton,
-                pressed && styles.nodeFilterClearButtonPressed,
-              ]}
-            >
-              <Text style={styles.nodeFilterClearButtonText}>Сбросить фильтр</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {paidOnlyActive ? (
-          <View style={styles.paidFilterBanner}>
-            <Text style={styles.paidFilterBannerText}>
-              <Text style={styles.paidFilterBannerStrong}>Показаны события с расходами</Text>
-              {" — только записи с суммой > 0 и валютой."}
-            </Text>
-            <Pressable
-              onPress={clearPaidOnlyFilter}
-              style={({ pressed }) => [
-                styles.nodeFilterClearButton,
-                pressed && styles.nodeFilterClearButtonPressed,
-              ]}
-            >
-              <Text style={styles.nodeFilterClearButtonText}>Сбросить фильтр</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
         <View style={styles.filterCard}>
+          <View style={styles.filterToolbarRow}>
+            <View style={styles.filterSearchInner}>
+              <MaterialIcons name="search" size={18} color={c.textMuted} style={styles.filterSearchIcon} />
+              <TextInput
+                value={filters.serviceType}
+                onChangeText={(value) => updateFilter("serviceType", value)}
+                placeholder="Поиск…"
+                placeholderTextColor={c.textMuted}
+                autoCapitalize="none"
+                style={styles.filterSearchInputToolbar}
+              />
+            </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.filterToolbarChip,
+                pressed && styles.filterHeaderButtonPressed,
+              ]}
+              onPress={() => setNodePickerOpen(true)}
+            >
+              <View style={styles.filterToolbarChipTextCol}>
+                <Text style={styles.filterToolbarChipMeta}>Узел</Text>
+                <Text style={styles.filterToolbarChipVal} numberOfLines={1}>
+                  {nodeSubtreeFilter ? nodeSubtreeFilter.displayLabel : "Все"}
+                </Text>
+              </View>
+              <Text style={styles.filterToolbarChipChevron}>▾</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.filterToolbarChip,
+                pressed && styles.filterHeaderButtonPressed,
+              ]}
+              onPress={() => {
+                setDatePickField(null);
+                setPeriodModalOpen(true);
+              }}
+            >
+              <View style={styles.filterToolbarChipTextCol}>
+                <Text style={styles.filterToolbarChipMeta}>Период</Text>
+                <Text style={styles.filterToolbarChipVal} numberOfLines={1}>
+                  {periodToolbarLabelRu(filters.dateFrom, filters.dateTo)}
+                </Text>
+              </View>
+              <Text style={styles.filterToolbarChipChevron}>▾</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.filterResetToolbar,
+                pressed && hasActiveFilters && styles.filterResetToolbarPressed,
+                !hasActiveFilters && styles.filterResetToolbarDisabled,
+              ]}
+              onPress={resetFiltersAndSort}
+              disabled={!hasActiveFilters}
+            >
+              <Text
+                style={[
+                  styles.filterResetToolbarText,
+                  !hasActiveFilters && styles.filterResetToolbarTextDisabled,
+                ]}
+              >
+                Сброс
+              </Text>
+            </Pressable>
+          </View>
+
           <Pressable
             style={({ pressed }) => [
               styles.filterHeaderButton,
@@ -1449,21 +1588,23 @@ export default function ServiceLogScreen() {
             <>
               <View style={styles.filterRow}>
                 <View style={styles.filterHalf}>
-                  <Text style={styles.filterLabel}>Дата с</Text>
+                  <Text style={styles.filterLabel}>Пробег от, км</Text>
                   <TextInput
-                    value={filters.dateFrom}
-                    onChangeText={(value) => updateFilter("dateFrom", value)}
-                    placeholder="YYYY-MM-DD"
+                    value={filters.odometerMin}
+                    onChangeText={(value) => updateFilter("odometerMin", value)}
+                    placeholder="от"
+                    keyboardType="number-pad"
                     autoCapitalize="none"
                     style={styles.input}
                   />
                 </View>
                 <View style={styles.filterHalf}>
-                  <Text style={styles.filterLabel}>Дата по</Text>
+                  <Text style={styles.filterLabel}>Пробег до, км</Text>
                   <TextInput
-                    value={filters.dateTo}
-                    onChangeText={(value) => updateFilter("dateTo", value)}
-                    placeholder="YYYY-MM-DD"
+                    value={filters.odometerMax}
+                    onChangeText={(value) => updateFilter("odometerMax", value)}
+                    placeholder="до"
+                    keyboardType="number-pad"
                     autoCapitalize="none"
                     style={styles.input}
                   />
@@ -1471,25 +1612,68 @@ export default function ServiceLogScreen() {
               </View>
               <View style={styles.filterRow}>
                 <View style={styles.filterHalf}>
-                  <Text style={styles.filterLabel}>Узел</Text>
+                  <Text style={styles.filterLabel}>Сумма от</Text>
                   <TextInput
-                    value={filters.node}
-                    onChangeText={(value) => updateFilter("node", value)}
-                    placeholder="Первые буквы узла"
+                    value={filters.costMin}
+                    onChangeText={(value) => updateFilter("costMin", value)}
+                    placeholder="от"
+                    keyboardType="decimal-pad"
                     autoCapitalize="none"
                     style={styles.input}
                   />
                 </View>
                 <View style={styles.filterHalf}>
-                  <Text style={styles.filterLabel}>Тип сервиса</Text>
+                  <Text style={styles.filterLabel}>Сумма до</Text>
                   <TextInput
-                    value={filters.serviceType}
-                    onChangeText={(value) => updateFilter("serviceType", value)}
-                    placeholder="Например, масло"
+                    value={filters.costMax}
+                    onChangeText={(value) => updateFilter("costMax", value)}
+                    placeholder="до"
+                    keyboardType="decimal-pad"
                     autoCapitalize="none"
                     style={styles.input}
                   />
                 </View>
+              </View>
+              <Text style={styles.filterLabel}>Тип работы</Text>
+              <View style={styles.chipsRow}>
+                <Pressable
+                  style={[styles.chip, !filters.actionType && styles.chipActive]}
+                  onPress={() => updateFilter("actionType", "")}
+                >
+                  <Text style={[styles.chipText, !filters.actionType && styles.chipTextActive]}>Все</Text>
+                </Pressable>
+                {SERVICE_ACTION_TYPE_OPTIONS.map((opt) => {
+                  const active = filters.actionType === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => updateFilter("actionType", opt.value)}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.filterLabel}>Исполнитель</Text>
+              <View style={styles.chipsRow}>
+                {[
+                  { value: "", label: "Все" },
+                  { value: "SELF", label: getPerformerLabel("SELF") },
+                  { value: "SERVICE", label: getPerformerLabel("SERVICE") },
+                  { value: "OTHER", label: getPerformerLabel("OTHER") },
+                ].map((opt) => {
+                  const active = filters.performerKind === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.label}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => updateFilter("performerKind", opt.value)}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
               <Text style={styles.filterLabel}>Тип записи</Text>
               <View style={styles.chipsRow}>
@@ -1568,18 +1752,6 @@ export default function ServiceLogScreen() {
                   );
                 })}
               </View>
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.resetButton,
-                  pressed && styles.resetButtonPressed,
-                  !hasActiveFilters && styles.resetButtonDisabled,
-                ]}
-                onPress={resetFiltersAndSort}
-                disabled={!hasActiveFilters}
-              >
-                <Text style={styles.resetButtonText}>Сбросить</Text>
-              </Pressable>
             </>
           ) : null}
         </View>
@@ -1618,6 +1790,131 @@ export default function ServiceLogScreen() {
           />
         ))}
       </KeyboardAwareScrollScreen>
+
+      <Modal
+        visible={periodModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setPeriodModalOpen(false);
+          setDatePickField(null);
+        }}
+      >
+        <View style={styles.periodModalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              setPeriodModalOpen(false);
+              setDatePickField(null);
+            }}
+          />
+          <View style={styles.periodModalCard}>
+            <Text style={styles.periodModalTitle}>Период</Text>
+            <View style={styles.periodPresetRow}>
+              {(
+                [
+                  { k: "month" as const, label: "Этот месяц" },
+                  { k: "quarter" as const, label: "90 дней" },
+                  { k: "year" as const, label: "Год" },
+                  { k: "all" as const, label: "Всё время" },
+                ] as const
+              ).map(({ k, label }) => (
+                <Pressable
+                  key={k}
+                  style={({ pressed }) => [styles.periodPresetChip, pressed && styles.filterHeaderButtonPressed]}
+                  onPress={() => {
+                    applyPeriodPreset(k);
+                    if (k === "all") {
+                      setPeriodModalOpen(false);
+                      setDatePickField(null);
+                    }
+                  }}
+                >
+                  <Text style={styles.periodPresetChipText}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.periodDateLine, pressed && styles.filterHeaderButtonPressed]}
+              onPress={() => setDatePickField("from")}
+            >
+              <Text style={styles.periodModalFieldLabel}>С даты</Text>
+              <Text style={styles.periodDateValue}>{filters.dateFrom || "…"}</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.periodDateLine, pressed && styles.filterHeaderButtonPressed]}
+              onPress={() => setDatePickField("to")}
+            >
+              <Text style={styles.periodModalFieldLabel}>По дату</Text>
+              <Text style={styles.periodDateValue}>{filters.dateTo || "…"}</Text>
+            </Pressable>
+            {datePickField ? (
+              <View style={styles.periodPickerBlock}>
+                <DateTimePicker
+                  value={parseYmdToLocalDate(datePickField === "from" ? filters.dateFrom : filters.dateTo)}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  {...(Platform.OS === "ios"
+                    ? {
+                        themeVariant: "dark" as const,
+                        textColor: c.textPrimary,
+                        accentColor: c.primaryAction,
+                      }
+                    : { accentColor: c.primaryAction })}
+                  onChange={(ev, date) => {
+                    if (Platform.OS === "android") {
+                      setDatePickField(null);
+                      if (ev.type === "dismissed") return;
+                      if (date) {
+                        updateFilter(
+                          datePickField === "from" ? "dateFrom" : "dateTo",
+                          localDateToYmd(date)
+                        );
+                      }
+                      return;
+                    }
+                    if (date) {
+                      updateFilter(
+                        datePickField === "from" ? "dateFrom" : "dateTo",
+                        localDateToYmd(date)
+                      );
+                    }
+                  }}
+                />
+                {Platform.OS === "ios" ? (
+                  <Pressable style={styles.periodIosDone} onPress={() => setDatePickField(null)}>
+                    <Text style={styles.periodIosDoneText}>Готово</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+            <Pressable
+              style={styles.periodCloseFooter}
+              onPress={() => {
+                setPeriodModalOpen(false);
+                setDatePickField(null);
+              }}
+            >
+              <Text style={styles.periodCloseFooterText}>Закрыть</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <MobileNodePickerModal
+        visible={nodePickerOpen}
+        title="Узлы журнала"
+        searchPlaceholder="Поиск по названию узла"
+        options={leafRowsForNodePicker}
+        topOptions={topLeafRowsForNodePicker}
+        selectedIds={nodeSubtreeFilter?.nodeIds ?? []}
+        onClose={() => setNodePickerOpen(false)}
+        onSelect={() => {}}
+        onConfirmSelection={(ids) => {
+          applyNodePickerSelection(ids);
+        }}
+      />
+
       <MobileEventDetailSheet
         entry={detailSheetEntry}
         event={detailSheetEvent}
@@ -1630,18 +1927,22 @@ export default function ServiceLogScreen() {
           setSelectedEventId("");
         }}
         onOpenNodeInTree={(nodeId) => {
+          closeDetailSheet();
           router.push(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(nodeId)}`);
         }}
         onOpenExpenses={(opts) => {
           if (!detailSheetEntry) return;
+          closeDetailSheet();
           const ev = serviceEventById.get(detailSheetEntry.id) ?? null;
           router.push(buildExpensesHrefForServiceEvent(vehicleId, detailSheetEntry.id, ev, opts));
         }}
         onOpenParts={(opts) => {
           if (!detailSheetEntry) return;
-          router.push(buildWishlistPickerHrefFromServiceLog(vehicleId, detailSheetEntry.id, opts));
+          closeDetailSheet();
+          router.push(buildPartsCartHrefFromServiceLog(vehicleId, detailSheetEntry.id, opts));
         }}
         onOpenWishlistOrigin={(wishlistItemId) => {
+          closeDetailSheet();
           router.push(buildVehicleWishlistItemHighlightHref(vehicleId, wishlistItemId));
         }}
         onRepeat={() => (detailSheetEntry ? openRepeatServiceEvent(detailSheetEntry.id) : undefined)}
@@ -1977,6 +2278,181 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
     marginBottom: 14,
+    gap: 10,
+  },
+  filterToolbarRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 6,
+  },
+  filterSearchInner: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: c.cardMuted,
+  },
+  filterSearchIcon: {
+    flexShrink: 0,
+  },
+  filterSearchInputToolbar: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    color: c.textPrimary,
+    paddingVertical: 4,
+  },
+  filterToolbarChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    maxWidth: 108,
+    minWidth: 76,
+    flexShrink: 0,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: c.cardMuted,
+  },
+  filterToolbarChipTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  filterToolbarChipMeta: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: c.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  filterToolbarChipVal: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: c.textPrimary,
+    marginTop: 1,
+  },
+  filterToolbarChipChevron: {
+    fontSize: 10,
+    color: c.textMuted,
+    flexShrink: 0,
+    alignSelf: "center",
+  },
+  filterResetToolbar: {
+    flexShrink: 0,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardMuted,
+  },
+  filterResetToolbarPressed: {
+    opacity: 0.88,
+  },
+  filterResetToolbarDisabled: {
+    opacity: 0.42,
+  },
+  filterResetToolbarText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: c.textSecondary,
+  },
+  filterResetToolbarTextDisabled: {
+    color: c.textMuted,
+  },
+  periodModalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: c.overlayModal,
+  },
+  periodModalCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    padding: 16,
+    gap: 12,
+  },
+  periodModalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: c.textPrimary,
+  },
+  periodPresetRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  periodPresetChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardMuted,
+  },
+  periodPresetChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: c.textPrimary,
+  },
+  periodDateLine: {
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: c.cardMuted,
+  },
+  periodModalFieldLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: c.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.35,
+    marginBottom: 2,
+  },
+  periodDateValue: {
+    marginTop: 2,
+    fontSize: 15,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  periodPickerBlock: {
+    marginTop: 4,
+  },
+  periodIosDone: {
+    marginTop: 8,
+    alignSelf: "flex-end",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: c.primaryAction,
+  },
+  periodIosDoneText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: c.onPrimaryAction,
+  },
+  periodCloseFooter: {
+    marginTop: 4,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  periodCloseFooterText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: c.textSecondary,
   },
   filterTitle: {
     fontSize: 14,
@@ -2173,37 +2649,38 @@ const styles = StyleSheet.create({
   journalRowOuter: {
     flexDirection: "row",
     alignItems: "stretch",
-    gap: 10,
+    gap: 8,
     width: "100%",
   },
   journalDateCol: {
     flexShrink: 0,
     justifyContent: "center",
-    gap: 2,
-    paddingRight: 4,
-    minWidth: 52,
+    gap: 1,
+    paddingRight: 2,
+    minWidth: 44,
+    maxWidth: 56,
   },
   journalDateDay: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
     color: c.textPrimary,
-    lineHeight: 16,
+    lineHeight: 15,
   },
   journalDateYear: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     color: c.textPrimary,
-    lineHeight: 16,
+    lineHeight: 14,
   },
   journalDateOdo: {
     marginTop: 1,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "400",
     color: c.textSecondary,
-    lineHeight: 15,
+    lineHeight: 13,
   },
   journalRailWrap: {
-    width: 22,
+    width: 20,
     alignItems: "center",
     justifyContent: "center",
     minHeight: 48,
@@ -2239,8 +2716,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(148,163,184,0.22)",
     backgroundColor: "rgba(255,255,255,0.032)",
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
   },
   journalCardSelected: {
     borderColor: `${c.primaryAction}55`,
@@ -2249,15 +2726,12 @@ const styles = StyleSheet.create({
   journalCardInner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     flexWrap: "nowrap",
   },
   journalTitleBlock: {
-    flex: 2,
+    flex: 1,
     minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
   },
   journalTypeIcon: {
     width: 36,
@@ -2272,7 +2746,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   journalMainTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     color: c.textPrimary,
     letterSpacing: -0.1,
@@ -2282,43 +2756,11 @@ const styles = StyleSheet.create({
     color: c.textMeta,
   },
   journalSubtitle: {
-    marginTop: 2,
-    fontSize: 12,
-    fontWeight: "400",
-    color: c.textSecondary,
-    lineHeight: 15,
-  },
-  journalRowMetric: {
-    flex: 1,
-    minWidth: 56,
-    maxWidth: 100,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    justifyContent: "center",
-  },
-  journalRowMetricIcon: {
-    flexShrink: 0,
-  },
-  journalRowMetricText: {
-    minWidth: 0,
-    flex: 1,
-    gap: 2,
-  },
-  journalRowMetricValue: {
+    marginTop: 3,
     fontSize: 11,
-    fontWeight: "700",
-    color: c.textPrimary,
-    letterSpacing: -0.1,
-  },
-  journalRowMetricValueAccent: {
-    color: c.successStrong,
-  },
-  journalRowMetricLabel: {
-    fontSize: 10,
     fontWeight: "400",
     color: c.textSecondary,
-    letterSpacing: 0.1,
+    lineHeight: 14,
   },
 
   // Event card base
@@ -2997,12 +3439,27 @@ const styles = StyleSheet.create({
     textDecorationColor: "rgba(148,163,184,0.35)",
   },
   detailMetricsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
   },
+  detailMetricsRow3: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "stretch",
+  },
+  detailMetricCellThird: {
+    flex: 1,
+    minWidth: 0,
+  },
+  detailMetricCostRow: {
+    alignSelf: "stretch",
+    width: "100%",
+  },
+  detailMetricFill: {
+    flex: 1,
+    width: "100%",
+    alignSelf: "stretch",
+  },
   detailMetric: {
-    width: "48%",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: c.border,

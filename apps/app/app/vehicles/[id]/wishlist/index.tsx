@@ -45,9 +45,9 @@ import {
   buildServiceEventNewFromWishlistHref,
   buildVehicleServiceLogEventHref,
   buildVehicleWishlistNewHref,
-} from "./hrefs";
-import { ScreenHeader } from "../../../components/screen-header";
-import { CompactVehicleContextRow } from "../../../components/vehicles/CompactVehicleContextRow";
+} from "../../../../components/vehicle-wishlist/hrefs";
+import { ScreenHeader } from "../../../../components/expo-shell/screen-header";
+import { CompactVehicleContextRow } from "../../../../components/expo-shell/vehicles/CompactVehicleContextRow";
 
 type PartsStatusFilter = PartWishlistItemStatus | "ALL";
 const INITIAL_VISIBLE_COUNT = 10;
@@ -231,6 +231,7 @@ export default function VehicleWishlistScreen() {
     id?: string;
     wishlistItemId?: string;
     partsStatus?: string;
+    partsSearch?: string;
     installWishlistItemId?: string;
     picked?: string;
   }>();
@@ -241,6 +242,8 @@ export default function VehicleWishlistScreen() {
   const installWishlistItemId =
     typeof params.installWishlistItemId === "string" ? params.installWishlistItemId : "";
   const pickedParam = typeof params.picked === "string" ? params.picked : "";
+  const partsSearchFromRoute =
+    typeof params.partsSearch === "string" ? params.partsSearch.trim() : "";
   const apiBaseUrl = getApiBaseUrl();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -341,6 +344,12 @@ export default function VehicleWishlistScreen() {
       setCollapsedGroups((prev) => ({ ...prev, [partsStatusParam]: false }));
     }
   }, [partsStatusParam]);
+
+  useEffect(() => {
+    if (partsSearchFromRoute) {
+      setSearchQuery(partsSearchFromRoute);
+    }
+  }, [partsSearchFromRoute]);
 
   useEffect(() => {
     if (detailItemId && !items.some((row) => row.id === detailItemId)) {
@@ -510,12 +519,13 @@ export default function VehicleWishlistScreen() {
       }
     }, 120);
 
-    /** Как web: панель деталей открыта сразу после перехода из журнала по «Из списка покупок». */
+    /** Как web: панель деталей открыта сразу после перехода из журнала по «Из списка покупок».
+     *  Без `router.replace` на «голый» wishlist: иначе снова срабатывает useFocusEffect → load(),
+     *  экран может перемонтироваться и фильтр сбрасывается в «Все», деталь пропадает. */
     const detailTimeoutId = skipDetailSheet
       ? null
       : setTimeout(() => {
           setDetailItemId(highlightedWishlistItemId);
-          router.replace(`/vehicles/${vehicleId}/wishlist`);
         }, 220);
 
     return () => {
@@ -524,7 +534,7 @@ export default function VehicleWishlistScreen() {
         clearTimeout(detailTimeoutId);
       }
     };
-  }, [highlightedWishlistItemId, installWishlistItemId, items, router, vehicleId]);
+  }, [highlightedWishlistItemId, installWishlistItemId, items, vehicleId]);
 
   useEffect(() => {
     if (!installWishlistItemId || items.length === 0 || !vehicleId) {
@@ -546,7 +556,6 @@ export default function VehicleWishlistScreen() {
       .map((s) => s.trim())
       .filter(Boolean);
     const found = ids.filter((id) => items.some((row) => row.id === id));
-    let scrollTimeoutId: ReturnType<typeof setTimeout> | null = null;
     if (found.length > 0) {
       setStatusFilter("ALL");
       setSearchQuery("");
@@ -575,24 +584,32 @@ export default function VehicleWishlistScreen() {
           }));
         }
       }
-      setDetailItemId(primaryId);
-      scrollTimeoutId = setTimeout(() => {
-        const y = itemYByIdRef.current[primaryId];
-        if (typeof y === "number") {
-          scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
-        }
-      }, 120);
     }
-    Alert.alert(
-      "Готово",
-      found.length > 0 ? `Добавлено в список: ${found.length}` : "Список обновлён."
-    );
-    router.replace(`/vehicles/${vehicleId}/wishlist`);
-    return () => {
-      if (scrollTimeoutId != null) {
-        clearTimeout(scrollTimeoutId);
-      }
-    };
+    const primaryIdForSheet = found.length > 0 ? found[0] : null;
+    const message =
+      found.length > 0 ? `Добавлено в список: ${found.length}` : "Список обновлён.";
+    /**
+     * Не открывать лист детали и не делать `router.replace` до закрытия Alert: иначе на RN
+     * одновременно Modal + системный Alert даёт «тишину» и подвисание; плюс после `replace`
+     * меняется `pickedParam`, cleanup эффекта отменяет отложенный scroll/alert.
+     */
+    Alert.alert("Готово", message, [
+      {
+        text: "OK",
+        onPress: () => {
+          router.replace(`/vehicles/${vehicleId}/wishlist`);
+          if (primaryIdForSheet) {
+            setDetailItemId(primaryIdForSheet);
+            setTimeout(() => {
+              const y = itemYByIdRef.current[primaryIdForSheet];
+              if (typeof y === "number") {
+                scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+              }
+            }, 120);
+          }
+        },
+      },
+    ]);
   }, [pickedParam, isLoading, items, router, vehicleId]);
 
   async function patchStatus(
@@ -720,13 +737,21 @@ export default function VehicleWishlistScreen() {
         currency: null,
       });
       const nextItems = await load();
+      const newItemId = res.item.id;
       setRepeatPurchaseConfirmItem(null);
       setDetailItemId(null);
       setStatusFilter("NEEDED");
-      Alert.alert("Список покупок", "Добавлена новая позиция «Нужно» по этой запчасти.");
-      if (nextItems) {
-        applyWishlistRowFocus(res.item.id, nextItems);
-      }
+      /** Не вызывать `applyWishlistRowFocus` в том же тике, что и Alert — иначе Modal + Alert подвисают. */
+      Alert.alert("Список покупок", "Добавлена новая позиция «Нужно» по этой запчасти.", [
+        {
+          text: "OK",
+          onPress: () => {
+            if (nextItems) {
+              applyWishlistRowFocus(newItemId, nextItems);
+            }
+          },
+        },
+      ]);
     } catch (e) {
       console.error(e);
       const message = e instanceof Error ? e.message : "Не удалось повторить покупку.";

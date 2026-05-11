@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "../ui";
-import { ActionIconButton } from "../../app/components/action-icon-button";
+import { ActionIconButton } from "../expo-shell/action-icon-button";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 
 export function GarageHeader(props: {

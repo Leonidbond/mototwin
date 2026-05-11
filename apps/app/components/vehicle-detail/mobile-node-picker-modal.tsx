@@ -1,6 +1,6 @@
 import { groupNodePickerOptionsByTopLevel, nodePickerGroupHeadingRu } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 export type MobileNodePickerOption = {
@@ -40,6 +40,11 @@ export function MobileNodePickerModal({
   const [query, setQuery] = useState("");
   const [topOnly, setTopOnly] = useState(false);
   const [multiSelected, setMultiSelected] = useState<Set<string>>(() => new Set(selectedIds ?? []));
+
+  useEffect(() => {
+    if (!visible) return;
+    setMultiSelected(new Set(selectedIds ?? []));
+  }, [visible, selectedIds]);
 
   const showTopToggle = Boolean(topOptions && topOptions.length > 0);
   const multi = Boolean(onConfirmSelection);

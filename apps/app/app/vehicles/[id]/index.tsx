@@ -106,11 +106,11 @@ import {
   buildServiceEventNewFromWishlistHref,
   buildVehicleWishlistItemHighlightHref,
   buildVehicleWishlistNewHref,
-} from "./wishlist/hrefs";
-import { StatusExplanationModal } from "./status-explanation-modal";
-import { ActionIconButton } from "../../components/action-icon-button";
-import { AppScreenHelpBar } from "../../components/app-screen-help-bar";
-import { ScreenHeader } from "../../components/screen-header";
+} from "../../../components/vehicle-wishlist/hrefs";
+import { StatusExplanationModal } from "../../../components/vehicle-detail/status-explanation-modal";
+import { ActionIconButton } from "../../../components/expo-shell/action-icon-button";
+import { AppScreenHelpBar } from "../../../components/expo-shell/app-screen-help-bar";
+import { ScreenHeader } from "../../../components/expo-shell/screen-header";
 import { HelpTriggerButton } from "../../../src/components/app-help-fab";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import adventureTouringSilhouette from "../../../../../images/Motocycles/adventure_touring.png";

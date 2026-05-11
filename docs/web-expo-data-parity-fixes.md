@@ -70,7 +70,7 @@
 | `src/app/vehicles/[id]/vehicle-detail-client.tsx` |
 | `src/app/vehicles/[id]/_components/service-event-form/ServiceEventForm.tsx` |
 | `apps/app/app/vehicles/[id]/service-events/new.tsx` |
-| `apps/app/app/vehicles/[id]/_components/basic-service-event-bundle-form.tsx` |
+| `apps/app/components/vehicle-detail/basic-service-event-bundle-form.tsx` |
 
 ## Impact
 

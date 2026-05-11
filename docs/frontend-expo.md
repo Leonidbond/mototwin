@@ -22,6 +22,13 @@ Defined in `apps/app/app/_layout.tsx`:
 - `vehicles/[id]/service-events/new` — Add Service Event
 - `vehicles/[id]/state` — Update Vehicle State
 - `vehicles/[id]/profile` — Edit Vehicle Profile
+- `vehicles/[id]/parts` — «Корзина замен» (алиас маршрута к wishlist с паритетом web `/parts`)
+- `vehicles/[id]/wishlist/*` — полный список покупок, picker, редактирование позиции
+
+Переиспользуемые экранные блоки вынесены из `app/**` в **`apps/app/components/`**:
+- `expo-shell/` — `ScreenHeader`, `KeyboardAwareScrollScreen`, `ActionIconButton`, контекст ТС и т.п.
+- `vehicle-detail/` — bundle-форма сервисного события, `MobileNodePickerModal`, модалки статуса
+- `vehicle-wishlist/` — блоки picker/корзины, редактор позиции, href-хелперы
 
 ## 3. Main Expo flows
 
@@ -109,7 +116,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - Distinguishes `SERVICE` vs `STATE_UPDATE`
 - Action to `vehicles/[id]/service-events/new`
 
-### 3.5 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `_components/basic-service-event-bundle-form.tsx`)
+### 3.5 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `components/vehicle-detail/basic-service-event-bundle-form.tsx`)
 - Screen loads node tree / vehicle / existing event (edit/repeat); builds initial **`AddServiceEventFormValues`** with shared domain helpers (same contract as web **`ServiceEventForm`**).
 - Bundle UI: multiple leaf rows in BASIC, parts + labor + total, SKU lookup, uninstalled expenses, JSON — see [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md).
 - Submit to `/api/vehicles/[id]/service-events` (create) or update route when editing.
@@ -124,10 +131,12 @@ Defined in `apps/app/app/_layout.tsx`:
 - Prefills nickname, vin, ride profile
 - Calls `updateVehicleProfile()` -> `/api/vehicles/[id]/profile`
 
-### 3.8 Parts wishlist / «корзина замен» (`vehicles/[id]/wishlist/index.tsx`)
+### 3.8 Parts wishlist / «корзина замен» (`vehicles/[id]/wishlist/index.tsx`, алиас `vehicles/[id]/parts.tsx`)
 - Full-vehicle wishlist list + status groups, summary cards, search, detail bottom sheet, and swipe actions; behavior and contracts match [parts-wishlist-mvp.md](./parts-wishlist-mvp.md). В блоке **«Действия»** детальной модалки — короткие подписи **Редактировать / Заказать / Купить / Установить / Повторить / Удалить**, к журналу — **Перейти** (с `accessibilityLabel` полной фразы).
-- **Repeat purchase** from the cart matches web `PartsCartPage`: confirmation modal, `createWishlistItem` with `NEEDED`, comment suffix «Повтор из корзины замен», no cost copy, then filter to NEEDED and `applyWishlistRowFocus` on the new item id. Entry points: orange action in detail sheet, row shortcut next to the status pill, and a row inside the status-change modal.
-- **Picker checkout** (`vehicles/[id]/wishlist/picker.tsx`): модалка превью как на web (`quantityUpgrade`: **`addAllFromDraft`** = прибавить весь подбор к строке; **`setQtyToDraft`** = довести до количества из подбора **без уменьшения** — `max(existing, draft)`, иначе без PATCH и с **`noOpQuantityUpdates`**); динамический итог по штукам/сумме; **`submitPickerDraft`** + **`updateWishlistItem`** по необходимости; редирект с **`picked=`**; успех возможен и при только no-op обновлениях.
+- **Deep link из журнала** (`wishlistItemId` и др. через `vehicles/[id]/parts.tsx`): после фокуса на строке и открытия детальной панели экран **не** делает `router.replace` на `/vehicles/[id]/wishlist` без query — иначе срабатывает повторный `useFocusEffect` → `load()`, возможен сброс состояния и скачок фильтра **«Установленные» → «Все»**. Поведение согласовано с комментарием у `applyWishlistRowFocus`: лишняя смена URL не нужна для стабильного UI.
+- **Repeat purchase** from the cart matches web `PartsCartPage`: confirmation modal, `createWishlistItem` with `NEEDED`, comment suffix «Повтор из корзины замен», no cost copy, then filter to NEEDED. Фокус на новую строку (**`applyWishlistRowFocus`**) вызывается **после** закрытия системного **`Alert`** (кнопка «OK»), чтобы не совмещать **`Modal`** детали и **`Alert`** в одном кадре — иначе на React Native возможен «пустой» экран и подвисание.
+- Сценарий **`picked=`** после подбора: сначала показывается **`Alert` «Готово»**; **`router.replace`** (сброс query) и открытие листа детали со скроллом выполняются **в `onPress` «OK»** — та же причина (избежать конфликта Modal + Alert и отмены таймеров при смене URL до показа алерта).
+- **Picker** (`vehicles/[id]/wishlist/picker.tsx`): при добавлении SKU или комплекта в черновик **автоматически открывается нижний лист корзины** (`PickerDraftCartSheet`), чтобы сразу менять количество без лишнего тапа по бару корзины. Модалка превью сабмита как на web (`quantityUpgrade`: **`addAllFromDraft`** / **`setQtyToDraft`** с теми же правилами **`max(existing, draft)`** и **`noOpQuantityUpdates`**); **`submitPickerDraft`**; редирект с **`picked=`**.
 
 ## 4. Expo-specific technical notes
 
@@ -140,7 +149,7 @@ Defined in `apps/app/app/_layout.tsx`:
 
 - Все формы Expo с `TextInput` (добавление мотоцикла, редактирование профиля, обновление состояния, добавление сервисного события, wishlist-редактор, фильтры журнала) используют keyboard-aware layout.
 - Базовый паттерн: `KeyboardAvoidingView` + `ScrollView` + `keyboardShouldPersistTaps="handled"` + `keyboardDismissMode="on-drag"`.
-- Для повторного использования применяется локальный helper в Expo app: `apps/app/app/components/keyboard-aware-scroll-screen.tsx`.
+- Для повторного использования применяется общий helper: `apps/app/components/expo-shell/keyboard-aware-scroll-screen.tsx`.
 - Логика валидации и API-вызовов не меняется; правки касаются только UX и достижимости полей/кнопок при открытой клавиатуре.
 
 ### 4.2 API / debug line policy (product UI)
@@ -160,7 +169,7 @@ Detailed parity matrix: `cross-platform-parity.md`.
 
 ## 6. Related docs
 
-- `node-picker-reuse.md` — **`MobileNodePickerModal`** и паритет с web
+- `node-picker-reuse.md` — **`MobileNodePickerModal`** (`apps/app/components/vehicle-detail/mobile-node-picker-modal.tsx`) и паритет с web
 - `frontend-web.md`
 - `shared-packages.md`
 - `cross-platform-parity.md`

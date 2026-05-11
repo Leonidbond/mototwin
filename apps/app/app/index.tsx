@@ -15,7 +15,7 @@ import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { getApiBaseUrl } from "../src/api-base-url";
 import { readLastViewedVehicleId } from "../src/ui-last-viewed-vehicle";
-import { AppScreenHelpBar } from "./components/app-screen-help-bar";
+import { AppScreenHelpBar } from "../components/expo-shell/app-screen-help-bar";
 import { GarageBottomNav } from "../components/garage/GarageBottomNav";
 import { GarageEmptyState } from "../components/garage/GarageEmptyState";
 import { GarageHeader } from "../components/garage/GarageHeader";

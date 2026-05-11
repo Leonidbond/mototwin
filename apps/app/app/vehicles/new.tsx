@@ -31,8 +31,8 @@ import type {
   RideUsageType,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../src/api-base-url";
-import { KeyboardAwareScrollScreen } from "../components/keyboard-aware-scroll-screen";
-import { ScreenHeader } from "../components/screen-header";
+import { KeyboardAwareScrollScreen } from "../../components/expo-shell/keyboard-aware-scroll-screen";
+import { ScreenHeader } from "../../components/expo-shell/screen-header";
 
 type RideOption<T extends string> = {
   value: T;
