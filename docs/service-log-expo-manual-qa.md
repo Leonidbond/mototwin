@@ -1,7 +1,7 @@
 # Ручной QA: журнал обслуживания Expo ≈ web
 
 **Дата:** 2026-05-10  
-**Связанные документы:** [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md)  
+**Связанные документы:** [web-expo-service-log-parity-fixes.md](./parity/web-expo-service-log-parity-fixes.md)  
 **Эталон web:** `src/app/vehicles/[id]/service-log/page.tsx` — `ServiceLogRow`, `ServiceLogEventDetails`  
 **Эталон Expo:** `apps/app/app/vehicles/[id]/service-log.tsx`, `apps/app/app/vehicles/[id]/expenses.tsx`, `apps/app/app/vehicles/[id]/wishlist/picker.tsx`, `apps/app/app/vehicles/[id]/wishlist/index.tsx`, `apps/app/app/vehicles/[id]/parts.tsx`; bundle-форма сервисного события — **`apps/app/components/vehicle-detail/basic-service-event-bundle-form.tsx`** (экран `service-events/new.tsx`).
 

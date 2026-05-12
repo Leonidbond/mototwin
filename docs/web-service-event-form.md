@@ -1,6 +1,6 @@
 # Форма сервисного события (Web): `ServiceEventForm` и страницы
 
-Описание **функционала** создания / редактирования / повтора сервисного события на Next.js после переноса с модалки на **полноэкранные страницы**. Контракт данных и нормализация — [`shared-form-contracts.md`](./shared-form-contracts.md); паритет с Expo и деньги в **ADVANCED** — [`web-expo-service-log-parity-fixes.md`](./web-expo-service-log-parity-fixes.md).
+Описание **функционала** создания / редактирования / повтора сервисного события на Next.js после переноса с модалки на **полноэкранные страницы**. Контракт данных и нормализация — [`shared-form-contracts.md`](./shared-form-contracts.md); паритет с Expo и деньги в **ADVANCED** — [`web-expo-service-log-parity-fixes.md`](./parity/web-expo-service-log-parity-fixes.md).
 
 **Код формы:** `src/app/vehicles/[id]/_components/service-event-form/` (корень — `ServiceEventForm.tsx`).
 

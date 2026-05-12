@@ -122,7 +122,7 @@ Defined in `apps/app/app/_layout.tsx`:
 
 ### 3.5 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `components/vehicle-detail/basic-service-event-bundle-form.tsx`)
 - Screen loads node tree / vehicle / existing event (edit/repeat); builds initial **`AddServiceEventFormValues`** with shared domain helpers (same contract as web **`ServiceEventForm`**).
-- Bundle UI: multiple leaf rows in BASIC, parts + labor + total, SKU lookup, uninstalled expenses, JSON — see [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md).
+- Bundle UI: multiple leaf rows in BASIC, parts + labor + total, SKU lookup, uninstalled expenses, JSON — see [web-expo-service-log-parity-fixes.md](./parity/web-expo-service-log-parity-fixes.md).
 - Submit to `/api/vehicles/[id]/service-events` (create) or update route when editing.
 - Supports return `source` (service-log, tree, attention, wishlist, …).
 
@@ -169,13 +169,13 @@ Defined in `apps/app/app/_layout.tsx`:
 - Vehicle detail/service log/state/profile/wishlist flows: implemented and functionally aligned (including **repeat purchase** from the full wishlist screen vs web cart). Vehicle detail now mirrors the web dashboard's first-screen information hierarchy while keeping mobile route-based flows and Expo icon fallback.
 - Web still keeps richer modal orchestration in one page; Expo uses decomposed routes.
 
-Detailed parity matrix: `cross-platform-parity.md`.
+Detailed parity matrix: `parity/cross-platform-parity.md`.
 
 ## 6. Related docs
 
 - `node-picker-reuse.md` — **`MobileNodePickerModal`** (`apps/app/components/vehicle-detail/mobile-node-picker-modal.tsx`) и паритет с web
 - `frontend-web.md`
 - `shared-packages.md`
-- `cross-platform-parity.md`
+- `parity/cross-platform-parity.md`
 - `api-backend.md`
 - `garage-dashboard-mvp.md`

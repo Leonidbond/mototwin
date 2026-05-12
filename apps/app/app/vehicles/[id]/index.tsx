@@ -32,10 +32,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildAttentionSummaryFromNodeTree,
-  getCurrentExpenseMonthKey,
-  getExpenseMonthKeyFromIso,
-  buildExpenseAnalyticsFromItems,
-  buildExpenseCategoryDonutSegmentsForExpenses,
+  buildVehicleDashboardExpensesViewModel,
   buildNodeTreeSectionProps,
   buildNodeContextViewModel,
   buildNodeSearchResultActions,
@@ -1813,27 +1810,11 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       },
     ]);
   }, [apiBaseUrl, isMovingToTrash, router, vehicleId]);
-  /** Сводка расходов на дашборде: те же правила, что на вебе ({@link buildExpenseAnalyticsFromItems}). */
-  const dashboardVehicleExpenses = useMemo(() => {
-    const monthKey = getCurrentExpenseMonthKey();
-    const analytics = buildExpenseAnalyticsFromItems(yearExpenses, currentExpenseYear);
-    const monthLabel =
-      analytics.byMonth.find((m) => m.key === monthKey)?.label ??
-      new Date().toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
-    const currentMonthExpenses = yearExpenses.filter(
-      (expense) => getExpenseMonthKeyFromIso(expense.expenseDate) === monthKey
-    );
-    const monthlyChart = buildExpenseCategoryDonutSegmentsForExpenses(currentMonthExpenses);
-    const currentMonthTotalsByCurrency =
-      analytics.byMonth.find((m) => m.key === monthKey)?.totalsByCurrency ?? [];
-    return {
-      monthLabel,
-      monthlyChart,
-      currentMonthTotalsLabel: formatExpenseTotals(currentMonthTotalsByCurrency),
-      seasonTotalsLabel: formatExpenseTotals(analytics.selectedYearTotalsByCurrency),
-      seasonExpenseCount: analytics.selectedYearExpenseCount,
-    };
-  }, [yearExpenses, currentExpenseYear]);
+  /** Сводка расходов на дашборде: та же логика, что на вебе ({@link buildVehicleDashboardExpensesViewModel}). */
+  const dashboardVehicleExpenses = useMemo(
+    () => buildVehicleDashboardExpensesViewModel(yearExpenses, { selectedYear: currentExpenseYear }),
+    [yearExpenses, currentExpenseYear]
+  );
 
   if (isLoading) {
     return (
@@ -3431,7 +3412,7 @@ function ExpenseDashboardCard(props: {
       : "· нет записей";
 
   return (
-    <DashboardSection title="Расходы" actionLabel="Детали" onActionPress={props.onPress}>
+    <DashboardSection title="Расходы" actionLabel="Все расходы" onActionPress={props.onPress}>
       <Pressable
         onPress={props.onPress}
         style={({ pressed }) => [styles.expenseDashboardPressable, pressed && styles.dashboardHeaderActionPressed]}
@@ -3663,13 +3644,6 @@ function getVehicleSilhouetteSource(vehicle: VehicleDetail): ImageSourcePropType
     rideProfile: vehicle.rideProfile,
   });
   return SILHOUETTE_SRC[key] ?? SILHOUETTE_SRC.naked_roadster;
-}
-
-function formatExpenseTotals(rows: ReadonlyArray<{ totalAmount: number; currency: string }>) {
-  if (rows.length === 0) {
-    return "0";
-  }
-  return rows.map((row) => `${formatExpenseAmountRu(row.totalAmount)} ${row.currency}`).join(" · ");
 }
 
 function pluralizeRu(value: number, variants: [string, string, string]) {

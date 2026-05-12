@@ -6,12 +6,11 @@ import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from
 import {
   buildExpenseAnalyticsFromItems,
   buildPartsCartSummary,
+  buildVehicleDashboardExpensesViewModelFromAnalytics,
   calculateGarageScore,
   formatExpenseAmountRu,
+  formatExpenseTotalsByCurrency,
   formatIsoCalendarDateRu,
-  getCurrentExpenseMonthKey,
-  getExpenseMonthKeyFromIso,
-  buildExpenseCategoryDonutSegmentsForExpenses,
   getVehicleSilhouetteClassLabel,
   getNodeTightUiDisplayName,
   partWishlistStatusLabelsRu,
@@ -219,20 +218,18 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
     soonCount: attentionSummary.soonCount,
   });
   const recentEvents = getRecentEvents(serviceEvents);
-  const currentExpenseYear = new Date().getFullYear();
+  const now = new Date();
+  const currentExpenseYear = now.getFullYear();
   const expenseAnalytics = buildExpenseAnalyticsFromItems(expenseItems, currentExpenseYear);
-  const currentExpenseMonthKey = getCurrentExpenseMonthKey();
-  const currentExpenseMonthLabel =
-    expenseAnalytics.byMonth.find((month) => month.key === currentExpenseMonthKey)?.label ??
-    new Date().toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
-  const currentMonthExpenses = expenseItems.filter(
-    (expense) => getExpenseMonthKeyFromIso(expense.expenseDate) === currentExpenseMonthKey
+  const expensesDashboard = buildVehicleDashboardExpensesViewModelFromAnalytics(
+    expenseItems,
+    expenseAnalytics,
+    now
   );
-  const monthlyChart = buildExpenseCategoryDonutSegmentsForExpenses(currentMonthExpenses);
-  const currentMonthTotalsLabel = formatExpenseTotalsFromRows(
-    expenseAnalytics.byMonth.find((month) => month.key === currentExpenseMonthKey)?.totalsByCurrency ?? []
-  );
-  const seasonTotalsLabel = formatExpenseTotalsFromRows(expenseAnalytics.selectedYearTotalsByCurrency);
+  const currentExpenseMonthLabel = expensesDashboard.monthLabel;
+  const monthlyChart = expensesDashboard.monthlyChart;
+  const currentMonthTotalsLabel = expensesDashboard.currentMonthTotalsLabel;
+  const seasonTotalsLabel = expensesDashboard.seasonTotalsLabel;
   const readiness = buildRideReadiness(attentionSummary);
   const seasonProgress = score ?? 0;
   const statsStripItems = buildStatsStripItems({
@@ -677,7 +674,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
               <div
                 className={styles.recentEventsScroll}
                 role="region"
-                aria-label="Последние события. Прокрутите список, чтобы увидеть до 10 записей."
+                aria-label="Последние события. Одновременно видно до трёх записей; прокрутите список, чтобы открыть до 10 последних."
               >
                 {recentEvents.map((event) => (
                   <RecentEventRow key={event.id} event={event} onOpen={() => props.onOpenServiceLogEvent(event.id)} />
@@ -777,8 +774,8 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
                     <span>{currentExpenseYear}</span>
                     <span style={{ fontSize: 15, fontWeight: 700 }}>{seasonTotalsLabel}</span>
                     <span style={{ color: productSemanticColors.textMuted, fontSize: 11, fontWeight: 500 }}>
-                      {expenseAnalytics.selectedYearExpenseCount > 0
-                        ? `· ${expenseAnalytics.selectedYearExpenseCount} ${pluralizeRu(expenseAnalytics.selectedYearExpenseCount, ["расход", "расхода", "расходов"])}`
+                      {expensesDashboard.seasonExpenseCount > 0
+                        ? `· ${expensesDashboard.seasonExpenseCount} ${pluralizeRu(expensesDashboard.seasonExpenseCount, ["расход", "расхода", "расходов"])}`
                         : "· нет записей"}
                     </span>
                   </div>
@@ -1536,8 +1533,9 @@ function RecentEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: ()
         display: "flex",
         width: "100%",
         minWidth: 0,
+        flexShrink: 0,
         boxSizing: "border-box",
-        alignItems: "center",
+        alignItems: "flex-start",
         gap: 10,
         padding: "9px 10px",
         borderRadius: 14,
@@ -1562,17 +1560,19 @@ function RecentEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: ()
           backgroundColor: productSemanticColors.cardSubtle,
           color: productSemanticColors.primaryAction,
           flexShrink: 0,
+          alignSelf: "flex-start",
+          marginTop: 1,
         }}
       >
         <WrenchIcon />
       </span>
-      <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+      <div style={{ minWidth: 0, flex: 1, overflowX: "hidden", overflowY: "visible" }}>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "minmax(0, 1fr) auto",
             gap: "6px 10px",
-            alignItems: "baseline",
+            alignItems: "start",
           }}
         >
           <div
@@ -1583,9 +1583,9 @@ function RecentEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: ()
               fontSize: 13,
               fontWeight: 700,
               lineHeight: "18px",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
+              whiteSpace: "normal",
             }}
           >
             {event.serviceType}
@@ -1615,9 +1615,9 @@ function RecentEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: ()
             marginTop: 3,
             fontSize: 12,
             lineHeight: "16px",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            overflowWrap: "anywhere",
+            wordBreak: "break-word",
+            whiteSpace: "normal",
           }}
         >
           {metaLine}
@@ -2000,17 +2000,6 @@ function buildRideReadiness(summary: AttentionSummaryViewModel): {
   };
 }
 
-function formatExpenseTotalsFromRows(
-  rows: Array<{ currency: string; totalAmount: number }>
-): string {
-  if (rows.length === 0) {
-    return "0";
-  }
-  return rows
-    .map((row) => `${formatExpenseAmountRu(row.totalAmount)} ${row.currency}`)
-    .join(" · ");
-}
-
 function buildStatsStripItems(args: {
   vehicleStateViewModel: VehicleStateViewModel | null;
   attentionSummary: AttentionSummaryViewModel;
@@ -2051,7 +2040,7 @@ function buildStatsStripItems(args: {
     },
     {
       title: "Сезонные расходы",
-      value: formatExpenseTotalsFromRows(args.expenseAnalytics.selectedYearTotalsByCurrency),
+      value: formatExpenseTotalsByCurrency(args.expenseAnalytics.selectedYearTotalsByCurrency),
       details:
         args.expenseAnalytics.selectedYearExpenseCount > 0
           ? `${args.expenseAnalytics.selectedYearExpenseCount} ${pluralizeRu(args.expenseAnalytics.selectedYearExpenseCount, ["расход", "расхода", "расходов"])}`

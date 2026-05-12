@@ -371,6 +371,9 @@ function JournalTimelineRow({
   const nodeOrSubtitleLine = isStateUpdate
     ? (entry.stateUpdateSubtitle ?? entry.compactMetricsLine)
     : (entry.expoServiceNodeLabel ?? entry.secondaryTitle);
+  const cost = isStateUpdate
+    ? null
+    : (getCompactCost(entry)?.replace(/^Итого\s+/u, "") ?? null);
 
   return (
     <Pressable
@@ -428,6 +431,11 @@ function JournalTimelineRow({
                 </Text>
               </View>
             </View>
+            {cost ? (
+              <Text style={styles.journalCost} numberOfLines={1}>
+                {cost}
+              </Text>
+            ) : null}
             <MaterialIcons name="chevron-right" size={18} color={isSelected ? c.primaryAction : "rgba(148,163,184,0.55)"} />
           </View>
         </View>
@@ -2754,6 +2762,14 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     color: c.textSecondary,
     lineHeight: 14,
+  },
+  journalCost: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: c.textPrimary,
+    letterSpacing: -0.1,
+    flexShrink: 0,
+    marginLeft: 6,
   },
 
   // Event card base

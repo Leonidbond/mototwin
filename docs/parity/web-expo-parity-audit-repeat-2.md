@@ -3,12 +3,12 @@
 **Дата:** 2026-04-18  
 **Метод:** статический обзор **актуального** кода web (`src/app/**`), Expo (`apps/app/app/**`), shared (`packages/types`, `packages/domain`, `packages/api-client`, `packages/design-tokens`) и связанной документации. **Изменений коду приложений в этом шаге не вносилось.**
 
-**Контекст:** после батчей: дефолт валюты сервисного события **RUB**, политика дат и спеков гаража, расширение `productSemanticColors` на web (журнал и др.), gating строки API на Expo (`__DEV__`), наведение порядка в parity-доках; кэш **TopNodeState** — правки и QA зафиксированы ранее ([status-cache-frontend-qa.md](./status-cache-frontend-qa.md)).
+**Контекст:** после батчей: дефолт валюты сервисного события **RUB**, политика дат и спеков гаража, расширение `productSemanticColors` на web (журнал и др.), gating строки API на Expo (`__DEV__`), наведение порядка в parity-доках; кэш **TopNodeState** — правки и QA зафиксированы ранее ([status-cache-frontend-qa.md](../status-cache-frontend-qa.md)).
 
 **Связанные документы:**
 
 - [web-expo-parity-audit.md](./web-expo-parity-audit.md) — индекс и навигация  
-- [cross-platform-parity.md](./cross-platform-parity.md), [web-expo-visual-parity-fixes.md](./web-expo-visual-parity-fixes.md), [web-expo-data-parity-fixes.md](./web-expo-data-parity-fixes.md), [shared-form-contracts.md](./shared-form-contracts.md), [shared-design-tokens.md](./shared-design-tokens.md), [status-cache-frontend-qa.md](./status-cache-frontend-qa.md)  
+- [cross-platform-parity.md](./cross-platform-parity.md), [web-expo-visual-parity-fixes.md](./web-expo-visual-parity-fixes.md), [web-expo-data-parity-fixes.md](./web-expo-data-parity-fixes.md), [shared-form-contracts.md](../shared-form-contracts.md), [shared-design-tokens.md](../shared-design-tokens.md), [status-cache-frontend-qa.md](../status-cache-frontend-qa.md)  
 
 **Ключевые файлы реализации:**
 
@@ -74,9 +74,9 @@
 | Расширение `productSemanticColors` на web | **Partially done** | Гараж, onboarding, карточка ТС, **модалка журнала** (оверлей, таймлайн, бейджи); остальной UI преимущественно Tailwind |
 | Строка отладки API в Expo | **Gated** | `apps/app/app/index.tsx`: `{__DEV__ ? <Text>Текущий API: …` |
 | Структура parity-документации | **Done** | Индекс [web-expo-parity-audit.md](./web-expo-parity-audit.md); детали в repeat / fix-доках |
-| TopNodeState / кэш статусов | **Вне объёма клиентского кода в этом шаге** | Логика на backend; клиенты потребляют дерево/статусы; регрессии — [status-cache-frontend-qa.md](./status-cache-frontend-qa.md) |
+| TopNodeState / кэш статусов | **Вне объёма клиентского кода в этом шаге** | Логика на backend; клиенты потребляют дерево/статусы; регрессии — [status-cache-frontend-qa.md](../status-cache-frontend-qa.md) |
 | Клик/тап по **статусу узла** → журнал с фильтром по узлу/поддереву | **Implemented** (2026-04-18) | Shared: `createServiceLogNodeFilter`, `restrictToNodeIds` в `buildServiceLogTimelineProps` / `filterServiceLogEntries`; web — state в модалке; Expo — query `nodeIds` / `nodeLabel`; см. [web-expo-node-tree-parity-fixes.md](./web-expo-node-tree-parity-fixes.md), [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md) |
-| **Пустой статус корня** (нет данных по поддереву) | **Implemented** (2026-04-18) | `node-tree` больше не подменяет `null` → `OK` для top-level; UI без бейджа; кэш `TopNodeState` может отличаться — см. [top-node-state-cache-plan.md](./top-node-state-cache-plan.md) |
+| **Пустой статус корня** (нет данных по поддереву) | **Implemented** (2026-04-18) | `node-tree` больше не подменяет `null` → `OK` для top-level; UI без бейджа; кэш `TopNodeState` может отличаться — см. [top-node-state-cache-plan.md](../top-node-state-cache-plan.md) |
 
 ---
 
@@ -89,7 +89,7 @@
 | **Статус** | **Addressed** (2026-04-18, рефакторинг) |
 | **Было** | Локальный nested-тип в `page.tsx` + `toSharedVehicleDetail` |
 | **Стало** | Канонический `VehicleDetail` из `@mototwin/types`; wire JSON → **`vehicleDetailFromApiRecord`** (`VehicleDetailApiRecord` в types); `buildVehicleHeaderProps(vehicle)` без лишнего маппинга |
-| **Остаточный долг** | `VehicleDetailResponse.vehicle` в типах/api-client по-прежнему помечен как `VehicleDetail`, тогда как wire — nested; на границе web использует `as unknown as VehicleDetailApiRecord` (документировано в [shared-vehicle-view-models.md](./shared-vehicle-view-models.md)) |
+| **Остаточный долг** | `VehicleDetailResponse.vehicle` в типах/api-client по-прежнему помечен как `VehicleDetail`, тогда как wire — nested; на границе web использует `as unknown as VehicleDetailApiRecord` (документировано в [shared-vehicle-view-models.md](../shared-vehicle-view-models.md)) |
 | **Файлы** | `src/app/vehicles/[id]/page.tsx`, `packages/types/src/vehicle.ts`, `packages/domain/src/vehicle-view-models.ts` |
 
 ---
@@ -114,13 +114,13 @@
 | Поле | Содержание |
 |------|------------|
 | **Статус паритета** | N/A (документы) |
-| **Документы** | [cross-platform-parity.md](./cross-platform-parity.md) §5.1 и [shared-packages.md](./shared-packages.md) утверждают, что web в основном использует прямой `fetch` |
+| **Документы** | [cross-platform-parity.md](./cross-platform-parity.md) §5.1 и [shared-packages.md](../shared-packages.md) утверждают, что web в основном использует прямой `fetch` |
 | **Факт в коде** | В `src/app/**` вызовов `fetch(` **не обнаружено**; гараж, onboarding, карточка ТС используют `createMotoTwinEndpoints` |
 | **Ожидаемо** | Документы отражают текущую архитектуру |
 | **Тип зазора** | Documentation gap |
 | **Severity** | Low |
-| **Рекомендация** | Обновить §5 `cross-platform-parity.md` и соответствующий абзац `shared-packages.md` |
-| **Файлы** | `docs/cross-platform-parity.md`, `docs/shared-packages.md` (вне списка обязательных правок этого аудита — зафиксировано как follow-up) |
+| **Рекомендация** | Обновить §5 `docs/parity/cross-platform-parity.md` и соответствующий абзац `shared-packages.md` |
+| **Файлы** | `docs/parity/cross-platform-parity.md`, `docs/shared-packages.md` (вне списка обязательных правок этого аудита — зафиксировано как follow-up) |
 
 ---
 
@@ -176,12 +176,12 @@
 - Один мотоцикл на web и Expo: гараж, карточка, дерево, журнал, формы, сохранение без смены валюты (ожидание **RUB**).  
 - Ошибка загрузки гаража на Expo: в **release** профиле нет строки с URL API; в **dev** — есть.  
 - Пояснение статуса узла и длинные комментарии в журнале.  
-- **«Требует внимания»:** счётчик, модалка/экран, порядок OVERDUE → SOON, свёрнутый по умолчанию подробный расчёт для просроченных, переход в журнал по узлу — см. [attention-flow-mvp.md](./attention-flow-mvp.md).
+- **«Требует внимания»:** счётчик, модалка/экран, порядок OVERDUE → SOON, свёрнутый по умолчанию подробный расчёт для просроченных, переход в журнал по узлу — см. [attention-flow-mvp.md](../attention-flow-mvp.md).
 
 ### 6.3. Требуется API / прокси (при необходимости)
 
 - Сверка тел ответов при одной сессии (`getGarageVehicles`, `getVehicleDetail`, `getNodeTree`, `getServiceEvents`).  
-- Регрессии кэша TopNodeState — сценарии из [status-cache-frontend-qa.md](./status-cache-frontend-qa.md).
+- Регрессии кэша TopNodeState — сценарии из [status-cache-frontend-qa.md](../status-cache-frontend-qa.md).
 
 ---
 

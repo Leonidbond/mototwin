@@ -19,6 +19,20 @@ const NODE_TREE_ICON_BY_CODE: Record<string, NodeTreeIconAsset> = {
   "brakes-rear-line": require("../images/node-tree-icons/nodes/brakes-rear-line.png"),
   "brakes-rear-master": require("../images/node-tree-icons/nodes/brakes-rear-master.png"),
   "brakes-rear-pads": require("../images/node-tree-icons/nodes/brakes-rear-pads.png"),
+  "chassis": require("../images/node-tree-icons/nodes/chassis.png"),
+  "chassis-frame": require("../images/node-tree-icons/nodes/chassis-frame.png"),
+  "chassis-mounts": require("../images/node-tree-icons/nodes/chassis-mounts.png"),
+  "chassis-plastics": require("../images/node-tree-icons/nodes/chassis-plastics.png"),
+  "chassis-plastics-fenders": require("../images/node-tree-icons/nodes/chassis-plastics-fenders.png"),
+  "chassis-plastics-fork-guards": require("../images/node-tree-icons/nodes/chassis-plastics-fork-guards.png"),
+  "chassis-plastics-handguards": require("../images/node-tree-icons/nodes/chassis-plastics-handguards.png"),
+  "chassis-plastics-side": require("../images/node-tree-icons/nodes/chassis-plastics-side.png"),
+  "chassis-protection": require("../images/node-tree-icons/nodes/chassis-protection.png"),
+  "chassis-protection-frame": require("../images/node-tree-icons/nodes/chassis-protection-frame.png"),
+  "chassis-protection-radiator": require("../images/node-tree-icons/nodes/chassis-protection-radiator.png"),
+  "chassis-protection-skid": require("../images/node-tree-icons/nodes/chassis-protection-skid.png"),
+  "chassis-seat": require("../images/node-tree-icons/nodes/chassis-seat.png"),
+  "chassis-subframe": require("../images/node-tree-icons/nodes/chassis-subframe.png"),
 };
 
 function normalizeNodeTreeIconKey(value: string): string {

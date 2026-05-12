@@ -88,7 +88,7 @@ Practical direction:
 - business-critical contracts and helper logic shared in `packages/*`
 - UI/layout/navigation remain platform-specific
 - web and Expo should converge on core workflow parity
-- parity gaps are tracked explicitly (see `cross-platform-parity.md`)
+- parity gaps are tracked explicitly (see `parity/cross-platform-parity.md`)
 
 ## 7. Current constraints
 
@@ -105,4 +105,4 @@ Practical direction:
 - `frontend-expo.md`
 - `shared-packages.md`
 - `functional-logic.md`
-- `cross-platform-parity.md`
+- `parity/cross-platform-parity.md`

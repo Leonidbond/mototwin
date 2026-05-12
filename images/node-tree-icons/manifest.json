@@ -13,5 +13,19 @@
   "brakes-rear-disc": "nodes/brakes-rear-disc.png",
   "brakes-rear-line": "nodes/brakes-rear-line.png",
   "brakes-rear-master": "nodes/brakes-rear-master.png",
-  "brakes-rear-pads": "nodes/brakes-rear-pads.png"
+  "brakes-rear-pads": "nodes/brakes-rear-pads.png",
+  "chassis": "nodes/chassis.png",
+  "chassis-frame": "nodes/chassis-frame.png",
+  "chassis-mounts": "nodes/chassis-mounts.png",
+  "chassis-plastics": "nodes/chassis-plastics.png",
+  "chassis-plastics-fenders": "nodes/chassis-plastics-fenders.png",
+  "chassis-plastics-fork-guards": "nodes/chassis-plastics-fork-guards.png",
+  "chassis-plastics-handguards": "nodes/chassis-plastics-handguards.png",
+  "chassis-plastics-side": "nodes/chassis-plastics-side.png",
+  "chassis-protection": "nodes/chassis-protection.png",
+  "chassis-protection-frame": "nodes/chassis-protection-frame.png",
+  "chassis-protection-radiator": "nodes/chassis-protection-radiator.png",
+  "chassis-protection-skid": "nodes/chassis-protection-skid.png",
+  "chassis-seat": "nodes/chassis-seat.png",
+  "chassis-subframe": "nodes/chassis-subframe.png"
 }

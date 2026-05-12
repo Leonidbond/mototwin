@@ -11,8 +11,8 @@
 
 Без этих четырёх пунктов задачу легко принять так, что один клиент или shared-слой останутся неучтёнными.
 
-Подробный чеклист и **Definition of Done**: [web-mobile-parity-workflow.md](./web-mobile-parity-workflow.md).  
-Готовый шаблон промпта: [parity-task-template.md](./parity-task-template.md).  
+Подробный чеклист и **Definition of Done**: [web-mobile-parity-workflow.md](./parity/web-mobile-parity-workflow.md).  
+Готовый шаблон промпта: [parity-task-template.md](./parity/parity-task-template.md).  
 Общие правила кода и паритета: [coding-rules.md](./coding-rules.md) (раздел 25).
 
 ## Прочее

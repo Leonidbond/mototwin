@@ -48,7 +48,7 @@ The page consolidates multiple operational blocks and modal flows:
 - vehicle identity/profile
 - current state with inline update (`PATCH /state`)
 - node tree with expand/collapse and status badges
-- link to **Service Log** page `/vehicles/[id]/service-log` (primary journal UX: фильтры — узлы через **`NodePickerModal`**, период, раскрываемая строка пробег/сумма/тип работы/исполнитель, сортировка; см. [service-log-mvp.md](./service-log-mvp.md), [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md))
+- link to **Service Log** page `/vehicles/[id]/service-log` (primary journal UX: фильтры — узлы через **`NodePickerModal`**, период, раскрываемая строка пробег/сумма/тип работы/исполнитель, сортировка; см. [service-log-mvp.md](./service-log-mvp.md), [web-expo-service-log-parity-fixes.md](./parity/web-expo-service-log-parity-fixes.md))
 - **`ServiceEventForm`** (`src/app/vehicles/[id]/_components/service-event-form/`) — создание / редактирование / повтор (bundle, только **листовые** узлы); страницы **`/vehicles/[id]/service-events/new`** и **`…/edit`**; навигация из **`vehicle-detail-client.tsx`** и **`service-log/page.tsx`** (см. [service-log-mvp.md](./service-log-mvp.md), [web-service-event-form.md](./web-service-event-form.md))
 - status explanation modal
 - edit profile modal (`PATCH /profile`)
@@ -77,7 +77,7 @@ After successful mutation, page reloads relevant datasets to reflect updated sta
 
 - `node-picker-reuse.md`
 - `frontend-expo.md`
-- `cross-platform-parity.md`
+- `parity/cross-platform-parity.md`
 - `api-backend.md`
 - `functional-logic.md`
 - `garage-dashboard-mvp.md`

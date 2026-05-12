@@ -165,3 +165,7 @@ The source of truth for TOP-node hierarchy/order is split across:
 - icon mappings: `VehicleDashboard.tsx`.
 
 When TOP-node hierarchy changes, update these files together and verify that every TOP node has either a leaf icon or a group fallback.
+
+## See also
+
+- [`node-tree-design-icons.md`](./node-tree-design-icons.md) — иконки **строк дерева узлов** по кодам каталога (`CHASSIS.*`, `BRAKES.*`, …), не путать с TOP-node наборами выше.

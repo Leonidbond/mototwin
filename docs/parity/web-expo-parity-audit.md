@@ -1,19 +1,19 @@
 # Аудит паритета Web (Next.js) и Expo — индекс и статус
 
-**Назначение:** краткая **навигация** и **текущий снимок** паритета web/Expo. Детальные матрицы, остаточные зазоры, батчи и QA — в **[web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md)** (актуальная детальная сверка) и в документах `web-expo-*-fixes.md` ниже.  
+**Назначение:** краткая **навигация** и **текущий снимок** паритета web/Expo. Детальные матрицы, остаточные зазоры, батчи и QA — в **[web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md)** (актуальная детальная сверка) и в документах `web-expo-*-fixes.md` ниже. **Новые parity-документы** добавляйте в этот каталог [`docs/parity/`](./).  
 **Не дублировать здесь** длинные таблицы находок: они разбиты по специализированным fix-докам и повторным аудитам.
 
 **Дата первичного обзора:** 2026-04-18  
-**Процесс и правила:** [coding-rules.md](./coding-rules.md) (§25), [web-mobile-parity-workflow.md](./web-mobile-parity-workflow.md), [parity-task-template.md](./parity-task-template.md), [cursor-workflow.md](./cursor-workflow.md).
+**Процесс и правила:** [coding-rules.md](../coding-rules.md) (§25), [web-mobile-parity-workflow.md](./web-mobile-parity-workflow.md), [parity-task-template.md](./parity-task-template.md), [cursor-workflow.md](../cursor-workflow.md).
 
 ---
 
 ## Текущий статус (кратко)
 
-- **Форма сервисного события (bundle, web + Expo, 2026-05):** одна и та же **семантика** bundle-формы `AddServiceEventFormValues` на web и в мобильном экране создания/редактирования: на Next.js — **`ServiceEventForm`** в **`src/app/vehicles/[id]/_components/service-event-form/`** + страницы **`service-events/new`** / **`service-events/[eventId]/edit`** (переходы из `service-log/page.tsx`, `vehicle-detail-client.tsx`); в Expo — **`apps/app/components/vehicle-detail/basic-service-event-bundle-form.tsx`**, экран-обёртка **`service-events/new.tsx`**. Включает блок **«Готово к установке»** (`GET …/installable`), **ADVANCED**-суммы (строки + верх, остаток при edit), превью **«Итого»**, парсинг сумм `ru-RU`. Детали — [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md), [shared-form-contracts.md](./shared-form-contracts.md), [web-service-event-form.md](./web-service-event-form.md).
+- **Форма сервисного события (bundle, web + Expo, 2026-05):** одна и та же **семантика** bundle-формы `AddServiceEventFormValues` на web и в мобильном экране создания/редактирования: на Next.js — **`ServiceEventForm`** в **`src/app/vehicles/[id]/_components/service-event-form/`** + страницы **`service-events/new`** / **`service-events/[eventId]/edit`** (переходы из `service-log/page.tsx`, `vehicle-detail-client.tsx`); в Expo — **`apps/app/components/vehicle-detail/basic-service-event-bundle-form.tsx`**, экран-обёртка **`service-events/new.tsx`**. Включает блок **«Готово к установке»** (`GET …/installable`), **ADVANCED**-суммы (строки + верх, остаток при edit), превью **«Итого»**, парсинг сумм `ru-RU`. Детали — [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md), [shared-form-contracts.md](../shared-form-contracts.md), [web-service-event-form.md](../web-service-event-form.md).
 - **Актуальный аудит (2026-04-18, вторая сверка):** [web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md) — подтверждены фиксы (RUB, даты, спеки гаража, токены журнала на web, `__DEV__` для API-строки на Expo); **критичных функциональных разрывов не найдено**; остаются low-only: локальный `VehicleDetail` на web, валидатор профиля не в UI, хвост Tailwind vs токены, устаревшие упоминания `fetch` в части docs.
 - По основным сценариям (гараж, карточка ТС, дерево узлов, журнал, новое сервисное событие, семантика статусов) в целом **practical / full parity** по смыслу данных и API; **намеренные** платформенные отличия — в repeat-2 **§4**.
-- Политики **дат**, **спеков гаража**, **токенов**: [cross-platform-parity.md](./cross-platform-parity.md), [web-expo-visual-parity-fixes.md](./web-expo-visual-parity-fixes.md), [shared-design-tokens.md](./shared-design-tokens.md).
+- Политики **дат**, **спеков гаража**, **токенов**: [cross-platform-parity.md](./cross-platform-parity.md), [web-expo-visual-parity-fixes.md](./web-expo-visual-parity-fixes.md), [shared-design-tokens.md](../shared-design-tokens.md).
 
 ---
 
@@ -25,11 +25,11 @@
 | [web-expo-parity-fixes.md](./web-expo-parity-fixes.md) | Первые функциональные выравнивания (в т.ч. высокий приоритет) |
 | [web-expo-data-parity-fixes.md](./web-expo-data-parity-fixes.md) | Паритет данных, гараж, журнал, общие VM |
 | [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md) | Журнал обслуживания |
-| [web-service-event-form.md](./web-service-event-form.md) | **Web:** `ServiceEventForm` + страницы new/edit (создание / edit, режимы, installable, SKU, валидация) |
+| [web-service-event-form.md](../web-service-event-form.md) | **Web:** `ServiceEventForm` + страницы new/edit (создание / edit, режимы, installable, SKU, валидация) |
 | [web-expo-node-tree-parity-fixes.md](./web-expo-node-tree-parity-fixes.md) | Дерево узлов и пояснения статусов |
 | [web-expo-visual-parity-fixes.md](./web-expo-visual-parity-fixes.md) | `productSemanticColors`, визуальное сближение, Expo debug API (политика) |
-| [shared-form-contracts.md](./shared-form-contracts.md) | Общие формы и начальные значения |
-| [status-cache-frontend-qa.md](./status-cache-frontend-qa.md) | QA кэша статусов на клиентах |
+| [shared-form-contracts.md](../shared-form-contracts.md) | Общие формы и начальные значения |
+| [status-cache-frontend-qa.md](../status-cache-frontend-qa.md) | QA кэша статусов на клиентах |
 
 ---
 
@@ -52,13 +52,13 @@
 ## Связанные обзорные документы
 
 - [cross-platform-parity.md](./cross-platform-parity.md) — матрица паритета и намеренные отличия  
-- [frontend-web.md](./frontend-web.md), [frontend-expo.md](./frontend-expo.md) — экраны и потоки по клиентам  
+- [frontend-web.md](../frontend-web.md), [frontend-expo.md](../frontend-expo.md) — экраны и потоки по клиентам  
 
 ---
 
 ## QA (высокий уровень)
 
-Чеклисты по сценариям и граничным случаям: **§6** в [web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md) (и при необходимости в первом repeat); при изменениях статусов узлов — [status-cache-frontend-qa.md](./status-cache-frontend-qa.md).
+Чеклисты по сценариям и граничным случаям: **§6** в [web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md) (и при необходимости в первом repeat); при изменениях статусов узлов — [status-cache-frontend-qa.md](../status-cache-frontend-qa.md).
 
 ---
 

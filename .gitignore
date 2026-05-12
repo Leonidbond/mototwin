@@ -11,3 +11,5 @@ prisma/dev.db
 .expo
 apps/app/.expo
 .venv-tools
+mototwin.dump
+*.tsbuildinfo

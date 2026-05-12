@@ -5,6 +5,8 @@
 - полное техническое дерево `Node` в БД (иерархия сохранена)
 - API-контракт UI: `GET /api/vehicles/[id]/node-tree` (без MVP-среза)
 
+Пиксельные иконки в строках дерева (код узла → PNG): см. [`node-tree-design-icons.md`](./node-tree-design-icons.md).
+
 ## Hierarchy Rules (DB)
 
 - each node has `code`, `name`, `parentId`, `level`, `displayOrder`

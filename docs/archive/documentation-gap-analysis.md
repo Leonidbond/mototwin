@@ -86,7 +86,7 @@
 4. **Cross-platform parity status**
 - Что отсутствует: единая фиксация «что уже выровнено», «что частично», «что различается».
 - Почему важно: при двух клиентах parity must be explicit.
-- Нужный doc: `docs/cross-platform-parity.md`.
+- Нужный doc: `docs/parity/cross-platform-parity.md`.
 
 ## Gap matrix by required area
 
@@ -133,7 +133,7 @@
 ### Cross-platform parity
 - Статус: **missing**.
 - Gap: нет централизованной матрицы parity web vs Expo.
-- Fix: `cross-platform-parity.md`.
+- Fix: `parity/cross-platform-parity.md`.
 
 ## Recommended documentation update plan
 
@@ -141,7 +141,7 @@
 1. `docs/README.md` — canonical index and ownership.
 2. `docs/technical-overview.md` — single source of architecture truth.
 3. `docs/frontend-web.md` + `docs/frontend-expo.md` — clear client separation.
-4. `docs/cross-platform-parity.md` — explicit parity state.
+4. `docs/parity/cross-platform-parity.md` — explicit parity state.
 5. `docs/repository-structure.md` — navigation baseline.
 
 ### Secondary priority

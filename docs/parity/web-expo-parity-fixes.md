@@ -25,8 +25,8 @@
 | `packages/domain/src/index.ts` |
 | `apps/app/app/vehicles/[id]/index.tsx` |
 | `apps/app/app/vehicles/[id]/service-events/new.tsx` |
-| `docs/web-expo-parity-audit.md` |
-| `docs/web-expo-parity-fixes.md` |
+| `docs/parity/web-expo-parity-audit.md` |
+| `docs/parity/web-expo-parity-fixes.md` |
 
 ## Impact
 

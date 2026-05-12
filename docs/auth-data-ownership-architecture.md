@@ -277,4 +277,4 @@ For every new `/api/vehicles/[id]/**` route:
 - [auth-implementation-plan.md](./auth-implementation-plan.md)
 - [garage-dashboard-mvp.md](./garage-dashboard-mvp.md)
 - [data-model.md](./data-model.md)
-- [cross-platform-parity.md](./cross-platform-parity.md)
+- [cross-platform-parity.md](./parity/cross-platform-parity.md)

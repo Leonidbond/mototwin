@@ -44,7 +44,7 @@ Stable **`value`** enums plus **Russian labels** (aligned with web onboarding / 
 
 - **Add service event:** canonical default currency is **RUB** (`DEFAULT_ADD_SERVICE_EVENT_CURRENCY`); web and Expo инициализируют **`AddServiceEventFormValues`** доменными хелперами (`createInitialAddServiceEventFormValues`, `createInitialAddServiceEventFromNode`, `createInitialAddServiceEventFromWishlistItem`, `createInitialEditServiceEventValues`, `createInitialRepeatServiceEventValues`, …), чтобы валюта и bundle-поля не расходились между клиентами.
 - One source for **payload normalization** (trim, `null` for empty optional strings, integers, ISO `eventDate` for service events).
-- **ADVANCED service event:** в payload **`partsCost` / `laborCost`** = сумма по соответствующим полям строк bundle **плюс** числа из верхних полей «Данные события»; **`totalCost`** = их сумма, если есть хотя бы одно число. Превью «Итого» в UI web/Expo использует ту же логику (см. [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md)).
+- **ADVANCED service event:** в payload **`partsCost` / `laborCost`** = сумма по соответствующим полям строк bundle **плюс** числа из верхних полей «Данные события»; **`totalCost`** = их сумма, если есть хотя бы одно число. Превью «Итого» в UI web/Expo использует ту же логику (см. [web-expo-service-log-parity-fixes.md](./parity/web-expo-service-log-parity-fixes.md)).
 - One source for **ride profile labels** so web and Expo don’t drift (some mobile chip captions may differ slightly from older hard-coded copy — e.g. load type wording aligned with web).
 - Validation remains **MVP client-side**; backend Zod and DB rules are unchanged.
 

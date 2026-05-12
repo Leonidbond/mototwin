@@ -82,8 +82,26 @@ prisma/
 ## 7. Documentation
 
 `docs/` contains:
-- canonical technical docs (architecture/model/api/frontend/shared/parity)
+- canonical technical docs (architecture/model/api/frontend/shared); cross-platform notes in **`docs/parity/`**
 - governance docs
 - historical migration notes
 
 Canonical index: `docs/README.md`.
+
+## 8. Node tree design icons (catalog row PNGs)
+
+```text
+images/node-tree-icons-new/           # исходные спрайты из дизайна
+images/node-tree-icons/from-design/   # by-label/<SECTION>/<CODE>.png
+images/node-tree-icons/nodes/         # копии для require() в приложении
+scripts/data/node-code-icon-source.json
+scripts/slice-chassis-row-7.mjs
+scripts/slice-chassis-row-6-protection.mjs
+scripts/postprocess-chassis-node-icons.mjs
+scripts/sync-node-icons-from-slices.mjs
+scripts/generate-node-tree-icons-ts.mjs
+src/node-tree-icons.ts                # сгенерировано
+images/node-tree-icons/manifest.json  # сгенерировано
+```
+
+Подробнее: [`docs/node-tree-design-icons.md`](./node-tree-design-icons.md).

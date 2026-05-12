@@ -307,6 +307,63 @@ export function buildExpenseAnalyticsFromItems(
   };
 }
 
+/** Данные для блока «Расходы» на дашборде мотоцикла (веб и мобильное приложение). */
+export type VehicleDashboardExpensesViewModel = {
+  monthLabel: string;
+  currentMonthTotalsLabel: string;
+  seasonTotalsLabel: string;
+  monthlyChart: ReturnType<typeof buildExpenseCategoryDonutSegmentsForExpenses>;
+  seasonExpenseCount: number;
+};
+
+/** Суммы по валютам в одну строку («12 345 ₽ · 100 USD»). */
+export function formatExpenseTotalsByCurrency(
+  rows: ReadonlyArray<{ currency: string; totalAmount: number }>
+): string {
+  if (rows.length === 0) {
+    return "0";
+  }
+  return rows.map((row) => `${formatExpenseAmountRu(row.totalAmount)} ${row.currency}`).join(" · ");
+}
+
+/**
+ * Сводка расходов для карточки мотоцикла; использует готовую аналитику
+ * (один вызов {@link buildExpenseAnalyticsFromItems} на экран).
+ */
+export function buildVehicleDashboardExpensesViewModelFromAnalytics(
+  expenses: ExpenseItem[],
+  expenseAnalytics: ExpenseAnalyticsSummary,
+  now: Date = new Date()
+): VehicleDashboardExpensesViewModel {
+  const monthKey = getCurrentExpenseMonthKey(now);
+  const monthLabel =
+    expenseAnalytics.byMonth.find((m) => m.key === monthKey)?.label ??
+    now.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  const currentMonthTotalsByCurrency =
+    expenseAnalytics.byMonth.find((m) => m.key === monthKey)?.totalsByCurrency ?? [];
+  const currentMonthExpenses = expenses.filter(
+    (expense) => getExpenseMonthKeyFromIso(expense.expenseDate) === monthKey
+  );
+  const monthlyChart = buildExpenseCategoryDonutSegmentsForExpenses(currentMonthExpenses);
+  return {
+    monthLabel,
+    currentMonthTotalsLabel: formatExpenseTotalsByCurrency(currentMonthTotalsByCurrency),
+    seasonTotalsLabel: formatExpenseTotalsByCurrency(expenseAnalytics.selectedYearTotalsByCurrency),
+    monthlyChart,
+    seasonExpenseCount: expenseAnalytics.selectedYearExpenseCount,
+  };
+}
+
+export function buildVehicleDashboardExpensesViewModel(
+  expenses: ExpenseItem[],
+  options?: { selectedYear?: number; now?: Date }
+): VehicleDashboardExpensesViewModel {
+  const now = options?.now ?? new Date();
+  const selectedYear = options?.selectedYear ?? getCurrentExpenseYear(now);
+  const analytics = buildExpenseAnalyticsFromItems(expenses, selectedYear);
+  return buildVehicleDashboardExpensesViewModelFromAnalytics(expenses, analytics, now);
+}
+
 /** Roll up paid SERVICE events by currency (no mixing). */
 export function groupExpensesByCurrency(
   paidEvents: ServiceEventItem[]

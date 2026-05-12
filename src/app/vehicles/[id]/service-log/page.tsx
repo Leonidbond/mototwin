@@ -51,6 +51,43 @@ import type {
 type ServiceRowActionKind = ServiceActionType | "STATE_UPDATE";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+const SERVICE_LOG_UI_SNAPSHOT_VERSION = 1 as const;
+
+type ServiceLogUiSnapshotV1 = {
+  v: typeof SERVICE_LOG_UI_SNAPSHOT_VERSION;
+  filters: ServiceEventsFilters;
+  sort: { field: ServiceEventsSortField; direction: ServiceEventsSortDirection };
+  filtersExpanded: boolean;
+};
+
+function serviceLogUiSnapshotStorageKey(vehicleId: string): string {
+  return `mototwin:service-log-ui-snapshot:v${SERVICE_LOG_UI_SNAPSHOT_VERSION}:${vehicleId}`;
+}
+
+function persistServiceLogUiSnapshot(
+  vehicleId: string,
+  state: Pick<ServiceLogUiSnapshotV1, "filters" | "sort" | "filtersExpanded">
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      serviceLogUiSnapshotStorageKey(vehicleId),
+      JSON.stringify({ v: SERVICE_LOG_UI_SNAPSHOT_VERSION, ...state })
+    );
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function clearServiceLogUiSnapshot(vehicleId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(serviceLogUiSnapshotStorageKey(vehicleId));
+  } catch {
+    /* ignore */
+  }
+}
+
 const SIDEBAR_COLLAPSED_KEY = "vehicle.detail.sidebar.collapsed";
 const LOAD_MORE_STEP = 20;
 const SERVICE_LOG_DETAILS_COL_WIDTH = 460;
@@ -568,6 +605,28 @@ export default function VehicleServiceLogPage() {
     direction: ServiceEventsSortDirection;
   }>({ field: "eventDate", direction: "desc" });
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = serviceLogUiSnapshotStorageKey(vehicleId);
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Partial<ServiceLogUiSnapshotV1>;
+      if (parsed.v !== SERVICE_LOG_UI_SNAPSHOT_VERSION || !parsed.filters || !parsed.sort) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+      setFilters(parsed.filters);
+      setSort(parsed.sort);
+      if (typeof parsed.filtersExpanded === "boolean") {
+        setFiltersExpanded(parsed.filtersExpanded);
+      }
+    } catch {
+      /* ignore malformed */
+    }
+    sessionStorage.removeItem(key);
+  }, [vehicleId]);
+
   const nodeFilter = useMemo<ServiceLogNodeFilter | null>(() => {
     const resolvedNodeIds = nodeIdsFromQuery
       ? nodeIdsFromQuery.split(",").filter(Boolean)
@@ -800,6 +859,7 @@ export default function VehicleServiceLogPage() {
     setFilters((prev) => ({ ...prev, [field]: value }));
 
   const resetFilters = () => {
+    clearServiceLogUiSnapshot(vehicleId);
     setFilters({
       dateFrom: "",
       dateTo: "",
@@ -870,7 +930,12 @@ export default function VehicleServiceLogPage() {
     }));
   }, []);
 
-  const serviceLogReturnTo = encodeURIComponent(`/vehicles/${vehicleId}/service-log`);
+  const serviceLogReturnTo = useMemo(() => {
+    const path = `/vehicles/${vehicleId}/service-log`;
+    const qs = searchParams.toString();
+    const full = qs ? `${path}?${qs}` : path;
+    return encodeURIComponent(full);
+  }, [vehicleId, searchParams]);
 
   const serviceLogHighlightReturnPath = useCallback(
     (eventId: string) => {
@@ -927,16 +992,20 @@ export default function VehicleServiceLogPage() {
     [router, vehicleId]
   );
 
-  const openCreate = () =>
+  const openCreate = () => {
+    persistServiceLogUiSnapshot(vehicleId, { filters, sort, filtersExpanded });
     router.push(`/vehicles/${vehicleId}/service-events/new?returnTo=${serviceLogReturnTo}`);
+  };
 
   const openRepeat = (id: string) => {
     if (serviceEventById.get(id)?.eventKind === "STATE_UPDATE") return;
+    persistServiceLogUiSnapshot(vehicleId, { filters, sort, filtersExpanded });
     router.push(`/vehicles/${vehicleId}/service-events/new?repeatOf=${encodeURIComponent(id)}&returnTo=${serviceLogReturnTo}`);
   };
 
   const openEdit = (id: string) => {
     if (serviceEventById.get(id)?.eventKind === "STATE_UPDATE") return;
+    persistServiceLogUiSnapshot(vehicleId, { filters, sort, filtersExpanded });
     router.push(`/vehicles/${vehicleId}/service-events/${encodeURIComponent(id)}/edit?returnTo=${serviceLogReturnTo}`);
   };
 
@@ -952,9 +1021,12 @@ export default function VehicleServiceLogPage() {
   };
 
   const navigateBack = () => {
-    if (window.history.length > 1) { router.back(); return; }
     if (returnNodeIdFromQuery) {
       router.push(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeIdFromQuery)}`);
+      return;
+    }
+    if (window.history.length > 1) {
+      router.back();
       return;
     }
     router.push(`/vehicles/${vehicleId}`);

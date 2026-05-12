@@ -63,14 +63,15 @@
   min-width: 0;
 }
 
-/* Видно ~3 строки; до 10 событий — вертикальный скролл (высота строки ≈58px + gap 8px). */
+/* Ровно три карточки без «просвета» четвёртой: высота окна чуть меньше 3×типичная_строка + gaps. */
 .recentEventsScroll {
   margin-top: 12px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   min-width: 0;
-  align-content: start;
-  max-height: calc(58px * 3 + 8px * 2);
+  align-items: stretch;
+  max-height: calc(66px * 3 + 8px * 2);
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;

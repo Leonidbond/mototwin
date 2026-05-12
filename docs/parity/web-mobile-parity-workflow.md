@@ -1,6 +1,6 @@
 # Рабочий процесс паритета Web + Expo (MotoTwin)
 
-Практичный порядок планирования и сдачи фич при двух клиентах (Next.js и Expo). Дополняет раздел **«25. Cross-Platform Parity Rules»** в [coding-rules.md](./coding-rules.md). Шаблон промпта для Cursor: [parity-task-template.md](./parity-task-template.md).
+Практичный порядок планирования и сдачи фич при двух клиентах (Next.js и Expo). Дополняет раздел **«25. Cross-Platform Parity Rules»** в [coding-rules.md](../coding-rules.md). Шаблон промпта для Cursor: [parity-task-template.md](./parity-task-template.md). **Новые parity-документы** — в каталоге **[`docs/parity/`](./)**.
 
 ---
 
@@ -84,9 +84,9 @@
 
 ## Связанные документы
 
-- [coding-rules.md](./coding-rules.md) — раздел 25, общие правила паритета  
+- [coding-rules.md](../coding-rules.md) — раздел 25, общие правила паритета  
 - [web-expo-parity-audit.md](./web-expo-parity-audit.md) — краткий индекс статуса web/Expo и ссылки на детальные документы  
 - [web-expo-parity-audit-repeat-2.md](./web-expo-parity-audit-repeat-2.md) — актуальная детальная матрица и остаточные зазоры после батчей  
 - [cross-platform-parity.md](./cross-platform-parity.md) — продуктовая матрица паритета и намеренные отличия  
 - [parity-task-template.md](./parity-task-template.md) — шаблон промпта  
-- [cursor-workflow.md](./cursor-workflow.md) — требования к полям промпта в Cursor  
+- [cursor-workflow.md](../cursor-workflow.md) — требования к полям промпта в Cursor  

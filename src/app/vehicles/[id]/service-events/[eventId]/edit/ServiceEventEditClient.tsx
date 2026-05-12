@@ -96,7 +96,7 @@ export function ServiceEventEditClient() {
   }, [returnToEncoded, vehicleId]);
 
   const onCancel = useCallback(() => {
-    router.push(decodedReturnTo);
+    router.replace(decodedReturnTo);
   }, [decodedReturnTo, router]);
 
   const serviceEventPageBreadcrumbs = useMemo(

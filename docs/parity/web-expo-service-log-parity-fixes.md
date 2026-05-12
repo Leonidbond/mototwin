@@ -26,7 +26,7 @@
 
 ## Форма сервисного события (bundle): web + Expo
 
-- **Web:** общий компонент **`ServiceEventForm`** в **`src/app/vehicles/[id]/_components/service-event-form/`** — те же `AddServiceEventFormValues`, BASIC/ADVANCED, bundle, SKU, **«Готово к установке»** (`getInstallableForServiceEvent`), валидация `validateAddServiceEventFormValues`, `onSubmit`. Страницы **`/vehicles/[id]/service-events/new`** и **`/vehicles/[id]/service-events/[eventId]/edit`**; переходы из **`service-log/page.tsx`** и **`vehicle-detail-client.tsx`** (`router.push` / query `returnTo` и др.). Поведение по шагам — [web-service-event-form.md](./web-service-event-form.md).
+- **Web:** общий компонент **`ServiceEventForm`** в **`src/app/vehicles/[id]/_components/service-event-form/`** — те же `AddServiceEventFormValues`, BASIC/ADVANCED, bundle, SKU, **«Готово к установке»** (`getInstallableForServiceEvent`), валидация `validateAddServiceEventFormValues`, `onSubmit`. Страницы **`/vehicles/[id]/service-events/new`** и **`/vehicles/[id]/service-events/[eventId]/edit`**; переходы из **`service-log/page.tsx`** и **`vehicle-detail-client.tsx`** (`router.push` / query `returnTo` и др.). Поведение по шагам — [web-service-event-form.md](../web-service-event-form.md).
 - **Expo:** тот же смысл полей в **`apps/app/components/vehicle-detail/basic-service-event-bundle-form.tsx`** — та же модалка **«Готово к установке…»** с теми же чипами и **`getInstallableForServiceEvent`**; экран **`service-events/new.tsx`** только загружает дерево/машину/событие, собирает начальные значения доменными хелперами (`createInitialAddServiceEventFromNode`, `FromWishlistItem`, `Edit`, `Repeat`, …), сбрасывает форму через `key` и вызывает `validateAddServiceEventFormValuesMobile` + `normalizeAddServiceEventPayload` / `normalizeEditServiceEventPayload` при сохранении.
 
 **Паритет экрана создания/редактирования (Expo ≈ web, 2026-05-11):**
@@ -71,7 +71,7 @@
 - Пустой журнал / пустой результат фильтра: те же формулировки, что на Expo («Журнал пуст» / «Ничего не найдено» + пояснение).
 - Комментарий: обрезка по `SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS`.
 - События, похожие на установку из списка покупок: под заголовком типа работы показывается `wishlistOriginLabelRu`, если сработала эвристика (см. таблицу выше). Если в `installedPartsJson` несколько wishlist-id, отображаются **несколько** кликабельных ссылок (нумерация), как на Expo.
-- **Правая панель деталей:** клики по узлам, суммам/расходам и строкам bundle (только **ADVANCED** для блока «Установленные запчасти»), плюс ссылки на источники wishlist — см. единое описание в [service-log-mvp.md](./service-log-mvp.md) (query `returnTo`, `partsSearch`, снятие `highlightServiceEventId` после скролла, доменное сопоставление `installedPartsJson` ↔ bundle).
+- **Правая панель деталей:** клики по узлам, суммам/расходам и строкам bundle (только **ADVANCED** для блока «Установленные запчасти»), плюс ссылки на источники wishlist — см. единое описание в [service-log-mvp.md](../service-log-mvp.md) (query `returnTo`, `partsSearch`, снятие `highlightServiceEventId` после скролла, доменное сопоставление `installedPartsJson` ↔ bundle).
 
 ## Expo (`apps/app/app/vehicles/[id]/service-log.tsx`)
 
@@ -92,7 +92,7 @@
 
 ## Блок расходов на карточке ТС (не журнал)
 
-- Web и Expo: секция **«Расходы на обслуживание»** **свёрнута по умолчанию**; полный журнал — из секции дерева узлов, не из отдельной кнопки **«Журнал»** в блоке расходов (кнопка убрана). Переход из развёрнутого блока расходов в журнал с фокусом на платных событиях использует query **`paidOnly`** и при необходимости **`expandExpenses`** — см. [expense-tracking-mvp.md](./expense-tracking-mvp.md) и [service-log-mvp.md](./service-log-mvp.md).
+- Web и Expo: секция **«Расходы на обслуживание»** **свёрнута по умолчанию**; полный журнал — из секции дерева узлов, не из отдельной кнопки **«Журнал»** в блоке расходов (кнопка убрана). Переход из развёрнутого блока расходов в журнал с фокусом на платных событиях использует query **`paidOnly`** и при необходимости **`expandExpenses`** — см. [expense-tracking-mvp.md](../expense-tracking-mvp.md) и [service-log-mvp.md](../service-log-mvp.md).
 
 ## Переход из «Требует внимания»
 
@@ -148,7 +148,7 @@
 
 ### Копируемый чеклист
 
-Полный пошаговый сценарий для одного прогона — в отдельном файле **[service-log-expo-manual-qa.md](./service-log-expo-manual-qa.md)**.
+Полный пошаговый сценарий для одного прогона — в отдельном файле **[service-log-expo-manual-qa.md](../service-log-expo-manual-qa.md)**.
 
 ## Проверки в репозитории
 

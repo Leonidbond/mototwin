@@ -1,21 +1,22 @@
 {
-  "BRAKES.ABS": {
-    "outRel": "by-label/BRAKES/BRAKES.ABS.png",
-    "labelSlug": "BRAKES.ABS",
-    "rawLabel": "ABS / датчики ABS",
-    "score": 332
-  },
   "BRAKES": {
     "outRel": "by-label/BRAKES/BRAKES.png",
     "labelSlug": "BRAKES",
     "rawLabel": "Тормоза",
     "score": 284
   },
-  "BRAKES.REAR": {
-    "outRel": "by-label/BRAKES/BRAKES.REAR.png",
-    "labelSlug": "BRAKES.REAR",
-    "rawLabel": "No",
-    "score": 113.8
+  "BRAKES.ABS": {
+    "outRel": "by-label/BRAKES/BRAKES.ABS.png",
+    "labelSlug": "BRAKES.ABS",
+    "rawLabel": "ABS / датчики ABS",
+    "score": 332
+  },
+  "BRAKES.FLUID": {
+    "outRel": "by-label/BRAKES/BRAKES.FLUID.png",
+    "labelSlug": "BRAKES.FLUID",
+    "rawLabel": "Тормозная жидкость",
+    "score": 284,
+    "note": "from-Зад-перед-тормоз-разделы-2-2-2-fluid-only"
   },
   "BRAKES.FRONT": {
     "outRel": "by-label/BRAKES/BRAKES.FRONT.png",
@@ -27,12 +28,6 @@
     "outRel": "by-label/BRAKES/BRAKES.FRONT.CALIPER.png",
     "labelSlug": "BRAKES.FRONT.CALIPER",
     "rawLabel": "or",
-    "score": 102.7
-  },
-  "BRAKES.FRONT.PADS": {
-    "outRel": "by-label/BRAKES/BRAKES.FRONT.PADS.png",
-    "labelSlug": "BRAKES.FRONT.PADS",
-    "rawLabel": "UY",
     "score": 102.7
   },
   "BRAKES.FRONT.DISC": {
@@ -53,12 +48,17 @@
     "rawLabel": "(0]",
     "score": 75.9
   },
-  "BRAKES.REAR.MASTER": {
-    "outRel": "by-label/BRAKES/BRAKES.FRONT.MASTER.png",
-    "labelSlug": "BRAKES.REAR.MASTER",
-    "rawLabel": "(0]",
-    "score": 75.9,
-    "note": "same-icon-as-BRAKES.FRONT.MASTER"
+  "BRAKES.FRONT.PADS": {
+    "outRel": "by-label/BRAKES/BRAKES.FRONT.PADS.png",
+    "labelSlug": "BRAKES.FRONT.PADS",
+    "rawLabel": "UY",
+    "score": 102.7
+  },
+  "BRAKES.REAR": {
+    "outRel": "by-label/BRAKES/BRAKES.REAR.png",
+    "labelSlug": "BRAKES.REAR",
+    "rawLabel": "No",
+    "score": 113.8
   },
   "BRAKES.REAR.CALIPER": {
     "outRel": "by-label/BRAKES/BRAKES.FRONT.CALIPER.png",
@@ -66,13 +66,6 @@
     "rawLabel": "or",
     "score": 102.7,
     "note": "same-icon-as-BRAKES.FRONT.CALIPER"
-  },
-  "BRAKES.REAR.PADS": {
-    "outRel": "by-label/BRAKES/BRAKES.FRONT.PADS.png",
-    "labelSlug": "BRAKES.REAR.PADS",
-    "rawLabel": "UY",
-    "score": 102.7,
-    "note": "same-icon-as-BRAKES.FRONT.PADS"
   },
   "BRAKES.REAR.DISC": {
     "outRel": "by-label/BRAKES/BRAKES.FRONT.DISC.png",
@@ -88,11 +81,102 @@
     "score": 97.1,
     "note": "same-icon-as-BRAKES.FRONT.LINE"
   },
-  "BRAKES.FLUID": {
-    "outRel": "by-label/BRAKES/BRAKES.FLUID.png",
-    "labelSlug": "BRAKES.FLUID",
-    "rawLabel": "Тормозная жидкость",
-    "score": 284,
-    "note": "from-Зад-перед-тормоз-разделы-2-2-2-fluid-only"
+  "BRAKES.REAR.MASTER": {
+    "outRel": "by-label/BRAKES/BRAKES.FRONT.MASTER.png",
+    "labelSlug": "BRAKES.REAR.MASTER",
+    "rawLabel": "(0]",
+    "score": 75.9,
+    "note": "same-icon-as-BRAKES.FRONT.MASTER"
+  },
+  "BRAKES.REAR.PADS": {
+    "outRel": "by-label/BRAKES/BRAKES.FRONT.PADS.png",
+    "labelSlug": "BRAKES.REAR.PADS",
+    "rawLabel": "UY",
+    "score": 102.7,
+    "note": "same-icon-as-BRAKES.FRONT.PADS"
+  },
+  "CHASSIS": {
+    "outRel": "by-label/CHASSIS/CHASSIS.png",
+    "labelSlug": "CHASSIS",
+    "rawLabel": "Рама и кузов",
+    "score": 200
+  },
+  "CHASSIS.FRAME": {
+    "outRel": "by-label/CHASSIS/CHASSIS.FRAME.png",
+    "labelSlug": "CHASSIS.FRAME",
+    "rawLabel": "Рама",
+    "score": 100
+  },
+  "CHASSIS.MOUNTS": {
+    "outRel": "by-label/CHASSIS/CHASSIS.MOUNTS.png",
+    "labelSlug": "CHASSIS.MOUNTS",
+    "rawLabel": "Крепёж/оси/втулки",
+    "score": 100
+  },
+  "CHASSIS.PLASTICS": {
+    "outRel": "by-label/CHASSIS/CHASSIS.PLASTICS.png",
+    "labelSlug": "CHASSIS.PLASTICS",
+    "rawLabel": "Пластик",
+    "score": 100
+  },
+  "CHASSIS.PLASTICS.FENDERS": {
+    "outRel": "by-label/CHASSIS/CHASSIS.PLASTICS.FENDERS.png",
+    "labelSlug": "CHASSIS.PLASTICS.FENDERS",
+    "rawLabel": "Крылья",
+    "score": 100
+  },
+  "CHASSIS.PLASTICS.SIDE": {
+    "outRel": "by-label/CHASSIS/CHASSIS.PLASTICS.SIDE.png",
+    "labelSlug": "CHASSIS.PLASTICS.SIDE",
+    "rawLabel": "Боковины/панели",
+    "score": 100
+  },
+  "CHASSIS.PLASTICS.FORK_GUARDS": {
+    "outRel": "by-label/CHASSIS/CHASSIS.PLASTICS.FORK_GUARDS.png",
+    "labelSlug": "CHASSIS.PLASTICS.FORK_GUARDS",
+    "rawLabel": "Защита вилки",
+    "score": 100
+  },
+  "CHASSIS.PLASTICS.HANDGUARDS": {
+    "outRel": "by-label/CHASSIS/CHASSIS.PLASTICS.HANDGUARDS.png",
+    "labelSlug": "CHASSIS.PLASTICS.HANDGUARDS",
+    "rawLabel": "Защита рук (если есть)",
+    "score": 100
+  },
+  "CHASSIS.PROTECTION": {
+    "outRel": "by-label/CHASSIS/CHASSIS.PROTECTION.png",
+    "labelSlug": "CHASSIS.PROTECTION",
+    "rawLabel": "Защита",
+    "score": 100
+  },
+  "CHASSIS.PROTECTION.FRAME": {
+    "outRel": "by-label/CHASSIS/CHASSIS.PROTECTION.FRAME.png",
+    "labelSlug": "CHASSIS.PROTECTION.FRAME",
+    "rawLabel": "Защита рамы/маятника",
+    "score": 100
+  },
+  "CHASSIS.PROTECTION.RADIATOR": {
+    "outRel": "by-label/CHASSIS/CHASSIS.PROTECTION.RADIATOR.png",
+    "labelSlug": "CHASSIS.PROTECTION.RADIATOR",
+    "rawLabel": "Защита радиаторов (если есть)",
+    "score": 100
+  },
+  "CHASSIS.PROTECTION.SKID": {
+    "outRel": "by-label/CHASSIS/CHASSIS.PROTECTION.SKID.png",
+    "labelSlug": "CHASSIS.PROTECTION.SKID",
+    "rawLabel": "Защита картера",
+    "score": 100
+  },
+  "CHASSIS.SEAT": {
+    "outRel": "by-label/CHASSIS/CHASSIS.SEAT.png",
+    "labelSlug": "CHASSIS.SEAT",
+    "rawLabel": "Сиденье/чехол",
+    "score": 100
+  },
+  "CHASSIS.SUBFRAME": {
+    "outRel": "by-label/CHASSIS/CHASSIS.SUBFRAME.png",
+    "labelSlug": "CHASSIS.SUBFRAME",
+    "rawLabel": "Подрамник",
+    "score": 100
   }
 }

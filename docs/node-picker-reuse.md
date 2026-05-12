@@ -63,4 +63,4 @@
 
 - [coding-rules.md](./coding-rules.md) — обязательное использование общих пикеров (§14).
 - [web-service-event-form.md](./web-service-event-form.md) — bundle, **`AddNodeSheet`**.
-- [cross-platform-parity.md](./cross-platform-parity.md) — §3.9, паритет web/Expo для выбора узла.
+- [cross-platform-parity.md](./parity/cross-platform-parity.md) — §3.9, паритет web/Expo для выбора узла.

@@ -82,11 +82,11 @@ Should remain platform-specific:
 - Web does not yet consistently consume `@mototwin/api-client`.
 - Some web page-local utility logic still duplicates shared behavior.
 
-These gaps are tracked in `cross-platform-parity.md` as implementation parity follow-ups.
+These gaps are tracked in `parity/cross-platform-parity.md` as implementation parity follow-ups.
 
 ## 7. Related docs
 
 - `technical-overview.md`
 - `frontend-web.md`
 - `frontend-expo.md`
-- `cross-platform-parity.md`
+- `parity/cross-platform-parity.md`

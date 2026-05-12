@@ -244,7 +244,7 @@
 
 - [parts-catalog-mvp.md](./parts-catalog-mvp.md) — **основной документ для реализации:** Prisma MVP, seed JSON (`parts-skus.json`), `partType`, wishlist + SKU, рекомендации, roadmap.
 - [parts-wishlist-mvp.md](./parts-wishlist-mvp.md) — текущий MVP списка покупок (до связки с SKU).
-- [coding-rules.md](./coding-rules.md), [web-mobile-parity-workflow.md](./web-mobile-parity-workflow.md) — процесс согласования web/expo после появления API.
+- [coding-rules.md](./coding-rules.md), [web-mobile-parity-workflow.md](./parity/web-mobile-parity-workflow.md) — процесс согласования web/expo после появления API.
 
 ---
 

@@ -17,7 +17,7 @@
 - `frontend-web.md`
 - `frontend-expo.md`
 - `functional-logic.md`
-- `cross-platform-parity.md`
+- `parity/cross-platform-parity.md`
 
 ## Why preserved
 

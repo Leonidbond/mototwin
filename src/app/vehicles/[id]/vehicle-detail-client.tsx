@@ -3291,16 +3291,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     if (pageView === "nodeTree") {
       const isSelected = selectedNodeContextId === node.id;
       const metaCount = node.children.length;
-      const connectorColor = productSemanticColors.border;
-      const guideColumnPx = 24;
-      const selectionTokens = node.effectiveStatus
-        ? statusSemanticTokens[node.effectiveStatus]
-        : statusSemanticTokens.UNKNOWN;
-      const selectionBorderColor = selectionTokens.border;
-      const iconColor = productSemanticColors.textSecondary;
       const rowStatusTokens = node.effectiveStatus
         ? statusSemanticTokens[node.effectiveStatus]
         : statusSemanticTokens.UNKNOWN;
+      const neutralConnectorColor = productSemanticColors.border;
+      const branchConnectorColor = node.effectiveStatus
+        ? rowStatusTokens.accent
+        : neutralConnectorColor;
+      const guideColumnPx = 24;
+      const selectionBorderColor = rowStatusTokens.border;
+      const iconColor = productSemanticColors.textSecondary;
       const rowStatusLabel =
         node.effectiveStatus === "OVERDUE"
           ? "Просрочено"
@@ -3337,7 +3337,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     top: -1,
                     bottom: -1,
                     transform: "translateX(-0.5px)",
-                    backgroundColor: connectorColor,
+                    backgroundColor: neutralConnectorColor,
                   }}
                 />
               )}
@@ -3357,7 +3357,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   top: -1,
                   transform: "translateX(-0.5px)",
                   bottom: isLast ? "calc(50% + 6px)" : -1,
-                  backgroundColor: connectorColor,
+                  backgroundColor: branchConnectorColor,
                 }}
               />
               <svg
@@ -3375,14 +3375,14 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               >
                 <path
                   d={`M ${guideColumnPx / 2} 0 V 5 Q ${guideColumnPx / 2} 9 ${guideColumnPx / 2 + 4} 9 H ${guideColumnPx - 3}`}
-                  stroke={connectorColor}
+                  stroke={branchConnectorColor}
                   strokeWidth="1"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
                 <path
                   d={`M ${guideColumnPx - 7} 6 L ${guideColumnPx - 3} 9 L ${guideColumnPx - 7} 12`}
-                  stroke={connectorColor}
+                  stroke={branchConnectorColor}
                   strokeWidth="1.4"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -3541,7 +3541,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   }
                 }}
                 className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded"
-                style={{ color: productSemanticColors.textSecondary }}
+                style={{
+                  color:
+                    hasChildren && node.effectiveStatus
+                      ? rowStatusTokens.foreground
+                      : productSemanticColors.textSecondary,
+                }}
                 aria-label={hasChildren ? (isExpanded ? "Свернуть ветку" : "Развернуть ветку") : undefined}
               >
                 {hasChildren ? (

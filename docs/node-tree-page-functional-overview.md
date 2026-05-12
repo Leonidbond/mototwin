@@ -152,5 +152,5 @@
 - `docs/node-tree.md`
 - `docs/archive/expo-screen-node-tree.md`
 - `docs/archive/expo-screen-node-tree-ux-improvements.md`
-- `docs/web-expo-node-tree-parity-fixes.md`
+- `docs/parity/web-expo-node-tree-parity-fixes.md`
 - `docs/archive/expenses-analytics-vision-draft.md` (черновик расширенной аналитики расходов по узлам; MVP — `expense-tracking-mvp.md`)

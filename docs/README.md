@@ -23,10 +23,11 @@
 | [`frontend-expo.md`](./frontend-expo.md) | Expo Router, экраны, потоки |
 | [`shared-packages.md`](./shared-packages.md) | `types`, `domain`, `api-client`, границы reuse |
 | [`functional-logic.md`](./functional-logic.md) | События, статусы узлов, агрегация |
-| [`cross-platform-parity.md`](./cross-platform-parity.md) | Матрица parity и намеренные отличия |
+| [`parity/cross-platform-parity.md`](./parity/cross-platform-parity.md) | Матрица parity и намеренные отличия |
 | [`mototwin_unified_design_concept.md`](./mototwin_unified_design_concept.md) | Единый дизайн-концепт |
 | [`mototwin_ui_refactor_playbook.md`](./mototwin_ui_refactor_playbook.md) | Playbook UI-рефакторинга |
 | [`top-node-icons.md`](./top-node-icons.md) | TOP-node иконки: хранение и именование |
+| [`node-tree-design-icons.md`](./node-tree-design-icons.md) | Иконки строк дерева узлов (design → `from-design` → `nodes`, скрипты) |
 
 ---
 
@@ -44,6 +45,7 @@
 |----------|------------|
 | [`mototwin-parts-cart-and-picker-ui-spec.md`](./mototwin-parts-cart-and-picker-ui-spec.md) | Корзина замен + single-page подбор детали (web + mobile) |
 | [`node-tree.md`](./node-tree.md) | Справочник иерархии узлов (коды дерева) |
+| [`node-tree-design-icons.md`](./node-tree-design-icons.md) | Иконки строк дерева: дизайн, нарезка, постобработка, маппинг |
 | [`node-tree-page-functional-overview.md`](./node-tree-page-functional-overview.md) | Поведение страницы «Узлы» (web + Expo) |
 | [`node-context-mvp.md`](./node-context-mvp.md) | Контекст узла, быстрые действия |
 | [`parts-catalog-architecture.md`](./parts-catalog-architecture.md) | Архитектура каталога запчастей |
@@ -61,11 +63,11 @@
 
 ## 5. Parity history (web ↔ Expo)
 
-**Индекс:** [`web-expo-parity-audit.md`](./web-expo-parity-audit.md) → детальная сверка [`web-expo-parity-audit-repeat-2.md`](./web-expo-parity-audit-repeat-2.md).
+**Индекс:** [`parity/web-expo-parity-audit.md`](./parity/web-expo-parity-audit.md) → детальная сверка [`parity/web-expo-parity-audit-repeat-2.md`](./parity/web-expo-parity-audit-repeat-2.md).
 
-**Процесс:** [`web-mobile-parity-workflow.md`](./web-mobile-parity-workflow.md) · [`parity-task-template.md`](./parity-task-template.md)
+**Процесс:** [`parity/web-mobile-parity-workflow.md`](./parity/web-mobile-parity-workflow.md) · [`parity/parity-task-template.md`](./parity/parity-task-template.md)
 
-**Журналы фиксов:** [`web-expo-parity-fixes.md`](./web-expo-parity-fixes.md) · [`web-expo-data-parity-fixes.md`](./web-expo-data-parity-fixes.md) · [`web-expo-node-tree-parity-fixes.md`](./web-expo-node-tree-parity-fixes.md) · [`web-expo-visual-parity-fixes.md`](./web-expo-visual-parity-fixes.md) · [`web-expo-service-log-parity-fixes.md`](./web-expo-service-log-parity-fixes.md) (в конце — приложение с ранними заметками по Expo journal; отдельные файлы `expo-service-log-*-parity.md` удалены как дубли).
+**Журналы фиксов:** [`parity/web-expo-parity-fixes.md`](./parity/web-expo-parity-fixes.md) · [`parity/web-expo-data-parity-fixes.md`](./parity/web-expo-data-parity-fixes.md) · [`parity/web-expo-node-tree-parity-fixes.md`](./parity/web-expo-node-tree-parity-fixes.md) · [`parity/web-expo-visual-parity-fixes.md`](./parity/web-expo-visual-parity-fixes.md) · [`parity/web-expo-service-log-parity-fixes.md`](./parity/web-expo-service-log-parity-fixes.md) (в конце — приложение с ранними заметками по Expo journal; отдельные файлы `expo-service-log-*-parity.md` удалены как дубли).
 
 **QA:** [`service-event-qa-smoke.md`](./service-event-qa-smoke.md) · [`status-cache-frontend-qa.md`](./status-cache-frontend-qa.md) · [`parts-catalog-regression-qa.md`](./parts-catalog-regression-qa.md) · [`parts-catalog-qa-seed.md`](./parts-catalog-qa-seed.md)
 

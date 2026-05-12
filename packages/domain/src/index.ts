@@ -91,6 +91,9 @@ export {
   filterPaidServiceExpenseEvents,
   buildExpenseAnalyticsFromItems,
   buildExpenseCategoryDonutSegmentsForExpenses,
+  buildVehicleDashboardExpensesViewModel,
+  buildVehicleDashboardExpensesViewModelFromAnalytics,
+  formatExpenseTotalsByCurrency,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
   groupExpensesByCurrency,
@@ -115,6 +118,7 @@ export {
   getExpenseMonthKeyFromIso,
   getExpenseMonthMeta,
 } from "./expense-summary";
+export type { VehicleDashboardExpensesViewModel } from "./expense-summary";
 export {
   SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS,
   buildStateUpdateDisplayViewModel,
