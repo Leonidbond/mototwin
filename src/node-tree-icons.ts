@@ -30,13 +30,16 @@ function normalizeNodeTreeIconKey(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
-const FALLBACK_NODE_ICON_KEY = "engine";
+/** Prefer ENGINE when present; otherwise first catalog key (map may be partial). */
+const FALLBACK_NODE_ICON_KEY = "brakes";
 
 export function getNodeTreeIconAsset(code: string, _name = ""): NodeTreeIconAsset {
   const key = normalizeNodeTreeIconKey(code);
   const direct = NODE_TREE_ICON_BY_CODE[key];
   if (direct) return direct;
-  return NODE_TREE_ICON_BY_CODE[FALLBACK_NODE_ICON_KEY];
+  const fallback = NODE_TREE_ICON_BY_CODE[FALLBACK_NODE_ICON_KEY];
+  if (fallback != null) return fallback;
+  return Object.values(NODE_TREE_ICON_BY_CODE)[0] as NodeTreeIconAsset;
 }
 
 export function getNodeTreeIconWebSrc(code: string, name = ""): string {
@@ -44,6 +47,6 @@ export function getNodeTreeIconWebSrc(code: string, name = ""): string {
     default?: { src?: string };
     src?: string;
   };
-  return asset.src ?? asset.default?.src ?? "";
+  return asset?.src ?? asset?.default?.src ?? "";
 }
 

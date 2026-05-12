@@ -89,14 +89,23 @@ function main() {
   lines.push(`    .replace(/^-|-$/g, "");`);
   lines.push(`}`);
   lines.push(``);
-  const fallbackKey = normalizeNodeTreeIconKey("ENGINE");
+  const normalizedKeys = codes.map((c) => normalizeNodeTreeIconKey(c));
+  const engineKey = normalizeNodeTreeIconKey("ENGINE");
+  const fallbackKey = normalizedKeys.includes(engineKey)
+    ? engineKey
+    : normalizedKeys[0];
+  lines.push(
+    `/** Prefer ENGINE when present; otherwise first catalog key (map may be partial). */`
+  );
   lines.push(`const FALLBACK_NODE_ICON_KEY = ${JSON.stringify(fallbackKey)};`);
   lines.push(``);
   lines.push(`export function getNodeTreeIconAsset(code: string, _name = ""): NodeTreeIconAsset {`);
   lines.push(`  const key = normalizeNodeTreeIconKey(code);`);
   lines.push(`  const direct = NODE_TREE_ICON_BY_CODE[key];`);
   lines.push(`  if (direct) return direct;`);
-  lines.push(`  return NODE_TREE_ICON_BY_CODE[FALLBACK_NODE_ICON_KEY];`);
+  lines.push(`  const fallback = NODE_TREE_ICON_BY_CODE[FALLBACK_NODE_ICON_KEY];`);
+  lines.push(`  if (fallback != null) return fallback;`);
+  lines.push(`  return Object.values(NODE_TREE_ICON_BY_CODE)[0] as NodeTreeIconAsset;`);
   lines.push(`}`);
   lines.push(``);
   lines.push(`export function getNodeTreeIconWebSrc(code: string, name = ""): string {`);
@@ -104,7 +113,7 @@ function main() {
   lines.push(`    default?: { src?: string };`);
   lines.push(`    src?: string;`);
   lines.push(`  };`);
-  lines.push(`  return asset.src ?? asset.default?.src ?? "";`);
+  lines.push(`  return asset?.src ?? asset?.default?.src ?? "";`);
   lines.push(`}`);
   lines.push(``);
 

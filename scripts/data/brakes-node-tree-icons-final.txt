@@ -1,0 +1,14 @@
+BRAKES node-tree icons — finalized baseline (2026-05-12).
+
+Canonical raster outputs:
+  images/node-tree-icons/from-design/by-label/BRAKES/*.png
+  images/node-tree-icons/nodes/brakes*.png (copied by sync-node-icons-from-slices.mjs)
+
+Design sources (edit here, then re-run sync + generate):
+  images/node-tree-icons-new/BRAKES/
+
+Mapping:
+  scripts/data/node-code-icon-source.json
+  scripts/data/slice-inventory-BRAKES.json
+  scripts/data/extracted-label-manifest-BRAKES.json
+  scripts/data/brakes-icon-reuse.json

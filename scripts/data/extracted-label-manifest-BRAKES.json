@@ -1,62 +1,62 @@
 [
   {
-    "slug": "BRAKES-Зад-перед-тормоз-разделы-s000",
+    "slug": "BRAKES.REAR",
     "rawLabel": "No",
     "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
     "sliceIndex": 0,
     "splitY": 131
   },
   {
-    "slug": "BRAKES-Зад-перед-тормоз-разделы-s001",
+    "slug": "BRAKES.FRONT",
     "rawLabel": "VU",
     "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
     "sliceIndex": 1,
     "splitY": 209
   },
   {
-    "slug": "BRAKES-Зад-перед-тормоз-разделы-s002",
+    "slug": "BRAKES.FRONT.CALIPER",
     "rawLabel": "or",
     "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
     "sliceIndex": 2,
     "splitY": 213
   },
   {
-    "slug": "BRAKES-Зад-перед-тормоз-разделы-s003",
+    "slug": "BRAKES.FRONT.PADS",
     "rawLabel": "UY",
     "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
     "sliceIndex": 3,
     "splitY": 195
   },
   {
-    "slug": "BRAKES-Зад-перед-тормоз-разделы-s004",
+    "slug": "BRAKES.FRONT.DISC",
     "rawLabel": "",
     "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
     "sliceIndex": 4,
     "splitY": 172
   },
   {
-    "slug": "BRAKES-Зад-перед-тормоз-разделы-s005",
+    "slug": "BRAKES.FRONT.LINE",
     "rawLabel": "\\",
     "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
     "sliceIndex": 5,
     "splitY": 255
   },
   {
-    "slug": "BRAKES-Зад-перед-тормоз-разделы-s006",
+    "slug": "BRAKES.FRONT.MASTER",
     "rawLabel": "(0]",
     "sourceRel": "BRAKES/Зад:перед тормоз + разделы.png",
     "sliceIndex": 6,
     "splitY": 171
   },
   {
-    "slug": "тормоза",
+    "slug": "BRAKES",
     "rawLabel": "Тормоза",
     "sourceRel": "BRAKES/Тормоз + ABS.png",
     "sliceIndex": 0,
     "splitY": 192
   },
   {
-    "slug": "abs-датчики-abs",
+    "slug": "BRAKES.ABS",
     "rawLabel": "ABS / датчики ABS",
     "sourceRel": "BRAKES/Тормоз + ABS.png",
     "sliceIndex": 1,
