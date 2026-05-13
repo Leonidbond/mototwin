@@ -205,6 +205,15 @@ export type {
   PartRecommendationFilters,
 } from "./part-recommendation";
 export type {
+  FitmentConfidenceStatus,
+  FitmentReportResultWire,
+  FitmentReportModerationStatusWire,
+  FitmentVoteTypeWire,
+  PartWishlistItemSourceWire,
+  PartMasterStatusWire,
+  TrustBadgeWire,
+} from "./fitment-community";
+export type {
   PartWishlistItem,
   PartWishlistItemStatus,
   PartWishlistItemViewModel,

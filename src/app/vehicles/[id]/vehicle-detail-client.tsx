@@ -2188,7 +2188,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       partsStatusFromSearchParams === "NEEDED" ||
       partsStatusFromSearchParams === "ORDERED" ||
       partsStatusFromSearchParams === "BOUGHT" ||
-      partsStatusFromSearchParams === "INSTALLED"
+      partsStatusFromSearchParams === "INSTALLED" ||
+      partsStatusFromSearchParams === "REJECTED"
     ) {
       setPartsStatusFilter(partsStatusFromSearchParams);
       setCollapsedPartsStatusGroups((prev) => ({

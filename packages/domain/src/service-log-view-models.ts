@@ -2,6 +2,7 @@ import type {
   MonthlyServiceLogSummary,
   ServiceBundleItem,
   ServiceEventItem,
+  ServiceEventNode,
   ServiceEventKind,
   ServiceEventsFilters,
   ServiceLogBundleItemSummary,
@@ -408,6 +409,20 @@ export function buildServiceLogEntryViewModel(
     laborCostLabel: formatBundleCostLabel("Работа", event.laborCost ?? null, event.currency ?? null),
     totalCostLabel: formatBundleCostLabel("Итого", totalAmount, event.currency ?? null),
   };
+}
+
+/**
+ * Узел каталога для иконки в журнале: привязка события (`event.node`), иначе узел первой строки bundle.
+ * Без `code` — `null` (UI может показать fallback по типу работы).
+ */
+export function resolvePrimaryCatalogNodeForServiceLogIcon(
+  event: ServiceEventItem | null
+): ServiceEventNode | null {
+  if (!event) return null;
+  if (event.node?.code?.trim()) return event.node;
+  const fromItem = event.items?.[0]?.node;
+  if (fromItem?.code?.trim()) return fromItem;
+  return null;
 }
 
 export function buildServiceLogMonthlySummary(

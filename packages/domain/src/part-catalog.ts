@@ -184,6 +184,7 @@ export function getPartSkuViewModelDisplayLines(sku: PartSkuViewModel): {
 export function buildPartSkuViewModel(row: {
   id: string;
   seedKey: string | null;
+  partMasterId?: string | null;
   primaryNodeId: string | null;
   brandName: string;
   canonicalName: string;
@@ -260,6 +261,7 @@ export function buildPartSkuViewModel(row: {
   const base: PartSku = {
     id: row.id,
     seedKey: row.seedKey,
+    partMasterId: row.partMasterId ?? null,
     primaryNodeId: row.primaryNodeId,
     brandName: row.brandName,
     canonicalName: row.canonicalName,

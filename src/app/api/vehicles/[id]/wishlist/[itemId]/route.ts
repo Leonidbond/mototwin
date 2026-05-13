@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { PartWishlistItemStatus } from "@prisma/client";
+import { PartWishlistItemSource, PartWishlistItemStatus } from "@prisma/client";
 import { z } from "zod";
 import { buildWishlistItemSkuInfo, normalizePartWishlistCostMutationArgs } from "@mototwin/domain";
 import { syncExpenseItemForWishlistItem } from "@/lib/expense-items";
@@ -19,7 +19,7 @@ type RouteContext = {
   }>;
 };
 
-const statusEnum = z.enum(["NEEDED", "ORDERED", "BOUGHT", "INSTALLED"]);
+const statusEnum = z.enum(["NEEDED", "ORDERED", "BOUGHT", "INSTALLED", "REJECTED"]);
 
 const wishlistSkuSelect = {
   id: true,
@@ -67,6 +67,7 @@ const patchWishlistSchema = z
     status: statusEnum.optional(),
     costAmount: z.union([z.number().min(0), z.null()]).optional(),
     currency: z.union([z.string(), z.null()]).optional(),
+    source: z.enum(["RECOMMENDATION", "USER_ADDED"]).optional(),
   })
   .strict();
 
@@ -96,6 +97,7 @@ function toWire(row: {
   title: string;
   quantity: number;
   status: PartWishlistItemStatus;
+  source: PartWishlistItemSource;
   comment: string | null;
   costAmount: number | null;
   currency: string | null;
@@ -112,6 +114,7 @@ function toWire(row: {
     title: row.title,
     quantity: row.quantity,
     status: row.status,
+    source: row.source,
     comment: row.comment,
     costAmount: row.costAmount,
     currency: row.currency,
@@ -253,6 +256,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     if (parsed.status !== undefined) {
       updateData.status = parsed.status;
+    }
+    if (parsed.source !== undefined) {
+      updateData.source = parsed.source;
     }
     if (parsed.comment !== undefined) {
       updateData.comment = parsed.comment?.trim() ? parsed.comment.trim() : null;

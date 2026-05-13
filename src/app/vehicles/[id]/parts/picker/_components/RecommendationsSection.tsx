@@ -8,9 +8,12 @@ import type {
 } from "@mototwin/types";
 import { formatRideStyleChipLabelRu } from "@mototwin/domain";
 import { RecommendationCard } from "./RecommendationCard";
+import { PickerFitmentReportLinkFromRecommendation } from "./PickerFitmentReportLink";
 import { pickerColors, pickerSectionSubtitleStyle, pickerSectionTitleStyle } from "./picker-styles";
 
 export function RecommendationsSection(props: {
+  vehicleId: string;
+  nodeId: string | null;
   nodeName: string | null;
   rideProfile: VehicleRideProfile | null;
   recommendations: PickerMerchandiseRecommendations;
@@ -79,6 +82,8 @@ export function RecommendationsSection(props: {
               recommendation={rec}
               isInDraft={props.draftSkuIds.has(rec.skuId)}
               onAdd={() => props.onAddSku(rec)}
+              vehicleId={props.vehicleId}
+              nodeId={props.nodeId}
             />
           ))}
         </div>
@@ -104,6 +109,12 @@ export function RecommendationsSection(props: {
                     <div style={{ fontSize: 11, color: pickerColors.textMuted, marginTop: 2 }}>
                       {rec.recommendationLabel}
                     </div>
+                    <PickerFitmentReportLinkFromRecommendation
+                      vehicleId={props.vehicleId}
+                      nodeId={props.nodeId}
+                      recommendation={rec}
+                      variant="inlineMuted"
+                    />
                   </div>
                   <button
                     type="button"

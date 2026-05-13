@@ -26,6 +26,7 @@ const WISHLIST_RANK: Record<PartWishlistItemStatus, number> = {
   ORDERED: 1,
   NEEDED: 2,
   INSTALLED: 9,
+  REJECTED: 10,
 };
 
 const wishlistInclude = {

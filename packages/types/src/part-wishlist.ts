@@ -1,7 +1,8 @@
 import type { WishlistItemSkuInfo } from "./part-catalog";
+import type { PartWishlistItemSourceWire } from "./fitment-community";
 
 /** Matches Prisma `PartWishlistItemStatus`. */
-export type PartWishlistItemStatus = "NEEDED" | "ORDERED" | "BOUGHT" | "INSTALLED";
+export type PartWishlistItemStatus = "NEEDED" | "ORDERED" | "BOUGHT" | "INSTALLED" | "REJECTED";
 
 /** Default ISO 4217 code for new wishlist lines (aligned with service event forms). */
 export const PART_WISHLIST_DEFAULT_CURRENCY = "RUB";
@@ -16,6 +17,8 @@ export type PartWishlistItem = {
   title: string;
   quantity: number;
   status: PartWishlistItemStatus;
+  /** Источник строки: рекомендация или добавлено пользователем вручную. */
+  source?: PartWishlistItemSourceWire;
   comment: string | null;
   /** Цена за одну штуку; сумма по строке в UI = `costAmount * quantity`. */
   costAmount: number | null;
@@ -66,6 +69,7 @@ export type CreatePartWishlistItemInput = {
   status?: PartWishlistItemStatus;
   costAmount?: number | null;
   currency?: string | null;
+  source?: PartWishlistItemSourceWire;
 };
 
 export type UpdatePartWishlistItemInput = {
@@ -78,6 +82,7 @@ export type UpdatePartWishlistItemInput = {
   status?: PartWishlistItemStatus;
   costAmount?: number | null;
   currency?: string | null;
+  source?: PartWishlistItemSourceWire;
 };
 
 export type PartWishlistStatusGroupViewModel = {

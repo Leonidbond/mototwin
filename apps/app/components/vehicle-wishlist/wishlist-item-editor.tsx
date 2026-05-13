@@ -268,6 +268,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
     const skuFromRecommendation: PartSkuViewModel = {
       id: rec.skuId,
       seedKey: null,
+      partMasterId: rec.partMasterId ?? null,
       primaryNodeId: rec.primaryNode?.id ?? null,
       brandName: rec.brandName,
       canonicalName: rec.canonicalName,

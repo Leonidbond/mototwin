@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import type { PartRecommendationViewModel, PickerMerchandiseLabel } from "@mototwin/types";
 import { MERCHANDISE_LABELS_RU } from "@mototwin/domain";
 import { merchandiseAccentColor, pickerColors } from "./picker-styles";
+import { PickerFitmentReportLinkFromRecommendation } from "./PickerFitmentReportLink";
 
 const REASON_BULLET_LIMIT = 4;
 
@@ -12,6 +13,8 @@ export function RecommendationCard(props: {
   recommendation: PartRecommendationViewModel;
   isInDraft: boolean;
   onAdd: () => void;
+  vehicleId: string;
+  nodeId: string | null;
 }) {
   const accent = merchandiseAccentColor[props.label];
   const labelText = MERCHANDISE_LABELS_RU[props.label];
@@ -39,6 +42,12 @@ export function RecommendationCard(props: {
         {rec.partType ? (
           <div style={specsLineStyle}>{rec.partType.replaceAll("_", " ")}</div>
         ) : null}
+        {rec.trustBadge ? (
+          <div style={trustChipStyle}>{trustBadgeLabelRu(rec.trustBadge)}</div>
+        ) : null}
+        {rec.communityLineRu ? (
+          <div style={communityLineStyle}>{rec.communityLineRu}</div>
+        ) : null}
       </div>
       {reasons.length > 0 ? (
         <ul style={reasonListStyle}>
@@ -53,9 +62,11 @@ export function RecommendationCard(props: {
       <div style={footerStyle}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={priceStyle}>{priceLabel}</div>
-          <div style={fitsStyle}>
-            <CheckIcon color={pickerColors.successStrong} /> Подходит
-          </div>
+          <PickerFitmentReportLinkFromRecommendation
+            vehicleId={props.vehicleId}
+            nodeId={props.nodeId}
+            recommendation={rec}
+          />
         </div>
         <button
           type="button"
@@ -83,6 +94,28 @@ function buildReasons(rec: PartRecommendationViewModel): string[] {
   if (rec.compatibilityWarning) list.push(rec.compatibilityWarning);
   return list;
 }
+
+function trustBadgeLabelRu(
+  badge: NonNullable<PartRecommendationViewModel["trustBadge"]>
+): string {
+  if (badge === "VERIFIED_BY_MOTOTWIN") return "Проверено MotoTwin";
+  if (badge === "COMMUNITY_CONFIRMED") return "Подтверждено сообществом";
+  return "Сигнал сообщества";
+}
+
+const trustChipStyle: CSSProperties = {
+  marginTop: 6,
+  fontSize: 11,
+  fontWeight: 700,
+  color: "#9AE6B4",
+};
+
+const communityLineStyle: CSSProperties = {
+  marginTop: 4,
+  fontSize: 11,
+  lineHeight: 1.35,
+  color: pickerColors.textMuted,
+};
 
 function formatPriceRu(amount: number | null, currency: string | null): string {
   if (amount == null || !Number.isFinite(amount)) {
@@ -195,15 +228,6 @@ const priceStyle: CSSProperties = {
   color: pickerColors.text,
   minWidth: 0,
   overflowWrap: "anywhere",
-};
-
-const fitsStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 4,
-  marginTop: 4,
-  fontSize: 12,
-  color: pickerColors.successText,
 };
 
 const addButtonStyle: CSSProperties = {

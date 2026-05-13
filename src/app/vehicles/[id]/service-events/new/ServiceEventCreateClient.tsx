@@ -210,7 +210,17 @@ export function ServiceEventCreateClient() {
             nodeId: anchorNodeId,
           });
         }
-        router.replace(withHighlightReturnTo(decodedReturnTo, newId));
+        let dest = withHighlightReturnTo(decodedReturnTo, newId);
+        if (res.suggestFitmentReport?.suggestions?.length) {
+          try {
+            const u = new URL(dest, typeof window !== "undefined" ? window.location.origin : "http://local");
+            u.searchParams.set("fitmentReportHint", "1");
+            dest = `${u.pathname}${u.search}${u.hash}`;
+          } catch {
+            // ignore malformed returnTo
+          }
+        }
+        router.replace(dest);
       } catch (e) {
         console.error(e);
         setSubmitError(e instanceof Error ? e.message : "Не удалось сохранить сервисное событие.");

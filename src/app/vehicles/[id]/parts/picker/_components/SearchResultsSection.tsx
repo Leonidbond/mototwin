@@ -3,9 +3,12 @@
 import type { CSSProperties } from "react";
 import type { PartSkuViewModel } from "@mototwin/types";
 import { getPartSkuViewModelDisplayLines } from "@mototwin/domain";
+import { PickerFitmentReportLinkFromSku } from "./PickerFitmentReportLink";
 import { pickerColors, pickerSectionSubtitleStyle, pickerSectionTitleStyle } from "./picker-styles";
 
 export function SearchResultsSection(props: {
+  vehicleId: string;
+  nodeId: string | null;
   query: string;
   results: PartSkuViewModel[];
   /** Если больше, чем results.length — показываем «из N в ответе» (клиентский фильтр). */
@@ -65,6 +68,8 @@ export function SearchResultsSection(props: {
               sku={sku}
               isInDraft={props.draftSkuIds.has(sku.id)}
               onAdd={() => props.onAddSku(sku)}
+              vehicleId={props.vehicleId}
+              nodeId={props.nodeId}
             />
           ))}
         </div>
@@ -73,7 +78,13 @@ export function SearchResultsSection(props: {
   );
 }
 
-function SearchResultRow(props: { sku: PartSkuViewModel; isInDraft: boolean; onAdd: () => void }) {
+function SearchResultRow(props: {
+  sku: PartSkuViewModel;
+  isInDraft: boolean;
+  onAdd: () => void;
+  vehicleId: string;
+  nodeId: string | null;
+}) {
   const lines = getPartSkuViewModelDisplayLines(props.sku);
   const price = formatPriceRu(props.sku.priceAmount, props.sku.currency);
   return (
@@ -97,6 +108,12 @@ function SearchResultRow(props: { sku: PartSkuViewModel; isInDraft: boolean; onA
             {lines.secondaryLine}
           </div>
         ) : null}
+        <PickerFitmentReportLinkFromSku
+          vehicleId={props.vehicleId}
+          nodeId={props.nodeId}
+          sku={props.sku}
+          variant="inlineMuted"
+        />
       </div>
       <div style={{ textAlign: "right", minWidth: 72, flexShrink: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: pickerColors.text }}>{price}</div>

@@ -9,6 +9,7 @@ export type PartsCartSummary = {
   ordered: CartSummaryMetric;
   bought: CartSummaryMetric;
   installed: CartSummaryMetric;
+  rejected: CartSummaryMetric;
 };
 
 function sumCostAmount(items: PartWishlistItemViewModel[]): number {
@@ -28,11 +29,13 @@ export function buildPartsCartSummary(items: PartWishlistItemViewModel[]): Parts
   const ordered = byStatus(items, "ORDERED");
   const bought = byStatus(items, "BOUGHT");
   const installed = byStatus(items, "INSTALLED");
+  const rejected = byStatus(items, "REJECTED");
   return {
     all: { count: items.length, amount: sumCostAmount(items) },
     needed: { count: needed.length, amount: sumCostAmount(needed) },
     ordered: { count: ordered.length, amount: sumCostAmount(ordered) },
     bought: { count: bought.length, amount: sumCostAmount(bought) },
     installed: { count: installed.length, amount: sumCostAmount(installed) },
+    rejected: { count: rejected.length, amount: sumCostAmount(rejected) },
   };
 }

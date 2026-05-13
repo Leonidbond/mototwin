@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PartWishlistItemStatus } from "@prisma/client";
+import { PartWishlistItemSource, PartWishlistItemStatus } from "@prisma/client";
 import { z } from "zod";
 import {
   applySkuDefaultsToWishlistDraft,
@@ -20,7 +20,7 @@ type RouteContext = {
   }>;
 };
 
-const statusEnum = z.enum(["NEEDED", "ORDERED", "BOUGHT", "INSTALLED"]);
+const statusEnum = z.enum(["NEEDED", "ORDERED", "BOUGHT", "INSTALLED", "REJECTED"]);
 
 const wishlistSkuSelect = {
   id: true,
@@ -64,6 +64,7 @@ const createWishlistSchema = z
     status: statusEnum.optional(),
     costAmount: z.union([z.number().min(0), z.null()]).optional(),
     currency: z.union([z.string(), z.null()]).optional(),
+    source: z.enum(["RECOMMENDATION", "USER_ADDED"]).optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.skuId && !data.title) {
@@ -101,6 +102,7 @@ function toWire(row: {
   title: string;
   quantity: number;
   status: PartWishlistItemStatus;
+  source: PartWishlistItemSource;
   comment: string | null;
   costAmount: number | null;
   currency: string | null;
@@ -117,6 +119,7 @@ function toWire(row: {
     title: row.title,
     quantity: row.quantity,
     status: row.status,
+    source: row.source,
     comment: row.comment,
     costAmount: row.costAmount,
     currency: row.currency,
@@ -238,6 +241,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           title: draft.title,
           quantity,
           status: data.status ?? PartWishlistItemStatus.NEEDED,
+          source: data.source ?? PartWishlistItemSource.RECOMMENDATION,
           comment: data.comment?.trim() ? data.comment.trim() : null,
           nodeId,
           costAmount,

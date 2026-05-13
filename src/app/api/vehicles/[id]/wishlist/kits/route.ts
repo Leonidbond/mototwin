@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PartWishlistItemStatus } from "@prisma/client";
+import { PartWishlistItemSource, PartWishlistItemStatus } from "@prisma/client";
 import { z } from "zod";
 import {
-  buildPartRecommendationViewModel,
-  buildPartSkuViewModel,
   buildWishlistItemSkuInfo,
   expandServiceKitToWishlistDrafts,
   getServiceKitsForNode,
   normalizeWishlistTitle,
   normalizePartWishlistCostMutationArgs,
-  sortPartRecommendations,
 } from "@mototwin/domain";
 import type { PartWishlistItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
+import { buildRecommendationsForNodeWithCommunity } from "@/lib/build-recommendations-for-node-with-community";
 import { getVehicleInCurrentContext, isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
 
@@ -90,6 +88,7 @@ function toWire(row: {
   title: string;
   quantity: number;
   status: PartWishlistItemStatus;
+  source: PartWishlistItemSource;
   comment: string | null;
   costAmount: number | null;
   currency: string | null;
@@ -106,6 +105,7 @@ function toWire(row: {
     title: row.title,
     quantity: row.quantity,
     status: row.status,
+    source: row.source,
     comment: row.comment,
     costAmount: row.costAmount,
     currency: row.currency,
@@ -114,86 +114,6 @@ function toWire(row: {
     node: row.node,
     sku: row.sku ? buildWishlistItemSkuInfo(row.sku) : null,
   };
-}
-
-async function buildRecommendationsForNode(
-  vehicle: { modelId: string; modelVariantId: string | null; modelVariant: { year: number } | null },
-  nodeId: string
-) {
-  const rows = await prisma.partSku.findMany({
-    where: {
-      isActive: true,
-      OR: [{ primaryNodeId: nodeId }, { nodeLinks: { some: { nodeId } } }],
-    },
-    include: {
-      primaryNode: { select: { id: true, code: true, name: true } },
-      partNumbers: { orderBy: { createdAt: "asc" } },
-      nodeLinks: {
-        include: { node: { select: { id: true, code: true, name: true } } },
-        where: { nodeId },
-        orderBy: { confidence: "desc" },
-      },
-      fitments: { orderBy: { confidence: "desc" } },
-      offers: { orderBy: { createdAt: "desc" }, take: 3 },
-    },
-    take: 60,
-  });
-
-  return sortPartRecommendations(
-    rows.map((row) => {
-      const sku = buildPartSkuViewModel(row);
-      const relation = row.nodeLinks[0];
-      const relationType =
-        relation?.relationType?.trim() ||
-        (row.primaryNodeId === nodeId ? "PRIMARY" : "ALTERNATIVE");
-      const relationConfidence = relation?.confidence ?? 60;
-      const hasExactFit = row.fitments.some(
-        (fitment) =>
-          fitment.modelVariantId &&
-          vehicle.modelVariantId &&
-          fitment.modelVariantId === vehicle.modelVariantId
-      );
-      const hasModelFit = row.fitments.some((fitment) => {
-        if (!fitment.modelId || fitment.modelId !== vehicle.modelId) {
-          return false;
-        }
-        const vehicleYear = vehicle.modelVariant?.year ?? null;
-        if (!vehicleYear) {
-          return true;
-        }
-        const yearFrom = fitment.yearFrom ?? Number.MIN_SAFE_INTEGER;
-        const yearTo = fitment.yearTo ?? Number.MAX_SAFE_INTEGER;
-        return vehicleYear >= yearFrom && vehicleYear <= yearTo;
-      });
-      const hasGenericFitment = row.fitments.some(
-        (fitment) => (fitment.fitmentType || "").toUpperCase() === "GENERIC_NODE"
-      );
-      const matchingFitment =
-        row.fitments.find(
-          (fitment) =>
-            fitment.modelVariantId &&
-            vehicle.modelVariantId &&
-            fitment.modelVariantId === vehicle.modelVariantId
-        ) ??
-        row.fitments.find((fitment) => fitment.modelId && fitment.modelId === vehicle.modelId) ??
-        row.fitments.find((fitment) => (fitment.fitmentType || "").toUpperCase() === "GENERIC_NODE") ??
-        row.fitments[0] ??
-        null;
-      const fitmentConfidence = row.fitments[0]?.confidence ?? 0;
-      const confidence = Math.max(relationConfidence, fitmentConfidence);
-
-      return buildPartRecommendationViewModel({
-        sku,
-        nodeId,
-        relationType,
-        confidence,
-        hasExactFit,
-        hasModelFit,
-        hasGenericFitment,
-        fitmentNote: matchingFitment?.note ?? null,
-      });
-    })
-  );
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -244,7 +164,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const codes = [...new Set(kit.items.map((item) => item.nodeCode))];
     const rawNodes = await prisma.node.findMany({
       where: { code: { in: codes } },
-      select: { id: true, code: true },
+      select: { id: true, code: true, serviceGroup: true },
     });
 
     const nodeIdByCode = new Map<string, string>();
@@ -264,9 +184,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     }
 
-    const recommendationsByNodeCode = new Map<string, Awaited<ReturnType<typeof buildRecommendationsForNode>>>();
-    for (const [code, nodeId] of nodeIdByCode) {
-      recommendationsByNodeCode.set(code, await buildRecommendationsForNode(vehicle, nodeId));
+    const recommendationsByNodeCode = new Map<
+      string,
+      Awaited<ReturnType<typeof buildRecommendationsForNodeWithCommunity>>
+    >();
+    for (const node of rawNodes) {
+      const nodeId = nodeIdByCode.get(node.code);
+      if (!nodeId) {
+        continue;
+      }
+      recommendationsByNodeCode.set(
+        node.code,
+        await buildRecommendationsForNodeWithCommunity(prisma, vehicle, nodeId, {
+          code: node.code,
+          serviceGroup: node.serviceGroup,
+        })
+      );
     }
 
     const expanded = expandServiceKitToWishlistDrafts({

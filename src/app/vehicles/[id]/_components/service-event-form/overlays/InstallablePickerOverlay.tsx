@@ -29,6 +29,7 @@ const STATUS_LABEL_RU: Record<PartWishlistItemStatus, string> = {
   ORDERED: "Заказано",
   BOUGHT: "Куплено",
   INSTALLED: "Установлено",
+  REJECTED: "Не подошла",
 };
 
 function entryBadge(entry: InstallableForServiceEventEntry): string {

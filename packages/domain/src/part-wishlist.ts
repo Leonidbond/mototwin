@@ -22,6 +22,7 @@ export const PART_WISHLIST_STATUS_ORDER: PartWishlistItemStatus[] = [
   "ORDERED",
   "BOUGHT",
   "INSTALLED",
+  "REJECTED",
 ];
 
 export const partWishlistStatusLabelsRu: Record<PartWishlistItemStatus, string> = {
@@ -29,6 +30,7 @@ export const partWishlistStatusLabelsRu: Record<PartWishlistItemStatus, string> 
   ORDERED: "Заказано",
   BOUGHT: "Куплено",
   INSTALLED: "Установлено",
+  REJECTED: "Не подошла",
 };
 
 export function getPartWishlistStatusLabelRu(status: PartWishlistItemStatus): string {
@@ -40,7 +42,8 @@ export function isPartWishlistItemStatus(value: string): value is PartWishlistIt
     value === "NEEDED" ||
     value === "ORDERED" ||
     value === "BOUGHT" ||
-    value === "INSTALLED"
+    value === "INSTALLED" ||
+    value === "REJECTED"
   );
 }
 
@@ -314,9 +317,9 @@ export function isWishlistTransitionToInstalled(
   return previousStatus !== "INSTALLED" && nextStatus === "INSTALLED";
 }
 
-/** Active «shopping list»: everything except completed installs (still stored in DB / API). */
+/** Active «shopping list»: everything except completed installs and отклонённые позиции. */
 export function isActiveWishlistItem(item: { status: PartWishlistItemStatus }): boolean {
-  return item.status !== "INSTALLED";
+  return item.status !== "INSTALLED" && item.status !== "REJECTED";
 }
 
 export function filterActiveWishlistItems<T extends { status: PartWishlistItemStatus }>(

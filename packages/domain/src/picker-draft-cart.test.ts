@@ -25,6 +25,7 @@ function sku(over: Partial<PartSkuViewModel> = {}): PartSkuViewModel {
   return {
     id: "sku-1",
     seedKey: null,
+    partMasterId: null,
     primaryNodeId: "node-a",
     brandName: "Motul",
     canonicalName: "Масло",

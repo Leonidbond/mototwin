@@ -8,6 +8,7 @@ import {
 import { syncExpenseItemForServiceEvent } from "@/lib/expense-items";
 import { linkInstalledExpenseItemsToServiceEvent } from "@/lib/service-event-expense-links";
 import { prisma } from "@/lib/prisma";
+import { buildSuggestFitmentReportPayload } from "@/lib/suggest-fitment-report";
 import {
   serializeServiceEventRow,
   type RawServiceEventRow,
@@ -289,8 +290,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return created;
     });
 
+    const suggestFitmentReport = await buildSuggestFitmentReportPayload(prisma, {
+      vehicleId: id,
+      serviceEventId: serviceEvent.id,
+      items: (serviceEvent.items ?? []).map((item) => ({
+        nodeId: item.nodeId,
+        sku: item.sku,
+      })),
+    });
+
     return NextResponse.json(
-      { serviceEvent: serializeServiceEventRow(serviceEvent as unknown as RawServiceEventRow) },
+      {
+        serviceEvent: serializeServiceEventRow(serviceEvent as unknown as RawServiceEventRow),
+        suggestFitmentReport,
+      },
       { status: 201 }
     );
   } catch (error) {

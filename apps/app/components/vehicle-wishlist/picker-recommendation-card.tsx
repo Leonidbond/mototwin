@@ -56,6 +56,16 @@ export function PickerRecommendationCard(props: {
             {rec.partType.replaceAll("_", " ")}
           </Text>
         ) : null}
+        {rec.trustBadge ? (
+          <Text style={styles.trustChip} numberOfLines={1}>
+            {trustBadgeLabelRu(rec.trustBadge)}
+          </Text>
+        ) : null}
+        {rec.communityLineRu ? (
+          <Text style={styles.communityLine} numberOfLines={2}>
+            {rec.communityLineRu}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.reasonList}>
         {reasons.map((reason, i) => (
@@ -101,6 +111,14 @@ function buildReasons(rec: PartRecommendationViewModel): string[] {
   if (rec.fitmentNote) list.push(rec.fitmentNote);
   if (rec.compatibilityWarning) list.push(rec.compatibilityWarning);
   return list;
+}
+
+function trustBadgeLabelRu(
+  badge: NonNullable<PartRecommendationViewModel["trustBadge"]>
+): string {
+  if (badge === "VERIFIED_BY_MOTOTWIN") return "Проверено MotoTwin";
+  if (badge === "COMMUNITY_CONFIRMED") return "Подтверждено сообществом";
+  return "Сигнал сообщества";
 }
 
 function formatPriceRu(amount: number | null, currency: string | null): string {
@@ -166,6 +184,18 @@ const styles = StyleSheet.create({
   specs: {
     marginTop: 4,
     fontSize: 12,
+    color: c.textMuted,
+  },
+  trustChip: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#9AE6B4",
+  },
+  communityLine: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 14,
     color: c.textMuted,
   },
   reasonList: {

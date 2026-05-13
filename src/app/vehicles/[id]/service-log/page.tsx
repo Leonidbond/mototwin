@@ -24,6 +24,7 @@ import {
   getTodayDateYmdLocal,
   getWishlistItemIdsFromInstalledPartsJson,
   resolveWishlistItemIdForServiceBundleItem,
+  resolvePrimaryCatalogNodeForServiceLogIcon,
   isServiceLogTimelineQueryActive,
   nodeAncestorPathLabelRu,
   SERVICE_ACTION_TYPE_OPTIONS,
@@ -46,6 +47,7 @@ import type {
   ServiceLogNodeFilter,
   TopServiceNodeItem,
 } from "@mototwin/types";
+import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 
 /** Тип строки журнала: действие по узлу или запись состояния. */
 type ServiceRowActionKind = ServiceActionType | "STATE_UPDATE";
@@ -2372,7 +2374,7 @@ function ServiceLogRow({
         }}
       >
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12, minWidth: 0 }}>
-          <ServiceTypeIcon actionKind={actionKind} iconCfg={iconCfg} size={36} />
+          <ServiceLogLeadingEventIcon event={event} actionKind={actionKind} iconCfg={iconCfg} size={26} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <span
               style={{
@@ -2633,7 +2635,7 @@ function ServiceLogEventDetails({
       <div style={{ padding: detailPanelHeaderPad, borderBottom: SPEC.borderSubtle }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
-            <ServiceTypeIcon actionKind={actionKind} iconCfg={iconCfg} size={34} />
+            <ServiceLogLeadingEventIcon event={event} actionKind={actionKind} iconCfg={iconCfg} size={24} />
             <div style={{ minWidth: 0 }}>
               <p style={{ fontSize: 15, fontWeight: 700, color: SPEC.textPrimary, lineHeight: 1.2 }}>
                 {entry.mainTitle}
@@ -3109,6 +3111,47 @@ function ServiceLogEventDetails({
 }
 
 // ─── Small components ──────────────────────────────────────────────────────────
+
+function ServiceLogLeadingEventIcon({
+  event,
+  actionKind,
+  iconCfg,
+  size,
+}: {
+  event: ServiceEventItem | null;
+  actionKind: ServiceRowActionKind;
+  iconCfg: ReturnType<typeof getServiceIconConfig>;
+  size: number;
+}) {
+  const node = resolvePrimaryCatalogNodeForServiceLogIcon(event);
+  if (node?.code) {
+    const src = getNodeTreeIconWebSrc(node.code, node.name);
+    if (src) {
+      return (
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: size,
+            height: size,
+            flexShrink: 0,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- static asset URL from bundled node-tree-icons */}
+          <img
+            src={src}
+            alt=""
+            width={size}
+            height={size}
+            style={{ objectFit: "contain", display: "block" }}
+          />
+        </span>
+      );
+    }
+  }
+  return <ServiceTypeIcon actionKind={actionKind} iconCfg={iconCfg} size={size} />;
+}
 
 function ServiceTypeIcon({
   actionKind,

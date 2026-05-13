@@ -122,6 +122,7 @@ export function buildPartRecommendationViewModel(
   const explanation = buildPartRecommendationExplanation(recommendationType);
   return {
     skuId: input.sku.id,
+    partMasterId: input.sku.partMasterId ?? null,
     canonicalName: input.sku.canonicalName,
     brandName: input.sku.brandName,
     partType: input.sku.partType,
@@ -136,6 +137,12 @@ export function buildPartRecommendationViewModel(
     whyRecommended: explanation.whyRecommended,
     fitmentNote: input.fitmentNote?.trim() || null,
     compatibilityWarning: explanation.compatibilityWarning,
+    trustBadge: null,
+    communityReportCount: 0,
+    communityScore: 0,
+    communityStatus: null,
+    communityLineRu: null,
+    communitySortBoost: 0,
   };
 }
 
@@ -164,6 +171,10 @@ export function sortPartRecommendationsWithinGroup(
   return [...items].sort((a, b) => {
     if (b.confidence !== a.confidence) {
       return b.confidence - a.confidence;
+    }
+    const byCommunity = (b.communitySortBoost ?? 0) - (a.communitySortBoost ?? 0);
+    if (byCommunity !== 0) {
+      return byCommunity;
     }
     const byPrice = Number(hasOfferPrice(b)) - Number(hasOfferPrice(a));
     if (byPrice !== 0) {
@@ -244,6 +255,8 @@ export function sortPartRecommendations(
     const byRelation = relationRank(a.relationType) - relationRank(b.relationType);
     if (byRelation !== 0) return byRelation;
     if (a.confidence !== b.confidence) return b.confidence - a.confidence;
+    const byCommunity = (b.communitySortBoost ?? 0) - (a.communitySortBoost ?? 0);
+    if (byCommunity !== 0) return byCommunity;
     const priceDiff = Number(hasVisiblePriceLegacy(b)) - Number(hasVisiblePriceLegacy(a));
     if (priceDiff !== 0) return priceDiff;
     return a.canonicalName.localeCompare(b.canonicalName, "ru");

@@ -4,6 +4,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -12,6 +13,7 @@ import {
   Text,
   TextInput,
   View,
+  type ImageSourcePropType,
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -48,9 +50,11 @@ import {
   isServiceLogTimelineQueryActive,
   nodeAncestorPathLabelRu,
   resolveWishlistItemIdForServiceBundleItem,
+  resolvePrimaryCatalogNodeForServiceLogIcon,
   SERVICE_ACTION_TYPE_OPTIONS,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
+import { getNodeTreeIconAsset } from "../../../../../src/node-tree-icons";
 import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../../components/expo-shell/keyboard-aware-scroll-screen";
 import { InternalScreenChrome } from "../../../components/expo-shell/internal-screen-chrome";
@@ -342,6 +346,48 @@ function getRowActionKind(entry: ServiceLogEntryViewModel, event: ServiceEventIt
   return "SERVICE";
 }
 
+function ServiceLogJournalLeadingIcon({
+  event,
+  actionKind,
+  size,
+}: {
+  event: ServiceEventItem | null;
+  actionKind: ServiceRowActionKind;
+  size: number;
+}) {
+  const iconCfg = getServiceIconConfig(actionKind);
+  const node = resolvePrimaryCatalogNodeForServiceLogIcon(event);
+  if (node?.code) {
+    const src = getNodeTreeIconAsset(node.code, node.name) as ImageSourcePropType;
+    return (
+      <Image
+        alt=""
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        source={src}
+        style={{ width: size, height: size, flexShrink: 0 }}
+        resizeMode="contain"
+      />
+    );
+  }
+  const glyphSize = Math.round(size * 0.5);
+  return (
+    <View
+      style={[
+        styles.journalTypeIcon,
+        {
+          width: size,
+          height: size,
+          borderRadius: 999,
+          backgroundColor: iconCfg.bg,
+        },
+      ]}
+    >
+      <ServiceLogActionGlyph kind={actionKind as ServiceLogGlyphKind} size={glyphSize} color={iconCfg.iconColor} />
+    </View>
+  );
+}
+
 function JournalTimelineRow({
   entry,
   event,
@@ -419,6 +465,7 @@ function JournalTimelineRow({
         >
           <View style={styles.journalCardInner}>
             <View style={styles.journalTitleBlock}>
+              <ServiceLogJournalLeadingIcon event={event} actionKind={actionKind} size={26} />
               <View style={styles.journalTitleTexts}>
                 <Text
                   style={[styles.journalMainTitle, isStateUpdate && styles.journalMainTitleState]}
@@ -442,11 +489,6 @@ function JournalTimelineRow({
       </View>
     </Pressable>
   );
-}
-
-/** Для sheet и навигации (совпадает с web getMobileCompactCost / getCompactCost). */
-function getMobileCompactCost(entry: ServiceLogEntryViewModel): string | null {
-  return getCompactCost(entry);
 }
 
 function serviceLogHighlightReturnPath(vehicleId: string, eventId: string): string {
@@ -671,7 +713,6 @@ function MobileEventDetailSheet({
   }
   const isStateUpdate = entry.eventKind === "STATE_UPDATE";
   const actionKind = getRowActionKind(entry, event);
-  const iconCfg = getServiceIconConfig(actionKind);
   const cost = getCompactCost(entry);
   const intervalLabel = getIntervalLabel(event);
   const performerLabel = getPerformerLabel(event?.performedBy);
@@ -692,9 +733,7 @@ function MobileEventDetailSheet({
           <View style={styles.detailSheetHandle} />
           <View style={styles.detailSheetHeader}>
             <View style={styles.detailSheetHeaderRow}>
-              <View style={[styles.journalTypeIcon, { backgroundColor: iconCfg.bg }]}>
-                <ServiceLogActionGlyph kind={actionKind as ServiceLogGlyphKind} size={18} color={iconCfg.iconColor} />
-              </View>
+              <ServiceLogJournalLeadingIcon event={event} actionKind={actionKind} size={24} />
               <View style={styles.detailSheetHeaderText}>
                 <Text style={styles.detailSheetTitle} numberOfLines={2}>
                   {entry.mainTitle}
@@ -2733,6 +2772,9 @@ const styles = StyleSheet.create({
   journalTitleBlock: {
     flex: 1,
     minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   journalTypeIcon: {
     width: 36,

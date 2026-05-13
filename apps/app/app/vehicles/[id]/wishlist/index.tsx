@@ -93,6 +93,7 @@ const CART_STATUS_COLOR: Record<PartWishlistItemStatus, string> = {
   ORDERED: "#F5C400",
   BOUGHT: "#36A3FF",
   INSTALLED: "#30D158",
+  REJECTED: "#8E8E93",
 };
 
 function tintRgb(hex: string, alpha: number): string {
@@ -366,21 +367,23 @@ export default function VehicleWishlistScreen() {
   const summaryCards = useMemo(() => {
     const summaryMetricByStatus: Record<
       PartWishlistItemStatus,
-      "needed" | "ordered" | "bought" | "installed"
+      "needed" | "ordered" | "bought" | "installed" | "rejected"
     > = {
       NEEDED: "needed",
       ORDERED: "ordered",
       BOUGHT: "bought",
       INSTALLED: "installed",
+      REJECTED: "rejected",
     };
     const iconByStatus: Record<
       PartWishlistItemStatus,
-      "report-problem" | "inventory-2" | "shopping-bag" | "check-circle"
+      "report-problem" | "inventory-2" | "shopping-bag" | "check-circle" | "cancel"
     > = {
       NEEDED: "report-problem",
       ORDERED: "inventory-2",
       BOUGHT: "shopping-bag",
       INSTALLED: "check-circle",
+      REJECTED: "cancel",
     };
     return [
       {

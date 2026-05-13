@@ -73,6 +73,8 @@ export type PartOffer = {
 export type PartSku = {
   id: string;
   seedKey: string | null;
+  /** Каноническая карточка детали; нужна для отчётов совместимости и агрегатов сообщества. */
+  partMasterId: string | null;
   primaryNodeId: string | null;
   brandName: string;
   canonicalName: string;

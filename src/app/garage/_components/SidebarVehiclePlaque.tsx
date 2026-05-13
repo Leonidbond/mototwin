@@ -3,13 +3,16 @@
 import type { StaticImageData } from "next/image";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type { GarageVehicleItem, VehicleDetail } from "@mototwin/types";
 import { getVehicleDetailSilhouetteStaticSrc } from "@/lib/vehicle-detail-silhouette";
 
 const SILHOUETTE_W_EXPANDED = 76;
 const SILHOUETTE_H_EXPANDED = 52;
+const SILHOUETTE_W_MODAL_COMPACT = 60;
+const SILHOUETTE_H_MODAL_COMPACT = 40;
 const SILHOUETTE_W_COLLAPSED = 40;
 const SILHOUETTE_H_COLLAPSED = 28;
 
@@ -17,12 +20,21 @@ export type SidebarVehiclePlaqueProps = {
   vehicle: VehicleDetail;
   title: string;
   subtitle: string;
-  /** Карточка мотоцикла (дашборд). */
+  /** Карточка мотоцикла (дашборд). В режиме `modalPicker` не используется. */
   href: string;
   collapsed: boolean;
   vehicles: GarageVehicleItem[];
   currentVehicleId: string;
   onSelectVehicle: (vehicleId: string) => void;
+  /**
+   * `modalPicker` — клик по плашке только открывает список мото из гаража (без ссылок на дашборд).
+   * Выпадающий список ренерится в `document.body`, чтобы не обрезался модалками с overflow.
+   */
+  variant?: "default" | "modalPicker";
+  /** Растянуть плашку на высоту ячейки грида (одинаковая высота с соседними колонками). */
+  fillGridCellHeight?: boolean;
+  /** Компактная высота (ряд контекста в модалке «добавить деталь»). */
+  compactTile?: boolean;
 };
 
 function labelForGarageVehicle(v: GarageVehicleItem): string {
@@ -41,11 +53,16 @@ export function SidebarVehiclePlaque({
   vehicles,
   currentVehicleId,
   onSelectVehicle,
+  variant = "default",
+  fillGridCellHeight = false,
+  compactTile = false,
 }: SidebarVehiclePlaqueProps) {
+  const isModalPicker = variant === "modalPicker";
   const src = getVehicleDetailSilhouetteStaticSrc(vehicle);
   const fullTitle = `${title} — ${subtitle}`.trim();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -55,7 +72,11 @@ export function SidebarVehiclePlaque({
     }
     const onDoc = (e: MouseEvent) => {
       const el = rootRef.current;
-      if (el && !el.contains(e.target as Node)) {
+      const t = e.target as Node;
+      if (isModalPicker && (e.target as HTMLElement).closest?.("[data-mt-sidebar-vehicle-dropdown]")) {
+        return;
+      }
+      if (el && !el.contains(t)) {
         close();
       }
     };
@@ -70,9 +91,30 @@ export function SidebarVehiclePlaque({
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, close]);
+  }, [open, close, isModalPicker]);
+
+  useLayoutEffect(() => {
+    if (!open || !isModalPicker) {
+      setAnchorRect(null);
+      return;
+    }
+    const measure = () => {
+      const el = rootRef.current;
+      if (el) {
+        setAnchorRect(el.getBoundingClientRect());
+      }
+    };
+    measure();
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [open, isModalPicker]);
 
   const canPick = vehicles.length > 1;
+  const menuOpenableModal = isModalPicker && vehicles.length > 0;
 
   const onPick = useCallback(
     (id: string) => {
@@ -83,6 +125,25 @@ export function SidebarVehiclePlaque({
     },
     [close, currentVehicleId, onSelectVehicle]
   );
+
+  const dropdownItems = vehicles.map((v) => {
+    const active = v.id === currentVehicleId;
+    return (
+      <li key={v.id} role="option" aria-selected={active}>
+        <button
+          type="button"
+          onClick={() => onPick(v.id)}
+          style={{
+            ...dropdownRowStyle,
+            backgroundColor: active ? "rgba(255,255,255,0.08)" : "transparent",
+            color: productSemanticColors.textPrimary,
+          }}
+        >
+          {labelForGarageVehicle(v)}
+        </button>
+      </li>
+    );
+  });
 
   if (collapsed) {
     return (
@@ -121,6 +182,109 @@ export function SidebarVehiclePlaque({
     );
   }
 
+  if (isModalPicker) {
+    const siloW = compactTile ? SILHOUETTE_W_MODAL_COMPACT : SILHOUETTE_W_EXPANDED;
+    const siloH = compactTile ? SILHOUETTE_H_MODAL_COMPACT : SILHOUETTE_H_EXPANDED;
+    let rowStyle: CSSProperties = expandedRowStyle;
+    if (fillGridCellHeight) {
+      rowStyle = { ...expandedRowStyle, alignItems: "flex-start", flex: 1, minHeight: 0 };
+    }
+    if (compactTile) {
+      rowStyle = { ...rowStyle, gap: 6 };
+    }
+    const rootStyle: CSSProperties = fillGridCellHeight
+      ? { position: "relative", alignSelf: "stretch", height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }
+      : { position: "relative" };
+    const buttonStyle: CSSProperties = {
+      ...expandedCardStyle,
+      ...modalPickerPlaqueButtonReset,
+      width: "100%",
+      cursor: menuOpenableModal ? "pointer" : "default",
+      opacity: menuOpenableModal ? 1 : 0.65,
+      ...(compactTile ? { padding: "6px 8px" } : {}),
+      ...(fillGridCellHeight
+        ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }
+        : {}),
+    };
+    const titleStyleResolved: CSSProperties =
+      fillGridCellHeight && compactTile
+        ? {
+            ...titleStyle,
+            whiteSpace: "normal",
+            overflowWrap: "anywhere",
+            textOverflow: "clip",
+            fontSize: 12,
+          }
+        : fillGridCellHeight
+          ? { ...titleStyle, whiteSpace: "normal", overflowWrap: "anywhere", textOverflow: "clip" }
+          : titleStyle;
+    const subtitleStyleResolved: CSSProperties =
+      fillGridCellHeight && compactTile
+        ? {
+            ...subtitleStyle,
+            whiteSpace: "normal",
+            overflowWrap: "anywhere",
+            textOverflow: "clip",
+            fontSize: 10,
+            marginTop: 1,
+          }
+        : fillGridCellHeight
+          ? { ...subtitleStyle, whiteSpace: "normal", overflowWrap: "anywhere", textOverflow: "clip" }
+          : subtitleStyle;
+    const chevronSpanStyle: CSSProperties = compactTile
+      ? { ...chevronButtonStyle, pointerEvents: "none", width: 26, height: 28 }
+      : { ...chevronButtonStyle, pointerEvents: "none" };
+
+    return (
+      <div ref={rootRef} style={rootStyle}>
+        <button
+          type="button"
+          disabled={!menuOpenableModal}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-label="Выбрать мотоцикл из гаража"
+          onClick={() => menuOpenableModal && setOpen((o) => !o)}
+          style={buttonStyle}
+        >
+          <div style={rowStyle}>
+            <div style={silhouetteLinkStyle} aria-hidden>
+              <SilhouetteImg src={src} width={siloW} height={siloH} />
+            </div>
+            <div style={{ ...textBlockStyle, minWidth: 0, flex: 1 }} title={fullTitle}>
+              <div style={titleStyleResolved}>{title}</div>
+              <div style={subtitleStyleResolved}>{subtitle}</div>
+            </div>
+            {menuOpenableModal ? (
+              <span style={chevronSpanStyle} aria-hidden>
+                <ChevronDown open={open} />
+              </span>
+            ) : null}
+          </div>
+        </button>
+        {open && menuOpenableModal && anchorRect && typeof document !== "undefined"
+          ? createPortal(
+              <ul
+                role="listbox"
+                data-mt-sidebar-vehicle-dropdown
+                style={{
+                  ...dropdownStyle,
+                  position: "fixed",
+                  top: anchorRect.bottom + 6,
+                  left: anchorRect.left,
+                  width: anchorRect.width,
+                  right: "auto",
+                  zIndex: 120,
+                }}
+              >
+                {dropdownItems}
+              </ul>,
+              document.body
+            )
+          : null}
+      </div>
+    );
+  }
+
   return (
     <div ref={rootRef} style={{ position: "relative" }}>
       <div style={expandedCardStyle}>
@@ -146,28 +310,7 @@ export function SidebarVehiclePlaque({
           ) : null}
         </div>
       </div>
-      {open && canPick ? (
-        <ul role="listbox" style={dropdownStyle}>
-          {vehicles.map((v) => {
-            const active = v.id === currentVehicleId;
-            return (
-              <li key={v.id} role="option" aria-selected={active}>
-                <button
-                  type="button"
-                  onClick={() => onPick(v.id)}
-                  style={{
-                    ...dropdownRowStyle,
-                    backgroundColor: active ? "rgba(255,255,255,0.08)" : "transparent",
-                    color: productSemanticColors.textPrimary,
-                  }}
-                >
-                  {labelForGarageVehicle(v)}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {open && canPick ? <ul role="listbox" style={dropdownStyle}>{dropdownItems}</ul> : null}
     </div>
   );
 }
@@ -239,6 +382,15 @@ const expandedCardStyle: CSSProperties = {
   backgroundColor: "rgba(255,255,255,0.03)",
   padding: "10px 10px",
   color: productSemanticColors.textPrimary,
+};
+
+const modalPickerPlaqueButtonReset: CSSProperties = {
+  appearance: "none",
+  WebkitAppearance: "none",
+  margin: 0,
+  textAlign: "left",
+  font: "inherit",
+  boxSizing: "border-box",
 };
 
 const expandedRowStyle: CSSProperties = {

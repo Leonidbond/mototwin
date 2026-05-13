@@ -88,16 +88,15 @@ prisma/
 
 Canonical index: `docs/README.md`.
 
+Сводка последних крупных изменений (fitment, подборщик, миграции, иконки): [`docs/mototwin_recent_implementation_notes_ru.md`](./mototwin_recent_implementation_notes_ru.md).
+
 ## 8. Node tree design icons (catalog row PNGs)
 
 ```text
-images/node-tree-icons-new/           # исходные спрайты из дизайна
-images/node-tree-icons/from-design/   # by-label/<SECTION>/<CODE>.png
+images/node-tree-icons-new/           # архив исходников из дизайна (не участвует в сборке)
+images/node-tree-icons/from-design/   # by-label/<SECTION>/<CODE>.png — канонические PNG
 images/node-tree-icons/nodes/         # копии для require() в приложении
 scripts/data/node-code-icon-source.json
-scripts/slice-chassis-row-7.mjs
-scripts/slice-chassis-row-6-protection.mjs
-scripts/postprocess-chassis-node-icons.mjs
 scripts/sync-node-icons-from-slices.mjs
 scripts/generate-node-tree-icons-ts.mjs
 src/node-tree-icons.ts                # сгенерировано

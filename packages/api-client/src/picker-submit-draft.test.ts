@@ -22,6 +22,7 @@ describe("submitPickerDraft", () => {
           sku: {
             id: "s1",
             seedKey: null,
+            partMasterId: null,
             primaryNodeId: null,
             brandName: "B",
             canonicalName: "X",
@@ -75,6 +76,7 @@ describe("submitPickerDraft", () => {
           sku: {
             id: "s1",
             seedKey: null,
+            partMasterId: null,
             primaryNodeId: null,
             brandName: "B",
             canonicalName: "X",
@@ -154,6 +156,7 @@ describe("submitPickerDraft", () => {
           sku: {
             id: "s1",
             seedKey: null,
+            partMasterId: null,
             primaryNodeId: "n",
             brandName: "B",
             canonicalName: "N",
@@ -270,6 +273,7 @@ describe("submitPickerDraft", () => {
           sku: {
             id: "s1",
             seedKey: null,
+            partMasterId: null,
             primaryNodeId: null,
             brandName: "B",
             canonicalName: "X",

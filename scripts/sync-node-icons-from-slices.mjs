@@ -1,6 +1,6 @@
 /**
- * Copies from-design slice PNGs into images/node-tree-icons/nodes/<code>.png
- * per scripts/data/node-code-icon-source.json.
+ * Copies from-design PNGs from images/node-tree-icons/from-design/by-label/…
+ * into images/node-tree-icons/nodes/<code>.png per scripts/data/node-code-icon-source.json.
  *
  * Run: node scripts/sync-node-icons-from-slices.mjs
  */

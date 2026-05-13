@@ -736,6 +736,31 @@ export function PartPickerPage({
                 breadcrumbs={pickerBreadcrumbs}
                 title="Подбор детали"
               />
+              <div style={{ marginTop: 10, marginBottom: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const q = selectedNodeId
+                      ? `?nodeId=${encodeURIComponent(selectedNodeId)}`
+                      : "";
+                    router.push(
+                      `/vehicles/${encodeURIComponent(vehicleId)}/parts/community${q}`
+                    );
+                  }}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    border: `1px solid ${pickerColors.border}`,
+                    backgroundColor: pickerColors.surface,
+                    color: pickerColors.text,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Добавить свою деталь
+                </button>
+              </div>
 
               {nodeTreeError ? (
                 <div style={{ ...bannerBaseStyle, ...bannerVariantStyle("error") }}>{nodeTreeError}</div>
@@ -836,6 +861,8 @@ export function PartPickerPage({
 
                       {showSearchResults ? (
                         <SearchResultsSection
+                          vehicleId={vehicleId}
+                          nodeId={selectedNodeId}
                           query={debouncedSearch}
                           results={catalogDisplaySkuResults}
                           totalUnfiltered={skuResults.length}
@@ -851,6 +878,8 @@ export function PartPickerPage({
                         />
                       ) : (
                         <RecommendationsSection
+                          vehicleId={vehicleId}
+                          nodeId={selectedNodeId}
                           nodeName={nodeNameForUi}
                           rideProfile={vehicle?.rideProfile ?? null}
                           recommendations={merchandise}

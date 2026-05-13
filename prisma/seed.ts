@@ -5,6 +5,7 @@ import path from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { normalizePartNumber } from "@mototwin/domain";
+import { backfillPartMastersFromSkus } from "./backfill-part-masters";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -1749,11 +1750,13 @@ async function main() {
     update: {
       displayName: "Demo User",
       passwordHash: null,
+      isModerator: true,
     },
     create: {
       email: "demo@mototwin.local",
       displayName: "Demo User",
       passwordHash: null,
+      isModerator: true,
     },
   });
 
@@ -2211,6 +2214,7 @@ async function main() {
 
   const partCatalogStats = await seedPartCatalogFromJson(nodeIdByCode);
   const partCatalogQaStats = await seedPartCatalogQaFromJson(nodeIdByCode);
+  const partMasterBackfill = await backfillPartMastersFromSkus(prisma);
   const expenseDemoStats = await seedExpenseDemoData({
     userId: demoUser.id,
     nodeIdByCode,
@@ -2408,6 +2412,7 @@ async function main() {
     legacyNodesDeleted: removableLegacyNodes.length,
     ...partCatalogStats,
     ...partCatalogQaStats,
+    partMasterBackfill,
     ...expenseDemoStats,
     ...treeExpenseDemoStats,
     ...serviceBundleTemplateStats,

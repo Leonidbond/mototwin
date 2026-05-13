@@ -79,6 +79,7 @@ function skuFromRecommendation(rec: PartRecommendationViewModel): PartSkuViewMod
   return {
     id: rec.skuId,
     seedKey: null,
+    partMasterId: rec.partMasterId ?? null,
     primaryNodeId: rec.primaryNode?.id ?? null,
     brandName: rec.brandName,
     canonicalName: rec.canonicalName,

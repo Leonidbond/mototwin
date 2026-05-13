@@ -178,5 +178,788 @@
     "labelSlug": "CHASSIS.SUBFRAME",
     "rawLabel": "Подрамник",
     "score": 100
+  },
+  "CONTROLS": {
+    "outRel": "by-label/CONTROLS/CONTROLS.png",
+    "labelSlug": "CONTROLS",
+    "rawLabel": "Органы управления",
+    "score": 100
+  },
+  "CONTROLS.CABLES": {
+    "outRel": "by-label/CONTROLS/CONTROLS.CABLES.png",
+    "labelSlug": "CONTROLS.CABLES",
+    "rawLabel": "Тросы/рубашки (общие)",
+    "score": 100
+  },
+  "CONTROLS.CLUTCH": {
+    "outRel": "by-label/CONTROLS/CONTROLS.CLUTCH.png",
+    "labelSlug": "CONTROLS.CLUTCH",
+    "rawLabel": "Рычаг/трос/гидро (как орган управления)",
+    "score": 100
+  },
+  "CONTROLS.FOOTPEG": {
+    "outRel": "by-label/CONTROLS/CONTROLS.FOOTPEG.png",
+    "labelSlug": "CONTROLS.FOOTPEG",
+    "rawLabel": "Подножки",
+    "score": 100
+  },
+  "CONTROLS.FRONT_BRAKE": {
+    "outRel": "by-label/CONTROLS/CONTROLS.FRONT_BRAKE.png",
+    "labelSlug": "CONTROLS.FRONT_BRAKE",
+    "rawLabel": "Рычаг переднего тормоза",
+    "score": 100
+  },
+  "CONTROLS.REAR_BRAKE": {
+    "outRel": "by-label/CONTROLS/CONTROLS.REAR_BRAKE.png",
+    "labelSlug": "CONTROLS.REAR_BRAKE",
+    "rawLabel": "Педаль заднего тормоза",
+    "score": 100
+  },
+  "CONTROLS.SHIFTER": {
+    "outRel": "by-label/CONTROLS/CONTROLS.SHIFTER.png",
+    "labelSlug": "CONTROLS.SHIFTER",
+    "rawLabel": "Лапка КПП",
+    "score": 100
+  },
+  "CONTROLS.THROTTLE": {
+    "outRel": "by-label/CONTROLS/CONTROLS.THROTTLE.png",
+    "labelSlug": "CONTROLS.THROTTLE",
+    "rawLabel": "Ручка газа/трос",
+    "score": 100
+  },
+  "COOLING": {
+    "outRel": "by-label/COOLING/COOLING.png",
+    "labelSlug": "COOLING",
+    "rawLabel": "Охлаждение",
+    "score": 100
+  },
+  "COOLING.AIR": {
+    "outRel": "by-label/COOLING/COOLING.AIR.png",
+    "labelSlug": "COOLING.AIR",
+    "rawLabel": "Воздушное",
+    "score": 100
+  },
+  "COOLING.LIQUID": {
+    "outRel": "by-label/COOLING/COOLING.LIQUID.png",
+    "labelSlug": "COOLING.LIQUID",
+    "rawLabel": "Жидкостное",
+    "score": 100
+  },
+  "COOLING.LIQUID.COOLANT": {
+    "outRel": "by-label/COOLING/COOLING.LIQUID.COOLANT.png",
+    "labelSlug": "COOLING.LIQUID.COOLANT",
+    "rawLabel": "Охлаждающая жидкость",
+    "score": 100
+  },
+  "COOLING.LIQUID.RADIATOR": {
+    "outRel": "by-label/COOLING/COOLING.LIQUID.RADIATOR.png",
+    "labelSlug": "COOLING.LIQUID.RADIATOR",
+    "rawLabel": "Радиаторы/крышка",
+    "score": 100
+  },
+  "COOLING.LIQUID.PUMP": {
+    "outRel": "by-label/COOLING/COOLING.LIQUID.PUMP.png",
+    "labelSlug": "COOLING.LIQUID.PUMP",
+    "rawLabel": "Помпа/крыльчатка/сальники",
+    "score": 100
+  },
+  "COOLING.LIQUID.HOSES": {
+    "outRel": "by-label/COOLING/COOLING.LIQUID.HOSES.png",
+    "labelSlug": "COOLING.LIQUID.HOSES",
+    "rawLabel": "Патрубки/хомуты",
+    "score": 100
+  },
+  "COOLING.LIQUID.THERMOSTAT": {
+    "outRel": "by-label/COOLING/COOLING.LIQUID.THERMOSTAT.png",
+    "labelSlug": "COOLING.LIQUID.THERMOSTAT",
+    "rawLabel": "Термостат",
+    "score": 100
+  },
+  "COOLING.LIQUID.EXPANSION": {
+    "outRel": "by-label/COOLING/COOLING.LIQUID.EXPANSION.png",
+    "labelSlug": "COOLING.LIQUID.EXPANSION",
+    "rawLabel": "Расширительный бачок",
+    "score": 100
+  },
+  "DRIVETRAIN": {
+    "outRel": "by-label/DRIVETRAIN/DRIVETRAIN.png",
+    "labelSlug": "DRIVETRAIN",
+    "rawLabel": "Привод",
+    "score": 100
+  },
+  "DRIVETRAIN.CHAIN": {
+    "outRel": "by-label/DRIVETRAIN/DRIVETRAIN.CHAIN.png",
+    "labelSlug": "DRIVETRAIN.CHAIN",
+    "rawLabel": "Цепь",
+    "score": 100
+  },
+  "DRIVETRAIN.CHAIN_GUIDE": {
+    "outRel": "by-label/DRIVETRAIN/DRIVETRAIN.CHAIN_GUIDE.png",
+    "labelSlug": "DRIVETRAIN.CHAIN_GUIDE",
+    "rawLabel": "Ролики/направляющая",
+    "score": 100
+  },
+  "DRIVETRAIN.FRONT_SPROCKET": {
+    "outRel": "by-label/DRIVETRAIN/DRIVETRAIN.FRONT_SPROCKET.png",
+    "labelSlug": "DRIVETRAIN.FRONT_SPROCKET",
+    "rawLabel": "Ведущая звезда",
+    "score": 100
+  },
+  "DRIVETRAIN.GUARD": {
+    "outRel": "by-label/DRIVETRAIN/DRIVETRAIN.GUARD.png",
+    "labelSlug": "DRIVETRAIN.GUARD",
+    "rawLabel": "Защита цепи",
+    "score": 100
+  },
+  "DRIVETRAIN.REAR_SPROCKET": {
+    "outRel": "by-label/DRIVETRAIN/DRIVETRAIN.REAR_SPROCKET.png",
+    "labelSlug": "DRIVETRAIN.REAR_SPROCKET",
+    "rawLabel": "Ведомая звезда",
+    "score": 100
+  },
+  "DRIVETRAIN.SWINGARM_SLIDER": {
+    "outRel": "by-label/DRIVETRAIN/DRIVETRAIN.SWINGARM_SLIDER.png",
+    "labelSlug": "DRIVETRAIN.SWINGARM_SLIDER",
+    "rawLabel": "Слайдер/ползун цепи",
+    "score": 100
+  },
+  "DRIVETRAIN.TENSIONERS": {
+    "outRel": "by-label/DRIVETRAIN/DRIVETRAIN.TENSIONERS.png",
+    "labelSlug": "DRIVETRAIN.TENSIONERS",
+    "rawLabel": "Натяжители/регулировка",
+    "score": 100
+  },
+  "ELECTRICS": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.png",
+    "labelSlug": "ELECTRICS",
+    "rawLabel": "Электрика",
+    "score": 100
+  },
+  "ELECTRICS.BATTERY": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.BATTERY.png",
+    "labelSlug": "ELECTRICS.BATTERY",
+    "rawLabel": "АКБ/клеммы",
+    "score": 100
+  },
+  "ELECTRICS.CHARGING": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.CHARGING.STATOR.png",
+    "labelSlug": "ELECTRICS.CHARGING",
+    "rawLabel": "Зарядка",
+    "score": 100,
+    "note": "same-icon-as-ELECTRICS.CHARGING.STATOR"
+  },
+  "ELECTRICS.CHARGING.REGULATOR": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.CHARGING.REGULATOR.png",
+    "labelSlug": "ELECTRICS.CHARGING.REGULATOR",
+    "rawLabel": "Регулятор напряжения",
+    "score": 100
+  },
+  "ELECTRICS.CHARGING.STATOR": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.CHARGING.STATOR.png",
+    "labelSlug": "ELECTRICS.CHARGING.STATOR",
+    "rawLabel": "Статор/ротор",
+    "score": 100
+  },
+  "ELECTRICS.DASH": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.DASH.SPEED.png",
+    "labelSlug": "ELECTRICS.DASH",
+    "rawLabel": "Приборка/датчики",
+    "score": 100,
+    "note": "same-icon-as-ELECTRICS.DASH.SPEED"
+  },
+  "ELECTRICS.DASH.NEUTRAL": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.DASH.NEUTRAL.png",
+    "labelSlug": "ELECTRICS.DASH.NEUTRAL",
+    "rawLabel": "Датчик нейтрали",
+    "score": 100
+  },
+  "ELECTRICS.DASH.SPEED": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.DASH.SPEED.png",
+    "labelSlug": "ELECTRICS.DASH.SPEED",
+    "rawLabel": "Датчик скорости",
+    "score": 100
+  },
+  "ELECTRICS.FUSES": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.FUSES.png",
+    "labelSlug": "ELECTRICS.FUSES",
+    "rawLabel": "Предохранители/реле",
+    "score": 100
+  },
+  "ELECTRICS.HORN": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.HORN.png",
+    "labelSlug": "ELECTRICS.HORN",
+    "rawLabel": "Сигнал",
+    "score": 100
+  },
+  "ELECTRICS.IGNITION": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.IGNITION.CDI_ECU.png",
+    "labelSlug": "ELECTRICS.IGNITION",
+    "rawLabel": "Зажигание",
+    "score": 100,
+    "note": "same-icon-as-ELECTRICS.IGNITION.CDI_ECU"
+  },
+  "ELECTRICS.IGNITION.CDI_ECU": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.IGNITION.CDI_ECU.png",
+    "labelSlug": "ELECTRICS.IGNITION.CDI_ECU",
+    "rawLabel": "CDI/ECU",
+    "score": 100
+  },
+  "ELECTRICS.IGNITION.COIL": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.IGNITION.COIL.png",
+    "labelSlug": "ELECTRICS.IGNITION.COIL",
+    "rawLabel": "Катушка",
+    "score": 100
+  },
+  "ELECTRICS.IGNITION.SPARK": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.IGNITION.SPARK.png",
+    "labelSlug": "ELECTRICS.IGNITION.SPARK",
+    "rawLabel": "Свеча/колпачок",
+    "score": 100
+  },
+  "ELECTRICS.LIGHTS": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.LIGHTS.HEAD.png",
+    "labelSlug": "ELECTRICS.LIGHTS",
+    "rawLabel": "Свет",
+    "score": 100,
+    "note": "same-icon-as-ELECTRICS.LIGHTS.HEAD"
+  },
+  "ELECTRICS.LIGHTS.HEAD": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.LIGHTS.HEAD.png",
+    "labelSlug": "ELECTRICS.LIGHTS.HEAD",
+    "rawLabel": "Фара",
+    "score": 100
+  },
+  "ELECTRICS.LIGHTS.TAIL": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.LIGHTS.TAIL.png",
+    "labelSlug": "ELECTRICS.LIGHTS.TAIL",
+    "rawLabel": "Задний фонарь",
+    "score": 100
+  },
+  "ELECTRICS.LIGHTS.TURN": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.LIGHTS.TURN.png",
+    "labelSlug": "ELECTRICS.LIGHTS.TURN",
+    "rawLabel": "Поворотники (если есть)",
+    "score": 100
+  },
+  "ELECTRICS.SENSORS": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.SENSORS.png",
+    "labelSlug": "ELECTRICS.SENSORS",
+    "rawLabel": "Датчики двигателя / общие датчики",
+    "score": 100
+  },
+  "ELECTRICS.WIRING": {
+    "outRel": "by-label/ELECTRICS/ELECTRICS.WIRING.png",
+    "labelSlug": "ELECTRICS.WIRING",
+    "rawLabel": "Проводка/жгуты/разъёмы",
+    "score": 100
+  },
+  "ENGINE": {
+    "outRel": "by-label/ENGINE/ENGINE.png",
+    "labelSlug": "ENGINE",
+    "rawLabel": "Двигатель",
+    "score": 100
+  },
+  "ENGINE.BOTTOMEND": {
+    "outRel": "by-label/ENGINE/ENGINE.BOTTOMEND.png",
+    "labelSlug": "ENGINE.BOTTOMEND",
+    "rawLabel": "Низ двигателя",
+    "score": 100
+  },
+  "ENGINE.BOTTOMEND.BEARINGS": {
+    "outRel": "by-label/ENGINE/ENGINE.BOTTOMEND.BEARINGS.png",
+    "labelSlug": "ENGINE.BOTTOMEND.BEARINGS",
+    "rawLabel": "Подшипники/сальники",
+    "score": 100
+  },
+  "ENGINE.BOTTOMEND.CRANK": {
+    "outRel": "by-label/ENGINE/ENGINE.BOTTOMEND.CRANK.png",
+    "labelSlug": "ENGINE.BOTTOMEND.CRANK",
+    "rawLabel": "Коленвал/шатун",
+    "score": 100
+  },
+  "ENGINE.CLUTCH": {
+    "outRel": "by-label/ENGINE/ENGINE.CLUTCH.png",
+    "labelSlug": "ENGINE.CLUTCH",
+    "rawLabel": "Сцепление",
+    "score": 100
+  },
+  "ENGINE.CLUTCH.ACTUATION": {
+    "outRel": "by-label/ENGINE/ENGINE.CLUTCH.ACTUATION.png",
+    "labelSlug": "ENGINE.CLUTCH.ACTUATION",
+    "rawLabel": "Привод сцепления (трос/гидро)",
+    "score": 100
+  },
+  "ENGINE.CLUTCH.BASKET": {
+    "outRel": "by-label/ENGINE/ENGINE.CLUTCH.BASKET.png",
+    "labelSlug": "ENGINE.CLUTCH.BASKET",
+    "rawLabel": "Корзина/ступица",
+    "score": 100
+  },
+  "ENGINE.CLUTCH.PLATES": {
+    "outRel": "by-label/ENGINE/ENGINE.CLUTCH.PLATES.png",
+    "labelSlug": "ENGINE.CLUTCH.PLATES",
+    "rawLabel": "Диски сцепления",
+    "score": 100
+  },
+  "ENGINE.GEARBOX": {
+    "outRel": "by-label/ENGINE/ENGINE.GEARBOX.png",
+    "labelSlug": "ENGINE.GEARBOX",
+    "rawLabel": "КПП",
+    "score": 100
+  },
+  "ENGINE.GEARBOX.GEARS": {
+    "outRel": "by-label/ENGINE/ENGINE.GEARBOX.GEARS.png",
+    "labelSlug": "ENGINE.GEARBOX.GEARS",
+    "rawLabel": "Шестерни/валы",
+    "score": 100
+  },
+  "ENGINE.GEARBOX.SHIFT": {
+    "outRel": "by-label/ENGINE/ENGINE.GEARBOX.SHIFT.png",
+    "labelSlug": "ENGINE.GEARBOX.SHIFT",
+    "rawLabel": "Барабан/вилки/механизм переключения",
+    "score": 100
+  },
+  "ENGINE.LUBE": {
+    "outRel": "by-label/ENGINE/ENGINE.LUBE.png",
+    "labelSlug": "ENGINE.LUBE",
+    "rawLabel": "Смазка",
+    "score": 100
+  },
+  "ENGINE.LUBE.FILTER": {
+    "outRel": "by-label/ENGINE/ENGINE.LUBE.FILTER.png",
+    "labelSlug": "ENGINE.LUBE.FILTER",
+    "rawLabel": "Маслофильтр/сетка",
+    "score": 100
+  },
+  "ENGINE.LUBE.GASKETS": {
+    "outRel": "by-label/ENGINE/ENGINE.LUBE.GASKETS.png",
+    "labelSlug": "ENGINE.LUBE.GASKETS",
+    "rawLabel": "Прокладки/сальники (двигатель)",
+    "score": 100
+  },
+  "ENGINE.LUBE.OIL": {
+    "outRel": "by-label/ENGINE/ENGINE.LUBE.OIL.png",
+    "labelSlug": "ENGINE.LUBE.OIL",
+    "rawLabel": "Масло двигателя",
+    "score": 100
+  },
+  "ENGINE.LUBE.PUMP": {
+    "outRel": "by-label/ENGINE/ENGINE.LUBE.PUMP.png",
+    "labelSlug": "ENGINE.LUBE.PUMP",
+    "rawLabel": "Маслонасос",
+    "score": 100
+  },
+  "ENGINE.MOUNTS": {
+    "outRel": "by-label/ENGINE/ENGINE.MOUNTS.png",
+    "labelSlug": "ENGINE.MOUNTS",
+    "rawLabel": "Крепления двигателя/опоры",
+    "score": 100,
+    "note": "archive-has-no-mounts-tile-uses-ДВИГАТЕЛЬ"
+  },
+  "ENGINE.START": {
+    "outRel": "by-label/ENGINE/ENGINE.START.png",
+    "labelSlug": "ENGINE.START",
+    "rawLabel": "Запуск двигателя",
+    "score": 100
+  },
+  "ENGINE.START.KICK": {
+    "outRel": "by-label/ENGINE/ENGINE.START.KICK.png",
+    "labelSlug": "ENGINE.START.KICK",
+    "rawLabel": "Кикстартер (если есть)",
+    "score": 100
+  },
+  "ENGINE.START.STARTER": {
+    "outRel": "by-label/ENGINE/ENGINE.START.STARTER.png",
+    "labelSlug": "ENGINE.START.STARTER",
+    "rawLabel": "Стартер/реле/бендикс (если есть)",
+    "score": 100
+  },
+  "ENGINE.TIMING": {
+    "outRel": "by-label/ENGINE/ENGINE.TIMING.png",
+    "labelSlug": "ENGINE.TIMING",
+    "rawLabel": "ГРМ",
+    "score": 100
+  },
+  "ENGINE.TIMING.CHAIN": {
+    "outRel": "by-label/ENGINE/ENGINE.TIMING.CHAIN.png",
+    "labelSlug": "ENGINE.TIMING.CHAIN",
+    "rawLabel": "Цепь ГРМ",
+    "score": 100
+  },
+  "ENGINE.TIMING.TENSIONER": {
+    "outRel": "by-label/ENGINE/ENGINE.TIMING.TENSIONER.png",
+    "labelSlug": "ENGINE.TIMING.TENSIONER",
+    "rawLabel": "Натяжитель/успокоители",
+    "score": 100
+  },
+  "ENGINE.TOPEND": {
+    "outRel": "by-label/ENGINE/ENGINE.TOPEND.png",
+    "labelSlug": "ENGINE.TOPEND",
+    "rawLabel": "Верх двигателя",
+    "score": 100
+  },
+  "ENGINE.TOPEND.CAM": {
+    "outRel": "by-label/ENGINE/ENGINE.TOPEND.CAM.png",
+    "labelSlug": "ENGINE.TOPEND.CAM",
+    "rawLabel": "Распредвал/рокеры",
+    "score": 100
+  },
+  "ENGINE.TOPEND.CYLINDER": {
+    "outRel": "by-label/ENGINE/ENGINE.TOPEND.CYLINDER.png",
+    "labelSlug": "ENGINE.TOPEND.CYLINDER",
+    "rawLabel": "Цилиндр",
+    "score": 100
+  },
+  "ENGINE.TOPEND.HEAD": {
+    "outRel": "by-label/ENGINE/ENGINE.TOPEND.HEAD.png",
+    "labelSlug": "ENGINE.TOPEND.HEAD",
+    "rawLabel": "ГБЦ",
+    "score": 100
+  },
+  "ENGINE.TOPEND.PISTON": {
+    "outRel": "by-label/ENGINE/ENGINE.TOPEND.PISTON.png",
+    "labelSlug": "ENGINE.TOPEND.PISTON",
+    "rawLabel": "Поршень",
+    "score": 100
+  },
+  "ENGINE.TOPEND.RINGS": {
+    "outRel": "by-label/ENGINE/ENGINE.TOPEND.RINGS.png",
+    "labelSlug": "ENGINE.TOPEND.RINGS",
+    "rawLabel": "Кольца",
+    "score": 100
+  },
+  "ENGINE.TOPEND.VALVES": {
+    "outRel": "by-label/ENGINE/ENGINE.TOPEND.VALVES.png",
+    "labelSlug": "ENGINE.TOPEND.VALVES",
+    "rawLabel": "Клапаны/сальники/пружины",
+    "score": 100
+  },
+  "EXHAUST": {
+    "outRel": "by-label/EXHAUST/EXHAUST.png",
+    "labelSlug": "EXHAUST",
+    "rawLabel": "Выпуск",
+    "score": 100
+  },
+  "EXHAUST.DBKILLER": {
+    "outRel": "by-label/EXHAUST/EXHAUST.DBKILLER.png",
+    "labelSlug": "EXHAUST.DBKILLER",
+    "rawLabel": "DB-killer/вставки (если есть)",
+    "score": 100
+  },
+  "EXHAUST.HEADER": {
+    "outRel": "by-label/EXHAUST/EXHAUST.HEADER.png",
+    "labelSlug": "EXHAUST.HEADER",
+    "rawLabel": "Коллектор/прокладки",
+    "score": 100
+  },
+  "EXHAUST.MUFFLER": {
+    "outRel": "by-label/EXHAUST/EXHAUST.MUFFLER.png",
+    "labelSlug": "EXHAUST.MUFFLER",
+    "rawLabel": "Глушитель/банка",
+    "score": 100
+  },
+  "EXHAUST.MOUNTS": {
+    "outRel": "by-label/EXHAUST/EXHAUST.MOUNTS.png",
+    "labelSlug": "EXHAUST.MOUNTS",
+    "rawLabel": "Крепёж/теплоэкраны",
+    "score": 100
+  },
+  "EXHAUST.SENSOR": {
+    "outRel": "by-label/EXHAUST/EXHAUST.SENSOR.png",
+    "labelSlug": "EXHAUST.SENSOR",
+    "rawLabel": "Лямбда/датчики (если есть)",
+    "score": 100
+  },
+  "FUEL": {
+    "outRel": "by-label/FUEL/FUEL.png",
+    "labelSlug": "FUEL",
+    "rawLabel": "Топливная система",
+    "score": 100
+  },
+  "FUEL.CARB": {
+    "outRel": "by-label/FUEL/FUEL.CARB.png",
+    "labelSlug": "FUEL.CARB",
+    "rawLabel": "Карбюратор",
+    "score": 100
+  },
+  "FUEL.CARB.REPAIR": {
+    "outRel": "by-label/FUEL/FUEL.CARB.REPAIR.png",
+    "labelSlug": "FUEL.CARB.REPAIR",
+    "rawLabel": "Ремкомплект/жиклёры/игла/поплавок",
+    "score": 100
+  },
+  "FUEL.EFI": {
+    "outRel": "by-label/FUEL/FUEL.EFI.png",
+    "labelSlug": "FUEL.EFI",
+    "rawLabel": "Инжектор (если EFI)",
+    "score": 100
+  },
+  "FUEL.EFI.INJECTOR": {
+    "outRel": "by-label/FUEL/FUEL.EFI.INJECTOR.png",
+    "labelSlug": "FUEL.EFI.INJECTOR",
+    "rawLabel": "Форсунка",
+    "score": 100
+  },
+  "FUEL.EFI.SENSORS": {
+    "outRel": "by-label/FUEL/FUEL.EFI.SENSORS.png",
+    "labelSlug": "FUEL.EFI.SENSORS",
+    "rawLabel": "Датчики (TPS/MAP/…)",
+    "score": 100
+  },
+  "FUEL.EFI.THROTTLE": {
+    "outRel": "by-label/FUEL/FUEL.EFI.THROTTLE.png",
+    "labelSlug": "FUEL.EFI.THROTTLE",
+    "rawLabel": "Дроссель",
+    "score": 100
+  },
+  "FUEL.LINES": {
+    "outRel": "by-label/FUEL/FUEL.LINES.png",
+    "labelSlug": "FUEL.LINES",
+    "rawLabel": "Топливные шланги/фильтр/кран",
+    "score": 100
+  },
+  "FUEL.PUMP": {
+    "outRel": "by-label/FUEL/FUEL.PUMP.png",
+    "labelSlug": "FUEL.PUMP",
+    "rawLabel": "Насос (если EFI)",
+    "score": 100
+  },
+  "FUEL.TANK": {
+    "outRel": "by-label/FUEL/FUEL.TANK.png",
+    "labelSlug": "FUEL.TANK",
+    "rawLabel": "Бак/крышка/клапаны",
+    "score": 100
+  },
+  "INTAKE": {
+    "outRel": "by-label/INTAKE/INTAKE.png",
+    "labelSlug": "INTAKE",
+    "rawLabel": "Впуск воздуха",
+    "score": 100
+  },
+  "INTAKE.AIRBOX": {
+    "outRel": "by-label/INTAKE/INTAKE.AIRBOX.png",
+    "labelSlug": "INTAKE.AIRBOX",
+    "rawLabel": "Airbox/патрубки",
+    "score": 100
+  },
+  "INTAKE.FILTER": {
+    "outRel": "by-label/INTAKE/INTAKE.FILTER.png",
+    "labelSlug": "INTAKE.FILTER",
+    "rawLabel": "Воздушный фильтр",
+    "score": 100
+  },
+  "STEERING": {
+    "outRel": "by-label/STEERING/STEERING.png",
+    "labelSlug": "STEERING",
+    "rawLabel": "Рулевое",
+    "score": 100
+  },
+  "STEERING.CONTROLS": {
+    "outRel": "by-label/STEERING/STEERING.CONTROLS.png",
+    "labelSlug": "STEERING.CONTROLS",
+    "rawLabel": "Пульты/кнопки",
+    "score": 100
+  },
+  "STEERING.DAMPER": {
+    "outRel": "by-label/STEERING/STEERING.DAMPER.png",
+    "labelSlug": "STEERING.DAMPER",
+    "rawLabel": "Демпфер руля (если есть)",
+    "score": 100
+  },
+  "STEERING.GRIPS": {
+    "outRel": "by-label/STEERING/STEERING.GRIPS.png",
+    "labelSlug": "STEERING.GRIPS",
+    "rawLabel": "Грипсы",
+    "score": 100
+  },
+  "STEERING.HANDLEBAR": {
+    "outRel": "by-label/STEERING/STEERING.HANDLEBAR.png",
+    "labelSlug": "STEERING.HANDLEBAR",
+    "rawLabel": "Руль/крепления/проставки",
+    "score": 100
+  },
+  "STEERING.HEADSET": {
+    "outRel": "by-label/STEERING/STEERING.HEADSET.png",
+    "labelSlug": "STEERING.HEADSET",
+    "rawLabel": "Рулевая колонка",
+    "score": 100
+  },
+  "STEERING.HEADSET.BEARINGS": {
+    "outRel": "by-label/STEERING/STEERING.HEADSET.BEARINGS.png",
+    "labelSlug": "STEERING.HEADSET.BEARINGS",
+    "rawLabel": "Подшипники рулевой",
+    "score": 100
+  },
+  "STEERING.TRIPLES": {
+    "outRel": "by-label/STEERING/STEERING.TRIPLES.png",
+    "labelSlug": "STEERING.TRIPLES",
+    "rawLabel": "Траверсы",
+    "score": 100
+  },
+  "SUSPENSION": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.png",
+    "labelSlug": "SUSPENSION",
+    "rawLabel": "Подвеска",
+    "score": 100
+  },
+  "SUSPENSION.FRONT": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.FRONT.png",
+    "labelSlug": "SUSPENSION.FRONT",
+    "rawLabel": "Передняя",
+    "score": 100
+  },
+  "SUSPENSION.FRONT.BUSHINGS": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.FRONT.BUSHINGS.png",
+    "labelSlug": "SUSPENSION.FRONT.BUSHINGS",
+    "rawLabel": "Втулки скольжения",
+    "score": 100
+  },
+  "SUSPENSION.FRONT.FORK": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.FRONT.FORK.png",
+    "labelSlug": "SUSPENSION.FRONT.FORK",
+    "rawLabel": "Вилка",
+    "score": 100
+  },
+  "SUSPENSION.FRONT.OIL": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.FRONT.OIL.png",
+    "labelSlug": "SUSPENSION.FRONT.OIL",
+    "rawLabel": "Масло/обслуживание",
+    "score": 100
+  },
+  "SUSPENSION.FRONT.SEALS": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.FRONT.SEALS.png",
+    "labelSlug": "SUSPENSION.FRONT.SEALS",
+    "rawLabel": "Сальники/пыльники",
+    "score": 100
+  },
+  "SUSPENSION.FRONT.SPRINGS": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.FRONT.SPRINGS.png",
+    "labelSlug": "SUSPENSION.FRONT.SPRINGS",
+    "rawLabel": "Пружины (если отдельно)",
+    "score": 100
+  },
+  "SUSPENSION.REAR": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.REAR.png",
+    "labelSlug": "SUSPENSION.REAR",
+    "rawLabel": "Задняя",
+    "score": 100
+  },
+  "SUSPENSION.REAR.BEARINGS": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.REAR.BEARINGS.png",
+    "labelSlug": "SUSPENSION.REAR.BEARINGS",
+    "rawLabel": "Подшипники/сальники/втулки маятника/линка",
+    "score": 100
+  },
+  "SUSPENSION.REAR.LINKAGE": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.REAR.LINKAGE.png",
+    "labelSlug": "SUSPENSION.REAR.LINKAGE",
+    "rawLabel": "Линк/прогрессия",
+    "score": 100
+  },
+  "SUSPENSION.REAR.SHOCK": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.REAR.SHOCK.png",
+    "labelSlug": "SUSPENSION.REAR.SHOCK",
+    "rawLabel": "Амортизатор",
+    "score": 100
+  },
+  "SUSPENSION.REAR.SWINGARM": {
+    "outRel": "by-label/SUSPENSION/SUSPENSION.REAR.SWINGARM.png",
+    "labelSlug": "SUSPENSION.REAR.SWINGARM",
+    "rawLabel": "Маятник",
+    "score": 100
+  },
+  "WHEELS": {
+    "outRel": "by-label/WHEELS/WHEELS.png",
+    "labelSlug": "WHEELS",
+    "rawLabel": "Колёса/шины",
+    "score": 100
+  },
+  "WHEELS.FRONT": {
+    "outRel": "by-label/WHEELS/WHEELS.FRONT.png",
+    "labelSlug": "WHEELS.FRONT",
+    "rawLabel": "Переднее колесо",
+    "score": 100
+  },
+  "WHEELS.FRONT.BEARINGS": {
+    "outRel": "by-label/WHEELS/WHEELS.FRONT.BEARINGS.png",
+    "labelSlug": "WHEELS.FRONT.BEARINGS",
+    "rawLabel": "Подшипники/ось/проставки",
+    "score": 100,
+    "note": "same-art-as-WHEELS.REAR.BEARINGS-archive"
+  },
+  "WHEELS.FRONT.HUB": {
+    "outRel": "by-label/WHEELS/WHEELS.FRONT.HUB.png",
+    "labelSlug": "WHEELS.FRONT.HUB",
+    "rawLabel": "Ступица",
+    "score": 100,
+    "note": "same-art-as-WHEELS.REAR.HUB-archive"
+  },
+  "WHEELS.FRONT.RIM": {
+    "outRel": "by-label/WHEELS/WHEELS.FRONT.RIM.png",
+    "labelSlug": "WHEELS.FRONT.RIM",
+    "rawLabel": "Обод",
+    "score": 100,
+    "note": "same-art-as-WHEELS.REAR.RIM-archive"
+  },
+  "WHEELS.FRONT.SPOKES": {
+    "outRel": "by-label/WHEELS/WHEELS.FRONT.SPOKES.png",
+    "labelSlug": "WHEELS.FRONT.SPOKES",
+    "rawLabel": "Спицы/ниппели",
+    "score": 100,
+    "note": "same-art-as-WHEELS.REAR.SPOKES-archive"
+  },
+  "WHEELS.REAR": {
+    "outRel": "by-label/WHEELS/WHEELS.REAR.png",
+    "labelSlug": "WHEELS.REAR",
+    "rawLabel": "Заднее колесо",
+    "score": 100
+  },
+  "WHEELS.REAR.BEARINGS": {
+    "outRel": "by-label/WHEELS/WHEELS.REAR.BEARINGS.png",
+    "labelSlug": "WHEELS.REAR.BEARINGS",
+    "rawLabel": "Подшипники/ось/проставки",
+    "score": 100
+  },
+  "WHEELS.REAR.HUB": {
+    "outRel": "by-label/WHEELS/WHEELS.REAR.HUB.png",
+    "labelSlug": "WHEELS.REAR.HUB",
+    "rawLabel": "Ступица",
+    "score": 100
+  },
+  "WHEELS.REAR.RIM": {
+    "outRel": "by-label/WHEELS/WHEELS.REAR.RIM.png",
+    "labelSlug": "WHEELS.REAR.RIM",
+    "rawLabel": "Обод",
+    "score": 100
+  },
+  "WHEELS.REAR.SPOKES": {
+    "outRel": "by-label/WHEELS/WHEELS.REAR.SPOKES.png",
+    "labelSlug": "WHEELS.REAR.SPOKES",
+    "rawLabel": "Спицы/ниппели",
+    "score": 100
+  },
+  "TIRES": {
+    "outRel": "by-label/TIRES/TIRES.png",
+    "labelSlug": "TIRES",
+    "rawLabel": "Резина/камеры",
+    "score": 100
+  },
+  "TIRES.FRONT": {
+    "outRel": "by-label/TIRES/TIRES.FRONT.png",
+    "labelSlug": "TIRES.FRONT",
+    "rawLabel": "Передняя шина/камера",
+    "score": 100
+  },
+  "TIRES.REAR": {
+    "outRel": "by-label/TIRES/TIRES.REAR.png",
+    "labelSlug": "TIRES.REAR",
+    "rawLabel": "Задняя шина/камера",
+    "score": 100
+  },
+  "TIRES.RIMLOCK": {
+    "outRel": "by-label/TIRES/TIRES.RIMLOCK.png",
+    "labelSlug": "TIRES.RIMLOCK",
+    "rawLabel": "Буксаторы/ободная лента",
+    "score": 100
   }
 }

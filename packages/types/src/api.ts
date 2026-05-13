@@ -56,6 +56,15 @@ export type ServiceEventsResponse = {
 
 export type CreateServiceEventResponse = {
   serviceEvent: ServiceEventItem;
+  suggestFitmentReport?: {
+    serviceEventId: string;
+    suggestions: Array<{
+      nodeId: string;
+      skuId: string | null;
+      partMasterId: string | null;
+      label: string;
+    }>;
+  } | null;
 };
 
 export type UpdateServiceEventResponse = {

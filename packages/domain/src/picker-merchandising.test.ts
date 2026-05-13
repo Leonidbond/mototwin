@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { PartRecommendationViewModel } from "@mototwin/types";
-import { classifyRecommendationsForPicker } from "./picker-merchandising.ts";
+import { classifyRecommendationsForPicker } from "./picker-merchandising";
 
 function rec(
   skuId: string,
@@ -12,6 +12,7 @@ function rec(
 ): PartRecommendationViewModel {
   return {
     skuId,
+    partMasterId: `pm_${skuId}`,
     recommendationType: type,
     recommendationLabel: "",
     whyRecommended: "",
@@ -26,6 +27,12 @@ function rec(
     relationType,
     fitmentNote: null,
     compatibilityWarning: null,
+    trustBadge: null,
+    communityReportCount: 0,
+    communityScore: 0,
+    communityStatus: null,
+    communityLineRu: null,
+    communitySortBoost: 0,
   };
 }
 

@@ -220,6 +220,7 @@ const INSTALLABLE_BADGE_BY_STATUS_RU: Record<PartWishlistItemStatus, string> = {
   ORDERED: "Заказано",
   BOUGHT: "Куплено",
   INSTALLED: "Установлено",
+  REJECTED: "Не подошла",
 };
 
 const CURRENCY_OPTIONS = ["RUB", "USD", "EUR"] as const;

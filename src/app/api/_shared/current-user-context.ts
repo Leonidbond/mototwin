@@ -14,6 +14,7 @@ export const DEMO_GARAGE_TITLE = "Мой гараж";
 export type CurrentUserContext = {
   userId: string;
   garageId: string;
+  isModerator: boolean;
 };
 
 export class CurrentUserContextError extends Error {
@@ -105,7 +106,7 @@ async function resolveCurrentUserEmail(): Promise<string> {
 async function findUserContextByEmail(email: string): Promise<CurrentUserContext> {
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true },
+    select: { id: true, isModerator: true },
   });
   if (!user) {
     throw new CurrentUserContextError(
@@ -131,5 +132,6 @@ async function findUserContextByEmail(email: string): Promise<CurrentUserContext
   return {
     userId: user.id,
     garageId: garage.id,
+    isModerator: user.isModerator,
   };
 }

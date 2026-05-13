@@ -131,6 +131,7 @@ export {
   getServiceLogEventKindBadgeLabel,
   groupServiceLogByMonth,
   buildServiceLogTimelineViewModel,
+  resolvePrimaryCatalogNodeForServiceLogIcon,
 } from "./service-log-view-models";
 export {
   buildVehicleSummaryViewModel,
@@ -305,6 +306,12 @@ export {
   type PartsCartSummary,
 } from "./parts-cart-summary";
 export {
+  normalizePartMasterBrand,
+  normalizePartMasterSku,
+  buildPartMasterIdentity,
+  resolvePartMasterSkuLabel,
+} from "./part-master-normalize";
+export {
   normalizePartNumber,
   getSkuDisplayPrice,
   buildPartSkuLabel,
@@ -316,6 +323,11 @@ export {
   getWishlistItemSkuDisplayLines,
   getPartSkuViewModelDisplayLines,
 } from "./part-catalog";
+export {
+  getPickerFitmentShortLabelRu,
+  getPickerSkuCatalogFitHintRu,
+  formatFitmentConfidenceStatusRu,
+} from "./picker-fitment-labels";
 export {
   PART_RECOMMENDATION_GROUP_ORDER,
   buildPartRecommendationGroupsForDisplay,
@@ -333,6 +345,18 @@ export {
   sortPartRecommendations,
   sortPartRecommendationsWithinGroup,
 } from "./part-recommendation";
+export {
+  computeFitmentConfidenceState,
+  type PublishedReportStats,
+  type VoteStats,
+} from "./fitment-confidence-recalc";
+export {
+  mergeCommunityFitmentIntoRecommendation,
+  compareRecommendationsWithCommunity,
+  recommendationTypeRank,
+  isSafetyCriticalNodeContext,
+  type CommunityFitmentMergeInput,
+} from "./part-recommendation-merge";
 export {
   SERVICE_KIT_DEFINITIONS,
   buildServiceKitPreview,

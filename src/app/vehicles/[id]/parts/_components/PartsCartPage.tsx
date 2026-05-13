@@ -143,6 +143,8 @@ function statusColor(status: PartWishlistItemStatus): string {
       return PARTS_CART_REF.statusBought;
     case "INSTALLED":
       return PARTS_CART_REF.statusInstalled;
+    case "REJECTED":
+      return PARTS_CART_REF.statusMuted;
   }
 }
 
@@ -155,11 +157,19 @@ function tint(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function SummaryIcon({ kind }: { kind: "all" | "needed" | "ordered" | "bought" | "installed" | "cart" }) {
+function SummaryIcon({ kind }: { kind: "all" | "needed" | "ordered" | "bought" | "installed" | "cart" | "rejected" }) {
   if (kind === "all") {
     return (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path d="M5 7h14M5 12h14M5 17h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === "rejected") {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     );
   }
@@ -410,7 +420,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
     label: string;
     value: CartSummaryMetric;
     color: string;
-    icon: "all" | "needed" | "ordered" | "bought" | "installed";
+    icon: "all" | "needed" | "ordered" | "bought" | "installed" | "rejected";
     filter: PartsStatusFilter;
   }> = [
     { key: "all", label: "Все", value: summary.all, color: "#ff6b00", icon: "all", filter: "ALL" },
@@ -418,6 +428,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
     { key: "ordered", label: "Заказано", value: summary.ordered, color: PARTS_CART_REF.statusOrdered, icon: "ordered", filter: "ORDERED" },
     { key: "bought", label: "Куплено", value: summary.bought, color: PARTS_CART_REF.statusBought, icon: "bought", filter: "BOUGHT" },
     { key: "installed", label: "Установлено", value: summary.installed, color: PARTS_CART_REF.statusInstalled, icon: "installed", filter: "INSTALLED" },
+    { key: "rejected", label: "Не подошла", value: summary.rejected, color: PARTS_CART_REF.statusMuted, icon: "rejected", filter: "REJECTED" },
   ];
 
   const updateAdvancedFilters = (patch: Partial<PartsAdvancedFilterState>) => {
@@ -617,7 +628,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
                 <span>Купить</span>
               </button>
             ) : null}
-            {item.status !== "INSTALLED" ? (
+            {item.status !== "INSTALLED" && item.status !== "REJECTED" ? (
               <button type="button" className={styles.actionButton} onClick={() => onPatchWishlistItemStatus(item.id, "INSTALLED", item.status)} disabled={isBusy} style={{ background: tint(PARTS_CART_REF.statusInstalled, 0.16), borderColor: tint(PARTS_CART_REF.statusInstalled, 0.35), color: PARTS_CART_REF.statusInstalled }}>
                 <span className={styles.actionIcon}><DetailActionIcon kind="installed" /></span>
                 <span>Установить</span>
@@ -937,7 +948,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
                               </div>
                               {openStatusMenuId === item.id && raw ? (
                                 <div className={styles.statusMenu}>
-                                  {PART_WISHLIST_STATUS_ORDER.map((nextStatus) => {
+                                  {(item.status === "REJECTED" ? (["REJECTED"] as const) : PART_WISHLIST_STATUS_ORDER).map((nextStatus) => {
                                     const nextColor = statusColor(nextStatus);
                                     const isCurrent = nextStatus === item.status;
                                     return (
@@ -958,9 +969,9 @@ export function PartsCartPage(props: PartsCartPageProps) {
                               {openRowMenuId === item.id && raw ? (
                                 <div className={styles.rowMenu}>
                                   <button type="button" onClick={() => { setOpenRowMenuId(null); onOpenWishlistEdit(raw); }}>Изменить</button>
-                                  {item.status !== "ORDERED" ? <button type="button" onClick={() => runStatusAction(item, raw, "ORDERED")} disabled={isBusy}>Заказано</button> : null}
-                                  {item.status !== "BOUGHT" ? <button type="button" onClick={() => runStatusAction(item, raw, "BOUGHT")} disabled={isBusy}>Куплено</button> : null}
-                                  {item.status !== "INSTALLED" ? <button type="button" onClick={() => runStatusAction(item, raw, "INSTALLED")} disabled={isBusy}>Установлено</button> : null}
+                                  {item.status !== "REJECTED" && item.status !== "ORDERED" ? <button type="button" onClick={() => runStatusAction(item, raw, "ORDERED")} disabled={isBusy}>Заказано</button> : null}
+                                  {item.status !== "REJECTED" && item.status !== "BOUGHT" ? <button type="button" onClick={() => runStatusAction(item, raw, "BOUGHT")} disabled={isBusy}>Куплено</button> : null}
+                                  {item.status !== "REJECTED" && item.status !== "INSTALLED" ? <button type="button" onClick={() => runStatusAction(item, raw, "INSTALLED")} disabled={isBusy}>Установлено</button> : null}
                                   {item.status === "INSTALLED" ? <button type="button" onClick={() => { setOpenRowMenuId(null); openWishlistItemJournal(item); }}>В журнал</button> : null}
                                   {canRepeatWishlistPurchase ? (
                                     <button
