@@ -158,8 +158,12 @@ export default function GaragePage() {
                 gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 420px), 1fr))",
               }}
             >
-              {vehicles.map((vehicle) => (
-                <VehicleCard key={vehicle.id} vehicle={vehicle} />
+              {vehicles.map((vehicle, index) => (
+                <VehicleCard
+                  key={vehicle.id}
+                  vehicle={vehicle}
+                  silhouettePriority={index < 2}
+                />
               ))}
               <AddMotorcycleCard />
             </div>

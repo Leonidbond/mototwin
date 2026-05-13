@@ -42,6 +42,8 @@ const TOP_NODE_ICONS: Record<TopNodeIconKey, StaticImageData> = {
 
 type Props = {
   vehicle: GarageVehicleItem;
+  /** First row of grid: eager-load silhouette for LCP. */
+  silhouettePriority?: boolean;
 };
 
 const LEGEND_COLORS = {
@@ -51,7 +53,7 @@ const LEGEND_COLORS = {
   recently: "#3AB8FF",
 } as const;
 
-export function VehicleCard({ vehicle }: Props) {
+export function VehicleCard({ vehicle, silhouettePriority }: Props) {
   const card = buildGarageCardProps(vehicle);
   const silhouetteKey = resolveGarageVehicleSilhouette(vehicle);
   const silhouetteClassLabel = getVehicleSilhouetteClassLabel(silhouetteKey);
@@ -99,7 +101,11 @@ export function VehicleCard({ vehicle }: Props) {
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <VehicleSilhouette vehicle={vehicle} silhouetteKey={silhouetteKey} />
+          <VehicleSilhouette
+            vehicle={vehicle}
+            silhouetteKey={silhouetteKey}
+            priority={silhouettePriority}
+          />
           <p style={{ marginTop: 2, textAlign: "center", ...captionStyle }}>
             Изображение класса &nbsp;•&nbsp; {silhouetteClassLabel}
           </p>

@@ -22,6 +22,8 @@ const SILHOUETTE_SRC = {
 export function VehicleSilhouette(props: {
   vehicle: GarageVehicleItem;
   silhouetteKey?: keyof typeof SILHOUETTE_SRC;
+  /** First visible cards: set so LCP silhouette is not lazy-loaded (Next.js LCP hint). */
+  priority?: boolean;
 }) {
   const key = props.silhouetteKey ?? resolveGarageVehicleSilhouette(props.vehicle);
   const src = SILHOUETTE_SRC[key] ?? SILHOUETTE_SRC.naked_roadster;
@@ -38,6 +40,7 @@ export function VehicleSilhouette(props: {
         src={src}
         alt={`Мотоцикл класса ${key.replaceAll("_", " ")}`}
         fill
+        priority={props.priority}
         sizes="(min-width: 1024px) 360px, 100vw"
         style={{ objectFit: "contain", opacity: 0.94 }}
       />

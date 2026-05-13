@@ -505,6 +505,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
               width={silhouetteSrc.width}
               height={silhouetteSrc.height}
               priority
+              loading="eager"
               sizes="(min-width: 1280px) 820px, 100vw"
               style={{
                 width: "100%",
