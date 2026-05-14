@@ -294,6 +294,7 @@ function ServiceEventFormInner({
   const [userTemplatesLoadError, setUserTemplatesLoadError] = useState("");
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [saveTemplateNameDraft, setSaveTemplateNameDraft] = useState("");
+  const [saveIncludeInPartPicker, setSaveIncludeInPartPicker] = useState(true);
   const [saveTemplateBusy, setSaveTemplateBusy] = useState(false);
   const [saveTemplateError, setSaveTemplateError] = useState("");
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
@@ -966,6 +967,7 @@ function ServiceEventFormInner({
   const openSaveTemplateModal = useCallback(() => {
     setSaveTemplateError("");
     setSaveTemplateNameDraft(form.title.trim());
+    setSaveIncludeInPartPicker(true);
     setSaveTemplateOpen(true);
   }, [form.title]);
 
@@ -977,6 +979,8 @@ function ServiceEventFormInner({
       const res = await api.createUserServiceEventFormTemplate({
         baseTitle: saveTemplateNameDraft.trim() || null,
         formSnapshot: snapshot,
+        includeInPartPicker:
+          form.mode === "ADVANCED" ? saveIncludeInPartPicker : undefined,
       });
       const tpl = res.template;
       setUserTemplates((prev) => [tpl, ...prev.filter((t) => t.id !== tpl.id)]);
@@ -991,7 +995,7 @@ function ServiceEventFormInner({
     } finally {
       setSaveTemplateBusy(false);
     }
-  }, [form, saveTemplateNameDraft]);
+  }, [form, saveIncludeInPartPicker, saveTemplateNameDraft]);
 
   const save = async () => {
     const validation = validateAddServiceEventFormValues(form, {
@@ -1579,6 +1583,24 @@ function ServiceEventFormInner({
             }}
           />
         </label>
+
+        {form.mode === "ADVANCED" ? (
+          <label
+            className="mt-3 flex cursor-pointer items-start gap-2 text-xs"
+            style={{ color: SERVICE_EVENT_PARTS_UI.text }}
+          >
+            <input
+              type="checkbox"
+              checked={saveIncludeInPartPicker}
+              onChange={(e) => setSaveIncludeInPartPicker(e.target.checked)}
+              disabled={saveTemplateBusy}
+              className="mt-0.5 h-4 w-4 shrink-0"
+            />
+            <span className="leading-snug" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
+              Показывать в подборе деталей как комплект обслуживания
+            </span>
+          </label>
+        ) : null}
 
         {saveTemplateError ? (
           <p className="mt-2 text-xs" style={{ color: productSemanticColors.error }}>

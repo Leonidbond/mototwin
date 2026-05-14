@@ -15,7 +15,17 @@ export function PickerKitsSection(props: {
   isLoading: boolean;
   onAddKit: (kit: ServiceKitViewModel) => void;
   onToggleExpand: (code: string) => void;
+  title?: string;
+  subtitle?: string;
+  emptyMessage?: string;
 }) {
+  const title = props.title ?? "Комплекты обслуживания";
+  const subtitle =
+    props.subtitle ??
+    "Готовые наборы для обслуживания узлов вашего мотоцикла";
+  const emptyMessage =
+    props.emptyMessage ??
+    "Для текущего контекста нет подходящих комплектов.";
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? props.kits : props.kits.slice(0, VISIBLE_LIMIT);
   const remaining = Math.max(0, props.kits.length - VISIBLE_LIMIT);
@@ -24,10 +34,8 @@ export function PickerKitsSection(props: {
     <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.headerTextCol}>
-          <Text style={styles.title}>Комплекты обслуживания</Text>
-          <Text style={styles.subtitle}>
-            Готовые наборы для обслуживания узлов вашего мотоцикла
-          </Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
       </View>
 
@@ -37,9 +45,7 @@ export function PickerKitsSection(props: {
         </View>
       ) : props.kits.length === 0 ? (
         <View style={styles.emptyBox}>
-          <Text style={styles.mutedText}>
-            Для текущего контекста нет подходящих комплектов.
-          </Text>
+          <Text style={styles.mutedText}>{emptyMessage}</Text>
         </View>
       ) : (
         <View style={styles.list}>

@@ -48,6 +48,7 @@ import type {
   PartRecommendationViewModel,
   PartSkuViewModel,
   PartWishlistItem,
+  PickerDraftItemSku,
   PickerDraftCart,
   PickerQuantitySubmitResolution,
   PickerSubmitDecision,
@@ -67,6 +68,7 @@ import { PickerNodeCtaBar } from "../../../../components/vehicle-wishlist/picker
 import { PickerRecommendationsSection } from "../../../../components/vehicle-wishlist/picker-recommendations-section";
 import { PickerSearchResultsSection } from "../../../../components/vehicle-wishlist/picker-search-results-section";
 import { PickerKitsSection } from "../../../../components/vehicle-wishlist/picker-kits-section";
+import { PickerUserKitSaveModal } from "../../../../components/vehicle-wishlist/picker-user-kit-save-modal";
 import {
   PickerDraftCartBar,
   PickerDraftCartSheet,
@@ -201,10 +203,12 @@ export default function WishlistPickerScreen() {
 
   const [kits, setKits] = useState<ServiceKitViewModel[]>([]);
   const [kitsLoading, setKitsLoading] = useState(false);
+  const [kitsReloadNonce, setKitsReloadNonce] = useState(0);
 
   const [draft, setDraft] = useState<PickerDraftCart>(() => createEmptyDraftCart(vehicleId || ""));
 
   const [expandedKitCode, setExpandedKitCode] = useState<string | null>(null);
+  const [addingKitCode, setAddingKitCode] = useState<string | null>(null);
   const [recAlternativesVisible, setRecAlternativesVisible] = useState(false);
 
   const [nodeModalOpen, setNodeModalOpen] = useState(false);
@@ -216,6 +220,7 @@ export default function WishlistPickerScreen() {
   const [maxPriceRub, setMaxPriceRub] = useState("");
 
   const [draftSheetOpen, setDraftSheetOpen] = useState(false);
+  const [saveUserKitOpen, setSaveUserKitOpen] = useState(false);
   const [submitPreviewModalOpen, setSubmitPreviewModalOpen] = useState(false);
   const [submitPreview, setSubmitPreview] = useState<PickerSubmitPreview | null>(null);
   const [quantityResolutionByDraftId, setQuantityResolutionByDraftId] = useState<
@@ -404,7 +409,7 @@ export default function WishlistPickerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, vehicleId, selectedNodeId]);
+  }, [apiBaseUrl, vehicleId, selectedNodeId, kitsReloadNonce]);
 
   useEffect(() => {
     if (debouncedSearch.length < 2) {
@@ -481,6 +486,30 @@ export default function WishlistPickerScreen() {
     return set;
   }, [draft.items]);
 
+  const userKits = useMemo(() => kits.filter((k) => k.isUserTemplate), [kits]);
+  const systemKits = useMemo(() => kits.filter((k) => !k.isUserTemplate), [kits]);
+
+  const draftSkuLinesForKit = useMemo(
+    () =>
+      draft.items
+        .filter((i): i is PickerDraftItemSku => i.kind === "sku")
+        .map((i) => ({
+          nodeId: i.nodeId,
+          sku: i.sku,
+          quantity: i.quantity,
+        })),
+    [draft.items]
+  );
+  const canSaveDraftAsUserKit = draftSkuLinesForKit.length >= 1;
+  const userKitModalInitialTitle = useMemo(() => {
+    const first = draftSkuLinesForKit[0];
+    if (!first) return "Мой комплект";
+    const brand = first.sku.brandName?.trim();
+    const name = first.sku.canonicalName?.trim();
+    if (brand && name) return `${brand} ${name}`;
+    return name || brand || "Мой комплект";
+  }, [draftSkuLinesForKit]);
+
   const whyMatches = useMemo(() => {
     if (!vehicle) return [];
     const modelLabel = `${vehicle.brandName} ${vehicle.modelName}`.trim();
@@ -533,9 +562,14 @@ export default function WishlistPickerScreen() {
   );
 
   const onAddKit = useCallback(
-    (kit: ServiceKitViewModel) => {
-      setDraft((d) => addKitToDraft(d, { kit, contextNodeId: selectedNodeId }));
-      setDraftSheetOpen(true);
+    async (kit: ServiceKitViewModel) => {
+      setAddingKitCode(kit.code);
+      try {
+        setDraft((d) => addKitToDraft(d, { kit, contextNodeId: selectedNodeId }));
+        setDraftSheetOpen(true);
+      } finally {
+        setAddingKitCode(null);
+      }
     },
     [selectedNodeId]
   );
@@ -806,17 +840,33 @@ export default function WishlistPickerScreen() {
                 />
               )}
 
-              <PickerKitsSection
-                kits={kits}
-                draftKitCodes={draftKitCodes}
-                addingKitCode={null}
-                expandedKitCode={expandedKitCode}
-                isLoading={kitsLoading}
-                onAddKit={onAddKit}
-                onToggleExpand={(code) =>
-                  setExpandedKitCode((prev) => (prev === code ? null : code))
-                }
-              />
+              <View style={styles.kitsStack}>
+                <PickerKitsSection
+                  kits={userKits}
+                  draftKitCodes={draftKitCodes}
+                  addingKitCode={addingKitCode}
+                  expandedKitCode={expandedKitCode}
+                  isLoading={kitsLoading}
+                  onAddKit={onAddKit}
+                  onToggleExpand={(code) =>
+                    setExpandedKitCode((prev) => (prev === code ? null : code))
+                  }
+                  title="Мои комплекты"
+                  subtitle="Сохранённые наборы из журнала или собранные вручную в подборе."
+                  emptyMessage="Создайте комплект из корзины (кнопка «Сохранить как комплект») или сохраните шаблон в журнале с включённым показом в подборе."
+                />
+                <PickerKitsSection
+                  kits={systemKits}
+                  draftKitCodes={draftKitCodes}
+                  addingKitCode={addingKitCode}
+                  expandedKitCode={expandedKitCode}
+                  isLoading={kitsLoading}
+                  onAddKit={onAddKit}
+                  onToggleExpand={(code) =>
+                    setExpandedKitCode((prev) => (prev === code ? null : code))
+                  }
+                />
+              </View>
 
               <PickerWhyMatchesPanel reasons={whyMatches} />
 
@@ -1106,6 +1156,30 @@ export default function WishlistPickerScreen() {
           setDraftSheetOpen(false);
           openSubmit();
         }}
+        onSaveAsKit={() => {
+          setDraftSheetOpen(false);
+          setSaveUserKitOpen(true);
+        }}
+        canSaveAsKit={canSaveDraftAsUserKit}
+      />
+
+      <PickerUserKitSaveModal
+        visible={saveUserKitOpen}
+        onClose={() => setSaveUserKitOpen(false)}
+        initialTitle={userKitModalInitialTitle}
+        lines={draftSkuLinesForKit}
+        onSubmit={(body) =>
+          createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).createUserServiceEventFormTemplate(
+            body
+          )
+        }
+        onSuccess={() => {
+          setKitsReloadNonce((n) => n + 1);
+          Alert.alert(
+            "Готово",
+            "Комплект сохранён. Он появился в разделе «Мои комплекты»."
+          );
+        }}
       />
     </SafeAreaView>
   );
@@ -1151,6 +1225,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 14,
   },
+  kitsStack: { gap: 20 },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -215,6 +215,18 @@ export {
   addServiceEventFormValuesFromUserTemplateJson,
 } from "./user-service-event-form-template";
 export {
+  USER_SERVICE_KIT_CODE_PREFIX,
+  isUserServiceKitCode,
+  buildUserServiceKitCode,
+  parseUserServiceKitTemplateId,
+  advancedFormToSyntheticServiceKitDefinition,
+  filterUserTemplateKitsByContextNode,
+  inferKitItemPartBinding,
+  wishlistRowsToAdvancedFormForTemplate,
+  advancedServiceKitSnapshotFromPickerLines,
+} from "./user-template-service-kit";
+export type { NodeRefLite, WishlistKitTemplateSourceMeta, WishlistRowSnapshotInput } from "./user-template-service-kit";
+export {
   buildGarageCardProps,
   filterMeaningfulGarageSpecHighlights,
   buildVehicleHeaderProps,
@@ -290,6 +302,7 @@ export {
   isWishlistItemFromKitByComment,
   isWishlistTransitionToInstalled,
   extractWishlistKitOriginLabel,
+  parseWishlistKitOriginDetails,
   normalizeCreatePartWishlistPayload,
   normalizePartWishlistCostMutationArgs,
   normalizeUpdatePartWishlistPayload,
@@ -326,8 +339,28 @@ export {
 export {
   getPickerFitmentShortLabelRu,
   getPickerSkuCatalogFitHintRu,
+  getPickerSkuCatalogConfidencePercent,
+  getPickerRecommendationStatsLineRu,
+  getPickerSkuSearchStatsLineRu,
   formatFitmentConfidenceStatusRu,
 } from "./picker-fitment-labels";
+export {
+  analyzeStructuredCatalogSignals,
+  type StructuredCatalogSignals,
+} from "./part-compatibility-catalog";
+export {
+  fitmentReportResultHeadlineRu,
+  compatibilityConfidenceTierLabelRu,
+  COMPATIBILITY_CONFIDENCE_TOOLTIP_LINES_RU,
+  deriveCompatibilityConfidenceTier,
+  deriveDominantFitmentResult,
+  buildCompatibilityBreakdown,
+  deriveSourcePriority,
+} from "./part-compatibility-report-logic";
+export {
+  buildRideProfileCompatibilityInsight,
+  parseVehicleRideProfileSnapshot,
+} from "./part-compatibility-ride-profile";
 export {
   PART_RECOMMENDATION_GROUP_ORDER,
   buildPartRecommendationGroupsForDisplay,

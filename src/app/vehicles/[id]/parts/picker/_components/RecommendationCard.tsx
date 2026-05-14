@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import type { PartRecommendationViewModel, PickerMerchandiseLabel } from "@mototwin/types";
-import { MERCHANDISE_LABELS_RU } from "@mototwin/domain";
+import { MERCHANDISE_LABELS_RU, getPickerRecommendationStatsLineRu } from "@mototwin/domain";
 import { merchandiseAccentColor, pickerColors } from "./picker-styles";
 import { PickerFitmentReportLinkFromRecommendation } from "./PickerFitmentReportLink";
 
@@ -21,6 +21,11 @@ export function RecommendationCard(props: {
   const rec = props.recommendation;
   const reasons = buildReasons(rec).slice(0, REASON_BULLET_LIMIT);
   const priceLabel = formatPriceRu(rec.priceAmount, rec.currency);
+  const statsLine = getPickerRecommendationStatsLineRu(rec);
+  const statsTitle = `${statsLine}
+
+Оценка каталога — уверенность привязки детали к вашей модификации и узлу в данных каталога (0–100%), не рейтинг сообщества.
+Опубликованные отчёты — только отчёты со статусом «опубликован»; на модерации в строке не учитываются.`;
 
   return (
     <article style={{ ...cardStyle, borderColor: accent }}>
@@ -42,12 +47,9 @@ export function RecommendationCard(props: {
         {rec.partType ? (
           <div style={specsLineStyle}>{rec.partType.replaceAll("_", " ")}</div>
         ) : null}
-        {rec.trustBadge ? (
-          <div style={trustChipStyle}>{trustBadgeLabelRu(rec.trustBadge)}</div>
-        ) : null}
-        {rec.communityLineRu ? (
-          <div style={communityLineStyle}>{rec.communityLineRu}</div>
-        ) : null}
+        <div style={statsLineStyle} title={statsTitle}>
+          {statsLine}
+        </div>
       </div>
       {reasons.length > 0 ? (
         <ul style={reasonListStyle}>
@@ -94,28 +96,6 @@ function buildReasons(rec: PartRecommendationViewModel): string[] {
   if (rec.compatibilityWarning) list.push(rec.compatibilityWarning);
   return list;
 }
-
-function trustBadgeLabelRu(
-  badge: NonNullable<PartRecommendationViewModel["trustBadge"]>
-): string {
-  if (badge === "VERIFIED_BY_MOTOTWIN") return "Проверено MotoTwin";
-  if (badge === "COMMUNITY_CONFIRMED") return "Подтверждено сообществом";
-  return "Сигнал сообщества";
-}
-
-const trustChipStyle: CSSProperties = {
-  marginTop: 6,
-  fontSize: 11,
-  fontWeight: 700,
-  color: "#9AE6B4",
-};
-
-const communityLineStyle: CSSProperties = {
-  marginTop: 4,
-  fontSize: 11,
-  lineHeight: 1.35,
-  color: pickerColors.textMuted,
-};
 
 function formatPriceRu(amount: number | null, currency: string | null): string {
   if (amount == null || !Number.isFinite(amount)) {
@@ -189,6 +169,17 @@ const specsLineStyle: CSSProperties = {
   fontSize: 12,
   color: pickerColors.textMuted,
   overflowWrap: "anywhere",
+};
+
+const statsLineStyle: CSSProperties = {
+  marginTop: 8,
+  fontSize: 11,
+  lineHeight: 1.35,
+  color: pickerColors.textSecondary,
+  letterSpacing: 0.01,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 const reasonListStyle: CSSProperties = {

@@ -109,8 +109,12 @@ export function PickerDraftCartSheet(props: {
   onRemove: (draftId: string) => void;
   onChangeSkuQuantity?: (draftId: string, nextQuantity: number) => void;
   onCheckout: () => void;
+  onSaveAsKit?: () => void;
+  canSaveAsKit?: boolean;
 }) {
   const totals = useMemo(() => getDraftTotals(props.draft), [props.draft]);
+  const isEmpty = props.draft.items.length === 0;
+  const canSave = Boolean(props.onSaveAsKit) && !isEmpty && (props.canSaveAsKit ?? false);
   return (
     <Modal
       visible={props.visible}
@@ -212,9 +216,14 @@ export function PickerDraftCartSheet(props: {
                   <View key={item.draftId} style={styles.sheetKitCard}>
                     <View style={styles.sheetRow}>
                       <View style={styles.sheetTextCol}>
-                        <Text style={styles.sheetRowTitle} numberOfLines={2}>
-                          {item.kit.title}
-                        </Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 6 }}>
+                          <Text style={styles.sheetKitCode} numberOfLines={1}>
+                            {item.kit.code}
+                          </Text>
+                          <Text style={styles.sheetRowTitle} numberOfLines={2}>
+                            {item.kit.title}
+                          </Text>
+                        </View>
                         <Text style={styles.sheetRowMeta} numberOfLines={1}>
                           Комплект · {item.kit.items.length} поз.
                         </Text>
@@ -237,6 +246,28 @@ export function PickerDraftCartSheet(props: {
               )
             )}
           </ScrollView>
+          {props.onSaveAsKit ? (
+            <View style={styles.sheetSaveKitWrap}>
+              <Pressable
+                onPress={props.onSaveAsKit}
+                disabled={!canSave}
+                style={({ pressed }) => [
+                  styles.sheetSaveKit,
+                  !canSave && styles.sheetSaveKitDisabled,
+                  pressed && canSave && styles.sheetSaveKitPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Сохранить как комплект"
+              >
+                <Text
+                  style={[styles.sheetSaveKitText, !canSave && styles.sheetSaveKitTextDisabled]}
+                  numberOfLines={1}
+                >
+                  Сохранить как комплект
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={styles.sheetFooter}>
             <Pressable
               onPress={props.onClear}
@@ -391,6 +422,29 @@ const styles = StyleSheet.create({
   },
   sheetScroll: { maxHeight: 420 },
   sheetScrollContent: { padding: 12, gap: 8 },
+  sheetSaveKitWrap: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: c.borderStrong,
+  },
+  sheetSaveKit: {
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetSaveKitPressed: { opacity: 0.88 },
+  sheetSaveKitDisabled: { opacity: 0.45 },
+  sheetSaveKitText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: c.textPrimary,
+  },
+  sheetSaveKitTextDisabled: { color: c.textMuted },
   sheetEmpty: {
     paddingVertical: 24,
     textAlign: "center",
@@ -404,6 +458,14 @@ const styles = StyleSheet.create({
   },
   sheetTextCol: { flex: 1, minWidth: 0 },
   sheetRowTitle: { fontSize: 13, fontWeight: "700", color: c.textPrimary },
+  sheetKitCode: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: c.textMuted,
+    fontFamily: "Menlo",
+    letterSpacing: 0.2,
+    flexShrink: 0,
+  },
   sheetRowMeta: { marginTop: 2, fontSize: 11, color: c.textMuted },
   sheetSkuQtyRow: {
     marginTop: 8,

@@ -13,6 +13,9 @@ export function PickerDraftCartPanel(props: {
   onClear: () => void;
   onCheckout: () => void;
   isSubmitting: boolean;
+  /** Сохранить SKU-строки корзины как пользовательский комплект (шаблон журнала). */
+  onSaveAsKit?: () => void;
+  canSaveAsKit?: boolean;
   /** Без sticky — для нижней панели на узком экране. */
   variant?: "sidebar" | "dock";
 }) {
@@ -75,6 +78,21 @@ export function PickerDraftCartPanel(props: {
       >
         Очистить корзину
       </button>
+
+      {props.onSaveAsKit ? (
+        <button
+          type="button"
+          onClick={props.onSaveAsKit}
+          disabled={isEmpty || !props.canSaveAsKit}
+          style={{
+            ...saveKitButtonStyle,
+            opacity: isEmpty || !props.canSaveAsKit ? 0.45 : 1,
+            cursor: isEmpty || !props.canSaveAsKit ? "default" : "pointer",
+          }}
+        >
+          Сохранить как комплект
+        </button>
+      ) : null}
 
       <div style={dividerStyle} />
 
@@ -217,7 +235,30 @@ function DraftKitCartRow(props: { item: PickerDraftItemKit; onRemove: () => void
             🛠
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={itemTitleStyle}>{item.kit.title}</div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+                minWidth: 0,
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: pickerColors.textMuted,
+                  fontFamily:
+                    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace",
+                  letterSpacing: "0.02em",
+                  flexShrink: 0,
+                }}
+              >
+                {item.kit.code}
+              </span>
+              <div style={{ ...itemTitleStyle, flex: "1 1 120px", minWidth: 0 }}>{item.kit.title}</div>
+            </div>
             <div style={itemMetaStyle}>
               {itemsCount} {positionsLabel(itemsCount)}
               <span style={{ color: pickerColors.textSecondary, fontWeight: 600 }}>
@@ -396,6 +437,17 @@ const clearButtonStyle: CSSProperties = {
   color: pickerColors.textMuted,
   fontSize: 12,
   fontWeight: 600,
+};
+
+const saveKitButtonStyle: CSSProperties = {
+  marginTop: 8,
+  padding: "8px 12px",
+  borderRadius: 10,
+  background: "transparent",
+  border: `1px solid ${pickerColors.primary}`,
+  color: pickerColors.primary,
+  fontSize: 12,
+  fontWeight: 700,
 };
 
 const dividerStyle: CSSProperties = {

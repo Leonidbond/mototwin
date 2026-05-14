@@ -9,7 +9,16 @@ import { pickerColors, pickerSectionSubtitleStyle, pickerSectionTitleStyle } fro
 const VISIBLE_LIMIT = 3;
 
 export const KitsSection = forwardRef<HTMLElement, KitsSectionProps>(function KitsSection(
-  { kits, draftKitCodes, addingKitCode, onAddKit, isLoading },
+  {
+    kits,
+    draftKitCodes,
+    addingKitCode,
+    onAddKit,
+    isLoading,
+    title = "Комплекты обслуживания",
+    subtitle = "Готовые наборы для обслуживания узлов вашего мотоцикла. Экономия времени и денег.",
+    emptyMessage = "Для текущего контекста нет подходящих комплектов.",
+  },
   ref
 ) {
   const [expanded, setExpanded] = useState(false);
@@ -20,10 +29,8 @@ export const KitsSection = forwardRef<HTMLElement, KitsSectionProps>(function Ki
     <section style={sectionStyle} ref={ref}>
       <header style={headerStyle}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <h2 style={pickerSectionTitleStyle}>Комплекты обслуживания</h2>
-          <p style={pickerSectionSubtitleStyle}>
-            Готовые наборы для обслуживания узлов вашего мотоцикла. Экономия времени и денег.
-          </p>
+          <h2 style={pickerSectionTitleStyle}>{title}</h2>
+          <p style={pickerSectionSubtitleStyle}>{subtitle}</p>
         </div>
         {!expanded && remaining > 0 ? (
           <button type="button" onClick={() => setExpanded(true)} style={showMoreLinkStyle}>
@@ -35,9 +42,7 @@ export const KitsSection = forwardRef<HTMLElement, KitsSectionProps>(function Ki
       {isLoading ? (
         <div style={loadingStyle}>Загружаем комплекты...</div>
       ) : kits.length === 0 ? (
-        <div style={emptyStyle}>
-          Для текущего контекста нет подходящих комплектов.
-        </div>
+        <div style={emptyStyle}>{emptyMessage}</div>
       ) : (
         <div style={listStyle}>
           {visible.map((kit) => (
@@ -61,6 +66,9 @@ type KitsSectionProps = {
   addingKitCode: string | null;
   onAddKit: (kit: ServiceKitViewModel) => void;
   isLoading: boolean;
+  title?: string;
+  subtitle?: string;
+  emptyMessage?: string;
 };
 
 const sectionStyle: CSSProperties = {

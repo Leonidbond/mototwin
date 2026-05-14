@@ -1,18 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PartWishlistItemSource, PartWishlistItemStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import {
+  buildUserServiceEventTemplateTitle,
   buildWishlistItemSkuInfo,
   expandServiceKitToWishlistDrafts,
-  getServiceKitsForNode,
+  isUserServiceKitCode,
   normalizeWishlistTitle,
   normalizePartWishlistCostMutationArgs,
+  stripAddServiceEventFormValuesForUserTemplate,
+  wishlistRowsToAdvancedFormForTemplate,
 } from "@mototwin/domain";
 import type { PartWishlistItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
-import { buildRecommendationsForNodeWithCommunity } from "@/lib/build-recommendations-for-node-with-community";
+import { resolveServiceKitDefinitionForVehicle } from "@/lib/resolve-service-kit-definition";
+import {
+  buildRecommendationsForNodeWithCommunity,
+  narrowVehicleFitmentContext,
+} from "@/lib/build-recommendations-for-node-with-community";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "../../../../_shared/current-user-context";
 import { getVehicleInCurrentContext, isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
-import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 type RouteContext = {
@@ -144,9 +155,30 @@ export async function POST(request: NextRequest, context: RouteContext) {
       contextNodeCode = node.code;
     }
 
-    const kit = getServiceKitsForNode(contextNodeCode).find((k) => k.code === body.kitCode);
-    if (!kit) {
-      return NextResponse.json({ error: "Комплект обслуживания не найден." }, { status: 404 });
+    const vctx = narrowVehicleFitmentContext(vehicle);
+    if (!vctx) {
+      return NextResponse.json(
+        { error: "У мотоцикла не задана модель — добавление комплекта недоступно." },
+        { status: 400 }
+      );
+    }
+
+    const kitOrErr = await resolveServiceKitDefinitionForVehicle({
+      prisma,
+      kitCode: body.kitCode,
+      contextNodeCode,
+      vehicle: vctx,
+    });
+    if (kitOrErr instanceof NextResponse) {
+      return kitOrErr;
+    }
+    const kit = kitOrErr;
+
+    let userIdForTemplate: string | null = null;
+    try {
+      userIdForTemplate = (await getCurrentUserContext()).userId;
+    } catch {
+      userIdForTemplate = null;
     }
 
     const activeRows = await prisma.partWishlistItem.findMany({
@@ -195,7 +227,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
       recommendationsByNodeCode.set(
         node.code,
-        await buildRecommendationsForNodeWithCommunity(prisma, vehicle, nodeId, {
+        await buildRecommendationsForNodeWithCommunity(prisma, vctx, nodeId, {
           code: node.code,
           serviceGroup: node.serviceGroup,
         })
@@ -277,6 +309,57 @@ export async function POST(request: NextRequest, context: RouteContext) {
           },
         });
         list.push(created);
+      }
+      if (userIdForTemplate && list.length > 0) {
+        const rowsSnapshot = list.map((r) => ({
+          nodeId: r.nodeId!,
+          skuId: r.skuId,
+          displaySku: r.sku?.partNumbers?.[0]?.number?.trim() ?? "",
+          partName: r.title,
+          quantity: r.quantity,
+        }));
+        const formSnap = wishlistRowsToAdvancedFormForTemplate({
+          rows: rowsSnapshot,
+          source: {
+            kitTitle: kit.title,
+            kitCode: kit.code,
+            builtIn: !isUserServiceKitCode(kit.code),
+          },
+        });
+        const stripped = stripAddServiceEventFormValuesForUserTemplate(formSnap);
+        const title = buildUserServiceEventTemplateTitle(
+          stripped.title.trim() || kit.title,
+          "ADVANCED"
+        );
+        const formJson = JSON.parse(JSON.stringify(stripped)) as Prisma.InputJsonValue;
+        try {
+          await tx.userServiceEventFormTemplate.create({
+            data: {
+              userId: userIdForTemplate,
+              title,
+              mode: "ADVANCED",
+              formJson,
+              includeInPartPicker: false,
+            },
+          });
+        } catch (tplErr) {
+          if (
+            tplErr instanceof Error &&
+            tplErr.message.includes("Unknown argument") &&
+            tplErr.message.includes("includeInPartPicker")
+          ) {
+            await tx.userServiceEventFormTemplate.create({
+              data: {
+                userId: userIdForTemplate,
+                title,
+                mode: "ADVANCED",
+                formJson,
+              },
+            });
+          } else {
+            throw tplErr;
+          }
+        }
       }
       return { createdRows: list, txSkips };
     });

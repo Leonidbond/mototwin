@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { recalculateFitmentConfidenceForKey } from "@/lib/fitment-confidence-prisma";
 import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
 import { getVehicleInCurrentContext } from "@/app/api/_shared/vehicle-context";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+const rideProfileBodySchema = z.object({
+  usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
+  ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
+  loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
+  usageIntensity: z.enum(["LOW", "MEDIUM", "HIGH"]),
+});
 
 const createReportSchema = z.object({
   partMasterId: z.string().trim().min(1),
@@ -23,6 +31,10 @@ const createReportSchema = z.object({
   serviceEventId: z.string().trim().optional().nullable(),
   installedAtMileage: z.number().int().optional().nullable(),
   installedAtHours: z.number().int().optional().nullable(),
+  /** 1–5, опционально (§23 средняя оценка). */
+  rating: z.number().int().min(1).max(5).optional().nullable(),
+  /** Профиль езды для снимка в отчёте (§19); иначе берётся из RideProfile мотоцикла. */
+  rideProfile: rideProfileBodySchema.optional().nullable(),
 });
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -105,6 +117,34 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     }
 
+    let rideProfileSnapshot: Record<string, string> | null = null;
+    if (body.rideProfile) {
+      rideProfileSnapshot = {
+        usageType: body.rideProfile.usageType,
+        ridingStyle: body.rideProfile.ridingStyle,
+        loadType: body.rideProfile.loadType,
+        usageIntensity: body.rideProfile.usageIntensity,
+      };
+    } else {
+      const fromGarage = await prisma.rideProfile.findUnique({
+        where: { vehicleId },
+        select: {
+          usageType: true,
+          ridingStyle: true,
+          loadType: true,
+          usageIntensity: true,
+        },
+      });
+      if (fromGarage) {
+        rideProfileSnapshot = {
+          usageType: fromGarage.usageType,
+          ridingStyle: fromGarage.ridingStyle,
+          loadType: fromGarage.loadType,
+          usageIntensity: fromGarage.usageIntensity,
+        };
+      }
+    }
+
     const report = await prisma.fitmentReport.create({
       data: {
         partMasterId: body.partMasterId,
@@ -118,11 +158,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
         comment: body.comment?.trim() || null,
         installedAtMileage: body.installedAtMileage ?? null,
         installedAtHours: body.installedAtHours ?? null,
+        rating: body.rating ?? null,
+        ...(rideProfileSnapshot ? { rideProfileSnapshot } : {}),
         serviceEventId: body.serviceEventId?.trim() || null,
-        moderationStatus: "PENDING",
+        /** Сразу виден на странице отчёта совместимости и в агрегатах; модератор может скрыть позже. */
+        moderationStatus: "PUBLISHED",
         createdByUserId: userCtx.userId,
       },
     });
+
+    try {
+      await recalculateFitmentConfidenceForKey(prisma, {
+        partMasterId: body.partMasterId,
+        modelVariantId: vehicle.modelVariantId,
+        nodeId: body.nodeId,
+      });
+    } catch (recalcErr) {
+      console.error("fitment-reports POST: confidence recalc failed:", recalcErr);
+    }
 
     return NextResponse.json({ report }, { status: 201 });
   } catch (error) {

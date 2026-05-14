@@ -38,6 +38,11 @@ export type CommunityFitmentMergeInput = {
     status: FitmentConfidenceStatus;
     isStaffVerified: boolean;
   } | null;
+  /**
+   * Опубликованные отчёты владельцев по той же связке (модификация + узел + part master).
+   * Нужен, чтобы UI не показывал «0 отчётов», если агрегат {@link input.confidence} ещё не пересчитан.
+   */
+  publishedFitmentReportCount?: number;
   nodeServiceGroup: string | null | undefined;
   nodeCode: string | null | undefined;
 };
@@ -55,8 +60,10 @@ export function mergeCommunityFitmentIntoRecommendation(
     nodeCode: input.nodeCode,
   });
   const c = input.confidence;
+  const published = Math.max(0, input.publishedFitmentReportCount ?? 0);
+  const communityReportCount = Math.max(c?.reportCount ?? 0, published);
+
   let trustBadge: TrustBadgeWire = null;
-  let communityReportCount = c?.reportCount ?? 0;
   let communityScore = c?.confidenceScore ?? 0;
   let communityStatus: FitmentConfidenceStatus | null = c?.status ?? null;
   let communityLineRu: string | null = null;
@@ -64,8 +71,10 @@ export function mergeCommunityFitmentIntoRecommendation(
   if (c?.isStaffVerified && c.status === "VERIFIED_BY_MOTOTWIN") {
     trustBadge = "VERIFIED_BY_MOTOTWIN";
     communityLineRu = "Проверено MotoTwin";
-  } else if (c && c.reportCount > 0) {
-    if (c.status === "COMMUNITY_CONFIRMED" || c.confirmationCount >= 2) {
+  } else if (communityReportCount > 0) {
+    const strongCommunity =
+      c != null && (c.status === "COMMUNITY_CONFIRMED" || c.confirmationCount >= 2);
+    if (strongCommunity) {
       trustBadge = safety && base.recommendationType === "VERIFY_REQUIRED" ? "COMMUNITY_SIGNAL" : "COMMUNITY_CONFIRMED";
     } else {
       trustBadge = "COMMUNITY_SIGNAL";
@@ -74,6 +83,10 @@ export function mergeCommunityFitmentIntoRecommendation(
       communityLineRu = "Подтверждено владельцами такой же модели";
     } else if (trustBadge === "COMMUNITY_SIGNAL") {
       communityLineRu = "Есть отзывы владельцев; проверьте применимость к вашей комплектации";
+    }
+    if (c == null && published > 0) {
+      communityStatus = "LOW_CONFIDENCE";
+      communityScore = 0;
     }
   }
 
@@ -96,7 +109,10 @@ export function mergeCommunityFitmentIntoRecommendation(
     communityLineRu,
     compatibilityWarning,
     /** Used only for sorting inside a recommendation group (0–100). */
-    communitySortBoost: Math.min(100, communityScore + (c?.confirmationCount ?? 0) * 3),
+    communitySortBoost: Math.min(
+      100,
+      communityScore + (c?.confirmationCount ?? 0) * 3 + (published > 0 && !c ? published * 2 : 0)
+    ),
   };
 }
 

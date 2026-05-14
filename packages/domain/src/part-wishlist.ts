@@ -282,11 +282,36 @@ function extractWishlistKitOriginLine(comment: string): string | null {
 }
 
 export function extractWishlistKitOriginLabel(comment: string | null | undefined): string | null {
+  return parseWishlistKitOriginDetails(comment)?.fullLineRu ?? null;
+}
+
+/**
+ * Разбор первой строки `comment` с префиксом «Из комплекта:» (и устаревшим «Комплект:»).
+ * Новые строки с сервера: `Из комплекта: [KIT_CODE] Название`.
+ */
+export function parseWishlistKitOriginDetails(
+  comment: string | null | undefined
+): { fullLineRu: string; kitCode: string | null; titleRu: string } | null {
   const text = comment?.trim();
   if (!text) {
     return null;
   }
-  return extractWishlistKitOriginLine(text);
+  const line = extractWishlistKitOriginLine(text);
+  if (!line) {
+    return null;
+  }
+  const body = line.replace(/^\s*Из комплекта:\s*/i, "").trim();
+  const bracket = body.match(/^\[([^\]]+)\]\s*(.*)$/);
+  if (bracket) {
+    const code = bracket[1].trim();
+    const title = (bracket[2] ?? "").trim();
+    return {
+      fullLineRu: line,
+      kitCode: code || null,
+      titleRu: title || code,
+    };
+  }
+  return { fullLineRu: line, kitCode: null, titleRu: body };
 }
 
 export function isWishlistItemFromKitByComment(comment: string | null | undefined): boolean {
@@ -529,12 +554,17 @@ export function wishlistLineTotalAmount(item: Pick<PartWishlistItem, "costAmount
 }
 
 export function buildPartWishlistItemViewModel(item: PartWishlistItem): PartWishlistItemViewModel {
-  const kitOriginLabelRu = extractWishlistKitOriginLabel(item.comment);
+  const kitParsed = parseWishlistKitOriginDetails(item.comment);
+  const kitOriginLabelRu = kitParsed?.fullLineRu ?? null;
+  const kitOriginKitCode = kitParsed?.kitCode ?? null;
+  const kitOriginTitleRu = kitParsed?.titleRu ?? null;
   const commentBodyRu = stripWishlistKitOriginFromComment(item.comment);
   const base: PartWishlistItemViewModel = {
     ...item,
     statusLabelRu: getPartWishlistStatusLabelRu(item.status),
     kitOriginLabelRu,
+    kitOriginKitCode,
+    kitOriginTitleRu,
     commentBodyRu,
   };
   if (item.costAmount != null && Number.isFinite(item.costAmount)) {

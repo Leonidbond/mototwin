@@ -18,6 +18,10 @@ import {
   getLeafNodeOptions,
   getOrderedTopNodeIdsPresentInNodeTree,
   nodeAncestorPathLabelRu,
+  RIDE_LOAD_TYPE_OPTIONS,
+  RIDE_RIDING_STYLE_OPTIONS,
+  RIDE_USAGE_INTENSITY_OPTIONS,
+  RIDE_USAGE_TYPE_OPTIONS,
   vehicleDetailFromApiRecord,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
@@ -28,6 +32,7 @@ import type {
   TopServiceNodeItem,
   VehicleDetail,
   VehicleDetailApiRecord,
+  VehicleRideProfile,
 } from "@mototwin/types";
 import { SidebarVehiclePlaque } from "@/app/garage/_components/SidebarVehiclePlaque";
 import { NodePickerModal } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
@@ -381,7 +386,18 @@ function contextPlateButtonStyle(extra?: CSSProperties): CSSProperties {
   };
 }
 
-export function CommunityPartPageClient(props: { vehicleId: string; initialNodeId: string }) {
+export function CommunityPartPageClient(props: {
+  vehicleId: string;
+  initialNodeId: string;
+  /** Предзаполнение с страницы отчёта совместимости (`?partMasterId=…`). */
+  initialPartFromQuery?: {
+    id: string;
+    brandName: string;
+    sku: string;
+    title: string;
+    suggestedCategory: string;
+  } | null;
+}) {
   const router = useRouter();
   const [isNarrow, setIsNarrow] = useState(false);
 
@@ -402,11 +418,12 @@ export function CommunityPartPageClient(props: { vehicleId: string; initialNodeI
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [garageVehicles, setGarageVehicles] = useState<GarageVehicleItem[]>([]);
 
-  const [brandName, setBrandName] = useState("");
-  const [sku, setSku] = useState("");
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
-  const [existingMasterId, setExistingMasterId] = useState<string | null>(null);
+  const ip = props.initialPartFromQuery ?? null;
+  const [brandName, setBrandName] = useState(() => ip?.brandName ?? "");
+  const [sku, setSku] = useState(() => ip?.sku ?? "");
+  const [title, setTitle] = useState(() => ip?.title ?? "");
+  const [category, setCategory] = useState(() => ip?.suggestedCategory ?? "");
+  const [existingMasterId, setExistingMasterId] = useState<string | null>(() => ip?.id ?? null);
 
   const [dupLoading, setDupLoading] = useState(false);
   const [dupCandidates, setDupCandidates] = useState<
@@ -418,6 +435,13 @@ export function CommunityPartPageClient(props: { vehicleId: string; initialNodeI
   const [lifeStatus, setLifeStatus] = useState<PartLifeStatus>("plan");
   const [fitmentChoice, setFitmentChoice] = useState<FitmentChoiceInstalled>("DIRECT_FIT");
   const [modificationDetails, setModificationDetails] = useState("");
+
+  const [reportRideProfile, setReportRideProfile] = useState<VehicleRideProfile>({
+    usageType: "MIXED",
+    ridingStyle: "ACTIVE",
+    loadType: "SOLO",
+    usageIntensity: "MEDIUM",
+  });
 
   const [photoPackagingUrl, setPhotoPackagingUrl] = useState("");
   const [photoInstalledUrl, setPhotoInstalledUrl] = useState("");
@@ -438,6 +462,25 @@ export function CommunityPartPageClient(props: { vehicleId: string; initialNodeI
   }, [done]);
 
   const dupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!vehicle) return;
+    if (vehicle.rideProfile) {
+      setReportRideProfile({
+        usageType: vehicle.rideProfile.usageType,
+        ridingStyle: vehicle.rideProfile.ridingStyle,
+        loadType: vehicle.rideProfile.loadType,
+        usageIntensity: vehicle.rideProfile.usageIntensity,
+      });
+    } else {
+      setReportRideProfile({
+        usageType: "MIXED",
+        ridingStyle: "ACTIVE",
+        loadType: "SOLO",
+        usageIntensity: "MEDIUM",
+      });
+    }
+  }, [vehicle]);
 
   useEffect(() => {
     let c = false;
@@ -852,6 +895,7 @@ export function CommunityPartPageClient(props: { vehicleId: string; initialNodeI
                   ? modificationDetails.trim() || null
                   : null,
               comment: comment.trim() || null,
+              rideProfile: reportRideProfile,
             }),
           }
         );
@@ -902,6 +946,7 @@ export function CommunityPartPageClient(props: { vehicleId: string; initialNodeI
     fitmentChoice,
     modificationDetails,
     comment,
+    reportRideProfile,
     photoPackagingUrl,
     photoInstalledUrl,
     photoReceiptUrl,
@@ -1664,6 +1709,64 @@ export function CommunityPartPageClient(props: { vehicleId: string; initialNodeI
                 />
                 <div style={{ textAlign: "right" as const, fontSize: 12, color: REF.subtle, marginTop: 6 }}>
                   {modificationDetails.length}/{MOD_MAX}
+                </div>
+              </div>
+            ) : null}
+
+            {showFitmentBlock ? (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: REF.text, marginBottom: 8 }}>
+                  Профиль езды для сообщества
+                </div>
+                <p style={{ fontSize: 12, color: REF.muted, marginBottom: 10, lineHeight: 1.45 }}>
+                  Сохраняется в отчёт и участвует в сводке «лучше всего подходит для…». По умолчанию совпадает с
+                  карточкой мотоцикла — уточните, если в момент установки ваш стиль был другим.
+                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isNarrow ? "1fr" : "1fr 1fr",
+                    gap: 10,
+                  }}
+                >
+                  {(
+                    [
+                      ["Тип использования", RIDE_USAGE_TYPE_OPTIONS, "usageType"] as const,
+                      ["Стиль езды", RIDE_RIDING_STYLE_OPTIONS, "ridingStyle"] as const,
+                      ["Нагрузка", RIDE_LOAD_TYPE_OPTIONS, "loadType"] as const,
+                      ["Интенсивность", RIDE_USAGE_INTENSITY_OPTIONS, "usageIntensity"] as const,
+                    ] as const
+                  ).map(([label, opts, key]) => (
+                    <label
+                      key={key}
+                      style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: REF.muted }}
+                    >
+                      {label}
+                      <select
+                        value={reportRideProfile[key]}
+                        onChange={(e) =>
+                          setReportRideProfile((prev) => ({
+                            ...prev,
+                            [key]: e.target.value as never,
+                          }))
+                        }
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: REF.radiusMd,
+                          border: `1px solid ${REF.panelBorder}`,
+                          backgroundColor: "#0f1218",
+                          color: REF.text,
+                          fontSize: 13,
+                        }}
+                      >
+                        {opts.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
                 </div>
               </div>
             ) : null}

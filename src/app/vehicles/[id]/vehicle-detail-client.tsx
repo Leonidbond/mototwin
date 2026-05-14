@@ -5611,7 +5611,23 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="font-medium text-gray-950">{it.title}</p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="font-medium text-gray-950">{it.title}</p>
+                                  {it.kitOriginLabelRu ? (
+                                    <span
+                                      className={`inline-flex max-w-[min(220px,70vw)] shrink-0 overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-800 ${it.kitOriginKitCode ? "font-mono tracking-tight" : ""}`}
+                                      title={
+                                        it.kitOriginTitleRu
+                                          ? `Комплект: ${it.kitOriginTitleRu}`
+                                          : it.kitOriginKitCode
+                                            ? `Комплект ${it.kitOriginKitCode}`
+                                            : "Из комплекта"
+                                      }
+                                    >
+                                      {it.kitOriginKitCode ?? "Комплект"}
+                                    </span>
+                                  ) : null}
+                                </div>
                                 {it.sku ? (
                                   <div className="mt-1 rounded-lg border border-gray-100 bg-white/80 px-2 py-1.5">
                                     <p className="text-xs font-medium text-gray-800">
@@ -5635,8 +5651,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                                   </p>
                                 ) : null}
                                 {it.kitOriginLabelRu ? (
-                                  <p className="mt-1 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
-                                    {it.kitOriginLabelRu}
+                                  <p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-medium text-indigo-700">
+                                    {it.kitOriginKitCode ? (
+                                      <span className="inline-flex rounded-md border border-indigo-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-900">
+                                        {it.kitOriginKitCode}
+                                      </span>
+                                    ) : null}
+                                    <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5">
+                                      {it.kitOriginTitleRu ??
+                                        it.kitOriginLabelRu.replace(/^Из комплекта:\s*/i, "")}
+                                    </span>
                                   </p>
                                 ) : null}
                                 {it.commentBodyRu ? (

@@ -79,6 +79,14 @@ export function PickerServiceKitRow(props: {
         </View>
         <View style={styles.bodyCol}>
           <View style={styles.titleRow}>
+            {props.kit.isUserTemplate ? (
+              <View style={styles.userBadge}>
+                <Text style={styles.userBadgeText}>Мой</Text>
+              </View>
+            ) : null}
+            <Text style={styles.kitCode} numberOfLines={1}>
+              {props.kit.code}
+            </Text>
             <Text style={styles.title} numberOfLines={2}>
               {props.kit.title}
             </Text>
@@ -178,6 +186,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexWrap: "wrap",
     gap: 6,
+  },
+  userBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: c.border,
+    flexShrink: 0,
+  },
+  userBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    color: c.textSecondary,
+  },
+  kitCode: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: c.textMuted,
+    fontFamily: "Menlo",
+    letterSpacing: 0.2,
+    flexShrink: 0,
   },
   title: {
     fontSize: 14,

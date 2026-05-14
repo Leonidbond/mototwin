@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -367,6 +368,7 @@ export function BasicServiceEventBundleForm({
   const [userTemplatesErr, setUserTemplatesErr] = useState("");
   const [saveUserTemplateOpen, setSaveUserTemplateOpen] = useState(false);
   const [saveUserTemplateName, setSaveUserTemplateName] = useState("");
+  const [saveIncludeInPartPicker, setSaveIncludeInPartPicker] = useState(true);
   const [saveUserTemplateBusy, setSaveUserTemplateBusy] = useState(false);
   const [saveUserTemplateErr, setSaveUserTemplateErr] = useState("");
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
@@ -992,6 +994,7 @@ export function BasicServiceEventBundleForm({
               onPress={() => {
                 setSaveUserTemplateErr("");
                 setSaveUserTemplateName(form.title.trim());
+                setSaveIncludeInPartPicker(true);
                 setSaveUserTemplateOpen(true);
               }}
               style={({ pressed }) => [styles.templatePickBtn, pressed && styles.pressed]}
@@ -1708,6 +1711,26 @@ export function BasicServiceEventBundleForm({
               placeholder="Например: сезонное ТО"
             />
             {saveUserTemplateErr ? <Text style={styles.err}>{saveUserTemplateErr}</Text> : null}
+            {form.mode === "ADVANCED" ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginTop: 10,
+                }}
+              >
+                <Text style={[styles.muted, { flex: 1 }]}>
+                  Показывать в подборе деталей как комплект
+                </Text>
+                <Switch
+                  value={saveIncludeInPartPicker}
+                  onValueChange={setSaveIncludeInPartPicker}
+                  disabled={saveUserTemplateBusy}
+                />
+              </View>
+            ) : null}
             <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
               <Pressable
                 onPress={() => !saveUserTemplateBusy && setSaveUserTemplateOpen(false)}
@@ -1727,6 +1750,8 @@ export function BasicServiceEventBundleForm({
                     .createUserServiceEventFormTemplate({
                       baseTitle: saveUserTemplateName.trim() || null,
                       formSnapshot: snapshot,
+                      includeInPartPicker:
+                        form.mode === "ADVANCED" ? saveIncludeInPartPicker : undefined,
                     })
                     .then((res) => {
                       const tpl = res.template;

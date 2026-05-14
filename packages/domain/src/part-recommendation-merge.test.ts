@@ -87,4 +87,17 @@ describe("mergeCommunityFitmentIntoRecommendation", () => {
     assert.equal(merged.trustBadge, "COMMUNITY_SIGNAL");
     assert.ok(merged.compatibilityWarning);
   });
+
+  it("uses published report count when confidence row is missing", () => {
+    const merged = mergeCommunityFitmentIntoRecommendation(baseRec(), {
+      partMasterId: "m1",
+      confidence: null,
+      publishedFitmentReportCount: 2,
+      nodeServiceGroup: "BODY_PROTECTION",
+      nodeCode: "CHASSIS.PLASTICS",
+    });
+    assert.equal(merged.communityReportCount, 2);
+    assert.equal(merged.trustBadge, "COMMUNITY_SIGNAL");
+    assert.equal(merged.communityStatus, "LOW_CONFIDENCE");
+  });
 });

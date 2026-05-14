@@ -46,6 +46,8 @@ export type ServiceKitViewModel = {
   description: string;
   targetNodeCodes: string[];
   items: ServiceKitItemViewModel[];
+  /** True when kit is built from a user journal template (synthetic code `user_template:…`). */
+  isUserTemplate?: boolean;
 };
 
 export type AddServiceKitToWishlistPayload = {

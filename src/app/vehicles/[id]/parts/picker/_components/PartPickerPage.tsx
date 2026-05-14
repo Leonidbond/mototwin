@@ -43,6 +43,7 @@ import type {
   PartSkuViewModel,
   PartWishlistItem,
   PickerDraftCart,
+  PickerDraftItemSku,
   PickerQuantitySubmitResolution,
   PickerSubmitPreview,
   ServiceKitViewModel,
@@ -50,6 +51,7 @@ import type {
   VehicleDetail,
   VehicleDetailApiRecord,
 } from "@mototwin/types";
+import { PARTS_CART_REF } from "../../_components/parts-cart-reference-theme";
 import { buildPartSkuViewModelFromRecommendation } from "../../_components/part-picker-utils";
 import { NodeChip, ResetSelectionChip } from "./PickerChips";
 import { PickerSearchBar } from "./PickerSearchBar";
@@ -57,6 +59,7 @@ import { RecommendationsSection } from "./RecommendationsSection";
 import { SearchResultsSection } from "./SearchResultsSection";
 import { KitsSection } from "./KitsSection";
 import { PickerDraftCartPanel } from "./PickerDraftCartPanel";
+import { UserKitSaveModal } from "./UserKitSaveModal";
 import { WhyMatchesPanel } from "./WhyMatchesPanel";
 import { PickerSubmitPreviewModal } from "./PickerSubmitPreviewModal";
 import { PickerCatalogFiltersPanel } from "./PickerCatalogFiltersPanel";
@@ -139,6 +142,8 @@ export function PartPickerPage({
   const [kits, setKits] = useState<ServiceKitViewModel[]>([]);
   const [kitsLoading, setKitsLoading] = useState(false);
   const [kitsError, setKitsError] = useState("");
+  const [kitsReloadNonce, setKitsReloadNonce] = useState(0);
+  const [saveUserKitOpen, setSaveUserKitOpen] = useState(false);
 
   const [draft, setDraft] = useState<PickerDraftCart>(() =>
     createEmptyDraftCart(vehicleId)
@@ -158,7 +163,7 @@ export function PartPickerPage({
   const [catalogSearchWithoutNodeScope, setCatalogSearchWithoutNodeScope] = useState(false);
   const [catalogMaxPriceRub, setCatalogMaxPriceRub] = useState("");
   const [isNarrow, setIsNarrow] = useState(false);
-  const kitsSectionRef = useRef<HTMLElement | null>(null);
+  const kitsSectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1279px)");
@@ -362,7 +367,31 @@ export function PartPickerPage({
     return () => {
       cancelled = true;
     };
-  }, [vehicleId, selectedNodeId]);
+  }, [vehicleId, selectedNodeId, kitsReloadNonce]);
+
+  const userKits = useMemo(() => kits.filter((k) => k.isUserTemplate), [kits]);
+  const systemKits = useMemo(() => kits.filter((k) => !k.isUserTemplate), [kits]);
+
+  const draftSkuLinesForKit = useMemo(() => {
+    return draft.items
+      .filter((i): i is PickerDraftItemSku => i.kind === "sku")
+      .map((i) => ({
+        nodeId: i.nodeId,
+        sku: i.sku,
+        quantity: i.quantity,
+      }));
+  }, [draft.items]);
+
+  const canSaveDraftAsUserKit = draftSkuLinesForKit.length >= 1;
+
+  const userKitModalInitialTitle = useMemo(() => {
+    const first = draftSkuLinesForKit[0];
+    if (!first) return "Мой комплект";
+    const brand = first.sku.brandName?.trim();
+    const name = first.sku.canonicalName?.trim();
+    if (brand && name) return `${brand} ${name}`;
+    return name || brand || "Мой комплект";
+  }, [draftSkuLinesForKit]);
 
   useEffect(() => {
     if (debouncedSearch.length < 2) {
@@ -585,6 +614,11 @@ export function PartPickerPage({
     setBanner(null);
   }, [draft.items.length, vehicleId]);
 
+  const openCommunityAddPart = useCallback(() => {
+    const q = selectedNodeId ? `?nodeId=${encodeURIComponent(selectedNodeId)}` : "";
+    router.push(`/vehicles/${encodeURIComponent(vehicleId)}/parts/community${q}`);
+  }, [router, selectedNodeId, vehicleId]);
+
   const openCheckoutPreview = useCallback(() => {
     const active = filterActiveWishlistItems(wishlistItems);
     setQuantityResolutionByDraftId({});
@@ -736,32 +770,17 @@ export function PartPickerPage({
                 breadcrumbs={pickerBreadcrumbs}
                 title="Подбор детали"
               />
-              <div style={{ marginTop: 10, marginBottom: 4 }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const q = selectedNodeId
-                      ? `?nodeId=${encodeURIComponent(selectedNodeId)}`
-                      : "";
-                    router.push(
-                      `/vehicles/${encodeURIComponent(vehicleId)}/parts/community${q}`
-                    );
-                  }}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 10,
-                    border: `1px solid ${pickerColors.border}`,
-                    backgroundColor: pickerColors.surface,
-                    color: pickerColors.text,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Добавить свою деталь
-                </button>
-              </div>
 
+              <div
+                style={{
+                  marginTop: 18,
+                  width: "100%",
+                  minWidth: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
               {nodeTreeError ? (
                 <div style={{ ...bannerBaseStyle, ...bannerVariantStyle("error") }}>{nodeTreeError}</div>
               ) : null}
@@ -796,24 +815,35 @@ export function PartPickerPage({
                     <>
                       <div
                         style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
+                          display: "flex",
+                          flexWrap: "wrap",
                           gap: 10,
+                          alignItems: "stretch",
                           width: "100%",
                           minWidth: 0,
                         }}
                       >
-                        <NodeChip
-                          nodeName={nodeNameForUi}
-                          nodePath={nodePathLabel}
-                          nodeCode={selectedPathVm?.at(-1)?.code ?? null}
-                          onClick={() => setNodePickerOpen(true)}
-                        />
-                        <ResetSelectionChip
-                          onClick={handleResetSelection}
-                          disabled={!selectedNodeId && draft.items.length === 0}
-                        />
+                        <div style={{ flex: "1 1 200px", minWidth: 0, display: "flex" }}>
+                          <NodeChip
+                            nodeName={nodeNameForUi}
+                            nodePath={nodePathLabel}
+                            nodeCode={selectedPathVm?.at(-1)?.code ?? null}
+                            onClick={() => setNodePickerOpen(true)}
+                          />
+                        </div>
+                        <div style={{ flex: "0 1 auto", minWidth: 0, display: "flex" }}>
+                          <ResetSelectionChip
+                            onClick={handleResetSelection}
+                            disabled={!selectedNodeId && draft.items.length === 0}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={openCommunityAddPart}
+                          style={addOwnPartCommunityButtonStyle}
+                        >
+                          Добавить свою деталь
+                        </button>
                       </div>
 
                       {recError ? (
@@ -898,14 +928,28 @@ export function PartPickerPage({
                         />
                       )}
 
-                      <KitsSection
+                      <div
                         ref={kitsSectionRef}
-                        kits={kits}
-                        draftKitCodes={draftKitCodes}
-                        addingKitCode={addingKitCode}
-                        onAddKit={(kit) => void handleAddKit(kit)}
-                        isLoading={kitsLoading}
-                      />
+                        style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}
+                      >
+                        <KitsSection
+                          kits={userKits}
+                          draftKitCodes={draftKitCodes}
+                          addingKitCode={addingKitCode}
+                          onAddKit={(kit) => void handleAddKit(kit)}
+                          isLoading={kitsLoading}
+                          title="Мои комплекты"
+                          subtitle="Сохранённые наборы из журнала или собранные вручную в подборе."
+                          emptyMessage="Создайте комплект из корзины (кнопка «Сохранить как комплект») или сохраните шаблон в журнале с включённым показом в подборе."
+                        />
+                        <KitsSection
+                          kits={systemKits}
+                          draftKitCodes={draftKitCodes}
+                          addingKitCode={addingKitCode}
+                          onAddKit={(kit) => void handleAddKit(kit)}
+                          isLoading={kitsLoading}
+                        />
+                      </div>
 
                       {isNarrow ? <WhyMatchesPanel reasons={whyMatches} /> : null}
 
@@ -936,10 +980,13 @@ export function PartPickerPage({
                       onClear={() => setDraft((d) => clearDraft(d))}
                       onCheckout={openCheckoutPreview}
                       isSubmitting={isSubmitting}
+                      onSaveAsKit={() => setSaveUserKitOpen(true)}
+                      canSaveAsKit={canSaveDraftAsUserKit}
                     />
                     <WhyMatchesPanel reasons={whyMatches} />
                   </div>
                 ) : null}
+              </div>
               </div>
 
               {isNarrow ? (
@@ -966,6 +1013,8 @@ export function PartPickerPage({
                     onClear={() => setDraft((d) => clearDraft(d))}
                     onCheckout={openCheckoutPreview}
                     isSubmitting={isSubmitting}
+                    onSaveAsKit={() => setSaveUserKitOpen(true)}
+                    canSaveAsKit={canSaveDraftAsUserKit}
                   />
                 </div>
               ) : null}
@@ -1002,6 +1051,21 @@ export function PartPickerPage({
               onConfirm={() => void handleConfirmSubmit()}
             />
           ) : null}
+
+          <UserKitSaveModal
+            open={saveUserKitOpen}
+            onClose={() => setSaveUserKitOpen(false)}
+            initialTitle={userKitModalInitialTitle}
+            lines={draftSkuLinesForKit}
+            onSubmit={(body) => vehiclePickerApi.createUserServiceEventFormTemplate(body)}
+            onSuccess={() => {
+              setKitsReloadNonce((n) => n + 1);
+              setBanner({
+                kind: "success",
+                message: "Комплект сохранён. Он появился в разделе «Мои комплекты».",
+              });
+            }}
+          />
         </section>
       </div>
     </main>
@@ -1036,6 +1100,25 @@ function bannerVariantStyle(kind: PickerBannerState["kind"]): CSSProperties {
     color: productSemanticColors.successText,
   };
 }
+
+const addOwnPartCommunityButtonStyle: CSSProperties = {
+  flex: "0 1 auto",
+  alignSelf: "stretch",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  borderRadius: 8,
+  padding: "0 14px",
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1,
+  whiteSpace: "nowrap",
+  border: `1px solid ${PARTS_CART_REF.orangeHover}`,
+  backgroundColor: PARTS_CART_REF.orange,
+  color: "#fff",
+  cursor: "pointer",
+};
 
 const mutedBoxStyle: CSSProperties = {
   padding: 24,

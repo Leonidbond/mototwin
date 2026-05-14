@@ -44,6 +44,7 @@
 | Документ | Назначение |
 |----------|------------|
 | [`mototwin-parts-cart-and-picker-ui-spec.md`](./mototwin-parts-cart-and-picker-ui-spec.md) | Корзина замен + single-page подбор детали (web + mobile) |
+| [`mototwin_user_template_service_kits_implementation_ru.md`](./mototwin_user_template_service_kits_implementation_ru.md) | Реализация: шаблоны ADVANCED ↔ комплекты в подборе (`user_template:`, API, web, Expo) |
 | [`node-tree.md`](./node-tree.md) | Справочник иерархии узлов (коды дерева) |
 | [`node-tree-design-icons.md`](./node-tree-design-icons.md) | Иконки строк дерева: дизайн, нарезка, постобработка, маппинг |
 | [`node-tree-page-functional-overview.md`](./node-tree-page-functional-overview.md) | Поведение страницы «Узлы» (web + Expo) |

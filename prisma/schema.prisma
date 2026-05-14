@@ -215,6 +215,8 @@ model UserServiceEventFormTemplate {
   title     String
   mode      String
   formJson  Json
+  /** When true, комплект из этого шаблона показывается в подборе деталей. */
+  includeInPartPicker Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -7,12 +7,35 @@ import {
 import type { PrismaClient } from "@prisma/client";
 import type { FitmentConfidenceStatus, PartRecommendationViewModel } from "@mototwin/types";
 
-type VehicleFitmentContext = {
+export type VehicleFitmentContext = {
   id: string;
   modelId: string;
   modelVariantId: string | null;
   modelVariant: { year: number } | null;
 };
+
+/**
+ * Prisma `Vehicle` rows may have nullable `modelId` / `year`; recommendations need a strict context.
+ */
+export function narrowVehicleFitmentContext(vehicle: {
+  id: string;
+  modelId: string | null;
+  modelVariantId: string | null;
+  modelVariant: { year: number | null } | null;
+}): VehicleFitmentContext | null {
+  if (!vehicle.modelId?.trim()) {
+    return null;
+  }
+  return {
+    id: vehicle.id,
+    modelId: vehicle.modelId,
+    modelVariantId: vehicle.modelVariantId,
+    modelVariant:
+      vehicle.modelVariant?.year != null && Number.isFinite(vehicle.modelVariant.year)
+        ? { year: vehicle.modelVariant.year }
+        : null,
+  };
+}
 
 /**
  * Loads SKU recommendations for a node and merges published {@link FitmentConfidence} for the vehicle variant.
@@ -43,6 +66,7 @@ export async function buildRecommendationsForNodeWithCommunity(
   });
 
   const masterIds = [...new Set(rows.map((r) => r.partMasterId).filter((id): id is string => Boolean(id)))];
+  const publishedCountByMasterId = new Map<string, number>();
   const confidenceByMasterId = new Map<
     string,
     {
@@ -57,13 +81,28 @@ export async function buildRecommendationsForNodeWithCommunity(
   >();
 
   if (masterIds.length > 0 && vehicle.modelVariantId) {
-    const confRows = await prisma.fitmentConfidence.findMany({
-      where: {
-        modelVariantId: vehicle.modelVariantId,
-        nodeId,
-        partMasterId: { in: masterIds },
-      },
-    });
+    const [confRows, publishedGroups] = await Promise.all([
+      prisma.fitmentConfidence.findMany({
+        where: {
+          modelVariantId: vehicle.modelVariantId,
+          nodeId,
+          partMasterId: { in: masterIds },
+        },
+      }),
+      prisma.fitmentReport.groupBy({
+        by: ["partMasterId"],
+        where: {
+          modelVariantId: vehicle.modelVariantId,
+          nodeId,
+          partMasterId: { in: masterIds },
+          moderationStatus: "PUBLISHED",
+        },
+        _count: { id: true },
+      }),
+    ]);
+    for (const g of publishedGroups) {
+      publishedCountByMasterId.set(g.partMasterId, g._count.id);
+    }
     for (const c of confRows) {
       confidenceByMasterId.set(c.partMasterId, {
         confidenceScore: c.confidenceScore,
@@ -132,12 +171,14 @@ export async function buildRecommendationsForNodeWithCommunity(
     });
 
     const cRow = row.partMasterId ? confidenceByMasterId.get(row.partMasterId) ?? null : null;
+    const published = row.partMasterId ? publishedCountByMasterId.get(row.partMasterId) ?? 0 : 0;
 
     return mergeCommunityFitmentIntoRecommendation(base, {
       partMasterId: row.partMasterId,
       confidence: cRow,
       nodeServiceGroup: nodeMeta.serviceGroup,
       nodeCode: nodeMeta.code,
+      publishedFitmentReportCount: published,
     });
   });
 

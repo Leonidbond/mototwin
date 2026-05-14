@@ -214,6 +214,23 @@ export type {
   TrustBadgeWire,
 } from "./fitment-community";
 export type {
+  CompatibilityConfidenceTierWire,
+  PartCompatibilityReportWire,
+  PartCompatibilityBreakdownWire,
+  PartCompatibilityConfidenceWire,
+  PartCompatibilityEvidenceItemWire,
+  PartCompatibilityNodeWire,
+  PartCompatibilityPartMasterWire,
+  PartCompatibilityRelatedPartWire,
+  PartCompatibilityReportItemWire,
+  PartCompatibilityRideProfileInsightWire,
+  PartCompatibilityServiceStatisticsWire,
+  PartCompatibilitySourcePriorityWire,
+  PartCompatibilityStructuredSummaryWire,
+  PartCompatibilityVehicleWire,
+  PartCompatibilityVoteAggregateWire,
+} from "./part-compatibility-report";
+export type {
   PartWishlistItem,
   PartWishlistItemStatus,
   PartWishlistItemViewModel,

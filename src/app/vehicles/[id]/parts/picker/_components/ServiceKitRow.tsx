@@ -64,6 +64,36 @@ export function ServiceKitRow(props: {
                 flexWrap: "wrap",
               }}
             >
+              {props.kit.isUserTemplate ? (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    color: pickerColors.textSecondary,
+                    border: `1px solid ${pickerColors.border}`,
+                    borderRadius: 6,
+                    padding: "2px 6px",
+                    flexShrink: 0,
+                  }}
+                >
+                  Мой
+                </span>
+              ) : null}
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: pickerColors.textMuted,
+                  fontFamily:
+                    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace",
+                  letterSpacing: "0.02em",
+                  flexShrink: 0,
+                }}
+              >
+                {props.kit.code}
+              </span>
               <h3 style={titleStyle}>{props.kit.title}</h3>
               {tag ? (
                 <span
@@ -203,10 +233,11 @@ const imageStyle: CSSProperties = {
 
 const titleStyle: CSSProperties = {
   margin: 0,
+  flex: "1 1 120px",
+  minWidth: 0,
   fontSize: 14,
   fontWeight: 700,
   color: pickerColors.text,
-  minWidth: 0,
   overflowWrap: "anywhere",
 };
 

@@ -1021,9 +1021,24 @@ export default function VehicleWishlistScreen() {
                                 />
                               </View>
                               <View style={styles.rowTitlePathCol}>
-                                <Text style={styles.rowTitle} numberOfLines={2}>
-                                  {item.title}
-                                </Text>
+                                <View style={styles.rowTitleKitRow}>
+                                  <Text style={styles.rowTitle} numberOfLines={2}>
+                                    {item.title}
+                                  </Text>
+                                  {item.kitOriginLabelRu ? (
+                                    <View style={styles.kitOriginBadge}>
+                                      <Text
+                                        style={[
+                                          styles.kitOriginBadgeText,
+                                          item.kitOriginKitCode ? styles.kitOriginBadgeTextMono : null,
+                                        ]}
+                                        numberOfLines={1}
+                                      >
+                                        {item.kitOriginKitCode ?? "Комплект"}
+                                      </Text>
+                                    </View>
+                                  ) : null}
+                                </View>
                                 <Text style={styles.rowPath} numberOfLines={2}>
                                   {wishlistNodePathForRow(nodeTree, item.nodeId, item.node?.name ?? null)}
                                 </Text>
@@ -1169,9 +1184,26 @@ export default function VehicleWishlistScreen() {
               >
                 <View style={styles.detailHeader}>
                   <View style={styles.detailHeaderText}>
-                    <Text style={styles.detailTitle} numberOfLines={3}>
-                      {detailItem.title}
-                    </Text>
+                    <View style={styles.detailTitleRow}>
+                      <View style={styles.detailTitleTextWrap}>
+                        <Text style={styles.detailTitle} numberOfLines={3}>
+                          {detailItem.title}
+                        </Text>
+                      </View>
+                      {detailItem.kitOriginLabelRu ? (
+                        <View style={styles.kitOriginBadge}>
+                          <Text
+                            style={[
+                              styles.kitOriginBadgeText,
+                              detailItem.kitOriginKitCode ? styles.kitOriginBadgeTextMono : null,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {detailItem.kitOriginKitCode ?? "Комплект"}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <Text
                       style={[styles.detailStatus, { color: CART_STATUS_COLOR[detailItem.status] }]}
                     >
@@ -1192,11 +1224,28 @@ export default function VehicleWishlistScreen() {
                     <MaterialIcons name="inventory-2" size={36} color={PARTS_CART_REF.textSubtle} />
                   </View>
                   <View style={styles.detailProductText}>
-                    <Text style={styles.detailProductName} numberOfLines={3}>
-                      {detailItem.sku
-                        ? getWishlistItemSkuDisplayLines(detailItem.sku).primaryLine
-                        : detailItem.title}
-                    </Text>
+                    <View style={styles.detailProductNameRow}>
+                      <View style={styles.detailProductNameTextWrap}>
+                        <Text style={styles.detailProductName} numberOfLines={3}>
+                          {detailItem.sku
+                            ? getWishlistItemSkuDisplayLines(detailItem.sku).primaryLine
+                            : detailItem.title}
+                        </Text>
+                      </View>
+                      {detailItem.kitOriginLabelRu ? (
+                        <View style={styles.kitOriginBadge}>
+                          <Text
+                            style={[
+                              styles.kitOriginBadgeText,
+                              detailItem.kitOriginKitCode ? styles.kitOriginBadgeTextMono : null,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {detailItem.kitOriginKitCode ?? "Комплект"}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <Text style={styles.detailProductMeta} numberOfLines={2}>
                       {detailItem.sku
                         ? getWishlistItemSkuDisplayLines(detailItem.sku).secondaryLine
@@ -1250,9 +1299,19 @@ export default function VehicleWishlistScreen() {
                 {detailItem.kitOriginLabelRu ? (
                   <View style={styles.detailKitBox}>
                     <Text style={styles.detailSectionLabel}>Из комплекта</Text>
-                    <Text style={styles.detailKitLine}>
-                      {detailItem.kitOriginLabelRu.replace(/^Из комплекта:\s*/i, "")}
-                    </Text>
+                    <View style={styles.detailKitLineRow}>
+                      {detailItem.kitOriginKitCode ? (
+                        <View style={styles.detailKitCodeChip}>
+                          <Text style={styles.detailKitCodeText} numberOfLines={1}>
+                            {detailItem.kitOriginKitCode}
+                          </Text>
+                        </View>
+                      ) : null}
+                      <Text style={[styles.detailKitLine, { flexShrink: 1 }]} numberOfLines={3}>
+                        {detailItem.kitOriginTitleRu ??
+                          detailItem.kitOriginLabelRu.replace(/^Из комплекта:\s*/i, "")}
+                      </Text>
+                    </View>
                   </View>
                 ) : null}
 
@@ -1927,6 +1986,32 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rowTitlePathCol: { flex: 1, minWidth: 0, gap: 2 },
+  rowTitleKitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  kitOriginBadge: {
+    maxWidth: 200,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#334155",
+    backgroundColor: "rgba(99, 102, 241, 0.14)",
+  },
+  kitOriginBadgeText: {
+    fontSize: 8,
+    fontWeight: "800",
+    color: "#c7d2fe",
+    letterSpacing: 0.3,
+  },
+  kitOriginBadgeTextMono: {
+    fontFamily: "Menlo",
+    fontSize: 7.5,
+    letterSpacing: 0.1,
+  },
   /** Как web `.rowTitle` / `.rowPath`. */
   rowTitle: {
     fontSize: 11,
@@ -2288,6 +2373,14 @@ const styles = StyleSheet.create({
     borderBottomColor: PARTS_LIST.panelBorder,
   },
   detailHeaderText: { flex: 1, minWidth: 0 },
+  detailTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: 8,
+    width: "100%",
+  },
+  detailTitleTextWrap: { flex: 1, minWidth: 0 },
   detailTitle: {
     fontSize: 16,
     fontWeight: "800",
@@ -2332,6 +2425,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   detailProductText: { flex: 1, minWidth: 0 },
+  detailProductNameRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: 8,
+    width: "100%",
+  },
+  detailProductNameTextWrap: { flex: 1, minWidth: 0 },
   detailProductName: {
     fontSize: 13,
     fontWeight: "800",
@@ -2408,6 +2509,28 @@ const styles = StyleSheet.create({
     backgroundColor: PARTS_LIST.rowBg,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  detailKitLineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  detailKitCodeChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#334155",
+    backgroundColor: "rgba(15, 23, 42, 0.85)",
+    flexShrink: 0,
+  },
+  detailKitCodeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#e2e8f0",
+    fontFamily: "Menlo",
+    letterSpacing: 0.2,
   },
   detailKitLine: {
     fontSize: 11,

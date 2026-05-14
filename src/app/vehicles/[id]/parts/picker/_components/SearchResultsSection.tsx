@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import type { PartSkuViewModel } from "@mototwin/types";
-import { getPartSkuViewModelDisplayLines } from "@mototwin/domain";
+import { getPartSkuViewModelDisplayLines, getPickerSkuSearchStatsLineRu } from "@mototwin/domain";
 import { PickerFitmentReportLinkFromSku } from "./PickerFitmentReportLink";
 import { pickerColors, pickerSectionSubtitleStyle, pickerSectionTitleStyle } from "./picker-styles";
 
@@ -87,6 +87,9 @@ function SearchResultRow(props: {
 }) {
   const lines = getPartSkuViewModelDisplayLines(props.sku);
   const price = formatPriceRu(props.sku.priceAmount, props.sku.currency);
+  const statsLine = getPickerSkuSearchStatsLineRu(props.sku, props.nodeId);
+  const statsTitle =
+    "Совместимость и уверенность по каталогу; число установок в отчётах сообщества — по ссылке «Отчёт о совместимости» ниже.";
   return (
     <div style={rowStyle}>
       <div style={imageStyle} aria-hidden>
@@ -108,6 +111,20 @@ function SearchResultRow(props: {
             {lines.secondaryLine}
           </div>
         ) : null}
+        <div
+          style={{
+            marginTop: 6,
+            fontSize: 11,
+            lineHeight: 1.35,
+            color: pickerColors.textSecondary,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+          title={statsTitle + " " + statsLine}
+        >
+          {statsLine}
+        </div>
         <PickerFitmentReportLinkFromSku
           vehicleId={props.vehicleId}
           nodeId={props.nodeId}

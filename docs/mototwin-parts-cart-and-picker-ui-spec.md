@@ -352,7 +352,7 @@ type CartGroup = {
 Desktop row contents:
 
 - image/icon;
-- title;
+- title; **если позиция из комплекта** — справа от названия в той же строке **плашка с кодом комплекта** (`kitOriginKitCode`) или **«Комплект»** без кода (legacy);
 - node path;
 - SKU short name;
 - quantity;
@@ -363,7 +363,7 @@ Desktop row contents:
 Mobile row contents:
 
 - image/icon;
-- title;
+- title; **плашка комплекта** — как на desktop;
 - node path;
 - quantity;
 - price;
@@ -406,7 +406,7 @@ Mobile opens as bottom sheet / full-screen detail.
 
 Content:
 
-- title: item name;
+- title: item name; **если позиция из комплекта** — рядом с названием (и у блока товара) компактная **плашка с `kitOriginKitCode`** (моноширинный стиль) или подпись **«Комплект»** для старых строк без кода в `comment`;
 - current status;
 - product image/placeholder;
 - SKU block;
@@ -414,7 +414,7 @@ Content:
 - quantity;
 - price + currency;
 - comment;
-- kit source if exists;
+- kit source if exists: блок **«Из комплекта»** — при наличии кода комплекта отдельный чип **`KIT_CODE`**, рядом человекочитаемое **название** (`kitOriginTitleRu`); для legacy — только название из первой строки `comment`;
 - compact expandable history with its own scroll viewport;
 - actions.
 
@@ -846,7 +846,7 @@ Body:
 ### `ServiceKitRow` (mobile-style горизонтальная строка)
 
 - kit image слева (квадрат);
-- центр: kit title bold + subtitle (`«Колодки + тормозная жидкость»`) + `MtTagBadge` (`«Популярный»` / `«Выгодный»` / `«Рекомендуем»`) + count `«Включает N позиций»`;
+- центр: **сначала `kit.code` (моноширинно)**, затем **kit title** bold + subtitle (`«Колодки + тормозная жидкость»`) + `MtTagBadge` (`«Популярный»` / `«Выгодный»` / `«Рекомендуем»`) + count `«Включает N позиций»`;
 - справа: цена + (deferred) `oldAmount` + (deferred) `−10%` discount badge + `«Подходит»` зелёная подпись;
 - primary CTA `«Добавить комплект»` или chevron.
 
@@ -886,7 +886,7 @@ Body:
 Для кита (агрегированная строка):
 
 - kit thumbnail / иконка-комплект;
-- kit title;
+- **строка 1:** **`kit.code`** (моноширинно) + **kit title**;
 - `«N позиций»`;
 - `1 шт.` + общая цена;
 - кнопка `×`.

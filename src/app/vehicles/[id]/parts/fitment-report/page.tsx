@@ -1,4 +1,4 @@
-import { FitmentReportPageClient } from "./FitmentReportPageClient";
+import { PartCompatibilityReportPageClient } from "./PartCompatibilityReportPageClient";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -16,5 +16,5 @@ export default async function Page({ params, searchParams }: Props) {
       </div>
     );
   }
-  return <FitmentReportPageClient vehicleId={id} partMasterId={partMasterId} nodeId={nodeId} />;
+  return <PartCompatibilityReportPageClient vehicleId={id} partMasterId={partMasterId} nodeId={nodeId} />;
 }

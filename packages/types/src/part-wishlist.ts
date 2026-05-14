@@ -41,6 +41,13 @@ export type PartWishlistItemViewModel = PartWishlistItem & {
   unitCostLabelRu?: string;
   /** UI-only label extracted from comment prefix, e.g. "Из комплекта: Замена масла". */
   kitOriginLabelRu?: string | null;
+  /**
+   * Код комплекта из первой строки `comment` (формат `Из комплекта: [CODE] …`);
+   * для старых строк без скобок — `null`.
+   */
+  kitOriginKitCode?: string | null;
+  /** Название комплекта без префикса и без блока `[CODE]` (для подписей в UI). */
+  kitOriginTitleRu?: string | null;
   /** Comment without kit-origin line for compact display. */
   commentBodyRu?: string | null;
 };

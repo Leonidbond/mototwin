@@ -18,6 +18,7 @@ const postBodySchema = z
   .object({
     baseTitle: z.string().max(200).optional().nullable(),
     formSnapshot: z.unknown(),
+    includeInPartPicker: z.boolean().optional(),
   })
   .strict();
 
@@ -31,6 +32,7 @@ function wireFromRow(row: {
   mode: string;
   updatedAt: Date;
   formJson: unknown;
+  includeInPartPicker?: boolean | null;
 }) {
   const mode = toMode(row.mode);
   const form =
@@ -41,6 +43,7 @@ function wireFromRow(row: {
     mode,
     updatedAt: row.updatedAt.toISOString(),
     form,
+    includeInPartPicker: row.includeInPartPicker ?? true,
   };
 }
 
@@ -93,14 +96,37 @@ export async function POST(request: Request) {
       );
     }
 
-    const created = await prisma.userServiceEventFormTemplate.create({
-      data: {
-        userId: currentUser.userId,
-        title,
-        mode: normalized.mode,
-        formJson,
-      },
-    });
+    const includeInPartPicker = parsed.data.includeInPartPicker ?? true;
+
+    let created;
+    try {
+      created = await prisma.userServiceEventFormTemplate.create({
+        data: {
+          userId: currentUser.userId,
+          title,
+          mode: normalized.mode,
+          formJson,
+          includeInPartPicker,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Unknown argument") &&
+        error.message.includes("includeInPartPicker")
+      ) {
+        created = await prisma.userServiceEventFormTemplate.create({
+          data: {
+            userId: currentUser.userId,
+            title,
+            mode: normalized.mode,
+            formJson,
+          },
+        });
+      } else {
+        throw error;
+      }
+    }
 
     return NextResponse.json({ template: wireFromRow(created) });
   } catch (error) {

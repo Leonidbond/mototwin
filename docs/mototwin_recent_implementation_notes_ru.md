@@ -1,6 +1,8 @@
 # Зафиксированные шаги реализации (сводка)
 
-Документ описывает **уже внесённые в репозиторий** изменения по ветке работ: community fitment, подбор деталей, отчёты, иконки дерева узлов, сопутствующие правки API и мобильного клиента. Полноценная страница «Итоговый отчёт по совместимости» по [mototwin_part_compatibility_report_ui_spec_ru.md](mototwin_part_compatibility_report_ui_spec_ru.md) в объёме **плана v1.1 (hero, breakdown, единый API `part-compatibility-report`)** на момент коммита может быть **ещё не реализована** — ориентир по коду: наличие маршрута `src/app/api/vehicles/[id]/part-compatibility-report/`.
+Документ описывает **уже внесённые в репозиторий** изменения по ветке работ: community fitment, подбор деталей, отчёты, иконки дерева узлов, сопутствующие правки API и мобильного клиента. Страница «Итоговый отчёт по совместимости» опирается на [mototwin_part_compatibility_report_ui_spec_ru.md](mototwin_part_compatibility_report_ui_spec_ru.md) и **`GET .../part-compatibility-report`**; детальное соответствие всем пунктам спеки v1.1 при необходимости доводится отдельно.
+
+**Шаблоны журнала (ADVANCED) и комплекты в подборе** (`includeInPartPicker`, коды `user_template:`, UI web/Expo) вынесены в отдельный документ: [mototwin_user_template_service_kits_implementation_ru.md](mototwin_user_template_service_kits_implementation_ru.md).
 
 ## 1. Данные и Prisma
 
@@ -20,13 +22,13 @@
 ## 3. HTTP API (web)
 
 - Отчёты по мотоциклу: [src/app/api/vehicles/[id]/fitment-reports/route.ts](../src/app/api/vehicles/[id]/fitment-reports/route.ts) (GET/POST; GET с опциональным `partMasterId`).
-- Сводка для страницы отчёта (агрегат по модификации + список отчётов): [src/app/api/vehicles/[id]/fitment-report-sheet/route.ts](../src/app/api/vehicles/[id]/fitment-report-sheet/route.ts).
+- Сводка для страницы отчёта (агрегат по модификации + список отчётов, breakdown, источник): [src/app/api/vehicles/[id]/part-compatibility-report/route.ts](../src/app/api/vehicles/[id]/part-compatibility-report/route.ts) (устаревший `fitment-report-sheet` удалён).
 - Fitment evidence, moderation, part-masters: каталоги [src/app/api/fitment/](../src/app/api/fitment/), [src/app/api/moderation/](../src/app/api/moderation/), [src/app/api/part-masters/](../src/app/api/part-masters/).
 - Подбор рекомендаций: [src/app/api/parts/recommended-skus/route.ts](../src/app/api/parts/recommended-skus/route.ts) (использует сборку с community).
 
 ## 4. UI (Next.js)
 
-- Страница отчёта (URL с `partMasterId` и `nodeId`): [src/app/vehicles/[id]/parts/fitment-report/](../src/app/vehicles/[id]/parts/fitment-report/).
+- Страница отчёта (URL с `partMasterId` и `nodeId`): [src/app/vehicles/[id]/parts/fitment-report/](../src/app/vehicles/[id]/parts/fitment-report/) — клиент `PartCompatibilityReportPageClient.tsx`, данные с `GET .../part-compatibility-report`.
 - Сообщество / «своя деталь»: [src/app/vehicles/[id]/parts/community/](../src/app/vehicles/[id]/parts/community/).
 - Подборщик: ссылка на отчёт с уровнем совместимости — [src/app/vehicles/[id]/parts/picker/_components/PickerFitmentReportLink.tsx](../src/app/vehicles/[id]/parts/picker/_components/PickerFitmentReportLink.tsx), карточки [RecommendationCard.tsx](../src/app/vehicles/[id]/parts/picker/_components/RecommendationCard.tsx), [RecommendationsSection.tsx](../src/app/vehicles/[id]/parts/picker/_components/RecommendationsSection.tsx), [SearchResultsSection.tsx](../src/app/vehicles/[id]/parts/picker/_components/SearchResultsSection.tsx).
 - Модерация (web): [src/app/moderation/](../src/app/moderation/).
@@ -50,4 +52,4 @@
 
 ## 8. Следующие шаги (по продуктовому плану)
 
-- Заменить `fitment-report-sheet` и текущую страницу отчёта на единый **`GET .../part-compatibility-report`** и новый layout (hero, breakdown, источники, sticky CTA) по спеке v1.1 — см. план в Cursor (Part compatibility report page), без правки самого файла плана в репозитории, если он хранится только локально в `.cursor/plans/`.
+- Довести UI страницы отчёта до полного соответствия [mototwin_part_compatibility_report_ui_spec_ru.md](mototwin_part_compatibility_report_ui_spec_ru.md) v1.1 (если остались секции спеки), корзину замен при появлении API, регрессия мобильного клиента под новый контракт при необходимости.

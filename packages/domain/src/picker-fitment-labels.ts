@@ -55,3 +55,43 @@ export function getPickerSkuCatalogFitHintRu(sku: PartSkuViewModel): string {
   if (c > 0) return "Каталог: низкая уверенность";
   return "Каталог: проверьте применимость";
 }
+
+/** 0–100: приоритет связи с выбранным узлом, иначе максимум по каталогу. */
+export function getPickerSkuCatalogConfidencePercent(sku: PartSkuViewModel, nodeId: string | null): number {
+  if (nodeId) {
+    const link = sku.nodeLinks.find((l) => l.nodeId === nodeId);
+    if (link != null) return Math.min(100, Math.max(0, Math.round(link.confidence)));
+  }
+  const linkMax = sku.nodeLinks.reduce((m, l) => Math.max(m, l.confidence), 0);
+  const fitMax = sku.fitments.reduce((m, f) => Math.max(m, f.confidence), 0);
+  return Math.min(100, Math.max(0, Math.round(Math.max(linkMax, fitMax, 0))));
+}
+
+/**
+ * Одна строка для карточки в подборщике: слой совместимости, уверенность (сообщество или каталог %), число отчётов.
+ */
+export function getPickerRecommendationStatsLineRu(rec: PartRecommendationViewModel): string {
+  const fit = getPickerFitmentShortLabelRu(rec);
+  const conf =
+    rec.communityStatus != null
+      ? formatFitmentConfidenceStatusRu(rec.communityStatus)
+      : `оценка каталога ${Math.min(100, Math.max(0, Math.round(rec.confidence)))}%`;
+  const n = rec.communityReportCount;
+  const installs = n === 0 ? "нет опубликованных отчётов" : `${n} ${pluralReportsShortRu(n)}`;
+  return `${fit} · ${conf} · ${installs}`;
+}
+
+/** Строка поиска: каталог; число отчётов сообщества в этом списке не подгружается — см. отчёт по ссылке. */
+export function getPickerSkuSearchStatsLineRu(sku: PartSkuViewModel, nodeId: string | null): string {
+  const hint = getPickerSkuCatalogFitHintRu(sku);
+  const pct = getPickerSkuCatalogConfidencePercent(sku, nodeId);
+  return `${hint} · ${pct}% · см. отчёт`;
+}
+
+function pluralReportsShortRu(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "отчёт";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "отчёта";
+  return "отчётов";
+}

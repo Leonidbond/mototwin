@@ -281,7 +281,17 @@ export function chooseBestSkuForKitItem(
   recommendations: PartRecommendationViewModel[],
   item: ServiceKitItemDefinition
 ): PartRecommendationViewModel | null {
-  const candidates = recommendations.filter((rec) => rec.partType === item.partType);
+  const preferred = item.preferredSkuId?.trim();
+  if (preferred) {
+    const direct = recommendations.find((r) => r.skuId === preferred);
+    if (direct) {
+      return direct;
+    }
+  }
+  let candidates = recommendations.filter((rec) => rec.partType === item.partType);
+  if (candidates.length === 0) {
+    candidates = [...recommendations];
+  }
   if (candidates.length === 0) {
     return null;
   }
@@ -523,7 +533,7 @@ export function expandServiceKitToWishlistDrafts(
       skuId,
       quantity: Math.max(1, Math.trunc(item.quantity || 1)),
       status: "NEEDED",
-      comment: `${WISHLIST_KIT_ORIGIN_PREFIX_RU} ${kit.title}`,
+      comment: `${WISHLIST_KIT_ORIGIN_PREFIX_RU} [${kit.code}] ${kit.title}`,
       costAmount: picked?.priceAmount ?? null,
       currency: picked?.currency?.trim() || null,
     });

@@ -150,6 +150,8 @@ export type UserServiceEventFormTemplateWire = {
   mode: ServiceEventMode;
   updatedAt: string;
   form: AddServiceEventFormValues;
+  /** Показывать синтетический комплект в подборе деталей. */
+  includeInPartPicker: boolean;
 };
 
 export type UserServiceEventFormTemplatesResponse = {
@@ -160,6 +162,8 @@ export type CreateUserServiceEventFormTemplateBody = {
   /** Optional name fragment; final title always includes quick/detailed mode. */
   baseTitle?: string | null;
   formSnapshot: AddServiceEventFormValues;
+  /** When false, комплект не мержится в GET /api/parts/service-kits. По умолчанию true. */
+  includeInPartPicker?: boolean;
 };
 
 export type CreateUserServiceEventFormTemplateResponse = {

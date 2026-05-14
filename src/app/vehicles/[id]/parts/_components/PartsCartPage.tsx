@@ -267,7 +267,7 @@ function RepeatPurchaseActionIcon() {
 function DetailActionIcon({
   kind,
 }: {
-  kind: "edit" | "ordered" | "bought" | "installed" | "delete" | "repeatPurchase";
+  kind: "edit" | "ordered" | "bought" | "installed" | "rejected" | "delete" | "repeatPurchase";
 }) {
   if (kind === "edit") {
     return (
@@ -301,6 +301,15 @@ function DetailActionIcon({
       <svg viewBox="0 0 24 24" fill="none" aria-hidden>
         <circle cx="12" cy="12" r="7.2" stroke="currentColor" strokeWidth="1.7" />
         <path d="M8.7 12.2l2.2 2.2 4.7-5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (kind === "rejected") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     );
   }
@@ -529,7 +538,23 @@ export function PartsCartPage(props: PartsCartPageProps) {
         <div className={styles.detailInner}>
           <div className={styles.detailHeader}>
             <div>
-              <h2 className={styles.detailTitle}>{item.title}</h2>
+              <div className={styles.detailTitleBlock}>
+                <h2 className={styles.detailTitle}>{item.title}</h2>
+                {item.kitOriginLabelRu ? (
+                  <span
+                    className={`${styles.kitOriginBadge}${item.kitOriginKitCode ? ` ${styles.kitOriginBadgeCode}` : ""}`}
+                    title={
+                      item.kitOriginTitleRu
+                        ? `Комплект: ${item.kitOriginTitleRu}`
+                        : item.kitOriginKitCode
+                          ? `Комплект ${item.kitOriginKitCode}`
+                          : "Из комплекта"
+                    }
+                  >
+                    {item.kitOriginKitCode ?? "Комплект"}
+                  </span>
+                ) : null}
+              </div>
               <p className={styles.detailStatus} style={{ color: st }}>{item.statusLabelRu}</p>
             </div>
             <button type="button" className={styles.closeButton} onClick={() => setIsDetailPanelClosed(true)} aria-label="Закрыть панель">
@@ -542,7 +567,23 @@ export function PartsCartPage(props: PartsCartPageProps) {
               <PartPlaceholderIcon />
             </div>
             <div className={styles.productText}>
-              <p className={styles.productName}>{skuLines?.primaryLine ?? item.title}</p>
+              <div className={styles.productNameRow}>
+                <p className={styles.productName}>{skuLines?.primaryLine ?? item.title}</p>
+                {item.kitOriginLabelRu ? (
+                  <span
+                    className={`${styles.kitOriginBadge}${item.kitOriginKitCode ? ` ${styles.kitOriginBadgeCode}` : ""}`}
+                    title={
+                      item.kitOriginTitleRu
+                        ? `Комплект: ${item.kitOriginTitleRu}`
+                        : item.kitOriginKitCode
+                          ? `Комплект ${item.kitOriginKitCode}`
+                          : "Из комплекта"
+                    }
+                  >
+                    {item.kitOriginKitCode ?? "Комплект"}
+                  </span>
+                ) : null}
+              </div>
               <p className={styles.productMeta}>{skuLines?.secondaryLine ?? item.node?.name ?? "Ручная позиция"}</p>
               {item.sku ? <span className={styles.aftermarket}>AFTERMARKET</span> : null}
               {item.sku?.primaryPartNumber ? <p className={styles.productMeta}>Арт.: {item.sku.primaryPartNumber}</p> : null}
@@ -583,7 +624,11 @@ export function PartsCartPage(props: PartsCartPageProps) {
             <div className={styles.kitBox}>
               <p className={styles.sectionLabel}>Из комплекта</p>
               <div className={styles.kitLine}>
-                <span>{item.kitOriginLabelRu.replace(/^Из комплекта:\s*/i, "")}</span>
+                {item.kitOriginKitCode ? <span className={styles.kitCodeChip}>{item.kitOriginKitCode}</span> : null}
+                <span>
+                  {item.kitOriginTitleRu ??
+                    item.kitOriginLabelRu.replace(/^Из комплекта:\s*/i, "")}
+                </span>
               </div>
             </div>
           ) : null}
@@ -632,6 +677,12 @@ export function PartsCartPage(props: PartsCartPageProps) {
               <button type="button" className={styles.actionButton} onClick={() => onPatchWishlistItemStatus(item.id, "INSTALLED", item.status)} disabled={isBusy} style={{ background: tint(PARTS_CART_REF.statusInstalled, 0.16), borderColor: tint(PARTS_CART_REF.statusInstalled, 0.35), color: PARTS_CART_REF.statusInstalled }}>
                 <span className={styles.actionIcon}><DetailActionIcon kind="installed" /></span>
                 <span>Установить</span>
+              </button>
+            ) : null}
+            {item.status !== "INSTALLED" && item.status !== "REJECTED" ? (
+              <button type="button" className={styles.actionButton} onClick={() => onPatchWishlistItemStatus(item.id, "REJECTED", item.status)} disabled={isBusy} style={{ background: tint(PARTS_CART_REF.statusMuted, 0.18), borderColor: tint(PARTS_CART_REF.statusMuted, 0.4), color: PARTS_CART_REF.textMuted }}>
+                <span className={styles.actionIcon}><DetailActionIcon kind="rejected" /></span>
+                <span>Не подошла</span>
               </button>
             ) : null}
             {detailCanRepeatWishlistPurchase ? (
@@ -906,7 +957,23 @@ export function PartsCartPage(props: PartsCartPageProps) {
                               >
                                 <span className={styles.thumb} aria-hidden><PartPlaceholderIcon /></span>
                                 <span className="min-w-0">
-                                  <span className={styles.rowTitle}>{item.title}</span>
+                                  <span className={styles.rowTitleRow}>
+                                    <span className={styles.rowTitle}>{item.title}</span>
+                                    {item.kitOriginLabelRu ? (
+                                      <span
+                                        className={`${styles.kitOriginBadge}${item.kitOriginKitCode ? ` ${styles.kitOriginBadgeCode}` : ""}`}
+                                        title={
+                                          item.kitOriginTitleRu
+                                            ? `Комплект: ${item.kitOriginTitleRu}`
+                                            : item.kitOriginKitCode
+                                              ? `Комплект ${item.kitOriginKitCode}`
+                                              : "Из комплекта"
+                                        }
+                                      >
+                                        {item.kitOriginKitCode ?? "Комплект"}
+                                      </span>
+                                    ) : null}
+                                  </span>
                                   <span className={styles.rowPath}>{nodePathForRow(nodeTree, item.nodeId)}</span>
                                 </span>
                                 <span className={styles.skuLine}>{skuLines?.primaryLine ?? "—"}</span>
@@ -968,15 +1035,72 @@ export function PartsCartPage(props: PartsCartPageProps) {
                               ) : null}
                               {openRowMenuId === item.id && raw ? (
                                 <div className={styles.rowMenu}>
-                                  <button type="button" onClick={() => { setOpenRowMenuId(null); onOpenWishlistEdit(raw); }}>Изменить</button>
-                                  {item.status !== "REJECTED" && item.status !== "ORDERED" ? <button type="button" onClick={() => runStatusAction(item, raw, "ORDERED")} disabled={isBusy}>Заказано</button> : null}
-                                  {item.status !== "REJECTED" && item.status !== "BOUGHT" ? <button type="button" onClick={() => runStatusAction(item, raw, "BOUGHT")} disabled={isBusy}>Куплено</button> : null}
-                                  {item.status !== "REJECTED" && item.status !== "INSTALLED" ? <button type="button" onClick={() => runStatusAction(item, raw, "INSTALLED")} disabled={isBusy}>Установлено</button> : null}
-                                  {item.status === "INSTALLED" ? <button type="button" onClick={() => { setOpenRowMenuId(null); openWishlistItemJournal(item); }}>В журнал</button> : null}
+                                  <button
+                                    type="button"
+                                    className={styles.rowMenuBlockButton}
+                                    onClick={() => {
+                                      setOpenRowMenuId(null);
+                                      onOpenWishlistEdit(raw);
+                                    }}
+                                  >
+                                    Изменить
+                                  </button>
+                                  {item.status !== "REJECTED" && item.status !== "INSTALLED" ? (
+                                    <>
+                                      {item.status !== "ORDERED" ? (
+                                        <button
+                                          type="button"
+                                          className={styles.rowMenuBlockButton}
+                                          onClick={() => runStatusAction(item, raw, "ORDERED")}
+                                          disabled={isBusy}
+                                        >
+                                          Заказано
+                                        </button>
+                                      ) : null}
+                                      {item.status !== "BOUGHT" ? (
+                                        <button
+                                          type="button"
+                                          className={styles.rowMenuBlockButton}
+                                          onClick={() => runStatusAction(item, raw, "BOUGHT")}
+                                          disabled={isBusy}
+                                        >
+                                          Куплено
+                                        </button>
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        className={styles.rowMenuBlockButton}
+                                        onClick={() => runStatusAction(item, raw, "INSTALLED")}
+                                        disabled={isBusy}
+                                      >
+                                        Установлено
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={styles.rowMenuBlockButton}
+                                        onClick={() => runStatusAction(item, raw, "REJECTED")}
+                                        disabled={isBusy}
+                                      >
+                                        Не подошла
+                                      </button>
+                                    </>
+                                  ) : null}
+                                  {item.status === "INSTALLED" ? (
+                                    <button
+                                      type="button"
+                                      className={styles.rowMenuBlockButton}
+                                      onClick={() => {
+                                        setOpenRowMenuId(null);
+                                        openWishlistItemJournal(item);
+                                      }}
+                                    >
+                                      В журнал
+                                    </button>
+                                  ) : null}
                                   {canRepeatWishlistPurchase ? (
                                     <button
                                       type="button"
-                                      className={styles.rowMenuItemWithIcon}
+                                      className={`${styles.rowMenuBlockButton} ${styles.rowMenuItemWithIcon}`}
                                       onClick={() => {
                                         setOpenRowMenuId(null);
                                         setRepeatPurchaseConfirmRaw(raw);
@@ -990,7 +1114,17 @@ export function PartsCartPage(props: PartsCartPageProps) {
                                       <span>Повторить покупку</span>
                                     </button>
                                   ) : null}
-                                  <button type="button" onClick={() => { setOpenRowMenuId(null); setDeleteConfirmItemId(item.id); }} style={{ color: PARTS_CART_REF.statusNeeded }}>Удалить</button>
+                                  <button
+                                    type="button"
+                                    className={styles.rowMenuBlockButton}
+                                    onClick={() => {
+                                      setOpenRowMenuId(null);
+                                      setDeleteConfirmItemId(item.id);
+                                    }}
+                                    style={{ color: PARTS_CART_REF.statusNeeded }}
+                                  >
+                                    Удалить
+                                  </button>
                                 </div>
                               ) : null}
                             </div>
