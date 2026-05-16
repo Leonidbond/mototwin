@@ -36,6 +36,8 @@ export const ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH = 500;
 
 export const ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH = 500;
 
+export const ADD_SERVICE_EVENT_INSTALL_LOCATION_MAX_LENGTH = 500;
+
 /** Local calendar `YYYY-MM-DD` (same semantics as web `getTodayDateString` in vehicle page). */
 export function getTodayDateYmdLocal(): string {
   const now = new Date();
@@ -282,6 +284,9 @@ export function createInitialAddServiceEventFormValues(): AddServiceEventFormVal
     installedExpenseItemIds: [],
     performedBy: "SELF",
     serviceProviderNote: "",
+    installLocationAddress: "",
+    installLocationLat: "",
+    installLocationLng: "",
     attachReceiptRequested: false,
     attachFileRequested: false,
     nextReminderEnabled: false,
@@ -1045,6 +1050,15 @@ export function createInitialEditServiceEventValues(
     installedExpenseItemIds: [],
     performedBy: (event.performedBy as ServicePerformedBy | undefined) ?? "SELF",
     serviceProviderNote: event.serviceProviderNote?.trim() ?? "",
+    installLocationAddress: event.installLocationAddress?.trim() ?? "",
+    installLocationLat:
+      event.installLocationLat != null && Number.isFinite(event.installLocationLat)
+        ? String(event.installLocationLat)
+        : "",
+    installLocationLng:
+      event.installLocationLng != null && Number.isFinite(event.installLocationLng)
+        ? String(event.installLocationLng)
+        : "",
     attachReceiptRequested: Boolean(event.attachReceiptRequested),
     attachFileRequested: Boolean(event.attachFileRequested),
     nextReminderEnabled: Boolean(event.nextReminderEnabled),
@@ -1200,6 +1214,19 @@ export function normalizeAddServiceEventPayload(
 
   const performedBy: ServicePerformedBy = values.performedBy;
   const serviceNote = values.serviceProviderNote.trim();
+  const installAddress = values.installLocationAddress.trim();
+  const installLatRaw = values.installLocationLat.trim();
+  const installLngRaw = values.installLocationLng.trim();
+  let installLocationLat: number | null = null;
+  let installLocationLng: number | null = null;
+  if (installLatRaw !== "" && installLngRaw !== "") {
+    const lat = Number(installLatRaw);
+    const lng = Number(installLngRaw);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      installLocationLat = lat;
+      installLocationLng = lng;
+    }
+  }
   const nextReminderEnabled = values.nextReminderEnabled;
   let nextReminderDateIso: string | null = null;
   let nextReminderOdometer: number | null = null;
@@ -1244,6 +1271,9 @@ export function normalizeAddServiceEventPayload(
     installedExpenseItemIds: values.installedExpenseItemIds,
     performedBy,
     serviceProviderNote: serviceNote ? serviceNote : null,
+    installLocationAddress: installAddress ? installAddress : null,
+    installLocationLat: installAddress && installLocationLat != null ? installLocationLat : null,
+    installLocationLng: installAddress && installLocationLng != null ? installLocationLng : null,
     attachReceiptRequested: values.attachReceiptRequested,
     attachFileRequested: values.attachFileRequested,
     nextReminderEnabled,
@@ -1274,6 +1304,28 @@ export function validateAddServiceEventFormValues(
     return {
       errors: [`Комментарий не длиннее ${ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH} символов.`],
     };
+  }
+  if (values.installLocationAddress.length > ADD_SERVICE_EVENT_INSTALL_LOCATION_MAX_LENGTH) {
+    return {
+      errors: [
+        `Место установки не длиннее ${ADD_SERVICE_EVENT_INSTALL_LOCATION_MAX_LENGTH} символов.`,
+      ],
+    };
+  }
+  const hasInstallLat = values.installLocationLat.trim() !== "";
+  const hasInstallLng = values.installLocationLng.trim() !== "";
+  if (hasInstallLat !== hasInstallLng) {
+    return { errors: ["Укажите и широту, и долготу места установки или очистите координаты."] };
+  }
+  if (hasInstallLat) {
+    const lat = Number(values.installLocationLat.trim());
+    const lng = Number(values.installLocationLng.trim());
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      return { errors: ["Некорректная широта места установки."] };
+    }
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      return { errors: ["Некорректная долгота места установки."] };
+    }
   }
   if (values.serviceProviderNote.length > ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH) {
     return {

@@ -414,6 +414,7 @@ Content:
 - quantity;
 - price + currency;
 - comment;
+- **совместимость** (`WishlistItemCompatibilityBlock` / Expo `WishlistItemCompatibilityBlock`): заголовок секции **«Совместимость»**; при `nodeId` и канонической карточке детали (`partMasterId` у SKU или после `getPartSku`) — краткая сводка с `GET .../part-compatibility-report` (итог, уровень уверенности, преобладающий результат по отчётам, число владельцев/записей, источник, строка каталога, до 2 поясняющих фраз); ссылка **«Отчёт о совместимости →»** на полную страницу (`/parts/fitment-report` web, `/wishlist/fitment-report` Expo); без узла / без PartMaster — короткое пояснение вместо ссылки;
 - kit source if exists: блок **«Из комплекта»** — при наличии кода комплекта отдельный чип **`KIT_CODE`**, рядом человекочитаемое **название** (`kitOriginTitleRu`); для legacy — только название из первой строки `comment`;
 - compact expandable history with its own scroll viewport;
 - actions.
@@ -597,6 +598,24 @@ Only after service event is saved:
 ### 6.6. «Почему это подходит»
 
 Под draft cart на web — небольшой блок `«Почему это подходит»` с 3–4 чекмарками (`buildWhyMatchesReasons`). На mobile — раскрываемая секция в самом низу скролла.
+
+### 6.7. Совместимость и «своя деталь»
+
+**Отчёт о совместимости (полная страница):**
+
+- Web: `/vehicles/[id]/parts/fitment-report?nodeId=&partMasterId=`
+- Expo: `/vehicles/[id]/wishlist/fitment-report?nodeId=&partMasterId=`
+- Данные: `GET /api/vehicles/[id]/part-compatibility-report` → `PartCompatibilityReportWire` (см. [mototwin_part_compatibility_report_ui_spec_ru.md](./mototwin_part_compatibility_report_ui_spec_ru.md)).
+
+**Ссылки с подборщика:** компонент `PickerFitmentReportLink` — заголовок **«Отчёт о совместимости»**, подпись уровня каталога/community; активна при `nodeId` + `partMasterId` (узел может подставляться из `primaryNode` SKU).
+
+**Добавить свою деталь:**
+
+- Web: `/vehicles/[id]/parts/community` (опционально `?nodeId=`, `?partMasterId=` для prefill).
+- Expo: `/vehicles/[id]/wishlist/community`.
+- Кнопка на picker и над списком корзины (Expo). См. [mototwin_add_your_part_ui_spec_ru.md](./mototwin_add_your_part_ui_spec_ru.md).
+
+**Панель деталей корзины:** блок **«Совместимость»** — сводка + ссылка на полный отчёт (см. `CartItemDetailPanel` выше).
 
 ---
 
@@ -786,10 +805,13 @@ Body:
 - brand bold + model;
 - specs (моноширинный текст);
 - `MtTagBadge` (`TOURING` / `DUAL SPORT` / `RALLY` — берётся из `partType` или meta);
+- строка статистики совместимости (`getPickerRecommendationStatsLineRu`: слой каталога / community, уверенность, число отчётов);
 - bullet-list `whyRecommended` (3–4 строки с зелёными чекмарками);
 - цена внизу слева крупно (`12 600 ₽`);
-- `«Подходит»` зелёная подпись;
+- ссылка **«Отчёт о совместимости →»** + подпись уровня каталога (`PickerFitmentReportLink`; нужны `nodeId` и `partMasterId`);
 - primary `+` button справа внизу (добавить в draft cart).
+
+В блоке **«Показать ещё рекомендации»** у каждой альтернативы — та же ссылка на отчёт (inline, muted).
 
 Visual accents:
 
@@ -821,8 +843,9 @@ Body:
 - product image / placeholder;
 - brand + name;
 - specs / category;
+- строка статистики каталога (`getPickerSkuSearchStatsLineRu`);
+- ссылка **«Отчёт о совместимости →»** (`PickerFitmentReportLinkFromSku`);
 - цена;
-- `«Подходит»` / `«Требует проверки»` / `«Не подходит»` (по `compatibility`);
 - primary `+` button (добавить в draft cart).
 
 Empty state: «Ничего не найдено» + подсказка изменить запрос или сбросить фильтры.

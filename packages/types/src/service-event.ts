@@ -77,6 +77,9 @@ export type ServiceEventItem = {
   comment: string | null;
   performedBy?: ServicePerformedBy | null;
   serviceProviderNote?: string | null;
+  installLocationAddress?: string | null;
+  installLocationLat?: number | null;
+  installLocationLng?: number | null;
   attachReceiptRequested?: boolean;
   attachFileRequested?: boolean;
   nextReminderEnabled?: boolean;
@@ -141,6 +144,9 @@ export type CreateServiceEventInput = {
   installedExpenseItemIds?: string[];
   performedBy?: ServicePerformedBy | null;
   serviceProviderNote?: string | null;
+  installLocationAddress?: string | null;
+  installLocationLat?: number | null;
+  installLocationLng?: number | null;
   attachReceiptRequested?: boolean;
   attachFileRequested?: boolean;
   nextReminderEnabled?: boolean;

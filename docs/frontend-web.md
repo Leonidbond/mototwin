@@ -72,6 +72,7 @@ After successful mutation, page reloads relevant datasets to reflect updated sta
 - Часть операционных сценариев (профиль, пояснения статуса) по-прежнему через модалки; сервисное событие — отдельные full-page маршруты (`service-events/new`, `…/edit`).
 - This differs from Expo route-based decomposition, but backend outcome remains aligned.
 - Web does not currently use shared `@mototwin/api-client` as primary data layer for page fetches.
+- **Яндекс.Карты (опционально):** для поля «Место установки» на страницах `service-events/new` и `…/edit` задайте `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` в корневом `.env` (см. `.env.example`, [web-service-event-form.md](./web-service-event-form.md) §5.1).
 
 ## 6. Related docs
 

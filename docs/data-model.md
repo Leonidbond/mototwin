@@ -81,6 +81,8 @@
   - `SERVICE`
   - `STATE_UPDATE`
 - Stores operation facts: `eventDate`, `odometer`, `engineHours`, `serviceType`, optional cost/comment/parts json.
+- Optional **place of service / installation** (web form «Место установки»): `installLocationAddress` (`String?`), `installLocationLat` / `installLocationLng` (`Float?`); координаты сохраняются только вместе с непустым адресом.
+- Form extras (also on `ServiceEvent`): `performedBy`, `serviceProviderNote`, attachment intent flags, next-service reminder fields — see [web-service-event-form.md](./web-service-event-form.md).
 - A service event with valid `costAmount/currency` is mirrored into linked `ExpenseItem` for analytics.
 
 ### ExpenseItem

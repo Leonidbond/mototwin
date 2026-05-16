@@ -9,6 +9,8 @@ import {
 } from "@mototwin/domain";
 import { pickerColors } from "./picker-styles";
 
+const REPORT_LINK_TITLE = "Отчёт о совместимости";
+
 export function buildFitmentReportHref(
   vehicleId: string,
   nodeId: string,
@@ -21,6 +23,7 @@ export function PickerFitmentReportLink(props: {
   vehicleId: string;
   nodeId: string | null;
   partMasterId: string | null;
+  /** Короткая подпись уровня совместимости (каталог / сообщество). */
   label: string;
   variant?: "cardFooter" | "inlineMuted";
 }) {
@@ -28,53 +31,105 @@ export function PickerFitmentReportLink(props: {
     props.partMasterId && props.nodeId
       ? buildFitmentReportHref(props.vehicleId, props.nodeId, props.partMasterId)
       : null;
-  const style: CSSProperties =
-    props.variant === "inlineMuted"
-      ? {
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          marginTop: 4,
-          fontSize: 11,
-          fontWeight: 600,
-          color: href ? pickerColors.primary : pickerColors.textSecondary,
-          textDecoration: "none",
-          border: "none",
-          background: "transparent",
-          padding: 0,
-          cursor: href ? "pointer" : "default",
-          opacity: href ? 1 : 0.55,
-        }
-      : {
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          marginTop: 4,
-          fontSize: 12,
-          fontWeight: 700,
-          color: href ? pickerColors.primary : pickerColors.textMuted,
-          textDecoration: "none",
-          cursor: href ? "pointer" : "default",
-          minWidth: 0,
-        };
+
+  const isMuted = props.variant === "inlineMuted";
+  const disabledHint = !props.partMasterId
+    ? "Нет канонической карточки детали"
+    : !props.nodeId
+      ? "Выберите узел мотоцикла"
+      : null;
+
+  const wrapStyle: CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: isMuted ? 1 : 2,
+    marginTop: isMuted ? 4 : 4,
+    minWidth: 0,
+    textDecoration: "none",
+    cursor: href ? "pointer" : "default",
+    opacity: href ? 1 : 0.7,
+  };
+
+  const titleRowStyle: CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 0,
+  };
+
+  const reportTitleStyle: CSSProperties = {
+    flex: 1,
+    minWidth: 0,
+    overflowWrap: "anywhere",
+    fontSize: isMuted ? 11 : 12,
+    fontWeight: 800,
+    color: href ? pickerColors.primary : pickerColors.textMuted,
+    lineHeight: 1.3,
+  };
+
+  const fitHintStyle: CSSProperties = {
+    paddingLeft: 20,
+    fontSize: 11,
+    lineHeight: 1.35,
+    fontWeight: 600,
+    color: href ? pickerColors.textSecondary : pickerColors.textMuted,
+    overflowWrap: "anywhere",
+  };
+
+  const disabledHintStyle: CSSProperties = {
+    paddingLeft: 20,
+    fontSize: 10,
+    lineHeight: 1.35,
+    fontStyle: "italic",
+    color: pickerColors.textMuted,
+    overflowWrap: "anywhere",
+  };
+
+  const content = (
+    <>
+      <span style={titleRowStyle}>
+        <CheckIcon color={href ? pickerColors.successStrong : pickerColors.textMuted} />
+        <span style={reportTitleStyle}>{REPORT_LINK_TITLE}</span>
+        {href ? (
+          <span
+            style={{
+              flexShrink: 0,
+              fontSize: 11,
+              fontWeight: 800,
+              color: pickerColors.primary,
+              opacity: 0.9,
+            }}
+            aria-hidden
+          >
+            →
+          </span>
+        ) : null}
+      </span>
+      {props.label.trim() ? <span style={fitHintStyle}>{props.label}</span> : null}
+      {!href && disabledHint ? <span style={disabledHintStyle}>{disabledHint}</span> : null}
+    </>
+  );
 
   if (!href) {
     return (
       <span
-        style={style}
-        title={!props.partMasterId ? "Нет канонической карточки детали для отчёта" : "Выберите узел"}
+        style={wrapStyle}
+        title={disabledHint ?? REPORT_LINK_TITLE}
+        aria-label={disabledHint ?? REPORT_LINK_TITLE}
       >
-        <CheckIcon color={pickerColors.successStrong} />
-        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{props.label}</span>
+        {content}
       </span>
     );
   }
 
   return (
-    <Link href={href} style={style} title="Открыть отчёт о совместимости">
-      <CheckIcon color={pickerColors.successStrong} />
-      <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{props.label}</span>
-      <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, opacity: 0.85 }}>→</span>
+    <Link
+      href={href}
+      style={wrapStyle}
+      title="Открыть отчёт о совместимости"
+      aria-label={REPORT_LINK_TITLE}
+    >
+      {content}
     </Link>
   );
 }
@@ -85,12 +140,14 @@ export function PickerFitmentReportLinkFromRecommendation(props: {
   recommendation: PartRecommendationViewModel;
   variant?: "cardFooter" | "inlineMuted";
 }) {
+  const rec = props.recommendation;
+  const nodeId = props.nodeId ?? rec.primaryNode?.id ?? null;
   return (
     <PickerFitmentReportLink
       vehicleId={props.vehicleId}
-      nodeId={props.nodeId}
-      partMasterId={props.recommendation.partMasterId}
-      label={getPickerFitmentShortLabelRu(props.recommendation)}
+      nodeId={nodeId}
+      partMasterId={rec.partMasterId}
+      label={getPickerFitmentShortLabelRu(rec)}
       variant={props.variant}
     />
   );
@@ -102,12 +159,14 @@ export function PickerFitmentReportLinkFromSku(props: {
   sku: PartSkuViewModel;
   variant?: "cardFooter" | "inlineMuted";
 }) {
+  const sku = props.sku;
+  const nodeId = props.nodeId ?? sku.primaryNodeId ?? sku.nodeLinks[0]?.nodeId ?? null;
   return (
     <PickerFitmentReportLink
       vehicleId={props.vehicleId}
-      nodeId={props.nodeId}
-      partMasterId={props.sku.partMasterId}
-      label={getPickerSkuCatalogFitHintRu(props.sku)}
+      nodeId={nodeId}
+      partMasterId={sku.partMasterId}
+      label={getPickerSkuCatalogFitHintRu(sku)}
       variant={props.variant}
     />
   );
@@ -125,7 +184,7 @@ function CheckIcon({ color }: { color: string }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
-      style={{ flexShrink: 0, marginTop: 2 }}
+      style={{ flexShrink: 0 }}
     >
       <polyline points="20 6 9 17 4 12" />
     </svg>

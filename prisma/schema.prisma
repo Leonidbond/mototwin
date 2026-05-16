@@ -397,6 +397,9 @@ model ServiceEvent {
   comment            String?
   performedBy               ServicePerformedBy?
   serviceProviderNote       String?
+  installLocationAddress    String?
+  installLocationLat        Float?
+  installLocationLng        Float?
   attachReceiptRequested    Boolean          @default(false)
   attachFileRequested       Boolean          @default(false)
   nextReminderEnabled       Boolean          @default(false)

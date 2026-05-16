@@ -37,6 +37,7 @@ const addKitSchema = z.object({
 
 const wishlistSkuSelect = {
   id: true,
+  partMasterId: true,
   canonicalName: true,
   brandName: true,
   partType: true,

@@ -28,7 +28,8 @@ function getOrCreatePrisma(): PrismaClient {
   const delegateMissing =
     !cached ||
     typeof (cached as { userServiceEventFormTemplate?: { create?: unknown } }).userServiceEventFormTemplate
-      ?.create !== "function";
+      ?.create !== "function" ||
+    typeof (cached as { partMaster?: { create?: unknown } }).partMaster?.create !== "function";
 
   if (!delegateMissing && cached) {
     return cached;

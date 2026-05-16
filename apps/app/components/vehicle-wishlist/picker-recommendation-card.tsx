@@ -1,13 +1,17 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { MERCHANDISE_LABELS_RU } from "@mototwin/domain";
+import { MERCHANDISE_LABELS_RU, getPickerRecommendationStatsLineRu } from "@mototwin/domain";
 import type {
   PartRecommendationViewModel,
   PickerMerchandiseLabel,
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
+import { PickerFitmentReportLinkFromRecommendation } from "./picker-fitment-report-link";
 
 const REASON_BULLET_LIMIT = 4;
+
+const STATS_TOOLTIP =
+  "Оценка каталога — уверенность привязки детали к вашей модификации и узлу в данных каталога (0–100%), не рейтинг сообщества. Опубликованные отчёты — только отчёты со статусом «опубликован»; на модерации в строке не учитываются.";
 
 const ACCENT: Record<PickerMerchandiseLabel, string> = {
   BEST_FIT: "#FF5A00",
@@ -22,6 +26,8 @@ const BADGE_FG: Record<PickerMerchandiseLabel, string> = {
 };
 
 export function PickerRecommendationCard(props: {
+  vehicleId: string;
+  nodeId: string | null;
   label: PickerMerchandiseLabel;
   recommendation: PartRecommendationViewModel;
   isInDraft: boolean;
@@ -33,6 +39,7 @@ export function PickerRecommendationCard(props: {
   const rec = props.recommendation;
   const reasons = buildReasons(rec).slice(0, REASON_BULLET_LIMIT);
   const priceLabel = formatPriceRu(rec.priceAmount, rec.currency);
+  const statsLine = getPickerRecommendationStatsLineRu(rec);
 
   return (
     <View style={[styles.card, { borderColor: accent, width: props.width }]}>
@@ -56,16 +63,13 @@ export function PickerRecommendationCard(props: {
             {rec.partType.replaceAll("_", " ")}
           </Text>
         ) : null}
-        {rec.trustBadge ? (
-          <Text style={styles.trustChip} numberOfLines={1}>
-            {trustBadgeLabelRu(rec.trustBadge)}
-          </Text>
-        ) : null}
-        {rec.communityLineRu ? (
-          <Text style={styles.communityLine} numberOfLines={2}>
-            {rec.communityLineRu}
-          </Text>
-        ) : null}
+        <Text
+          style={styles.statsLine}
+          numberOfLines={1}
+          accessibilityLabel={`${statsLine}. ${STATS_TOOLTIP}`}
+        >
+          {statsLine}
+        </Text>
       </View>
       <View style={styles.reasonList}>
         {reasons.map((reason, i) => (
@@ -78,10 +82,11 @@ export function PickerRecommendationCard(props: {
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
           <Text style={styles.price}>{priceLabel}</Text>
-          <View style={styles.fitsRow}>
-            <MaterialIcons name="check" size={12} color={c.successStrong} />
-            <Text style={styles.fitsText}>Подходит</Text>
-          </View>
+          <PickerFitmentReportLinkFromRecommendation
+            vehicleId={props.vehicleId}
+            nodeId={props.nodeId}
+            recommendation={rec}
+          />
         </View>
         <Pressable
           onPress={props.onAdd}
@@ -111,14 +116,6 @@ function buildReasons(rec: PartRecommendationViewModel): string[] {
   if (rec.fitmentNote) list.push(rec.fitmentNote);
   if (rec.compatibilityWarning) list.push(rec.compatibilityWarning);
   return list;
-}
-
-function trustBadgeLabelRu(
-  badge: NonNullable<PartRecommendationViewModel["trustBadge"]>
-): string {
-  if (badge === "VERIFIED_BY_MOTOTWIN") return "Проверено MotoTwin";
-  if (badge === "COMMUNITY_CONFIRMED") return "Подтверждено сообществом";
-  return "Сигнал сообщества";
 }
 
 function formatPriceRu(amount: number | null, currency: string | null): string {
@@ -186,17 +183,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: c.textMuted,
   },
-  trustChip: {
-    marginTop: 6,
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#9AE6B4",
-  },
-  communityLine: {
-    marginTop: 4,
+  statsLine: {
+    marginTop: 8,
     fontSize: 11,
     lineHeight: 14,
-    color: c.textMuted,
+    color: c.textSecondary,
   },
   reasonList: {
     marginTop: 10,
@@ -234,16 +225,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
     color: c.textPrimary,
-  },
-  fitsRow: {
-    marginTop: 4,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  fitsText: {
-    fontSize: 12,
-    color: c.successText,
   },
   addBtn: {
     width: 40,

@@ -25,6 +25,7 @@ import type {
 } from "@mototwin/types";
 import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { PARTS_CART_REF } from "./parts-cart-reference-theme";
+import { WishlistItemCompatibilityBlock } from "./WishlistItemCompatibilityBlock";
 import styles from "./PartsCartPage.module.css";
 
 export type PartsStatusFilter = PartWishlistItemStatus | "ALL";
@@ -619,6 +620,13 @@ export function PartsCartPage(props: PartsCartPageProps) {
               <dd className={styles.detailValue}>{item.commentBodyRu?.trim() || "—"}</dd>
             </div>
           </dl>
+
+          <WishlistItemCompatibilityBlock
+            vehicleId={vehicleId}
+            nodeId={item.nodeId}
+            partMasterId={item.sku?.partMasterId ?? null}
+            skuId={item.sku?.id ?? raw.skuId ?? null}
+          />
 
           {item.kitOriginLabelRu ? (
             <div className={styles.kitBox}>

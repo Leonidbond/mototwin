@@ -72,3 +72,29 @@ export function buildServiceEventNewFromWishlistHref(
   }
   return `/vehicles/${vehicleId}/service-events/new?${q.toString()}`;
 }
+
+export function buildVehicleWishlistCommunityHref(
+  vehicleId: string,
+  options?: { nodeId?: string; partMasterId?: string }
+): string {
+  const q = new URLSearchParams();
+  if (options?.nodeId?.trim()) {
+    q.set("nodeId", options.nodeId.trim());
+  }
+  if (options?.partMasterId?.trim()) {
+    q.set("partMasterId", options.partMasterId.trim());
+  }
+  const qs = q.toString();
+  return `/vehicles/${vehicleId}/wishlist/community${qs ? `?${qs}` : ""}`;
+}
+
+export function buildVehicleWishlistFitmentReportHref(
+  vehicleId: string,
+  params: { nodeId: string; partMasterId: string }
+): string {
+  const q = new URLSearchParams({
+    nodeId: params.nodeId.trim(),
+    partMasterId: params.partMasterId.trim(),
+  });
+  return `/vehicles/${vehicleId}/wishlist/fitment-report?${q.toString()}`;
+}

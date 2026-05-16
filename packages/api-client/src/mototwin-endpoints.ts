@@ -53,6 +53,17 @@ import type {
   TopServiceNodesResponse,
   VehicleNodeTreeResponse,
   VehicleWishlistResponse,
+  PartMasterDuplicatesResponse,
+  CreatePartMasterInput,
+  CreatePartMasterResponse,
+  EnsurePartMasterSkuInput,
+  EnsurePartMasterSkuResponse,
+  CreateFitmentReportInput,
+  CreateFitmentReportResponse,
+  CreateFitmentEvidenceInput,
+  CreateFitmentEvidenceResponse,
+  PartCompatibilityReportResponse,
+  PartMasterPrefillResponse,
 } from "@mototwin/types";
 import type { ApiClient } from "./fetcher";
 
@@ -393,6 +404,71 @@ export function createMotoTwinEndpoints(client: ApiClient) {
 
     createVehicle(input: CreateVehicleInput) {
       return client.request<CreateVehicleResponse>("/api/vehicles", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    getPartCompatibilityReport(
+      vehicleId: string,
+      params: { partMasterId: string; nodeId: string }
+    ) {
+      const q = new URLSearchParams({
+        partMasterId: params.partMasterId.trim(),
+        nodeId: params.nodeId.trim(),
+      });
+      return client.request<PartCompatibilityReportResponse>(
+        `/api/vehicles/${encodeURIComponent(vehicleId)}/part-compatibility-report?${q.toString()}`
+      );
+    },
+
+    getPartMaster(partMasterId: string, params?: { nodeId?: string }) {
+      const q = new URLSearchParams();
+      if (params?.nodeId?.trim()) {
+        q.set("nodeId", params.nodeId.trim());
+      }
+      const qs = q.toString();
+      return client.request<PartMasterPrefillResponse>(
+        `/api/part-masters/${encodeURIComponent(partMasterId)}${qs ? `?${qs}` : ""}`
+      );
+    },
+
+    checkPartMasterDuplicates(params: { brandName: string; sku: string }) {
+      const q = new URLSearchParams({
+        brandName: params.brandName.trim(),
+        sku: params.sku.trim(),
+      });
+      return client.request<PartMasterDuplicatesResponse>(
+        `/api/part-masters/duplicates?${q.toString()}`
+      );
+    },
+
+    createPartMaster(input: CreatePartMasterInput) {
+      return client.request<CreatePartMasterResponse>("/api/part-masters", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    ensurePartMasterSku(input: EnsurePartMasterSkuInput) {
+      return client.request<EnsurePartMasterSkuResponse>("/api/part-masters/ensure-sku", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    createFitmentReport(vehicleId: string, input: CreateFitmentReportInput) {
+      return client.request<CreateFitmentReportResponse>(
+        `/api/vehicles/${encodeURIComponent(vehicleId)}/fitment-reports`,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        }
+      );
+    },
+
+    createFitmentEvidence(input: CreateFitmentEvidenceInput) {
+      return client.request<CreateFitmentEvidenceResponse>("/api/fitment/evidence", {
         method: "POST",
         body: JSON.stringify(input),
       });

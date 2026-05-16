@@ -75,6 +75,7 @@ import {
 } from "../../../../components/vehicle-wishlist/picker-draft-cart-bar";
 import { PickerWhyMatchesPanel } from "../../../../components/vehicle-wishlist/picker-why-matches-panel";
 import { MobileNodePickerModal } from "../../../../components/vehicle-detail/mobile-node-picker-modal";
+import { buildVehicleWishlistCommunityHref } from "../../../../components/vehicle-wishlist/hrefs";
 
 function skuFromRecommendation(rec: PartRecommendationViewModel): PartSkuViewModel {
   const now = new Date().toISOString();
@@ -574,6 +575,36 @@ export default function WishlistPickerScreen() {
     [selectedNodeId]
   );
 
+  const handleResetSelection = useCallback(() => {
+    const reset = () => {
+      setSelectedNodeId(null);
+      setDraft(createEmptyDraftCart(vehicleId));
+      setSearchQuery("");
+      setRecAlternativesVisible(false);
+    };
+    if (draft.items.length > 0) {
+      Alert.alert(
+        "Сбросить выбор",
+        "Сбросить выбор узла и очистить черновую корзину?",
+        [
+          { text: "Отмена", style: "cancel" },
+          { text: "Сбросить", style: "destructive", onPress: reset },
+        ]
+      );
+      return;
+    }
+    reset();
+  }, [draft.items.length, vehicleId]);
+
+  const openCommunityAddPart = useCallback(() => {
+    if (!vehicleId) return;
+    router.push(
+      buildVehicleWishlistCommunityHref(vehicleId, {
+        nodeId: selectedNodeId ?? undefined,
+      })
+    );
+  }, [router, selectedNodeId, vehicleId]);
+
   const openSubmit = useCallback(() => {
     const active = filterActiveWishlistItems(wishlistItems);
     const preview = buildPickerSubmitPreview({ draft, activeWishlistItems: active });
@@ -760,6 +791,34 @@ export default function WishlistPickerScreen() {
                 onPickNode={() => setNodeModalOpen(true)}
               />
 
+              <View style={styles.pickerActionRow}>
+                <Pressable
+                  onPress={handleResetSelection}
+                  disabled={!selectedNodeId && draft.items.length === 0}
+                  style={({ pressed }) => [
+                    styles.resetSelectionBtn,
+                    (!selectedNodeId && draft.items.length === 0) && styles.resetSelectionBtnDisabled,
+                    pressed && styles.resetSelectionBtnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Сбросить выбор узла и корзину"
+                >
+                  <MaterialIcons name="restart-alt" size={16} color={c.textSecondary} />
+                  <Text style={styles.resetSelectionText}>Сбросить выбор</Text>
+                </Pressable>
+                <Pressable
+                  onPress={openCommunityAddPart}
+                  style={({ pressed }) => [
+                    styles.addOwnPartBtn,
+                    pressed && styles.addOwnPartBtnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Добавить свою деталь"
+                >
+                  <Text style={styles.addOwnPartText}>Добавить свою деталь</Text>
+                </Pressable>
+              </View>
+
               <View
                 onLayout={(e) => {
                   searchSectionLayoutY.current = e.nativeEvent.layout.y;
@@ -818,6 +877,8 @@ export default function WishlistPickerScreen() {
 
               {showSearchResults ? (
                 <PickerSearchResultsSection
+                  vehicleId={vehicleId}
+                  nodeId={selectedNodeId}
                   query={debouncedSearch}
                   results={filteredSkuResults}
                   isLoading={skuLoading}
@@ -827,6 +888,8 @@ export default function WishlistPickerScreen() {
                 />
               ) : (
                 <PickerRecommendationsSection
+                  vehicleId={vehicleId}
+                  nodeId={selectedNodeId}
                   nodeName={selectedNodeName}
                   rideProfile={vehicle?.rideProfile ?? null}
                   recommendations={merchandise}
@@ -1226,6 +1289,53 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   kitsStack: { gap: 20 },
+  pickerActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "stretch",
+  },
+  resetSelectionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+  },
+  resetSelectionBtnDisabled: {
+    opacity: 0.45,
+  },
+  resetSelectionBtnPressed: {
+    opacity: 0.88,
+  },
+  resetSelectionText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: c.textSecondary,
+  },
+  addOwnPartBtn: {
+    flexGrow: 1,
+    flexBasis: 160,
+    minHeight: 40,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: "#FF5A00",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addOwnPartBtnPressed: {
+    opacity: 0.9,
+  },
+  addOwnPartText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -100,6 +100,7 @@ function decimalToNumber(value: DecimalLike): number | null {
 
 export function buildWishlistItemSkuInfo(row: {
   id: string;
+  partMasterId?: string | null;
   canonicalName: string;
   brandName: string;
   partType: string;
@@ -114,6 +115,7 @@ export function buildWishlistItemSkuInfo(row: {
   const primaryPartNumber = row.partNumbers?.[0]?.number?.trim() || null;
   return {
     id: row.id,
+    partMasterId: row.partMasterId ?? null,
     canonicalName: row.canonicalName,
     brandName: row.brandName,
     partType: row.partType,

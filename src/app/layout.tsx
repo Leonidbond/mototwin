@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+import Script from "next/script";
 import { AppHelpFab } from "../components/app-help-fab";
+import { EXTENSION_DOM_SANITIZE_SCRIPT } from "../lib/extension-dom-sanitize-script";
 import "./globals.css";
 
 /** UI sans — Inter matches garage web reference (geometric UI sans, Cyrillic). */
@@ -43,6 +45,11 @@ export default function RootLayout({
         }}
         suppressHydrationWarning
       >
+        <Script
+          id="mototwin-extension-dom-sanitize"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: EXTENSION_DOM_SANITIZE_SCRIPT }}
+        />
         {children}
         <AppHelpFab />
       </body>

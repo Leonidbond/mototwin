@@ -80,11 +80,47 @@
 | Когда / пробег | `eventDate`, `odometer`, `engineHours`. |
 | Деньги (верх «Стоимость») | `partsCost`, `laborCost`, `currency`; валюта выбирается в заголовке карточки «Стоимость». |
 | Текст | `comment`, **`serviceProviderNote`** (поле названия сервиса показывается только при исполнителе **Сервис**). |
+| Место установки | **`installLocationAddress`**, **`installLocationLat`**, **`installLocationLng`** — опционально; адрес вручную или через Яндекс.Карты (см. §5.1). |
 | Исполнитель | `performedBy` (`SELF` \| `SERVICE` \| `OTHER`). |
 | Вложения | `attachReceiptRequested`, `attachFileRequested`. |
 | Напоминание | `nextReminderEnabled`, даты/пробег/моточасы напоминания. |
 | Bundle | `items[]` — `key`, `nodeId`, `actionType`, деталь, SKU, количество, цена детали за единицу, работа, комментарий узла. |
-| Установки | `installedPartsJson`, `installedExpenseItemIds`. |
+| Установки (запчасти) | `installedPartsJson`, `installedExpenseItemIds`. |
+
+### 5.1. Место установки и Яндекс.Карты (web)
+
+**Где в UI:** карточка «Основная информация» — **`InstallLocationField`** (`cards/InstallLocationField.tsx`), сразу после блока исполнителя / поля «Сервис», перед «Комментарий».
+
+**Поведение:**
+
+- Подпись **«Место установки (опционально)»**; текстовое поле адреса (до 500 символов, `ADD_SERVICE_EVENT_INSTALL_LOCATION_MAX_LENGTH` в `@mototwin/domain`).
+- Кнопка **«На карте»** открывает модалку **`YandexMapPlacePickerModal`** — поиск адреса (Suggest), клик по карте, обратное геокодирование; по **«Выбрать»** в форму подставляются адрес и координаты.
+- Кнопка **×** очищает адрес и координаты.
+- При заданных координатах под полем показывается строка «Координаты: …».
+
+**Модуль интеграции** (переиспользуемый, только web):
+
+| Путь | Назначение |
+|------|------------|
+| `src/components/integrations/yandex-maps/` | Загрузка JS API 2.1, модалка выбора точки, тип `YandexMapPlace`. |
+| `index.ts` | Экспорт: `YandexMapPlacePickerModal`, `loadYandexMapsApi`, `getYandexMapsApiKey`, `isYandexMapsConfigured`. |
+
+**Переменная окружения** (корневой `.env`, см. `.env.example`):
+
+```bash
+NEXT_PUBLIC_YANDEX_MAPS_API_KEY="ключ-из-кабинета-разработчика"
+```
+
+- Ключ: [Кабинет разработчика Яндекса](https://developer.tech.yandex.ru/) → сервис **«JavaScript API и HTTP Геокодер»** (нужны и карта, и геокодер/Suggest).
+- Без ключа поле адреса работает; кнопка «На карте» скрыта, под полем — подсказка про `NEXT_PUBLIC_YANDEX_MAPS_API_KEY`.
+- После добавления ключа перезапустите `npm run dev` (переменные `NEXT_PUBLIC_*` читаются при старте Next.js).
+- В кабинете Яндекса ограничьте ключ по **HTTP Referrer** (для локальной разработки — `localhost`).
+
+**Сохранение:** `normalizeAddServiceEventPayload` отправляет в API `installLocationAddress` и, если адрес непустой и координаты валидны, `installLocationLat` / `installLocationLng`; иначе координаты в БД — `null`. Валидация формы: длина адреса; широта/долгота задаются парой (−90…90 / −180…180).
+
+**Expo:** те же поля есть в **`AddServiceEventFormValues`** и API, но UI выбора на карте **пока только на web** (см. [shared-form-contracts.md](./shared-form-contracts.md)).
+
+**Миграция БД:** `prisma/migrations/20260516143000_service_event_install_location/`.
 
 ---
 
@@ -211,11 +247,13 @@ Expo/mobile намеренно оставляет один экран **`apps/ap
 | `styles.ts`, `utils.ts` | Локальная холодная палитра формы, поля (**`FIELD_IN_STACK`** — колонка «подпись + поле» без лишнего `marginTop`), дата, breadcrumb, клон формы. |
 | `body/ServiceEventModalBodyUnified.tsx` | Двухколоночный layout (matchMedia + grid), плотные отступы в карточке узлов. |
 | `cards/BasicInfoCard.tsx` | Заголовок секции «1. Основная информация» + **`BasicInfoPrimaryFields`**. |
-| `cards/basic-info-primary-fields.tsx` | **Общие** поля основной информации для обоих режимов (шаблон → название → дата/пробег/моточасы → …). |
+| `cards/basic-info-primary-fields.tsx` | **Общие** поля основной информации для обоих режимов (шаблон → название → дата/пробег/моточасы → …); подключает **`InstallLocationField`**. |
+| `cards/InstallLocationField.tsx` | Поле «Место установки» + кнопка «На карте» → **`YandexMapPlacePickerModal`**. |
 | `cards/*` (остальные) | Cost, **`AdditionalCardFast`** (общий для режимов). `AdditionalCardExtended`, `PreliminarySummaryCard` в каталоге, в текущем layout не выводятся. |
 | `bundle/*` | Header, строки fast, карточки extended, totals. |
 | `node-picker/NodePickerModal.tsx` | Общая модалка выбора узла (single/multi); см. [node-picker-reuse.md](./node-picker-reuse.md). |
 | `overlays/*` | AddNode, TemplateContents, InstallablePicker. `PreviewOverlay` сохранён в каталоге, но не используется текущей страницей формы. |
+| `src/components/integrations/yandex-maps/` | Интеграция Яндекс.Карт (см. §5.1); не внутри `service-event-form/`, но используется формой. |
 | `index.ts` | Экспорт `ServiceEventForm`, тип пропсов. |
 
 ---
@@ -228,6 +266,7 @@ Expo/mobile намеренно оставляет один экран **`apps/ap
 4. Из **service-log** — переходы new / repeat / edit с **`returnTo`**.
 5. Из **vehicle-detail** — new, edit, wishlist / узел (query-параметры), без регрессии навигации.
 6. Пробег/моточасы **выше текущих** → модалка; **«Не обновлять»** / фон / крестик → в полях снова **текущие** показатели ТС; **«Обновить»** → успешный PATCH и поля без отката.
+7. **Место установки:** ручной ввод адреса; с **`NEXT_PUBLIC_YANDEX_MAPS_API_KEY`** — «На карте» → выбор на карте → адрес и координаты в форме; после сохранения события поля в ответе API / при повторном edit.
 
 Линт по области формы (в zsh квадратные скобки в пути — в кавычках):
 

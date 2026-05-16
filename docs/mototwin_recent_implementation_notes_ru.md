@@ -14,8 +14,11 @@
 
 - Общие типы совместимости: [packages/types/src/fitment-community.ts](../packages/types/src/fitment-community.ts).
 - У **PartSku** / **PartRecommendationViewModel** добавлено поле **`partMasterId`** для связки с отчётами и агрегатами: [packages/types/src/part-catalog.ts](../packages/types/src/part-catalog.ts), [packages/types/src/part-recommendation.ts](../packages/types/src/part-recommendation.ts).
+- В компактном блоке **`WishlistItemSkuInfo`** (ответ wishlist API) тоже отдаётся **`partMasterId`** — для панели деталей корзины и ссылки на отчёт без отдельного запроса SKU.
 - Слияние community-слоя в рекомендации: [packages/domain/src/part-recommendation-merge.ts](../packages/domain/src/part-recommendation-merge.ts).
 - Подписи для подборщика и статусов: [packages/domain/src/picker-fitment-labels.ts](../packages/domain/src/picker-fitment-labels.ts).
+- Сводка для панели деталей корзины из ответа отчёта: [packages/domain/src/wishlist-detail-compatibility.ts](../packages/domain/src/wishlist-detail-compatibility.ts) (`buildWishlistDetailCompatibilitySummary`).
+- Подписи страницы отчёта (вердикт, breakdown, источник): [packages/domain/src/part-compatibility-report-labels.ts](../packages/domain/src/part-compatibility-report-labels.ts).
 - Пересчёт confidence: [packages/domain/src/fitment-confidence-recalc.ts](../packages/domain/src/fitment-confidence-recalc.ts), интеграция с Prisma: [src/lib/fitment-confidence-prisma.ts](../src/lib/fitment-confidence-prisma.ts).
 - Рекомендации по узлу с учётом community: [src/lib/build-recommendations-for-node-with-community.ts](../src/lib/build-recommendations-for-node-with-community.ts).
 
@@ -29,13 +32,22 @@
 ## 4. UI (Next.js)
 
 - Страница отчёта (URL с `partMasterId` и `nodeId`): [src/app/vehicles/[id]/parts/fitment-report/](../src/app/vehicles/[id]/parts/fitment-report/) — клиент `PartCompatibilityReportPageClient.tsx`, данные с `GET .../part-compatibility-report`.
-- Сообщество / «своя деталь»: [src/app/vehicles/[id]/parts/community/](../src/app/vehicles/[id]/parts/community/).
-- Подборщик: ссылка на отчёт с уровнем совместимости — [src/app/vehicles/[id]/parts/picker/_components/PickerFitmentReportLink.tsx](../src/app/vehicles/[id]/parts/picker/_components/PickerFitmentReportLink.tsx), карточки [RecommendationCard.tsx](../src/app/vehicles/[id]/parts/picker/_components/RecommendationCard.tsx), [RecommendationsSection.tsx](../src/app/vehicles/[id]/parts/picker/_components/RecommendationsSection.tsx), [SearchResultsSection.tsx](../src/app/vehicles/[id]/parts/picker/_components/SearchResultsSection.tsx).
+- Сообщество / «своя деталь»: [src/app/vehicles/[id]/parts/community/](../src/app/vehicles/[id]/parts/community/) — `CommunityPartPageClient.tsx` (форма, дубликаты, fitment при «Установил» / «Не подошла»).
+- Подборщик:
+  - явная ссылка **«Отчёт о совместимости →»** + подпись уровня каталога — [PickerFitmentReportLink.tsx](../src/app/vehicles/[id]/parts/picker/_components/PickerFitmentReportLink.tsx);
+  - карточки рекомендаций, поиск SKU, альтернативы — [RecommendationCard.tsx](../src/app/vehicles/[id]/parts/picker/_components/RecommendationCard.tsx), [RecommendationsSection.tsx](../src/app/vehicles/[id]/parts/picker/_components/RecommendationsSection.tsx), [SearchResultsSection.tsx](../src/app/vehicles/[id]/parts/picker/_components/SearchResultsSection.tsx);
+  - кнопки **«Сбросить выбор»** и **«Добавить свою деталь»** — [PartPickerPage.tsx](../src/app/vehicles/[id]/parts/picker/_components/PartPickerPage.tsx).
+- Корзина замен: в правой панели деталей позиции блок **«Совместимость»** (агрегат с `part-compatibility-report` + ссылка на полный отчёт) — [WishlistItemCompatibilityBlock.tsx](../src/app/vehicles/[id]/parts/_components/WishlistItemCompatibilityBlock.tsx), встроен в [PartsCartPage.tsx](../src/app/vehicles/[id]/parts/_components/PartsCartPage.tsx).
 - Модерация (web): [src/app/moderation/](../src/app/moderation/).
 
 ## 5. Мобильный клиент (Expo)
 
-- Обновления под `partMasterId` в SKU из рекомендации и связанные экраны: [apps/app/app/vehicles/[id]/wishlist/picker.tsx](../apps/app/app/vehicles/[id]/wishlist/picker.tsx), [apps/app/components/vehicle-wishlist/wishlist-item-editor.tsx](../apps/app/components/vehicle-wishlist/wishlist-item-editor.tsx), прочие изменения в `apps/app/` по `git status`.
+- Маршруты (паритет с web): `/vehicles/[id]/wishlist/picker`, `/vehicles/[id]/wishlist/community`, `/vehicles/[id]/wishlist/fitment-report` (query: `nodeId`, `partMasterId`; опционально `partMasterId` для prefill community).
+- Подбор: [picker.tsx](../apps/app/app/vehicles/[id]/wishlist/picker.tsx) — те же ссылки на отчёт ([picker-fitment-report-link.tsx](../apps/app/components/vehicle-wishlist/picker-fitment-report-link.tsx)), «Добавить свою деталь», сброс узла/черновика.
+- Отчёт совместимости: [fitment-report-screen.tsx](../apps/app/components/vehicle-wishlist/fitment-report-screen.tsx).
+- Своя деталь: [community-part-screen.tsx](../apps/app/components/vehicle-wishlist/community-part-screen.tsx).
+- Корзина: нижний лист деталей — блок **«Совместимость»** ([wishlist-item-compatibility-block.tsx](../apps/app/components/vehicle-wishlist/wishlist-item-compatibility-block.tsx)) в [wishlist/index.tsx](../apps/app/app/vehicles/[id]/wishlist/index.tsx).
+- API-клиент: `getPartCompatibilityReport`, `getPartMaster`, fitment-reports, part-masters — [packages/api-client/src/mototwin-endpoints.ts](../packages/api-client/src/mototwin-endpoints.ts); hrefs — [apps/app/components/vehicle-wishlist/hrefs.ts](../apps/app/components/vehicle-wishlist/hrefs.ts).
 
 ## 6. Иконки дерева узлов
 
@@ -52,4 +64,6 @@
 
 ## 8. Следующие шаги (по продуктовому плану)
 
-- Довести UI страницы отчёта до полного соответствия [mototwin_part_compatibility_report_ui_spec_ru.md](mototwin_part_compatibility_report_ui_spec_ru.md) v1.1 (если остались секции спеки), корзину замен при появлении API, регрессия мобильного клиента под новый контракт при необходимости.
+- Довести UI страницы отчёта до полного соответствия [mototwin_part_compatibility_report_ui_spec_ru.md](mototwin_part_compatibility_report_ui_spec_ru.md) v1.1 (если остались секции спеки).
+- Регрессия web/Expo: пикер → отчёт, панель деталей корзины → сводка совместимости, community → wishlist + fitment-report.
+- Опционально: кэш сводки совместимости в панели деталей, презентация community/fitment-report как modal на Expo.

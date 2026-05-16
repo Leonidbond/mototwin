@@ -24,6 +24,7 @@ const statusEnum = z.enum(["NEEDED", "ORDERED", "BOUGHT", "INSTALLED", "REJECTED
 
 const wishlistSkuSelect = {
   id: true,
+  partMasterId: true,
   canonicalName: true,
   brandName: true,
   partType: true,

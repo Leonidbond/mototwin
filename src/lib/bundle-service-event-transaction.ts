@@ -39,6 +39,9 @@ export type CreateBundleServiceEventInTxInput = {
   installedPartsJson: Prisma.InputJsonValue | null;
   performedBy?: ServicePerformedBy | null;
   serviceProviderNote?: string | null;
+  installLocationAddress?: string | null;
+  installLocationLat?: number | null;
+  installLocationLng?: number | null;
   attachReceiptRequested?: boolean;
   attachFileRequested?: boolean;
   nextReminderEnabled?: boolean;
@@ -65,6 +68,9 @@ export type ServiceEventInclude = {
   comment: string | null;
   performedBy?: ServicePerformedBy | string | null;
   serviceProviderNote?: string | null;
+  installLocationAddress?: string | null;
+  installLocationLat?: number | null;
+  installLocationLng?: number | null;
   attachReceiptRequested?: boolean;
   attachFileRequested?: boolean;
   nextReminderEnabled?: boolean;
@@ -425,6 +431,9 @@ export async function createBundleServiceEventInTransaction(
       comment: input.comment || null,
       performedBy: input.performedBy ?? null,
       serviceProviderNote: input.serviceProviderNote?.trim() || null,
+      installLocationAddress: input.installLocationAddress?.trim() || null,
+      installLocationLat: input.installLocationLat ?? null,
+      installLocationLng: input.installLocationLng ?? null,
       attachReceiptRequested: input.attachReceiptRequested ?? false,
       attachFileRequested: input.attachFileRequested ?? false,
       nextReminderEnabled: input.nextReminderEnabled ?? false,
@@ -510,6 +519,9 @@ export async function updateBundleServiceEventInTransaction(
       comment: input.comment || null,
       performedBy: input.performedBy ?? null,
       serviceProviderNote: input.serviceProviderNote?.trim() || null,
+      installLocationAddress: input.installLocationAddress?.trim() || null,
+      installLocationLat: input.installLocationLat ?? null,
+      installLocationLng: input.installLocationLng ?? null,
       attachReceiptRequested: input.attachReceiptRequested ?? false,
       attachFileRequested: input.attachFileRequested ?? false,
       nextReminderEnabled: input.nextReminderEnabled ?? false,

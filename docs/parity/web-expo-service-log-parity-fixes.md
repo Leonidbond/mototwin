@@ -28,6 +28,7 @@
 
 - **Web:** общий компонент **`ServiceEventForm`** в **`src/app/vehicles/[id]/_components/service-event-form/`** — те же `AddServiceEventFormValues`, BASIC/ADVANCED, bundle, SKU, **«Готово к установке»** (`getInstallableForServiceEvent`), валидация `validateAddServiceEventFormValues`, `onSubmit`. Страницы **`/vehicles/[id]/service-events/new`** и **`/vehicles/[id]/service-events/[eventId]/edit`**; переходы из **`service-log/page.tsx`** и **`vehicle-detail-client.tsx`** (`router.push` / query `returnTo` и др.). Поведение по шагам — [web-service-event-form.md](../web-service-event-form.md).
 - **Expo:** тот же смысл полей в **`apps/app/components/vehicle-detail/basic-service-event-bundle-form.tsx`** — та же модалка **«Готово к установке…»** с теми же чипами и **`getInstallableForServiceEvent`**; экран **`service-events/new.tsx`** только загружает дерево/машину/событие, собирает начальные значения доменными хелперами (`createInitialAddServiceEventFromNode`, `FromWishlistItem`, `Edit`, `Repeat`, …), сбрасывает форму через `key` и вызывает `validateAddServiceEventFormValuesMobile` + `normalizeAddServiceEventPayload` / `normalizeEditServiceEventPayload` при сохранении.
+- **Место установки (web-only UI, 2026-05):** на web — поле + **Яндекс.Карты** (`installLocationAddress` / lat / lng, `NEXT_PUBLIC_YANDEX_MAPS_API_KEY`); контракт формы и API общие, на Expo экрана карты **нет** — [web-service-event-form.md](../web-service-event-form.md) §5.1.
 
 **Паритет экрана создания/редактирования (Expo ≈ web, 2026-05-11):**
 

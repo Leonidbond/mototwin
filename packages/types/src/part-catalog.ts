@@ -101,6 +101,8 @@ export type PartSkuViewModel = PartSku & {
 /** Compact SKU block on wishlist API responses. */
 export type WishlistItemSkuInfo = {
   id: string;
+  /** Для отчёта совместимости; null если SKU без PartMaster. */
+  partMasterId?: string | null;
   canonicalName: string;
   brandName: string;
   partType: string;

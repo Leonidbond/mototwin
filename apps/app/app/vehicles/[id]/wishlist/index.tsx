@@ -45,10 +45,12 @@ import { getApiBaseUrl } from "../../../../src/api-base-url";
 import {
   buildServiceEventNewFromWishlistHref,
   buildVehicleServiceLogEventHref,
+  buildVehicleWishlistCommunityHref,
   buildVehicleWishlistNewHref,
 } from "../../../../components/vehicle-wishlist/hrefs";
 import { InternalScreenChrome } from "../../../../components/expo-shell/internal-screen-chrome";
 import { GarageVehicleContextPlaque } from "../../../../components/garage/GarageVehicleContextPlaque";
+import { WishlistItemCompatibilityBlock } from "../../../../components/vehicle-wishlist/wishlist-item-compatibility-block";
 
 type PartsStatusFilter = PartWishlistItemStatus | "ALL";
 const INITIAL_VISIBLE_COUNT = 10;
@@ -1140,6 +1142,14 @@ export default function VehicleWishlistScreen() {
           </View>
         </ScrollView>
 
+        <Pressable
+          onPress={() => router.push(buildVehicleWishlistCommunityHref(vehicleId))}
+          style={({ pressed }) => [styles.communityLink, pressed && { opacity: 0.85 }]}
+          accessibilityRole="button"
+        >
+          <Text style={styles.communityLinkText}>Добавить свою деталь</Text>
+        </Pressable>
+
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           <Pressable
             onPress={() => router.push(buildVehicleWishlistNewHref(vehicleId))}
@@ -1295,6 +1305,13 @@ export default function VehicleWishlistScreen() {
                     </Text>
                   </View>
                 </View>
+
+                <WishlistItemCompatibilityBlock
+                  vehicleId={vehicleId}
+                  nodeId={detailItem.nodeId}
+                  partMasterId={detailItem.sku?.partMasterId ?? null}
+                  skuId={detailItem.sku?.id ?? detailItem.skuId ?? null}
+                />
 
                 {detailItem.kitOriginLabelRu ? (
                   <View style={styles.detailKitBox}>
@@ -2274,6 +2291,22 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   showMoreText: { color: PARTS_CART_REF.textMuted, fontSize: 11, fontWeight: "600", textAlign: "center" },
+  communityLink: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FF5A00",
+    backgroundColor: "rgba(255,90,0,0.1)",
+    alignItems: "center",
+  },
+  communityLinkText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FF5A00",
+  },
   footer: {
     flexDirection: "row",
     gap: 10,

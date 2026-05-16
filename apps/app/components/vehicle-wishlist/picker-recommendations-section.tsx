@@ -9,6 +9,7 @@ import type {
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { PickerRecommendationCard } from "./picker-recommendation-card";
+import { PickerFitmentReportLinkFromRecommendation } from "./picker-fitment-report-link";
 
 const CARD_GAP = 10;
 const SCREEN_PADDING_X = 16;
@@ -20,6 +21,8 @@ function getCardWidth(): number {
 }
 
 export function PickerRecommendationsSection(props: {
+  vehicleId: string;
+  nodeId: string | null;
   nodeName: string | null;
   rideProfile: VehicleRideProfile | null;
   recommendations: PickerMerchandiseRecommendations;
@@ -101,6 +104,8 @@ export function PickerRecommendationsSection(props: {
               style={[styles.cardWrap, idx > 0 && { marginLeft: CARD_GAP }]}
             >
               <PickerRecommendationCard
+                vehicleId={props.vehicleId}
+                nodeId={props.nodeId}
                 label={label}
                 recommendation={rec}
                 isInDraft={props.draftSkuIds.has(rec.skuId)}
@@ -143,6 +148,12 @@ export function PickerRecommendationsSection(props: {
                       <Text style={styles.altSub} numberOfLines={1}>
                         {rec.recommendationLabel}
                       </Text>
+                      <PickerFitmentReportLinkFromRecommendation
+                        vehicleId={props.vehicleId}
+                        nodeId={props.nodeId}
+                        recommendation={rec}
+                        variant="inlineMuted"
+                      />
                     </View>
                     <Pressable
                       onPress={() => props.onAddSku(rec)}

@@ -1,8 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { getPartSkuViewModelDisplayLines } from "@mototwin/domain";
+import { getPartSkuViewModelDisplayLines, getPickerSkuSearchStatsLineRu } from "@mototwin/domain";
 import type { PartSkuViewModel } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
+import { PickerFitmentReportLinkFromSku } from "./picker-fitment-report-link";
+
+const SEARCH_STATS_TOOLTIP =
+  "Совместимость и уверенность по каталогу; число установок в отчётах сообщества — по ссылке «Отчёт о совместимости» ниже.";
 
 function formatPriceRu(amount: number | null, currency: string | null): string {
   if (amount == null || !Number.isFinite(amount)) {
@@ -18,6 +22,8 @@ function formatPriceRu(amount: number | null, currency: string | null): string {
 }
 
 export function PickerSearchResultsSection(props: {
+  vehicleId: string;
+  nodeId: string | null;
   query: string;
   results: PartSkuViewModel[];
   isLoading: boolean;
@@ -61,6 +67,7 @@ export function PickerSearchResultsSection(props: {
         props.results.map((sku) => {
           const lines = getPartSkuViewModelDisplayLines(sku);
           const inDraft = props.draftSkuIds.has(sku.id);
+          const statsLine = getPickerSkuSearchStatsLineRu(sku, props.nodeId);
           return (
             <View key={sku.id} style={styles.row}>
               <View style={styles.thumb}>
@@ -75,14 +82,23 @@ export function PickerSearchResultsSection(props: {
                     {lines.secondaryLine}
                   </Text>
                 ) : null}
+                <Text
+                  style={styles.statsLine}
+                  numberOfLines={1}
+                  accessibilityLabel={`${statsLine}. ${SEARCH_STATS_TOOLTIP}`}
+                >
+                  {statsLine}
+                </Text>
+                <PickerFitmentReportLinkFromSku
+                  vehicleId={props.vehicleId}
+                  nodeId={props.nodeId}
+                  sku={sku}
+                  variant="inlineMuted"
+                />
                 <View style={styles.metaRow}>
                   <Text style={styles.rowPrice}>
                     {formatPriceRu(sku.priceAmount, sku.currency)}
                   </Text>
-                  <View style={styles.fitsRow}>
-                    <MaterialIcons name="check" size={12} color={c.successStrong} />
-                    <Text style={styles.fitsText}>Подходит</Text>
-                  </View>
                 </View>
               </View>
               <Pressable
@@ -98,7 +114,7 @@ export function PickerSearchResultsSection(props: {
               >
                 <MaterialIcons
                   name={inDraft ? "check" : "add"}
-                  size={20}
+                  size={22}
                   color={inDraft ? c.textMuted : c.onPrimaryAction}
                 />
               </Pressable>
@@ -111,81 +127,105 @@ export function PickerSearchResultsSection(props: {
 }
 
 const styles = StyleSheet.create({
-  section: { gap: 8 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
+  section: {
     gap: 10,
   },
-  headerTextCol: { flex: 1, minWidth: 0 },
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  headerTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
   title: {
     fontSize: 16,
     fontWeight: "800",
     color: c.textPrimary,
-    letterSpacing: -0.2,
   },
   subtitle: {
-    marginTop: 2,
+    marginTop: 4,
     fontSize: 12,
     color: c.textMuted,
   },
   resetBtn: {
-    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 999,
+    paddingHorizontal: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: c.border,
   },
-  resetBtnPressed: { opacity: 0.85 },
+  resetBtnPressed: {
+    opacity: 0.85,
+  },
   resetBtnText: {
     fontSize: 12,
-    fontWeight: "600",
-    color: c.textMuted,
+    fontWeight: "700",
+    color: c.textSecondary,
   },
   loadingBox: {
-    paddingVertical: 24,
-    alignItems: "center",
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: c.border,
-    borderRadius: 14,
+    paddingVertical: 16,
   },
-  mutedText: { fontSize: 13, color: c.textMuted, textAlign: "center" },
+  mutedText: {
+    fontSize: 13,
+    color: c.textMuted,
+  },
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
-    padding: 10,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: c.border,
     backgroundColor: c.card,
   },
   thumb: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 10,
     backgroundColor: c.cardSubtle,
     alignItems: "center",
     justifyContent: "center",
   },
-  textCol: { flex: 1, minWidth: 0 },
-  rowTitle: { fontSize: 13, fontWeight: "700", color: c.textPrimary },
-  rowSub: { marginTop: 2, fontSize: 11, color: c.textMuted },
+  textCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: c.textPrimary,
+  },
+  rowSub: {
+    marginTop: 2,
+    fontSize: 12,
+    color: c.textMuted,
+  },
+  statsLine: {
+    marginTop: 6,
+    fontSize: 11,
+    lineHeight: 14,
+    color: c.textSecondary,
+  },
   metaRow: {
     marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
   },
-  rowPrice: { fontSize: 14, fontWeight: "800", color: c.textPrimary },
-  fitsRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  fitsText: { fontSize: 11, color: c.successText },
+  rowPrice: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: c.textPrimary,
+  },
   addBtn: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    alignSelf: "center",
   },
 });

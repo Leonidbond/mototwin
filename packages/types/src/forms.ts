@@ -62,6 +62,12 @@ export type AddServiceEventFormValues = {
   performedBy: ServicePerformedBy;
   /** Название, телефон или адрес сервиса (опционально). */
   serviceProviderNote: string;
+  /** Адрес или название места установки / обслуживания. */
+  installLocationAddress: string;
+  /** Широта (строка из input; пусто — координаты не заданы). */
+  installLocationLat: string;
+  /** Долгота (строка из input). */
+  installLocationLng: string;
   attachReceiptRequested: boolean;
   attachFileRequested: boolean;
   nextReminderEnabled: boolean;

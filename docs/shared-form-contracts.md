@@ -6,7 +6,7 @@ Cross-platform **form value shapes**, **normalization** to API payloads, **light
 
 ### Types (`packages/types/src/forms.ts`)
 
-- **`AddServiceEventFormValues`** / **`AddServiceEventPayload`** (`CreateServiceEventInput`)
+- **`AddServiceEventFormValues`** / **`AddServiceEventPayload`** (`CreateServiceEventInput`) — в т.ч. опциональное **место установки**: `installLocationAddress`, `installLocationLat`, `installLocationLng` (строки в форме; в API — адрес и `number | null` для координат)
 - **`UpdateVehicleStateFormValues`** / **`UpdateVehicleStatePayload`**
 - **`EditVehicleProfileFormValues`** / **`EditVehicleProfilePayload`**
 - **`AddMotorcycleFormValues`** / **`AddMotorcyclePayload`** (`CreateVehicleInput`)
@@ -16,7 +16,7 @@ Cross-platform **form value shapes**, **normalization** to API payloads, **light
 
 | Area | Functions |
 |------|-----------|
-| Service event | **`DEFAULT_ADD_SERVICE_EVENT_CURRENCY`** (`"RUB"`, ISO 4217), `createInitialAddServiceEventFormValues` (initial `currency` = RUB), `normalizeAddServiceEventPayload` / `normalizeEditServiceEventPayload`, `validateAddServiceEventFormValues` (web), **`validateAddServiceEventFormValuesMobile`** (Expo UI — делегирует те же правила, см. `forms.ts`), **`parseExpenseAmountInputToNumberOrNull`** / **`stripLocaleMoneyGroupingSeparators`** (суммы в форме и ввода wishlist; `ru-RU`, обычный и неразрывный пробел как разделитель групп), **`createInitialEditServiceEventValues`** (в **ADVANCED** верхние «Запчасти»/«Работа» = **остаток** к сумме по строкам bundle, чтобы повторное сохранение не удваивало учёт), **`sumFiniteBundleItemField`** |
+| Service event | **`DEFAULT_ADD_SERVICE_EVENT_CURRENCY`** (`"RUB"`, ISO 4217), **`ADD_SERVICE_EVENT_INSTALL_LOCATION_MAX_LENGTH`** (500), `createInitialAddServiceEventFormValues` (initial `currency` = RUB), `normalizeAddServiceEventPayload` / `normalizeEditServiceEventPayload` (место установки: пустой адрес → все три поля `null` в payload; координаты только вместе с непустым адресом), `validateAddServiceEventFormValues` (web), **`validateAddServiceEventFormValuesMobile`** (Expo UI — делегирует те же правила, см. `forms.ts`), **`parseExpenseAmountInputToNumberOrNull`** / **`stripLocaleMoneyGroupingSeparators`** (суммы в форме и ввода wishlist; `ru-RU`, обычный и неразрывный пробел как разделитель групп), **`createInitialEditServiceEventValues`** (в **ADVANCED** верхние «Запчасти»/«Работа» = **остаток** к сумме по строкам bundle, чтобы повторное сохранение не удваивало учёт), **`sumFiniteBundleItemField`** |
 | Vehicle state | `createInitialVehicleStateFormValues`, `normalizeVehicleStatePayload`, `validateVehicleStateFormValues` (`web` vs `mobile` wording / parsing) |
 | Vehicle profile | `createInitialEditVehicleProfileFormValues`, `normalizeEditVehicleProfilePayload`, `validateEditVehicleProfileFormValues` (no extra client checks yet) |
 | Add motorcycle | `createInitialAddMotorcycleFormValues`, `normalizeAddMotorcyclePayload`, `validateAddMotorcycleFormValues` (`web` vs `mobile`; engine-hours field validation only on **mobile** to match prior web onboarding) |
@@ -33,6 +33,7 @@ Stable **`value`** enums plus **Russian labels** (aligned with web onboarding / 
 - **Validation context:** service event **дата не в будущем**, **пробег** и сопоставление с текущим пробегом ТС — через **`AddServiceEventValidationContext`** (`todayDateYmd`, `currentVehicleOdometer`, **`leafNodeIds`**) и на web, и в Expo bundle-форме.
 - **Layout / навигация:** на web — полноэкранные страницы **`ServiceEventForm`** (`service-event-form/`, маршруты `service-events/new` и `service-events/[eventId]/edit`); на Expo — полноэкранный блок (`basic-service-event-bundle-form`) внутри `service-events/new.tsx`.
 - **Web-only UX:** при вводе пробега/моточасов **выше** текущих показателей ТС форма предлагает обновить состояние ТС (`PATCH …/state`); при **отказе** поля события возвращаются к **текущим** показателям ТС (см. [web-service-event-form.md](./web-service-event-form.md), раздел 12). На Expo отдельный экран «Состояние»; такой модалки в bundle-форме нет.
+- **Web-only UX (место установки):** выбор точки через **Яндекс.Карты** (`src/components/integrations/yandex-maps/`, `NEXT_PUBLIC_YANDEX_MAPS_API_KEY`) — см. [web-service-event-form.md](./web-service-event-form.md), §5.1. На Expo поля в контракте и API есть, экран карты **не реализован**.
 - **Defaults**: e.g. Expo «новый мотоцикл» still initializes **`ridingStyle`** with **`CALM`** locally; shared `createInitialAddMotorcycleFormValues` defaults match **web** (`ACTIVE`) for onboarding-style flows.
 
 ## Where it is wired
@@ -50,6 +51,6 @@ Stable **`value`** enums plus **Russian labels** (aligned with web onboarding / 
 
 ## Boundaries
 
-- No API route or Prisma changes.
-- No new npm dependencies.
+- Изменения **API / Prisma** для сервисного события (в т.ч. место установки) описаны в [data-model.md](./data-model.md) и [api-backend.md](./api-backend.md); доменные модули по-прежнему без React / Next / Expo.
+- Интеграция Яндекс.Карт — **отдельный npm-пакет не используется**; JS API 2.1 подгружается скриптом в браузере (`src/components/integrations/yandex-maps/`).
 - No React / Next / Expo imports under `packages/domain` form modules.

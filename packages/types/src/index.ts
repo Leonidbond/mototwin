@@ -214,6 +214,20 @@ export type {
   TrustBadgeWire,
 } from "./fitment-community";
 export type {
+  PartMasterCandidateWire,
+  PartMasterDuplicatesResponse,
+  CreatePartMasterInput,
+  CreatePartMasterResponse,
+  EnsurePartMasterSkuInput,
+  EnsurePartMasterSkuResponse,
+  CreateFitmentReportInput,
+  CreateFitmentReportResponse,
+  CreateFitmentEvidenceInput,
+  CreateFitmentEvidenceResponse,
+  PartCompatibilityReportResponse,
+  PartMasterPrefillResponse,
+} from "./fitment-api";
+export type {
   CompatibilityConfidenceTierWire,
   PartCompatibilityReportWire,
   PartCompatibilityBreakdownWire,

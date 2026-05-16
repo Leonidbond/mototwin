@@ -21,6 +21,9 @@ export type RawServiceEventRow = {
   comment: string | null;
   performedBy?: string | null;
   serviceProviderNote?: string | null;
+  installLocationAddress?: string | null;
+  installLocationLat?: number | null;
+  installLocationLng?: number | null;
   attachReceiptRequested?: boolean | null;
   attachFileRequested?: boolean | null;
   nextReminderEnabled?: boolean | null;
@@ -152,6 +155,9 @@ export function serializeServiceEventRow(row: RawServiceEventRow): ServiceEventI
     comment: row.comment,
     performedBy: (row.performedBy as ServiceEventItem["performedBy"]) ?? null,
     serviceProviderNote: row.serviceProviderNote ?? null,
+    installLocationAddress: row.installLocationAddress ?? null,
+    installLocationLat: row.installLocationLat ?? null,
+    installLocationLng: row.installLocationLng ?? null,
     attachReceiptRequested: Boolean(row.attachReceiptRequested),
     attachFileRequested: Boolean(row.attachFileRequested),
     nextReminderEnabled: Boolean(row.nextReminderEnabled),

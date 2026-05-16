@@ -358,9 +358,23 @@ export {
   deriveSourcePriority,
 } from "./part-compatibility-report-logic";
 export {
+  ownerCountLabelRu,
+  installationStatusLabelRu,
+  sourcePriorityVariantLabelRu,
+  trustBadgeShortRu,
+  evidenceTypeShortRu,
+  verdictSupportParagraphsRu,
+  isBrakesSafetyContext,
+  fitmentReportResultLabelRu,
+} from "./part-compatibility-report-labels";
+export {
   buildRideProfileCompatibilityInsight,
   parseVehicleRideProfileSnapshot,
 } from "./part-compatibility-ride-profile";
+export {
+  buildWishlistDetailCompatibilitySummary,
+  type WishlistDetailCompatibilitySummary,
+} from "./wishlist-detail-compatibility";
 export {
   PART_RECOMMENDATION_GROUP_ORDER,
   buildPartRecommendationGroupsForDisplay,

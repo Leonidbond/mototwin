@@ -21,6 +21,7 @@ import {
   PRIMARY_ACTION_BG_TINT,
   SERVICE_EVENT_PARTS_UI,
 } from "../styles";
+import { InstallLocationField } from "./InstallLocationField";
 
 const PERFORMER_OPTIONS: Array<{
   key: ServicePerformedBy;
@@ -425,6 +426,8 @@ export function BasicInfoPrimaryFields({
           />
         </label>
       ) : null}
+
+      <InstallLocationField form={form} onPatch={onPatch} />
 
       <label className="mt-3 flex flex-col gap-1.5">
         <span className="text-xs font-medium leading-none" style={LABEL_STYLE}>

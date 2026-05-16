@@ -96,6 +96,7 @@
   - top node state must exist for vehicle (compatibility requirement)
 - Request notes:
   - **`nextReminderDate`**: допускается **`null`** при выключенном напоминании или при включённом напоминании без даты (только пробег/моточасы); см. Zod-схему в `service-events/route.ts`
+  - **`installLocationAddress`**, **`installLocationLat`**, **`installLocationLng`**: опционально; адрес до 500 символов; широта −90…90, долгота −180…180 (Zod в `service-events/route.ts` и `…/[eventId]/route.ts`). UI и ключ Яндекс.Карт — [web-service-event-form.md](./web-service-event-form.md), §5.1.
 - Side effects after create (транзакция):
   - `NodeState` для **каждого** узла из `items` и anchor (`RECENTLY_REPLACED`, `lastServiceEventId`)
   - пересчёт **`TopNodeState`** по мотоциклу
