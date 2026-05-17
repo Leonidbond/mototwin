@@ -1751,12 +1751,14 @@ async function main() {
       displayName: "Demo User",
       passwordHash: null,
       isModerator: true,
+      adminRole: "SUPER_ADMIN",
     },
     create: {
       email: "demo@mototwin.local",
       displayName: "Demo User",
       passwordHash: null,
       isModerator: true,
+      adminRole: "SUPER_ADMIN",
     },
   });
 
@@ -1825,6 +1827,85 @@ async function main() {
       title: "Гараж B",
     },
   });
+
+  /*
+   * Admin panel staff accounts (per docs/mototwin_admin_panel_spec.md §24.1).
+   * Roles map directly to AdminRole enum; isModerator mirrors MODERATOR for
+   * back-compat with the existing /api/moderation/* routes.
+   */
+  const adminAccounts: Array<{
+    email: string;
+    displayName: string;
+    role: "SUPER_ADMIN" | "CATALOG_MANAGER" | "MODERATOR" | "ANALYST";
+    garageTitle: string;
+  }> = [
+    {
+      email: "super@mototwin.local",
+      displayName: "Алексей Соколов",
+      role: "SUPER_ADMIN",
+      garageTitle: "Гараж супер-админа",
+    },
+    {
+      email: "catalog@mototwin.local",
+      displayName: "Catalog Manager",
+      role: "CATALOG_MANAGER",
+      garageTitle: "Гараж каталог-менеджера",
+    },
+    {
+      email: "moderator@mototwin.local",
+      displayName: "Moderator",
+      role: "MODERATOR",
+      garageTitle: "Гараж модератора",
+    },
+    {
+      email: "analyst@mototwin.local",
+      displayName: "Analyst",
+      role: "ANALYST",
+      garageTitle: "Гараж аналитика",
+    },
+  ];
+  for (const account of adminAccounts) {
+    const adminUser = await prisma.user.upsert({
+      where: { email: account.email },
+      update: {
+        displayName: account.displayName,
+        adminRole: account.role,
+        isModerator: account.role === "MODERATOR" || account.role === "SUPER_ADMIN",
+      },
+      create: {
+        email: account.email,
+        displayName: account.displayName,
+        adminRole: account.role,
+        isModerator: account.role === "MODERATOR" || account.role === "SUPER_ADMIN",
+      },
+    });
+    await prisma.garage.upsert({
+      where: {
+        ownerUserId_title: {
+          ownerUserId: adminUser.id,
+          title: account.garageTitle,
+        },
+      },
+      update: {},
+      create: {
+        ownerUserId: adminUser.id,
+        title: account.garageTitle,
+      },
+    });
+    await prisma.userSettings.upsert({
+      where: { userId: adminUser.id },
+      update: {},
+      create: {
+        userId: adminUser.id,
+        defaultCurrency: "RUB",
+        distanceUnit: "km",
+        engineHoursUnit: "h",
+        dateFormat: "DD.MM.YYYY",
+        defaultSnoozeDays: 7,
+        vehicleTrashRetentionDays: 30,
+      },
+    });
+  }
 
   const inconsistentVehicles = await prisma.vehicle.findMany({
     where: {

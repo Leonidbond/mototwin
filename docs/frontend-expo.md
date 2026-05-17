@@ -151,9 +151,11 @@ Defined in `apps/app/app/_layout.tsx`:
 
 ### 4.1 Keyboard-aware forms policy
 
-- Все формы Expo с `TextInput` (добавление мотоцикла, редактирование профиля, обновление состояния, добавление сервисного события, wishlist-редактор, фильтры журнала) используют keyboard-aware layout.
-- Базовый паттерн: `KeyboardAvoidingView` + `ScrollView` + `keyboardShouldPersistTaps="handled"` + `keyboardDismissMode="on-drag"`.
-- Для повторного использования применяется общий helper: `apps/app/components/expo-shell/keyboard-aware-scroll-screen.tsx`.
+- Все формы Expo с `TextInput` обязаны использовать keyboard-aware layout. На данный момент покрытие:
+  - **Полноэкранные формы:** добавление мотоцикла (`vehicles/new`), редактирование профиля (`vehicles/[id]/profile`), обновление состояния (`vehicles/[id]/state`), добавление/редактирование сервисного события (`vehicles/[id]/service-events/new` + `BasicServiceEventBundleForm`), фильтры журнала (`vehicles/[id]/service-log`), wishlist-picker (`vehicles/[id]/wishlist/picker`), wishlist-редактор (`components/vehicle-wishlist/wishlist-item-editor`), форма «своей детали» (`components/vehicle-wishlist/community-part-screen`), расходы (`vehicles/[id]/expenses`).
+  - **Модалки с `TextInput`:** `MobileNodePickerModal` (поиск узла), `PickerUserKitSaveModal` (название комплекта), фильтр поиска в `wishlist/picker`, внутренние модалки `BasicServiceEventBundleForm` («Сохранить как шаблон», «Валюта»). RN-`Modal` рендерится в отдельный native-оверлей, поэтому каждая такая модалка оборачивается **своим** `KeyboardAvoidingView` — внешний KAV родителя до неё не достаёт.
+- Базовый паттерн: `KeyboardAvoidingView` (`behavior={Platform.OS === "ios" ? "padding" : "height"}`, `keyboardVerticalOffset` ≈ 8 на iOS) + `ScrollView` + `keyboardShouldPersistTaps="handled"` + `keyboardDismissMode="on-drag"`.
+- Для типового случая «экран = scroll + клавиатура» используется общий helper **`apps/app/components/expo-shell/keyboard-aware-scroll-screen.tsx`** (`KeyboardAwareScrollScreen`). В экранах с абсолютно-позиционированным футером (например, `community-part-screen`) KAV оборачивает только `ScrollView`, а футер остаётся снаружи — это сознательный выбор: пока клавиатура открыта, инпуты доступны, submit-кнопка появляется после dismiss клавиатуры.
 - Логика валидации и API-вызовов не меняется; правки касаются только UX и достижимости полей/кнопок при открытой клавиатуре.
 
 ### 4.2 API / debug line policy (product UI)

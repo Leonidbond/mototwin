@@ -28,6 +28,7 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [trashCount, setTrashCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
   const [lastViewedVehicleId, setLastViewedVehicleId] = useState<string | null>(null);
 
   const apiBaseUrl = getApiBaseUrl();
@@ -38,9 +39,10 @@ export default function HomeScreen() {
       setError("");
       const client = createApiClient({ baseUrl: apiBaseUrl });
       const endpoints = createMotoTwinEndpoints(client);
-      const [garageResult, trashResult] = await Promise.allSettled([
+      const [garageResult, trashResult, notificationsResult] = await Promise.allSettled([
         endpoints.getGarageVehicles(),
         endpoints.getTrashedVehicles(),
+        endpoints.getNotifications({ limit: 1 }),
       ]);
 
       if (garageResult.status === "rejected") {
@@ -52,6 +54,11 @@ export default function HomeScreen() {
         setTrashCount(trashResult.value.vehicles?.length ?? 0);
       } else {
         setTrashCount(0);
+      }
+      if (notificationsResult.status === "fulfilled") {
+        setNotificationCount(notificationsResult.value.unreadCount ?? 0);
+      } else {
+        setNotificationCount(0);
       }
     } catch (requestError) {
       console.error(requestError);
@@ -73,6 +80,7 @@ export default function HomeScreen() {
 
   const dashboardSummary = buildGarageDashboardSummary(vehicles);
   const openTrash = useCallback(() => router.push("/trash"), [router]);
+  const openNotifications = useCallback(() => router.push("/notifications"), [router]);
   const openProfile = useCallback(() => router.push("/profile"), [router]);
   const openAddVehicle = useCallback(() => router.push("/vehicles/new"), [router]);
   const reloadGarage = useCallback(() => void loadGarage(), [loadGarage]);
@@ -128,7 +136,9 @@ export default function HomeScreen() {
           <View style={styles.contentWrap}>
             <GarageHeader
               trashCount={trashCount}
+              notificationCount={notificationCount}
               onOpenTrash={openTrash}
+              onOpenNotifications={openNotifications}
               onOpenProfile={openProfile}
               onAddVehicle={openAddVehicle}
             />
@@ -151,7 +161,9 @@ export default function HomeScreen() {
               <View>
                 <GarageHeader
                   trashCount={trashCount}
+                  notificationCount={notificationCount}
                   onOpenTrash={openTrash}
+                  onOpenNotifications={openNotifications}
                   onOpenProfile={openProfile}
                   onAddVehicle={openAddVehicle}
                 />

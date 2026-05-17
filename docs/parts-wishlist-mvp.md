@@ -94,7 +94,7 @@
 - После выбора статуса **Установлено** с **`nodeId`** — переход на экран добавления сервисного события с предзаполнением; статус применяется только после сохранения события. Без узла — подсказка выбрать узел; после сохранения события — возврат к списку покупок с подсветкой установленной позиции; при фокусе карточки мотоцикла дерево и журнал подтягиваются как раньше.
 - Создание: переход на экран `/vehicles/[id]/wishlist/picker` (опциональный `?nodeId=`, `?focus=kits`); это single-page picker (см. spec Часть B v2.0). Старый маршрут `/vehicles/[id]/wishlist/new` остаётся как redirect на picker с пробросом query.
 - Редактирование: `/vehicles/[id]/wishlist/[itemId]` — компонент формы в **`apps/app/components/vehicle-wishlist/wishlist-item-editor.tsx`** (edit-only, без секций рекомендаций / комплектов).
-- Picker экран в Expo keyboard-aware: оболочка **`KeyboardAwareScrollScreen`** из `expo-shell`; **`keyboardShouldPersistTaps="handled"`**; те же endpoint-ы, что и на web, плюс **`getPartCompatibilityReport`**, community/part-masters. Ссылки на отчёт — `picker-fitment-report-link.tsx`; полный отчёт — `/wishlist/fitment-report`; своя деталь — `/wishlist/community` (`hrefs.ts`).
+- Picker экран в Expo keyboard-aware: оболочка **`KeyboardAwareScrollScreen`** из `expo-shell`; **`keyboardShouldPersistTaps="handled"`**; те же endpoint-ы, что и на web, плюс **`getPartCompatibilityReport`**, community/part-masters. Ссылки на отчёт — `picker-fitment-report-link.tsx`; полный отчёт — `/wishlist/fitment-report`; своя деталь — `/wishlist/community` (`hrefs.ts`). Экран **«своей детали»** (`components/vehicle-wishlist/community-part-screen.tsx`) и сопутствующие модалки (`MobileNodePickerModal`, `PickerUserKitSaveModal`, фильтр поиска в `picker`) тоже keyboard-aware (см. `frontend-expo.md` §4.1).
 - Комплекты обслуживания добавляются на picker как одна агрегированная строка draft; на сабмит вызывается `addServiceKitToWishlist`, который создаёт несколько строк (с тем же preview / дедупликацией, что и на web).
 - На карточках wishlist в Expo — **тот же смысл**, что на web: плашка с **кодом комплекта** (или «Комплект» для legacy-комментария) рядом с названием, в деталях — блок «Из комплекта» с чипом кода и названием.
 - Для установленной позиции в Expo показывается **«В журнал»**, если найдено связанное сервисное событие. Журнал Expo принимает `serviceEventId`, скроллит/подсвечивает событие и делает **«Из списка покупок»** кликабельным переходом обратно к конкретной позиции (`wishlistItemId`).
@@ -103,6 +103,10 @@
 ## Parity
 
 Один и тот же backend и те же клиентские контракты. Dashboard/preview wishlist остаётся **активным списком**; full parts/wishlist screens на web и Expo показывают все статусы для операционной работы и обратных ссылок из журнала. **История установок** — через **журнал обслуживания**. Доступны: просмотр, создание, обновление статуса, удаление, обязательная привязка к leaf-узлу, **опциональный выбор SKU из каталога (поиск + очистка)**, **консервативные рекомендации SKU по выбранному узлу с одинаковыми метками**, **сводка и отчёт о совместимости** (пикер + панель деталей корзины, при наличии `partMasterId`), **«Добавить свою деталь»** (community flow), **опциональная стоимость и валюта (по умолчанию `RUB`)**, перенос стоимости и **данных каталога в комментарий** сервисного события при **`INSTALLED`** с **`nodeId`**, быстрый вход с предвыбранным узлом, а также **«Повторить покупку»** из полной корзины (web и Expo) по общим правилам выше.
+
+## QA
+
+Ручной и API-прогон совместимости (подбор, панель деталей, отчёт): [parts-compatibility-qa.md](./parts-compatibility-qa.md).
 
 ## Отложено (намеренно)
 

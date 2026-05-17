@@ -74,7 +74,22 @@ After successful mutation, page reloads relevant datasets to reflect updated sta
 - Web does not currently use shared `@mototwin/api-client` as primary data layer for page fetches.
 - **Яндекс.Карты (опционально):** для поля «Место установки» на страницах `service-events/new` и `…/edit` задайте `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` в корневом `.env` (см. `.env.example`, [web-service-event-form.md](./web-service-event-form.md) §5.1).
 
-## 6. Related docs
+## 6. Responsive layout (web в мобильном браузере)
+
+Web-клиент рассчитан на desktop, но должен оставаться юзабельным при просмотре в мобильном браузере (≈ 360–480 px). Общая политика:
+
+- **Брейкпоинт.** Базовый порог — **`max-width: 1023px`** (соответствует Tailwind v4 `lg`). Часть страниц использует собственные пороги (`service-log` — 1180 px, `parts/picker` — 1279 px, `parts/community` — 900 px) — это сохраняется как есть.
+- **Общие хуки** (только для web client components) живут в `src/lib/`:
+  - **`useIsNarrow(maxWidthPx = 1023)`** (`src/lib/use-is-narrow.ts`) — подписка на `matchMedia("(max-width: …px)")`; используется страницами для переключения многоколоночных сеток в одну колонку и для условного рендера sheet/модалок.
+  - **`useSidebarCollapsed(storageKey?)`** (`src/lib/use-sidebar-collapsed.ts`) — единый источник состояния свёрнутости **`GarageSidebar`** на всех страницах с «гаражным» хромом. На узком viewport (`useIsNarrow`) сайдбар принудительно `collapsed=true`, `toggle()` — no-op. Пользовательский выбор на широком — в `localStorage` по переданному ключу (обратная совместимость с уже сохранёнными ключами: `garage.sidebar.collapsed`, `expenses.sidebar.collapsed`, `vehicle.detail.sidebar.collapsed`, и т. д.).
+
+Конкретные адаптации страниц:
+
+- **`/vehicles/[id]/nodes` (Дерево узлов).** На ширине ≥ 1024 px — двухколоночная сетка `minmax(0, 1fr) minmax(0, 1fr)` (дерево + «Контекст узла»). На ≤ 1023 px дерево занимает всю ширину; при выборе узла «Контекст узла» открывается **полноэкранным sheet** поверх дерева (`position: fixed; inset: 0; zIndex: 40`) с шапкой «← Назад к дереву» и именем узла. Кнопка «Назад» вызывает `closeNodeContextModal({ restorePrevious: false })` и снимает `?nodeId=` из URL через `history.replaceState`, чтобы после возврата к странице sheet не всплывал автоматически.
+- **`/expenses` и `/vehicles/[id]/expenses`.** На узком — `dashboardGridStyle` переключается в `minmax(0, 1fr)` (было `minmax(0, 1.5fr) minmax(320px, 1fr)` — правая колонка с `min-width: 320px` ранее выдавливала горизонтальный скролл); строка из шести KPI-метрик идёт через `repeat(auto-fit, minmax(140px, 1fr))` вместо жёстких 6 колонок.
+- **`GarageSidebar`** на всех страницах с «гаражным» хромом подключён через `useSidebarCollapsed`. На мобильнике это освобождает ≈ 140 px ширины (сайдбар «свёрнутый» = 64 px вместо развёрнутого 204 px / 220 px).
+
+## 7. Related docs
 
 - `node-picker-reuse.md`
 - `frontend-expo.md`

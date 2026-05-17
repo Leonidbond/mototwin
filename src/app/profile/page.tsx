@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
@@ -21,6 +21,7 @@ import {
   type UserLocalSettings
 } from "@mototwin/types";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
 type ProfileViewModel = {
   displayName: string;
@@ -47,7 +48,7 @@ function buildProfileViewModel(selectedDevUserEmail: string, fromApi?: ProfileVi
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
   const [userSettings, setUserSettings] = useState<UserLocalSettings>(() => ({
     ...DEFAULT_USER_LOCAL_SETTINGS,
   }));
@@ -129,28 +130,6 @@ export default function ProfilePage() {
 
   useEffect(() => {
     void loadSettings();
-  }, []);
-
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
-        setSidebarCollapsed(true);
-      }
-    } catch {
-      // Ignore localStorage read failures.
-    }
-  }, []);
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
-      } catch {
-        // Ignore localStorage write failures.
-      }
-      return next;
-    });
   }, []);
 
   useEffect(() => {

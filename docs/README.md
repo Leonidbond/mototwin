@@ -70,7 +70,7 @@
 
 **Журналы фиксов:** [`parity/web-expo-parity-fixes.md`](./parity/web-expo-parity-fixes.md) · [`parity/web-expo-data-parity-fixes.md`](./parity/web-expo-data-parity-fixes.md) · [`parity/web-expo-node-tree-parity-fixes.md`](./parity/web-expo-node-tree-parity-fixes.md) · [`parity/web-expo-visual-parity-fixes.md`](./parity/web-expo-visual-parity-fixes.md) · [`parity/web-expo-service-log-parity-fixes.md`](./parity/web-expo-service-log-parity-fixes.md) (в конце — приложение с ранними заметками по Expo journal; отдельные файлы `expo-service-log-*-parity.md` удалены как дубли).
 
-**QA:** [`service-event-qa-smoke.md`](./service-event-qa-smoke.md) · [`status-cache-frontend-qa.md`](./status-cache-frontend-qa.md) · [`parts-catalog-regression-qa.md`](./parts-catalog-regression-qa.md) · [`parts-catalog-qa-seed.md`](./parts-catalog-qa-seed.md)
+**QA:** [`service-event-qa-smoke.md`](./service-event-qa-smoke.md) · [`status-cache-frontend-qa.md`](./status-cache-frontend-qa.md) · [`parts-catalog-regression-qa.md`](./parts-catalog-regression-qa.md) · [`parts-compatibility-qa.md`](./parts-compatibility-qa.md) · [`parts-catalog-qa-seed.md`](./parts-catalog-qa-seed.md)
 
 ---
 

@@ -36,6 +36,7 @@ import {
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import type {
   NodeTreeItem,
@@ -88,29 +89,7 @@ export function PartPickerPage({
   initialFocus,
 }: PartPickerPageProps) {
   const router = useRouter();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
-        setSidebarCollapsed(true);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  }, []);
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [vehicleError, setVehicleError] = useState("");

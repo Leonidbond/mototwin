@@ -26,6 +26,11 @@ import type {
   ExpenseNodeSummaryResponse,
   MarkExpenseInstalledInput,
   MarkExpenseInstalledResponse,
+  NotificationMutationResponse,
+  NotificationRecalculateResponse,
+  NotificationSettingsResponse,
+  NotificationsListResponse,
+  NotificationSnoozePayload,
   ServiceBundleTemplatesResponse,
   CreateUserServiceEventFormTemplateBody,
   CreateUserServiceEventFormTemplateResponse,
@@ -46,6 +51,15 @@ import type {
   UpdateVehicleProfileResponse,
   UpdateServiceEventInput,
   UpdateServiceEventResponse,
+  UpdateNotificationSettingsPayload,
+  UpdateVehicleNotificationSettingsPayload,
+  UsageUpdatePayload,
+  UsageUpdateResponse,
+  PushSubscriptionDeleteResponse,
+  PushSubscriptionResponse,
+  PushSubscriptionTestResponse,
+  UpsertPushSubscriptionPayload,
+  VehicleNotificationSettingsResponse,
   UpdateVehicleStateInput,
   UpdateVehicleStateResponse,
   UpdateWishlistItemResponse,
@@ -85,6 +99,112 @@ export function createMotoTwinEndpoints(client: ApiClient) {
       return client.request<UserSettingsResponse>("/api/user-settings", {
         method: "PATCH",
         body: JSON.stringify(input),
+      });
+    },
+
+    getNotificationSettings() {
+      return client.request<NotificationSettingsResponse>("/api/notification-settings");
+    },
+
+    updateNotificationSettings(input: UpdateNotificationSettingsPayload) {
+      return client.request<NotificationSettingsResponse>("/api/notification-settings", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      });
+    },
+
+    getVehicleNotificationSettings(vehicleId: string) {
+      return client.request<VehicleNotificationSettingsResponse>(
+        `/api/vehicles/${encodeURIComponent(vehicleId)}/notification-settings`
+      );
+    },
+
+    updateVehicleNotificationSettings(
+      vehicleId: string,
+      input: UpdateVehicleNotificationSettingsPayload
+    ) {
+      return client.request<VehicleNotificationSettingsResponse>(
+        `/api/vehicles/${encodeURIComponent(vehicleId)}/notification-settings`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(input),
+        }
+      );
+    },
+
+    getNotifications(params?: {
+      status?: string;
+      severity?: string;
+      limit?: number;
+      includeResolved?: boolean;
+    }) {
+      const q = new URLSearchParams();
+      if (params?.status) q.set("status", params.status);
+      if (params?.severity) q.set("severity", params.severity);
+      if (typeof params?.limit === "number") q.set("limit", String(params.limit));
+      if (params?.includeResolved) q.set("includeResolved", "1");
+      const qs = q.toString();
+      return client.request<NotificationsListResponse>(`/api/notifications${qs ? `?${qs}` : ""}`);
+    },
+
+    markNotificationRead(notificationId: string) {
+      return client.request<NotificationMutationResponse>(
+        `/api/notifications/${encodeURIComponent(notificationId)}/read`,
+        { method: "PATCH" }
+      );
+    },
+
+    markNotificationSeen(notificationId: string) {
+      return client.request<NotificationMutationResponse>(
+        `/api/notifications/${encodeURIComponent(notificationId)}/seen`,
+        { method: "PATCH" }
+      );
+    },
+
+    snoozeNotification(notificationId: string, input: NotificationSnoozePayload) {
+      return client.request<NotificationMutationResponse>(
+        `/api/notifications/${encodeURIComponent(notificationId)}/snooze`,
+        { method: "PATCH", body: JSON.stringify(input) }
+      );
+    },
+
+    dismissNotification(notificationId: string) {
+      return client.request<NotificationMutationResponse>(
+        `/api/notifications/${encodeURIComponent(notificationId)}/dismiss`,
+        { method: "PATCH" }
+      );
+    },
+
+    recalculateNotifications() {
+      return client.request<NotificationRecalculateResponse>("/api/notifications/recalculate", {
+        method: "POST",
+      });
+    },
+
+    updateVehicleUsage(vehicleId: string, input: UsageUpdatePayload) {
+      return client.request<UsageUpdateResponse>(
+        `/api/vehicles/${encodeURIComponent(vehicleId)}/usage-update`,
+        { method: "POST", body: JSON.stringify(input) }
+      );
+    },
+
+    upsertPushSubscription(input: UpsertPushSubscriptionPayload) {
+      return client.request<PushSubscriptionResponse>("/api/push-subscriptions", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    deletePushSubscription(id: string) {
+      return client.request<PushSubscriptionDeleteResponse>(
+        `/api/push-subscriptions/${encodeURIComponent(id)}`,
+        { method: "DELETE" }
+      );
+    },
+
+    testPushSubscriptions() {
+      return client.request<PushSubscriptionTestResponse>("/api/push-subscriptions/test", {
+        method: "POST",
       });
     },
 

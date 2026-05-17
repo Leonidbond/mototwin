@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -1695,6 +1697,10 @@ export function BasicServiceEventBundleForm({
         animationType="fade"
         onRequestClose={() => !saveUserTemplateBusy && setSaveUserTemplateOpen(false)}
       >
+        <KeyboardAvoidingView
+          style={styles.modalKav}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <Pressable style={styles.modalOverlay} onPress={() => !saveUserTemplateBusy && setSaveUserTemplateOpen(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Сохранить как шаблон</Text>
@@ -1778,6 +1784,7 @@ export function BasicServiceEventBundleForm({
             </View>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -1924,6 +1931,10 @@ export function BasicServiceEventBundleForm({
         animationType="fade"
         onRequestClose={() => setCurrencyPickerOpen(false)}
       >
+        <KeyboardAvoidingView
+          style={styles.modalKav}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <Pressable style={styles.modalOverlay} onPress={() => setCurrencyPickerOpen(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Валюта</Text>
@@ -1976,6 +1987,7 @@ export function BasicServiceEventBundleForm({
             </Pressable>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -2654,6 +2666,7 @@ const styles = StyleSheet.create({
   saveDis: { opacity: 0.45 },
   saveTxt: { color: c.onPrimaryAction, fontSize: 15, fontWeight: "800" },
   pressed: { opacity: 0.88 },
+  modalKav: { flex: 1 },
   modalOverlay: {
     flex: 1,
     backgroundColor: c.overlayModal,

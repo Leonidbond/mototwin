@@ -4,6 +4,8 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -505,7 +507,17 @@ export default function VehicleExpensesScreen() {
           </Pressable>
         }
       />
-      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoiding}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+      >
+      <ScrollView
+        ref={scrollViewRef}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
         <View style={styles.headerCard}>
           {isMobileLayout ? (
             <ChipRow>
@@ -760,6 +772,7 @@ export default function VehicleExpensesScreen() {
           </>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
       <GarageBottomNav
         activeKey="expenses"
         onOpenGarage={() => router.push("/")}
@@ -953,6 +966,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: c.canvas,
+  },
+  keyboardAvoiding: {
+    flex: 1,
   },
   content: {
     paddingHorizontal: 16,

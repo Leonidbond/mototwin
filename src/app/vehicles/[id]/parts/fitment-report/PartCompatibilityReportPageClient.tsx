@@ -1,10 +1,13 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
+import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type {
   FitmentReportResultWire,
@@ -108,6 +111,7 @@ export function PartCompatibilityReportPageClient(props: {
   nodeId: string;
 }) {
   const router = useRouter();
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed("fitment-report.sidebar.collapsed");
   const [data, setData] = useState<PartCompatibilityReportWire | null>(null);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -313,8 +317,25 @@ export function PartCompatibilityReportPageClient(props: {
     </div>
   );
 
+  const withShell = (content: ReactNode) => (
+    <main className="min-h-screen" style={{ backgroundColor: BG }}>
+      <div
+        style={{
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: `${sidebarCollapsed ? 64 : 220}px minmax(0, 1fr)`,
+          alignItems: "start",
+          transition: "grid-template-columns 0.18s ease",
+        }}
+      >
+        <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <section style={{ minWidth: 0 }}>{content}</section>
+      </div>
+    </main>
+  );
+
   if (loading) {
-    return (
+    return withShell(
       <div style={{ minHeight: "100vh", backgroundColor: BG, padding: 24 }}>
         <InternalPageChrome
           variant="garageDark"
@@ -342,7 +363,7 @@ export function PartCompatibilityReportPageClient(props: {
   }
 
   if (loadError || !data) {
-    return (
+    return withShell(
       <div style={{ minHeight: "100vh", backgroundColor: BG, padding: 24 }}>
         <InternalPageChrome
           variant="garageDark"
@@ -392,7 +413,7 @@ export function PartCompatibilityReportPageClient(props: {
         alignItems: "start",
       };
 
-  return (
+  return withShell(
     <div style={{ minHeight: "100vh", backgroundColor: BG, padding: "16px 20px 96px", boxSizing: "border-box" }}>
       <InternalPageChrome
         variant="garageDark"
@@ -1063,12 +1084,12 @@ export function PartCompatibilityReportPageClient(props: {
                         background: "#000",
                       }}
                     >
-                      <img
+                      <Image
                         src={e.fileUrl}
                         alt=""
                         width={96}
                         height={96}
-                        loading="lazy"
+                        unoptimized
                         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                       />
                     </div>

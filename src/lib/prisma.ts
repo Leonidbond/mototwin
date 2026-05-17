@@ -29,7 +29,8 @@ function getOrCreatePrisma(): PrismaClient {
     !cached ||
     typeof (cached as { userServiceEventFormTemplate?: { create?: unknown } }).userServiceEventFormTemplate
       ?.create !== "function" ||
-    typeof (cached as { partMaster?: { create?: unknown } }).partMaster?.create !== "function";
+    typeof (cached as { partMaster?: { create?: unknown } }).partMaster?.create !== "function" ||
+    typeof (cached as { notification?: { create?: unknown } }).notification?.create !== "function";
 
   if (!delegateMissing && cached) {
     return cached;

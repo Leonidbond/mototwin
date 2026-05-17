@@ -274,3 +274,14 @@ body {
 .mt-internal-page :is(.hover\:bg-white:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover) {
   background-color: var(--color-card-muted) !important;
 }
+
+/* ============================================================================
+ * Admin panel
+ * ============================================================================
+ */
+
+@keyframes mototwin-admin-skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+

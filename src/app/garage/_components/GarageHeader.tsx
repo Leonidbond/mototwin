@@ -3,7 +3,13 @@ import type { CSSProperties, ReactNode } from "react";
 import { Button } from "@/components/ui";
 import { productSemanticColors } from "@mototwin/design-tokens";
 
-export function GarageHeader({ trashCount }: { trashCount: number }) {
+export function GarageHeader({
+  trashCount,
+  notificationCount,
+}: {
+  trashCount: number;
+  notificationCount: number;
+}) {
   return (
     <div
       style={{
@@ -29,7 +35,7 @@ export function GarageHeader({ trashCount }: { trashCount: number }) {
         >
           <TrashIcon />
         </IconLink>
-        <IconLink href="/notifications" label="Уведомления" badgeDot>
+        <IconLink href="/notifications" label="Уведомления" badgeCount={notificationCount}>
           <BellIcon />
         </IconLink>
         <IconLink href="/help" label="Помощь">

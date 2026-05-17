@@ -27,6 +27,18 @@ import type { NodeTreeItem, TopServiceNodeItem } from "./node";
 import type { ServiceBundleTemplateWire } from "./service-bundle-template";
 import type { AddServiceEventFormValues } from "./forms";
 import type { ServiceEventMode } from "./service-event";
+import type {
+  NotificationsListResponse,
+  NotificationItemWire,
+  NotificationSnoozePayload,
+  PushSubscriptionWire,
+  UpsertPushSubscriptionPayload,
+  UsageUpdatePayload,
+  UserNotificationSettingsPatch,
+  UserNotificationSettingsWire,
+  VehicleNotificationSettingsPatch,
+  VehicleNotificationSettingsWire,
+} from "./notification";
 
 /** Backend often returns `{ error: string }` on 4xx/5xx. */
 export type MotoTwinApiErrorBody = {
@@ -238,4 +250,58 @@ export type VehicleTrashMutationResponse = {
 export type VehicleTrashDeleteResponse = {
   deleted: true;
   vehicleId: string;
+};
+
+export type NotificationSettingsResponse = {
+  settings: UserNotificationSettingsWire;
+};
+
+export type VehicleNotificationSettingsResponse = {
+  settings: VehicleNotificationSettingsWire;
+};
+
+export type UpdateNotificationSettingsPayload = UserNotificationSettingsPatch;
+export type UpdateVehicleNotificationSettingsPayload = VehicleNotificationSettingsPatch;
+
+export type {
+  NotificationsListResponse,
+  NotificationItemWire,
+  NotificationSnoozePayload,
+  PushSubscriptionWire,
+  UpsertPushSubscriptionPayload,
+  UsageUpdatePayload,
+};
+
+export type NotificationMutationResponse = {
+  notification: NotificationItemWire;
+};
+
+export type NotificationRecalculateResponse = {
+  createdCount: number;
+  notifications: NotificationItemWire[];
+};
+
+export type PushSubscriptionResponse = {
+  subscription: PushSubscriptionWire;
+};
+
+export type PushSubscriptionDeleteResponse = {
+  deleted: true;
+  id: string;
+};
+
+export type PushSubscriptionTestResponse = {
+  ok: true;
+  testedSubscriptionIds: string[];
+};
+
+export type UsageUpdateResponse = {
+  ok: true;
+  vehicle: {
+    id: string;
+    odometer: number;
+    engineHours: number | null;
+    updatedAt: string;
+  };
+  resolvedNotifications: number;
 };

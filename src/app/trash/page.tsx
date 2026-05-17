@@ -5,12 +5,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildTrashedVehicleViewModel } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
-import { BackButton } from "@/components/navigation/BackButton";
+import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
 const trashApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+const SIDEBAR_COLLAPSED_KEY = "trash.sidebar.collapsed";
 
 export default function TrashPage() {
   const router = useRouter();
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
   const [items, setItems] = useState<Array<ReturnType<typeof buildTrashedVehicleViewModel>>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -77,19 +81,31 @@ export default function TrashPage() {
 
   return (
     <main
-      className="mt-internal-page min-h-screen px-6 py-16 text-gray-950"
+      className="mt-internal-page min-h-screen text-gray-950"
       style={{ backgroundColor: productSemanticColors.canvas }}
     >
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Свалка</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Здесь хранятся удаленные мотоциклы перед окончательным удалением
-            </p>
-          </div>
-          <BackButton onClick={navigateBackWithFallback} />
-        </div>
+      <div
+        style={{
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: `${sidebarCollapsed ? 64 : 220}px minmax(0, 1fr)`,
+          alignItems: "start",
+          transition: "grid-template-columns 0.18s ease",
+        }}
+      >
+        <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <section className="px-6 py-8">
+          <div className="mx-auto max-w-4xl">
+            <InternalPageChrome
+              variant="garageTokens"
+              onBack={navigateBackWithFallback}
+              breadcrumbs={[
+                { label: "Гараж", href: "/garage" },
+                { label: "Свалка" },
+              ]}
+              title="Свалка"
+              subtitle="Здесь хранятся удаленные мотоциклы перед окончательным удалением."
+            />
 
         {isLoading ? <p className="text-sm text-gray-600">Загрузка Свалки...</p> : null}
         {error ? <p className="text-sm text-rose-600">{error}</p> : null}
@@ -146,6 +162,8 @@ export default function TrashPage() {
             </section>
           ))}
         </div>
+          </div>
+        </section>
       </div>
     </main>
   );

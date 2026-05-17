@@ -62,7 +62,18 @@
 - [docs/mototwin_add_your_part_ui_spec_ru.md](mototwin_add_your_part_ui_spec_ru.md) — UI «добавить свою деталь».
 - Референсы: `images/examples/part-compatibility-report.png`, `images/examples/add-part.png`.
 
-## 8. Следующие шаги (по продуктовому плану)
+## 8. Responsive layout web-клиента (мобильный браузер)
+
+- Общие client-side хуки в `src/lib/`:
+  - **`use-is-narrow.ts`** — `useIsNarrow(maxWidthPx = 1023)` поверх `matchMedia`; базовый брейкпоинт — Tailwind `lg` (1023 px).
+  - **`use-sidebar-collapsed.ts`** — `useSidebarCollapsed(storageKey?)`: единая обёртка над **`GarageSidebar`**, на узком viewport принудительно `collapsed=true` и `toggle()` — no-op; на широком пользовательский выбор сохраняется в `localStorage` по переданному ключу.
+- Хук `useSidebarCollapsed` подключён на всех страницах с «гаражным» хромом: `src/app/page.tsx`, `garage/page.tsx`, `trash/page.tsx`, `onboarding/page.tsx`, `profile/page.tsx`, `moderation/fitment/page.tsx`, `expenses/ExpensesPageClient.tsx`, `vehicles/[id]/vehicle-detail-client.tsx`, `vehicles/[id]/service-events/new/ServiceEventCreateClient.tsx`, `vehicles/[id]/service-events/[eventId]/edit/ServiceEventEditClient.tsx`, `vehicles/[id]/service-log/page.tsx`, `vehicles/[id]/parts/picker/_components/PartPickerPage.tsx`, `vehicles/[id]/parts/community/CommunityPartPageClient.tsx`, `vehicles/[id]/parts/fitment-report/PartCompatibilityReportPageClient.tsx`. Ранее в каждом из этих файлов был свой `useState + useEffect(localStorage) + useCallback(toggle)` — теперь источник один.
+- Адаптация конкретных страниц:
+  - **«Дерево узлов»** (`/vehicles/[id]/nodes`, `src/app/vehicles/[id]/vehicle-detail-client.tsx`) — на узком одна колонка (дерево), а правая панель «Контекст узла» открывается полноэкранным sheet (`position: fixed; inset: 0; zIndex: 40`) с кнопкой «← Назад к дереву», которая снимает `?nodeId=` из URL через `history.replaceState`.
+  - **«Расходы»** (`src/app/expenses/ExpensesPageClient.tsx`) — на узком `dashboardGridStyle` → `minmax(0, 1fr)`, KPI-строка → `repeat(auto-fit, minmax(140px, 1fr))`.
+- Документация: каноническая запись — `docs/frontend-web.md` §6; референсы в `docs/garage-dashboard-mvp.md` («Свёрнутость»), `docs/node-tree-page-functional-overview.md` §5.3, `docs/expense-tracking-mvp.md` («Web responsive»), `docs/repository-structure.md` §3.
+
+## 9. Следующие шаги (по продуктовому плану)
 
 - Довести UI страницы отчёта до полного соответствия [mototwin_part_compatibility_report_ui_spec_ru.md](mototwin_part_compatibility_report_ui_spec_ru.md) v1.1 (если остались секции спеки).
 - Регрессия web/Expo: пикер → отчёт, панель деталей корзины → сводка совместимости, community → wishlist + fitment-report.

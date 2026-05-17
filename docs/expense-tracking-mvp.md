@@ -88,6 +88,8 @@ Prisma:
 
 Все блоки dashboard строятся от текущего набора фильтров. Если страница открыта из дерева узлов через `nodeId`, фильтр применяется к выбранному узлу и всему его поддереву.
 
+**Web responsive (мобильный браузер).** На узком viewport (`max-width: 1023 px`, хук `useIsNarrow` в `src/lib/use-is-narrow.ts`) `ExpensesPageClient` переключает `dashboardGridStyle` в одну колонку (`minmax(0, 1fr)`), а строка KPI становится `repeat(auto-fit, minmax(140px, 1fr))` — без жёстких 6 колонок и без горизонтального скролла. На широком (≥ 1024 px) сохраняется прежняя двухколоночная сетка `minmax(0, 1.5fr) minmax(320px, 1fr)`. `GarageSidebar` подключён через общий хук `useSidebarCollapsed("expenses.sidebar.collapsed")` и на узком автоматически свёрнут (см. `docs/frontend-web.md` §6).
+
 ### Deep link с журнала обслуживания (web, `ExpensesPageClient`)
 
 При открытии **`/vehicles/[id]/expenses`** из правой панели журнала (и аналогичных сценариев) в query могут передаваться:

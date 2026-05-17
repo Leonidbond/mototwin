@@ -72,6 +72,8 @@ import { TopNodeIcon } from "@/components/icons/top-nodes";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
+import { useIsNarrow } from "@/lib/use-is-narrow";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
 import { PartsCartPage, type PartsAdvancedFilterState } from "./parts/_components/PartsCartPage";
 import { WishlistItemEditModal } from "./parts/_components/WishlistItemEditModal";
@@ -1263,7 +1265,8 @@ function isIssueNodeStatus(status: NodeStatus | null): status is "OVERDUE" | "SO
 export function VehicleDetailClient({ params, pageView = "dashboard" }: VehiclePageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
+  const isNarrowViewport = useIsNarrow();
   const [vehicleId, setVehicleId] = useState("");
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -1390,27 +1393,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [vehicleStateError, setVehicleStateError] = useState("");
   const [isSavingVehicleState, setIsSavingVehicleState] = useState(false);
   const [isAdvancedDetailsOpen, setIsAdvancedDetailsOpen] = useState(false);
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
-        setSidebarCollapsed(true);
-      }
-    } catch {
-      // Ignore local storage failures.
-    }
-  }, []);
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
-      } catch {
-        // Ignore local storage failures.
-      }
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     if (!profileFormSuccess) {
@@ -5115,41 +5097,147 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                     </div>
                   }
                 />
-                <div
-                  className="grid gap-4"
-                  style={{
-                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                    alignItems: "stretch",
-                    minWidth: 0,
-                    minHeight: 0,
-                    flex: 1,
-                    overflow: "hidden",
-                  }}
-                >
+                {isNarrowViewport ? (
                   <div
                     style={{
-                      height: "100%",
                       minWidth: 0,
                       minHeight: 0,
+                      flex: 1,
                       overflowX: "hidden",
                       overflowY: "auto",
-                      paddingRight: 4,
                     }}
                   >
                     {renderMainNodeTreeSection()}
                   </div>
+                ) : (
                   <div
+                    className="grid gap-4"
                     style={{
-                      height: "100%",
+                      gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                      alignItems: "stretch",
                       minWidth: 0,
                       minHeight: 0,
-                      overflowX: "hidden",
-                      overflowY: "auto",
-                      paddingRight: 4,
+                      flex: 1,
+                      overflow: "hidden",
                     }}
                   >
-                    {renderNodeContextSidePanel()}
+                    <div
+                      style={{
+                        height: "100%",
+                        minWidth: 0,
+                        minHeight: 0,
+                        overflowX: "hidden",
+                        overflowY: "auto",
+                        paddingRight: 4,
+                      }}
+                    >
+                      {renderMainNodeTreeSection()}
+                    </div>
+                    <div
+                      style={{
+                        height: "100%",
+                        minWidth: 0,
+                        minHeight: 0,
+                        overflowX: "hidden",
+                        overflowY: "auto",
+                        paddingRight: 4,
+                      }}
+                    >
+                      {renderNodeContextSidePanel()}
+                    </div>
                   </div>
+                )}
+              </div>
+            ) : null}
+
+            {!isLoading &&
+            !error &&
+            vehicle &&
+            pageView === "nodeTree" &&
+            isNarrowViewport &&
+            selectedNodeContextId ? (
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Контекст узла"
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 40,
+                  display: "flex",
+                  flexDirection: "column",
+                  backgroundColor: productSemanticColors.canvas,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "10px 12px",
+                    borderBottom: `1px solid ${productSemanticColors.border}`,
+                    backgroundColor: productSemanticColors.card,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeNodeContextModal({ restorePrevious: false });
+                      try {
+                        const q = new URLSearchParams(window.location.search);
+                        q.delete("nodeId");
+                        const search = q.toString();
+                        const nextHref = `/vehicles/${vehicleId}/nodes${search ? `?${search}` : ""}`;
+                        if (window.location.pathname + window.location.search !== nextHref) {
+                          window.history.replaceState(window.history.state, "", nextHref);
+                        }
+                      } catch {
+                        // Ignore URL update failures (история не критична для UX).
+                      }
+                    }}
+                    aria-label="Закрыть контекст узла"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      height: 36,
+                      padding: "0 12px",
+                      borderRadius: 10,
+                      border: `1px solid ${productSemanticColors.borderStrong}`,
+                      backgroundColor: productSemanticColors.cardSubtle,
+                      color: productSemanticColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ← Назад к дереву
+                  </button>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: productSemanticColors.textPrimary,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      minWidth: 0,
+                    }}
+                  >
+                    {selectedNodeContextViewModel?.nodeName ?? "Контекст узла"}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: "auto",
+                    overflowX: "hidden",
+                    padding: 10,
+                    backgroundColor: productSemanticColors.canvas,
+                  }}
+                >
+                  {renderNodeContextSidePanel()}
                 </div>
               </div>
             ) : null}

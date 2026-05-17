@@ -25,4 +25,24 @@ export const DEV_USER_OPTIONS: DevUserOption[] = [
     label: "Test User B",
     garageTitle: "Гараж B",
   },
+  {
+    email: "super@mototwin.local",
+    label: "Admin · Super",
+    garageTitle: "Гараж супер-админа",
+  },
+  {
+    email: "catalog@mototwin.local",
+    label: "Admin · Catalog Manager",
+    garageTitle: "Гараж каталог-менеджера",
+  },
+  {
+    email: "moderator@mototwin.local",
+    label: "Admin · Moderator",
+    garageTitle: "Гараж модератора",
+  },
+  {
+    email: "analyst@mototwin.local",
+    label: "Admin · Analyst",
+    garageTitle: "Гараж аналитика",
+  },
 ];

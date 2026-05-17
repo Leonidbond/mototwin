@@ -13,6 +13,7 @@ import { GarageSidebar } from "./_components/GarageSidebar";
 import { GarageSummary } from "./_components/GarageSummary";
 import { GarageTasksStrip } from "./_components/GarageTasksStrip";
 import { VehicleCard } from "./_components/VehicleCard";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
 const garageApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
@@ -23,37 +24,17 @@ export default function GaragePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [trashCount, setTrashCount] = useState(0);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
-        setSidebarCollapsed(true);
-      }
-    } catch {
-      // ignore storage access errors (SSR / privacy mode)
-    }
-  }, []);
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
-      } catch {
-        // ignore storage access errors
-      }
-      return next;
-    });
-  }, []);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
 
   const loadGarage = useCallback(async () => {
     try {
       setIsLoading(true);
       setError("");
-      const [garageResult, trashResult] = await Promise.allSettled([
+      const [garageResult, trashResult, notificationsResult] = await Promise.allSettled([
         garageApi.getGarageVehicles(),
         garageApi.getTrashedVehicles(),
+        garageApi.getNotifications({ limit: 1 }),
       ]);
 
       if (garageResult.status === "rejected") {
@@ -67,6 +48,12 @@ export default function GaragePage() {
       } else {
         console.warn("Failed to fetch trashed vehicles count:", trashResult.reason);
         setTrashCount(0);
+      }
+      if (notificationsResult.status === "fulfilled") {
+        setNotificationCount(notificationsResult.value.unreadCount ?? 0);
+      } else {
+        console.warn("Failed to fetch notifications count:", notificationsResult.reason);
+        setNotificationCount(0);
       }
     } catch (err) {
       console.error(err);
@@ -131,7 +118,7 @@ export default function GaragePage() {
             justifySelf: "center",
           }}
         >
-          <GarageHeader trashCount={trashCount} />
+          <GarageHeader trashCount={trashCount} notificationCount={notificationCount} />
 
           {isLoading ? <GarageStateCard>Загрузка гаража...</GarageStateCard> : null}
 

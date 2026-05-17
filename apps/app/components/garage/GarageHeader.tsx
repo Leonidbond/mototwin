@@ -6,7 +6,9 @@ import { productSemanticColors as c } from "@mototwin/design-tokens";
 
 export function GarageHeader(props: {
   trashCount: number;
+  notificationCount?: number;
   onOpenTrash: () => void;
+  onOpenNotifications?: () => void;
   onOpenProfile: () => void;
   onAddVehicle: () => void;
 }) {
@@ -22,6 +24,20 @@ export function GarageHeader(props: {
       </View>
       <View style={styles.actionsRow}>
         <View style={styles.iconActions}>
+          <View style={styles.badgedIcon}>
+            <ActionIconButton
+              onPress={props.onOpenNotifications ?? (() => undefined)}
+              accessibilityLabel={`Открыть оповещения (${props.notificationCount ?? 0})`}
+              variant="subtle"
+              icon={<MaterialIcons name="notifications-none" size={22} color={c.textPrimary} />}
+              style={styles.roundAction}
+            />
+            {(props.notificationCount ?? 0) > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{props.notificationCount}</Text>
+              </View>
+            ) : null}
+          </View>
           <View style={styles.badgedIcon}>
             <ActionIconButton
               onPress={props.onOpenTrash}

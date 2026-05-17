@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   createInitialAddMotorcycleFormValues,
@@ -12,6 +13,9 @@ import {
   validateAddMotorcycleFormValues,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
+import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import type {
   AddMotorcycleFormValues,
   RideLoadType,
@@ -21,6 +25,7 @@ import type {
 } from "@mototwin/types";
 
 const onboardingApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+const SIDEBAR_COLLAPSED_KEY = "onboarding.sidebar.collapsed";
 
 type Brand = {
   id: string;
@@ -67,6 +72,8 @@ function initialRideProfileForm(): RideProfileForm {
 }
 
 export default function OnboardingPage() {
+  const router = useRouter();
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [variants, setVariants] = useState<ModelVariant[]>([]);
@@ -219,11 +226,29 @@ export default function OnboardingPage() {
   };
 
   return (
-    <main
-      className="mt-internal-page min-h-screen px-6 py-16 text-gray-950"
-      style={{ backgroundColor: productSemanticColors.canvas }}
-    >
-      <div className="mx-auto max-w-6xl">
+    <main className="mt-internal-page min-h-screen" style={{ backgroundColor: productSemanticColors.canvas }}>
+      <div
+        style={{
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: `${sidebarCollapsed ? 64 : 220}px minmax(0, 1fr)`,
+          alignItems: "start",
+          transition: "grid-template-columns 0.18s ease",
+        }}
+      >
+        <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <section className="px-6 py-8">
+          <div className="mx-auto max-w-6xl">
+            <InternalPageChrome
+              variant="garageTokens"
+              onBack={() => router.push("/")}
+              breadcrumbs={[
+                { label: "Главная", href: "/" },
+                { label: "Onboarding" },
+              ]}
+              title="Добавление мотоцикла"
+              subtitle="Заполните профиль техники, чтобы начать работу в гараже."
+            />
         <div className="mb-10 max-w-3xl">
           <div className="inline-flex items-center rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600">
             MotoTwin | Первый мотоцикл в гараже
@@ -602,6 +627,8 @@ export default function OnboardingPage() {
             )}
           </aside>
         </div>
+      </div>
+        </section>
       </div>
     </main>
   );

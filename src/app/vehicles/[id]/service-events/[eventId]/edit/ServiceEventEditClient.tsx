@@ -7,6 +7,7 @@ import {
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AddServiceEventFormValues, NodeTreeItem, ServiceEventItem } from "@mototwin/types";
@@ -20,7 +21,7 @@ export function ServiceEventEditClient() {
   const searchParams = useSearchParams();
   const vehicleId = params.id;
   const eventId = params.eventId;
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed();
   const returnToEncoded = searchParams.get("returnTo");
 
   const todayDateYmd = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -143,7 +144,7 @@ export function ServiceEventEditClient() {
       >
         <GarageSidebar
           collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed((c) => !c)}
+          onToggle={toggleSidebar}
         />
         <section
           className="flex min-h-0 min-w-0 flex-col"

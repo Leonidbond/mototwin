@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -962,6 +964,10 @@ export default function WishlistPickerScreen() {
       />
 
       <Modal visible={filtersOpen} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          style={styles.modalKav}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Фильтры поиска</Text>
@@ -1021,6 +1027,7 @@ export default function WishlistPickerScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={submitPreviewModalOpen} animationType="fade" transparent>
@@ -1417,6 +1424,7 @@ const styles = StyleSheet.create({
   link: { fontSize: 13, fontWeight: "600", color: c.primaryAction },
   muted: { fontSize: 13, color: c.textMuted, paddingHorizontal: 16, paddingVertical: 8 },
   rowTitle: { fontSize: 14, fontWeight: "700", color: c.textPrimary },
+  modalKav: { flex: 1 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",

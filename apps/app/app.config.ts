@@ -74,7 +74,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   return {
     ...baseConfig,
-    plugins: [...(baseConfig.plugins ?? []), "@react-native-community/datetimepicker"],
+    plugins: [
+      ...(baseConfig.plugins ?? []),
+      "@react-native-community/datetimepicker",
+      "expo-notifications",
+    ],
     extra: {
       ...baseConfig.extra,
       ...(devApiBaseUrl ? { devApiBaseUrl } : {}),

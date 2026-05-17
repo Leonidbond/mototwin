@@ -113,6 +113,7 @@ When no motorcycles exist:
 **Свёрнутость**
 
 - Кнопка сворачивания; ключ `garage.sidebar.collapsed` в `localStorage` (на части экранов используются свои ключи, например расходы — `expenses.sidebar.collapsed`, но компонент тот же).
+- Состояние свёрнутости на всех страницах подключается единым клиентским хуком **`useSidebarCollapsed(storageKey)`** (`src/lib/use-sidebar-collapsed.ts`). На узком viewport (`useIsNarrow`, по умолчанию `max-width: 1023 px` ≈ Tailwind `lg`) сайдбар принудительно `collapsed=true`, а **`toggle()` становится no-op** — это освобождает горизонтальное пространство в мобильных браузерах без потери основной навигации. Пользовательское «свернуть/развернуть» сохраняется только на широких экранах. См. также `docs/frontend-web.md` §6 «Responsive layout».
 
 ## Expo
 

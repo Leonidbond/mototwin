@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -87,11 +89,16 @@ export function PickerUserKitSaveModal(props: {
 
   return (
     <Modal visible={props.visible} animationType="fade" transparent onRequestClose={props.onClose}>
+      <KeyboardAvoidingView
+        style={styles.kavRoot}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => !busy && props.onClose()} />
         <View style={styles.card}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             contentContainerStyle={styles.scrollContent}
           >
             <Text style={styles.title}>Сохранить как комплект</Text>
@@ -149,11 +156,13 @@ export function PickerUserKitSaveModal(props: {
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  kavRoot: { flex: 1 },
   overlay: {
     flex: 1,
     justifyContent: "center",

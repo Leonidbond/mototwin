@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
+import { useIsNarrow } from "@/lib/use-is-narrow";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildExpenseAnalyticsFromItems,
@@ -173,7 +175,8 @@ export function ExpensesPageClient(props: {
   const highlightExpenseIdFromQuery = searchParams.get("highlightExpenseId")?.trim() || "";
   const returnToFromQuery = decodeMototwinInternalReturnTo(searchParams.get("returnTo"));
   const effectiveVehicleId = props.vehicleId ?? vehicleIdFromQuery;
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
+  const isNarrowViewport = useIsNarrow();
   const [selectedYear, setSelectedYear] = useState(selectedYearDefault);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [years, setYears] = useState<number[]>([]);
@@ -209,16 +212,6 @@ export function ExpensesPageClient(props: {
   });
 
   useEffect(() => {
-    try {
-      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
-        setSidebarCollapsed(true);
-      }
-    } catch {
-      // localStorage can be unavailable in restricted browser contexts.
-    }
-  }, []);
-
-  useEffect(() => {
     const nextServiceEventId = searchParams.get("serviceEventId")?.trim() || "";
     setFilters((prev) =>
       prev.serviceEventId === nextServiceEventId ? prev : { ...prev, serviceEventId: nextServiceEventId }
@@ -243,18 +236,6 @@ export function ExpensesPageClient(props: {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [highlightExpenseIdFromQuery, isLoading, expenses.length]);
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
-      } catch {
-        // Ignore persistence failures.
-      }
-      return next;
-    });
-  }, []);
 
   const yearOptions = useMemo(() => {
     const set = new Set([selectedYearDefault, selectedYear, ...years]);
@@ -754,7 +735,13 @@ export function ExpensesPageClient(props: {
             <StateCard>Загружаю расходы...</StateCard>
           ) : (
             <>
-              <section style={metricGridStyle}>
+              <section
+                style={
+                  isNarrowViewport
+                    ? { ...metricGridStyle, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }
+                    : metricGridStyle
+                }
+              >
                 <MetricCard tone="blue" label="Всего расходов" value={formatTotals(visibleAnalytics.totalsByCurrency)} hint="за выбранный период" icon="₽" />
                 <MetricCard tone="green" label="За сезон" value={formatTotals(visibleAnalytics.selectedYearTotalsByCurrency)} hint="с начала сезона" icon="↗" />
                 <MetricCard tone="violet" label="Событий" value={String(visibleAnalytics.selectedYearExpenseCount)} hint="всего расходов" icon="☷" />
@@ -763,7 +750,13 @@ export function ExpensesPageClient(props: {
                 <MetricCard tone="red" label="Самый дорогой узел" value={topNode ? topNode.label : "—"} hint={topNode ? `${formatCurrencyAmount(topNode.amount, primaryCurrency)} · ${Math.round((topNode.amount / Math.max(totalInPrimaryCurrency, 1)) * 100)}%` : "нет данных"} icon="☆" />
               </section>
 
-              <section style={dashboardGridStyle}>
+              <section
+                style={
+                  isNarrowViewport
+                    ? { ...dashboardGridStyle, gridTemplateColumns: "minmax(0, 1fr)" }
+                    : dashboardGridStyle
+                }
+              >
                 <div style={leftColumnStyle}>
                   <Panel
                     title="Расходы по месяцам"

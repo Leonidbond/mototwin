@@ -29,7 +29,12 @@ src/
     api/**/route.ts         # backend API handlers
   lib/
     prisma.ts               # shared Prisma client setup
+    use-is-narrow.ts        # client hook: matchMedia(max-width)
+    use-sidebar-collapsed.ts# client hook: единое поведение GarageSidebar
+    …                       # прочие web-only утилиты и доменные хелперы
 ```
+
+Общие клиентские хуки `useIsNarrow` / `useSidebarCollapsed` используются страницами с «гаражным» хромом для адаптации к мобильным браузерам — см. `docs/frontend-web.md` §6 «Responsive layout».
 
 ## 4. Expo mobile application
 

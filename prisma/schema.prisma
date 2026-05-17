@@ -187,6 +187,107 @@ enum ExpenseInstallationStatus {
   INSTALLED
 }
 
+enum NotificationType {
+  SERVICE_OVERDUE
+  SERVICE_UPCOMING
+  MILEAGE_UPDATE_REQUIRED
+  ENGINE_HOURS_UPDATE_REQUIRED
+  MISSING_SERVICE_DATA
+  WEEKLY_DIGEST
+}
+
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum NotificationStatus {
+  NEW
+  SEEN
+  READ
+  SNOOZED
+  RESOLVED
+  DISMISSED
+  EXPIRED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH_WEB
+  PUSH_MOBILE
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+  MUTED
+  RATE_LIMITED
+}
+
+enum PushChannelType {
+  WEB_PUSH
+  MOBILE_PUSH
+}
+
+enum PushProvider {
+  WEBPUSH
+  EXPO
+  FCM
+  APNS
+}
+
+enum PushPlatform {
+  WEB
+  IOS
+  ANDROID
+}
+
+enum UsageUpdateSource {
+  MANUAL
+  SERVICE_EVENT
+  IMPORT
+  TELEMETRY
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  CATALOG_MANAGER
+  MODERATOR
+  ANALYST
+}
+
+enum ModelSupportLevel {
+  FULL_SUPPORT
+  COMMUNITY_SUPPORT
+  EARLY_BETA
+  NO_DATA
+  UNSUPPORTED
+}
+
+enum ImportBatchType {
+  PARTS
+  FITMENT_RULES
+  SERVICE_RULES
+  MODELS
+  CONFIGURATIONS
+  OEM_CROSS
+  PART_ALIASES
+}
+
+enum ImportBatchStatus {
+  DRAFT
+  VALIDATING
+  READY
+  IMPORTING
+  COMMITTED
+  ROLLED_BACK
+  FAILED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String?  @unique
@@ -194,18 +295,28 @@ model User {
   passwordHash String?
   /** Moderation UI for community fitment and PartMaster review. */
   isModerator Boolean  @default(false)
+  /** Primary RBAC source for the admin panel; null = no admin access. */
+  adminRole   AdminRole?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   subscription Subscription?
   settings     UserSettings?
+  notificationSettings UserNotificationSettings?
+  vehicleNotificationSettings VehicleNotificationSettings[]
   vehicles     Vehicle[]
   garages      Garage[]
   serviceEventFormTemplates UserServiceEventFormTemplate[]
+  notifications            Notification[]
+  pushSubscriptions        PushSubscription[]
+  mileageHoursUpdateLogs   MileageHoursUpdateLog[]
   partMastersCreated        PartMaster[]        @relation("PartMasterCreatedBy")
   fitmentReportsCreated     FitmentReport[]     @relation("FitmentReportCreatedBy")
   fitmentVotes              FitmentVote[]
+  adminAuditLogs            AdminAuditLog[]
+  importBatches             ImportBatch[]
 
+  @@index([adminRole])
   @@map("users")
 }
 
@@ -311,6 +422,10 @@ model ModelVariant {
   brakeSystem    String?
   chainPitch     String?
   stockSprockets String?
+  /** Admin override; when null, support level is inferred from data. */
+  supportLevel   ModelSupportLevel?
+  /** Last reason captured when support level was changed by an admin. */
+  supportLevelReason String?
   createdAt      DateTime @default(now())
 
   model    Model     @relation(fields: [modelId], references: [id], onDelete: Cascade)
@@ -347,6 +462,9 @@ model Vehicle {
   serviceEvents     ServiceEvent[]
   topNodeStates     TopNodeState[]
   nodeStates        NodeState[]
+  notifications     Notification[]
+  notificationSettings VehicleNotificationSettings?
+  mileageHoursUpdateLogs MileageHoursUpdateLog[]
   partWishlistItems PartWishlistItem[]
   expenseItems      ExpenseItem[]
   fitmentReports    FitmentReport[]
@@ -487,6 +605,7 @@ model Node {
   topNodeStates     TopNodeState[]
   nodeStates        NodeState[]
   maintenanceRule   NodeMaintenanceRule?
+  notifications     Notification[]
   partWishlistItems PartWishlistItem[]
   expenseItems      ExpenseItem[]
   partSkusPrimary   PartSku[]            @relation("PartSkuPrimaryNode")
@@ -553,6 +672,7 @@ model PartMaster {
   skus               PartSku[]
   fitmentReports     FitmentReport[]
   fitmentConfidences FitmentConfidence[]
+  aliases            PartAlias[]
 
   @@unique([normalizedSku, brandNormalized])
   @@index([brandNormalized])
@@ -928,4 +1048,261 @@ model RideProfile {
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@map("ride_profiles")
+}
+
+model UserNotificationSettings {
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  inAppEnabled              Boolean  @default(true)
+  emailEnabled              Boolean  @default(true)
+  pushEnabled               Boolean  @default(false)
+  daysBeforeService         Int      @default(14)
+  kmBeforeService           Int      @default(500)
+  hoursBeforeService        Int      @default(10)
+  mileageStaleAfterDays     Int      @default(14)
+  engineHoursStaleAfterDays Int      @default(14)
+  suppressWhenStored        Boolean  @default(true)
+  weeklyDigestEnabled       Boolean  @default(true)
+  weeklyDigestDay           Int      @default(1)
+  weeklyDigestHour          Int      @default(9)
+  quietHoursEnabled         Boolean  @default(false)
+  quietHoursStart           String?
+  quietHoursEnd             String?
+  timezone                  String   @default("Europe/Moscow")
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_settings")
+}
+
+model VehicleNotificationSettings {
+  id                        String   @id @default(cuid())
+  userId                    String
+  vehicleId                 String   @unique
+  useUserDefaults           Boolean  @default(true)
+  notificationsEnabled      Boolean  @default(true)
+  inAppEnabled              Boolean?
+  emailEnabled              Boolean?
+  pushEnabled               Boolean?
+  isStored                  Boolean  @default(false)
+  storedUntil               DateTime?
+  daysBeforeService         Int?
+  kmBeforeService           Int?
+  hoursBeforeService        Int?
+  mileageStaleAfterDays     Int?
+  engineHoursStaleAfterDays Int?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("vehicle_notification_settings")
+}
+
+model Notification {
+  id             String               @id @default(cuid())
+  userId         String
+  vehicleId      String?
+  nodeId         String?
+  serviceRuleId  String?
+  type           NotificationType
+  severity       NotificationSeverity
+  status         NotificationStatus   @default(NEW)
+  title          String
+  body           String
+  actionLabel    String?
+  actionUrl      String?
+  dueDate        DateTime?
+  dueMileageKm   Int?
+  dueEngineHours Int?
+  dedupeKey      String
+  periodBucket   String
+  createdAt      DateTime             @default(now())
+  seenAt         DateTime?
+  readAt         DateTime?
+  snoozedUntil   DateTime?
+  resolvedAt     DateTime?
+  dismissedAt    DateTime?
+
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle    Vehicle?               @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  node       Node?                  @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  deliveries NotificationDelivery[]
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([userId, vehicleId, type])
+  @@index([status, createdAt])
+  @@unique([userId, dedupeKey, periodBucket])
+  @@map("notifications")
+}
+
+model NotificationDelivery {
+  id                String                     @id @default(cuid())
+  notificationId    String
+  channel           NotificationChannel
+  status            NotificationDeliveryStatus @default(PENDING)
+  scheduledAt       DateTime?
+  sentAt            DateTime?
+  failedAt          DateTime?
+  errorCode         String?
+  errorMessage      String?
+  providerMessageId String?
+  attemptCount      Int                        @default(0)
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId, channel])
+  @@index([status, scheduledAt])
+  @@map("notification_deliveries")
+}
+
+model PushSubscription {
+  id            String          @id @default(cuid())
+  userId        String
+  channelType   PushChannelType
+  provider      PushProvider
+  platform      PushPlatform
+  token         String
+  endpoint      String?
+  p256dh        String?
+  auth          String?
+  userAgent     String?
+  deviceId      String?
+  deviceName    String?
+  appVersion    String?
+  osVersion     String?
+  locale        String?
+  timezone      String?
+  enabled       Boolean         @default(true)
+  lastSeenAt    DateTime        @default(now())
+  invalidatedAt DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, token])
+  @@index([userId, enabled])
+  @@index([channelType, provider, platform])
+  @@map("push_subscriptions")
+}
+
+model MileageHoursUpdateLog {
+  id          String            @id @default(cuid())
+  userId      String
+  vehicleId   String
+  mileageKm   Int?
+  engineHours Int?
+  source      UsageUpdateSource @default(MANUAL)
+  createdAt   DateTime          @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([vehicleId, createdAt])
+  @@map("mileage_hours_update_logs")
+}
+
+/**
+ * Append-only journal of mutating admin actions for traceability and rollbacks.
+ * Populated via `logAdminAction()` from `src/lib/admin-audit.ts`.
+ */
+model AdminAuditLog {
+  id            String   @id @default(cuid())
+  actorId       String
+  actor         User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  /** Stable dot-namespaced action id, e.g. "fitment.publish", "support.change". */
+  action        String
+  /** Prisma model name, e.g. "PartMaster", "FitmentReport", "ModelVariant". */
+  entityType    String
+  entityId      String
+  before        Json?
+  after         Json?
+  reason        String?
+  importBatchId String?
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([importBatchId])
+  @@map("admin_audit_logs")
+}
+
+/**
+ * Single bulk-upload session. The 8-step import wizard (см. spec §9) carries
+ * its state on this row; raw rows live on {@link ImportBatchRow}.
+ */
+model ImportBatch {
+  id           String            @id @default(cuid())
+  type         ImportBatchType
+  status       ImportBatchStatus @default(DRAFT)
+  fileName     String
+  fileUrl      String?
+  createdById  String
+  createdBy    User              @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  /** Mapping of source columns to canonical fields, set on step 3. */
+  mapping      Json?
+  /** Aggregated counters: { created, updated, skipped, conflicts, errors }. */
+  summary      Json?
+  dryRunAt     DateTime?
+  committedAt  DateTime?
+  rolledBackAt DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  rows ImportBatchRow[]
+
+  @@index([type, status])
+  @@index([createdById, createdAt])
+  @@map("import_batches")
+}
+
+model ImportBatchRow {
+  id             String   @id @default(cuid())
+  batchId        String
+  batch          ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowIndex       Int
+  raw            Json
+  /** "create" | "update" | "skip" | "conflict" — set after validation. */
+  action         String?
+  /** "ok" | "warning" | "error". */
+  status         String   @default("ok")
+  errorMessage   String?
+  /** ID of the entity created/updated by this row, if any. */
+  mappedEntityId String?
+
+  @@index([batchId, rowIndex])
+  @@index([batchId, status])
+  @@map("import_batch_rows")
+}
+
+/**
+ * Alternative SKU/article spellings for {@link PartMaster}. Used by duplicate
+ * search and OEM cross-reference flows in the admin panel.
+ */
+model PartAlias {
+  id           String     @id @default(cuid())
+  partMasterId String
+  partMaster   PartMaster @relation(fields: [partMasterId], references: [id], onDelete: Cascade)
+  alias        String
+  normalized   String
+  /** "import" | "admin" | "user". */
+  source       String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([partMasterId, normalized])
+  @@index([partMasterId])
+  @@index([normalized])
+  @@map("part_aliases")
 }

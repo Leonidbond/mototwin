@@ -34,7 +34,10 @@ import type {
   VehicleDetailApiRecord,
   VehicleRideProfile,
 } from "@mototwin/types";
+import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { SidebarVehiclePlaque } from "@/app/garage/_components/SidebarVehiclePlaque";
+import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { NodePickerModal } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
 import type { NodePickerOption } from "@/app/vehicles/[id]/parts/picker/_components/NodePickerPopover";
 import { pickerColors } from "@/app/vehicles/[id]/parts/picker/_components/picker-styles";
@@ -399,6 +402,7 @@ export function CommunityPartPageClient(props: {
   } | null;
 }) {
   const router = useRouter();
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed("community.sidebar.collapsed");
   const [isNarrow, setIsNarrow] = useState(false);
 
   useEffect(() => {
@@ -451,15 +455,6 @@ export function CommunityPartPageClient(props: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    if (done) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [done]);
 
   const dupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -969,12 +964,12 @@ export function CommunityPartPageClient(props: {
   ];
 
   const modalPanel: CSSProperties = {
-    width: "min(880px, calc(100vw - 24px))",
-    maxHeight: "min(92vh, 900px)",
+    width: "100%",
+    maxWidth: 980,
     backgroundColor: REF.modalBg,
     borderRadius: 12,
     border: `1px solid ${REF.panelBorder}`,
-    boxShadow: "0 24px 80px rgba(0,0,0,0.55)",
+    boxShadow: "0 14px 44px rgba(0,0,0,0.4)",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
@@ -1001,66 +996,61 @@ export function CommunityPartPageClient(props: {
   };
 
   const renderSuccess = () => (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 80,
-        backgroundColor: REF.overlay,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <div style={modalPanel}>
-        <div style={{ padding: 24 }}>
-          <p style={{ margin: 0, color: pickerColors.successText, fontSize: 16, fontWeight: 700 }}>
-            Готово. Деталь сохранена по вашему сценарию.
-          </p>
-          <p style={{ margin: "12px 0 0", color: REF.muted, fontSize: 14, lineHeight: 1.5 }}>
-            Новые детали и отчёты по ответственным узлам могут проходить проверку перед публикацией.
-          </p>
-          <button
-            type="button"
-            style={{
-              marginTop: 20,
-              padding: "12px 20px",
-              borderRadius: REF.radiusMd,
-              border: "none",
-              backgroundColor: REF.primary,
-              color: REF.onPrimary,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-            onClick={closeModal}
-          >
-            Вернуться к подбору
-          </button>
-        </div>
+    <div style={modalPanel}>
+      <div style={{ padding: 24 }}>
+        <p style={{ margin: 0, color: pickerColors.successText, fontSize: 16, fontWeight: 700 }}>
+          Готово. Деталь сохранена по вашему сценарию.
+        </p>
+        <p style={{ margin: "12px 0 0", color: REF.muted, fontSize: 14, lineHeight: 1.5 }}>
+          Новые детали и отчёты по ответственным узлам могут проходить проверку перед публикацией.
+        </p>
+        <button
+          type="button"
+          style={{
+            marginTop: 20,
+            padding: "12px 20px",
+            borderRadius: REF.radiusMd,
+            border: "none",
+            backgroundColor: REF.primary,
+            color: REF.onPrimary,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+          onClick={closeModal}
+        >
+          Вернуться к подбору
+        </button>
       </div>
     </div>
   );
 
-  if (done) {
-    return renderSuccess();
-  }
-
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 70,
-        backgroundColor: REF.overlay,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 12,
-        boxSizing: "border-box",
-      }}
-    >
-      <div style={modalPanel}>
+    <main className="min-h-screen" style={{ backgroundColor: productSemanticColors.canvas }}>
+      <div
+        style={{
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: `${sidebarCollapsed ? 64 : 220}px minmax(0, 1fr)`,
+          alignItems: "start",
+          transition: "grid-template-columns 0.18s ease",
+        }}
+      >
+        <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <section style={{ padding: "16px 20px 32px", minWidth: 0 }}>
+          <div style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: 14 }}>
+            <InternalPageChrome
+              variant="garageDark"
+              onBack={closeModal}
+              backLabel="К подбору"
+              breadcrumbs={[
+                { label: "Гараж", href: "/garage" },
+                { label: vehicle ? sidebarPlaqueTitle || "Мотоцикл" : "Мотоцикл", href: `/vehicles/${encodeURIComponent(props.vehicleId)}` },
+                { label: "Подбор", href: `/vehicles/${encodeURIComponent(props.vehicleId)}/parts/picker${selectedNodeId ? `?nodeId=${encodeURIComponent(selectedNodeId)}` : ""}` },
+                { label: "Добавить свою деталь" },
+              ]}
+              title="Добавить свою деталь"
+            />
+            {done ? renderSuccess() : <div style={modalPanel}>
         {/* Header */}
         <div
           style={{
@@ -1925,7 +1915,10 @@ export function CommunityPartPageClient(props: {
             <span style={{ fontSize: 12, color: REF.muted }}>{footerHint ?? "\u00a0"}</span>
           </div>
         </div>
+      </div>}
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

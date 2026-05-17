@@ -32,6 +32,7 @@ import {
 import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 import { Button } from "@/components/ui";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { NodePickerModal, type SharedNodePickerOption } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
 import type {
@@ -579,7 +580,7 @@ export default function VehicleServiceLogPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
   const [selectedEventId, setSelectedEventId] = useState(highlightedServiceEventId ?? "");
   const [visibleCount, setVisibleCount] = useState(LOAD_MORE_STEP);
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
@@ -770,12 +771,6 @@ export default function VehicleServiceLogPage() {
     : null;
 
   useEffect(() => {
-    try {
-      setSidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
     const mq = window.matchMedia("(min-width: 1180px)");
     const update = () => setIsWideViewport(mq.matches);
@@ -787,14 +782,6 @@ export default function VehicleServiceLogPage() {
     mq.addListener(update);
     return () => mq.removeListener(update);
   }, []);
-
-  const toggleSidebar = () => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0"); } catch { /* ignore */ }
-      return next;
-    });
-  };
 
   useEffect(() => {
     if (highlightedServiceEventId) {

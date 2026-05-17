@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -632,9 +634,15 @@ export function CommunityPartScreen(props: {
         }
       />
 
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoiding}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+      >
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: 120 + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {vehicleError ? <Text style={styles.errorText}>{vehicleError}</Text> : null}
 
@@ -961,6 +969,7 @@ export function CommunityPartScreen(props: {
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <Pressable onPress={closeScreen} style={styles.footerCancel}>
@@ -1016,6 +1025,7 @@ export function CommunityPartScreen(props: {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.canvas },
+  keyboardAvoiding: { flex: 1 },
   scroll: { padding: 16, gap: 14 },
   sectionHeading: {
     flexDirection: "row",

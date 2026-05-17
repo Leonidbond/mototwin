@@ -2,7 +2,18 @@ import { groupNodePickerOptionsByTopLevel, nodePickerGroupHeadingRu } from "@mot
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ImageSourcePropType } from "react-native";
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { getNodeTreeIconAsset } from "../../../../src/node-tree-icons";
 
 export type MobileNodePickerOption = {
@@ -72,6 +83,10 @@ export function MobileNodePickerModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={resetAndClose}>
+      <KeyboardAvoidingView
+        style={styles.kavRoot}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={resetAndClose} />
         <View style={styles.card}>
@@ -183,11 +198,13 @@ export function MobileNodePickerModal({
           )}
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  kavRoot: { flex: 1 },
   overlay: {
     flex: 1,
     justifyContent: "center",
