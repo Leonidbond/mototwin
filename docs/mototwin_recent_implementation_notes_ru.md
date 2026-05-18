@@ -74,7 +74,43 @@
     Также выровнен фильтр по узлам с мобильной версией: вместо одиночного select используется `NodePickerModal` с мультивыбором, поиском и переключателем «Топ-узлы»; фильтрация применяется по выбранным узлам и их дочерним узлам.
 - Документация: каноническая запись — `docs/frontend-web.md` §6; референсы в `docs/garage-dashboard-mvp.md` («Свёрнутость»), `docs/node-tree-page-functional-overview.md` §5.3, `docs/expense-tracking-mvp.md` («Web responsive»), `docs/repository-structure.md` §3.
 
-## 9. Следующие шаги (по продуктовому плану)
+## 9. Обновления за 2026-05-18 (web + Expo)
+
+- **Компактный мобильный хедер (declutter pattern)**:
+  - В `apps/app/components/expo-shell/internal-screen-chrome.tsx` добавлены `declutterMobile`, `scrollOffsetY`, `collapseThreshold`; реализованы compact crumbs и модальное окно полного пути.
+  - Добавлено sticky-collapsed состояние: после прокрутки скрываются подзаголовки и `belowNavRow`, остаются back + title + action.
+  - Паттерн применён на страницах: `service-log`, `expenses`, `wishlist`, `wishlist/picker`, `service-events/new`, `vehicles/[id]/nodes`.
+
+- **Плашка мотоцикла compact-by-default**:
+  - В `apps/app/components/garage/GarageVehicleContextPlaque.tsx` добавлен режим `compactByDefault` (одна строка с именем/силуэтом + раскрытие деталей по тапу).
+  - В compact-режиме переключение мотоцикла доступно инлайн-кнопкой в плашке.
+
+- **Нижняя мобильная навигация (GarageBottomNav)**:
+  - В `apps/app/components/garage/GarageBottomNav.tsx` добавлен пункт `Подбор` (`picker`) с переходом в корзину/подбор.
+  - Панель сделана компактнее по высоте (иконки/отступы/радиусы), обновлены все экраны-источники навигации.
+  - Bottom nav подключён на странице `apps/app/app/vehicles/[id]/wishlist/index.tsx`.
+
+- **Расходы (Expo) — фильтры и компактность**:
+  - `apps/app/app/vehicles/[id]/expenses.tsx`: KPI-карточки сделаны компактнее (2 в ряд на мобиле), добавлены иконки.
+  - Переработан блок «Все расходы»: более плотная карточка, компактные действия (`Журнал`, `Установить`) в правой колонке.
+  - Блок «Фильтры» уплотнён: show/hide + reset в заголовке, год и месяц объединены с остальными фильтрами.
+  - Добавлен фильтр по узлам через `MobileNodePickerModal` (multi + топ-узлы), фильтрация по выбранным узлам и дочерним.
+  - В «Куплено, не установлено» оставлены только позиции, реально присутствующие в wishlist со статусом `BOUGHT`.
+
+- **Расходы (web) — parity node filter с мобилой**:
+  - `src/app/expenses/ExpensesPageClient.tsx`: вместо single-select внедрён `NodePickerModal` (мультивыбор, поиск, переключатель «Топ-узлы»).
+  - Фильтрация выполняется по выбранным узлам и всему их поддереву; добавлен `Сброс узлов`.
+  - Загружаются `getNodeTree(vehicleId)` и `getTopServiceNodes()` для корректного top-node scope.
+
+- **Корзина/статусы и узлы (Expo)**:
+  - `apps/app/app/vehicles/[id]/wishlist/index.tsx`: статусные подписи выровнены с web (`Нужно купить / Заказано / Куплено / Установлено / Не подошла`).
+  - Для экрана `vehicles/[id]/nodes` поправлено выравнивание контента с шапкой (убран лишний визуальный сдвиг слева).
+
+- **Admin web: responsive-полировка dashboard/таблиц**:
+  - Обновлены `src/app/admin/page.tsx` и компоненты `AdminTopBar`, `AdminFilterBar`, `AdminDataTable`, `DashboardSection`, `FitmentQualityDonut`, `WorkQueueCard`.
+  - Улучшено поведение на узких ширинах: auto-fit grid, корректные переносы, min-width для таблиц, wrap для action-кнопок и контролов.
+
+## 10. Следующие шаги (по продуктовому плану)
 
 - Довести UI страницы отчёта до полного соответствия [mototwin_part_compatibility_report_ui_spec_ru.md](mototwin_part_compatibility_report_ui_spec_ru.md) v1.1 (если остались секции спеки).
 - Регрессия web/Expo: пикер → отчёт, панель деталей корзины → сводка совместимости, community → wishlist + fitment-report.
