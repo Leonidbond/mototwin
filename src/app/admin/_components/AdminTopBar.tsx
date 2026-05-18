@@ -27,6 +27,8 @@ export function AdminTopBar({
         display: "flex",
         alignItems: "center",
         gap: 18,
+        rowGap: 10,
+        flexWrap: "wrap",
         padding: "16px 28px",
         borderBottom: `1px solid ${productSemanticColors.border}`,
         backgroundColor: productSemanticColors.canvas,
@@ -42,15 +44,27 @@ export function AdminTopBar({
           fontWeight: 700,
           color: productSemanticColors.textPrimary,
           letterSpacing: -0.2,
-          whiteSpace: "nowrap",
+          minWidth: 0,
+          whiteSpace: "normal",
+          overflowWrap: "anywhere",
         }}
       >
         {title}
       </h1>
-      <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
+      <div style={{ flex: "1 1 320px", minWidth: 0, display: "flex", justifyContent: "center" }}>
         <CommandPalette />
       </div>
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+      <div
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 12,
+          flexWrap: "wrap",
+          minWidth: 0,
+          maxWidth: "100%",
+        }}
+      >
         {rightSlot}
         {showPeriodPicker ? <PeriodPicker /> : null}
         <AlertsBell />

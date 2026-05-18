@@ -242,6 +242,7 @@ export default function EditVehicleProfileScreen() {
         onOpenGarage={() => router.push("/")}
         onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
         onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
+        onOpenPicker={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
         onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
         onOpenProfile={() => undefined}
         hasVehicleContext

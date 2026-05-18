@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { writeLastViewedVehicleId } from "../../src/ui-last-viewed-vehicle";
 
-type BottomNavKey = "garage" | "nodes" | "journal" | "expenses" | "profile";
+type BottomNavKey = "garage" | "nodes" | "journal" | "picker" | "expenses" | "profile";
 
 type NavItem = {
   key: BottomNavKey;
@@ -21,6 +21,7 @@ export function GarageBottomNav(props: {
   onOpenGarage: () => void;
   onOpenNodes: () => void;
   onOpenJournal: () => void;
+  onOpenPicker: () => void;
   onOpenExpenses: () => void;
   onOpenProfile: () => void;
   hasVehicleContext: boolean;
@@ -53,6 +54,13 @@ export function GarageBottomNav(props: {
       disabled: !props.hasVehicleContext,
     },
     {
+      key: "picker",
+      label: "Подбор",
+      icon: "playlist-add-check-circle",
+      onPress: props.onOpenPicker,
+      disabled: !props.hasVehicleContext,
+    },
+    {
       key: "expenses",
       label: "Расходы",
       icon: "account-balance-wallet",
@@ -68,7 +76,7 @@ export function GarageBottomNav(props: {
   ];
 
   return (
-    <View style={[styles.shell, { paddingBottom: Math.max(insets.bottom, 4) }]}>
+    <View style={[styles.shell, { paddingBottom: Math.max(insets.bottom - 6, 2) }]}>
       <View style={styles.bar}>
         {items.map((item) => {
           const active = props.activeKey ? props.activeKey === item.key : !!item.active;
@@ -91,7 +99,7 @@ export function GarageBottomNav(props: {
                 item.disabled && styles.itemDisabled,
               ]}
             >
-              <MaterialIcons name={item.icon} size={20} color={foreground} />
+              <MaterialIcons name={item.icon} size={18} color={foreground} />
               <Text style={[styles.label, { color: foreground }]} numberOfLines={1}>
                 {item.label}
               </Text>
@@ -106,12 +114,12 @@ export function GarageBottomNav(props: {
 const styles = StyleSheet.create({
   shell: {
     paddingHorizontal: 12,
-    paddingTop: 6,
+    paddingTop: 4,
     backgroundColor: c.canvas,
   },
   bar: {
     flexDirection: "row",
-    gap: 6,
+    gap: 4,
     paddingHorizontal: 0,
     paddingVertical: 0,
     backgroundColor: "transparent",
@@ -121,10 +129,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 2,
     paddingHorizontal: 4,
-    paddingVertical: 8,
-    borderRadius: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   itemActive: {
     backgroundColor: c.cardMuted,
@@ -136,8 +144,8 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   label: {
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 9,
+    lineHeight: 11,
     fontWeight: "600",
   },
 });

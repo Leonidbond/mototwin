@@ -11,8 +11,13 @@ import {
   buildExpenseAnalyticsFromItems,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
+  filterLeafOptionsUnderTopNodeAncestors,
+  findNodeTreeItemById,
   formatExpenseAmountRu,
+  getLeafNodeOptions,
   getExpenseMonthKeyFromIso,
+  getOrderedTopNodeIdsPresentInNodeTree,
+  nodeAncestorPathLabelRu,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -22,7 +27,9 @@ import type {
   ExpenseItem,
   GarageVehicleItem,
   NodeTreeItem,
+  TopServiceNodeItem,
 } from "@mototwin/types";
+import { NodePickerModal, type SharedNodePickerOption } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 const SIDEBAR_COLLAPSED_KEY = "expenses.sidebar.collapsed";
@@ -137,6 +144,14 @@ function collectNodeAndDescendantIds(nodes: NodeTreeItem[], targetNodeId: string
   return new Set();
 }
 
+function buildMultiNodeLabel(nodeTree: NodeTreeItem[], nodeOptions: Array<[string, string]>, ids: string[]): string {
+  if (ids.length === 0) return "Узел: все";
+  const nodeNameMap = new Map(nodeOptions);
+  const names = ids.map((id) => findNodeTreeItemById(nodeTree, id)?.name ?? nodeNameMap.get(id) ?? id);
+  if (names.length === 1) return `Узел: ${names[0] ?? "—"}`;
+  return `Узлы: ${names.length}`;
+}
+
 function sumByCurrency(expenses: ExpenseItem[], currency: string): number {
   return expenses
     .filter((expense) => expense.currency === currency)
@@ -181,7 +196,10 @@ export function ExpensesPageClient(props: {
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [years, setYears] = useState<number[]>([]);
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
-  const [nodeScopeIds, setNodeScopeIds] = useState<Set<string> | null>(null);
+  const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(() => (nodeIdFromQuery ? [nodeIdFromQuery] : []));
+  const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -204,7 +222,6 @@ export function ExpensesPageClient(props: {
     installStatus: "",
     installationStatus: "",
     currency: "",
-    nodeId: nodeIdFromQuery,
     monthKey: "",
     source: "",
     search: "",
@@ -252,10 +269,10 @@ export function ExpensesPageClient(props: {
         if (filters.installationStatus === "INSTALLED" && expense.installationStatus !== "INSTALLED") return false;
         if (filters.installationStatus === "NOT_APPLICABLE" && expense.installStatus !== "NOT_APPLICABLE") return false;
         if (filters.currency && expense.currency !== filters.currency) return false;
-        if (filters.nodeId) {
-          if (nodeScopeIds && nodeScopeIds.size > 0) {
-            if (!expense.nodeId || !nodeScopeIds.has(expense.nodeId)) return false;
-          } else if (expense.nodeId !== filters.nodeId) {
+        if (selectedNodeIds.length > 0) {
+          if (selectedNodeScopeIds && selectedNodeScopeIds.size > 0) {
+            if (!expense.nodeId || !selectedNodeScopeIds.has(expense.nodeId)) return false;
+          } else if (!expense.nodeId || !selectedNodeIds.includes(expense.nodeId)) {
             return false;
           }
         }
@@ -279,7 +296,7 @@ export function ExpensesPageClient(props: {
         }
         return true;
       }),
-    [expenses, filters, nodeScopeIds]
+    [expenses, filters, selectedNodeIds, selectedNodeScopeIds]
   );
 
   const visibleAnalytics = useMemo(
@@ -305,6 +322,54 @@ export function ExpensesPageClient(props: {
       ).sort((a, b) => a[1].localeCompare(b[1], "ru-RU")),
     [expenses]
   );
+
+  const nodePickerOptions = useMemo((): SharedNodePickerOption[] => {
+    if (nodeTree.length > 0) {
+      return getLeafNodeOptions(nodeTree).map((option) => ({
+        id: option.id,
+        code: option.code,
+        name: option.name,
+        level: option.level,
+        pathLabel: nodeAncestorPathLabelRu(nodeTree, option.id),
+      }));
+    }
+    return nodeOptions.map(([id, name]) => ({ id, name }));
+  }, [nodeOptions, nodeTree]);
+
+  const nodePickerTopOptions = useMemo((): SharedNodePickerOption[] => {
+    if (nodeTree.length === 0) return [];
+    const leafRows = getLeafNodeOptions(nodeTree).map((option) => ({
+      id: option.id,
+      code: option.code,
+      name: option.name,
+      level: option.level,
+      pathLabel: nodeAncestorPathLabelRu(nodeTree, option.id),
+    }));
+    const topIds = getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes);
+    return filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafRows, topIds);
+  }, [nodeTree, topServiceNodes]);
+
+  const selectedNodeScopeIds = useMemo(() => {
+    if (selectedNodeIds.length === 0 || nodeTree.length === 0) return null;
+    const scoped = new Set<string>();
+    for (const nodeId of selectedNodeIds) {
+      const descendants = collectNodeAndDescendantIds(nodeTree, nodeId);
+      if (descendants.size === 0) {
+        scoped.add(nodeId);
+      } else {
+        for (const id of descendants) scoped.add(id);
+      }
+    }
+    return scoped;
+  }, [nodeTree, selectedNodeIds]);
+
+  const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
+
+  const nodeFilterLabel = useMemo(
+    () => buildMultiNodeLabel(nodeTree, nodeOptions, selectedNodeIds),
+    [nodeOptions, nodeTree, selectedNodeIds]
+  );
+  const selectedNodeIdsKey = useMemo(() => [...selectedNodeIds].sort().join("|"), [selectedNodeIds]);
 
   const monthOptions = useMemo(() => {
     const months = new Map<string, string>();
@@ -395,31 +460,29 @@ export function ExpensesPageClient(props: {
       filters.installStatus ||
       filters.installationStatus ||
       filters.currency ||
-      filters.nodeId ||
+      selectedNodeIds.length > 0 ||
       filters.monthKey ||
       filters.source ||
       filters.search.trim() ||
       filters.serviceEventId
     );
-  }, [effectiveVehicleId, filters]);
+  }, [effectiveVehicleId, filters, selectedNodeIds.length]);
 
   async function load(year = selectedYear) {
     try {
       setIsLoading(true);
       setError("");
-      const shouldLoadNodeScope = Boolean(effectiveVehicleId && nodeIdFromQuery);
-      const [expensesResult, vehiclesResult, nodeTreeResult] = await Promise.all([
+      const shouldLoadNodeData = Boolean(effectiveVehicleId);
+      const [expensesResult, vehiclesResult, nodeTreeResult, topServiceNodesResult] = await Promise.all([
         api.getExpenses({ year, vehicleId: effectiveVehicleId || undefined }),
         effectiveVehicleId ? Promise.resolve(null) : api.getGarageVehicles(),
-        shouldLoadNodeScope ? api.getNodeTree(effectiveVehicleId) : Promise.resolve(null),
+        shouldLoadNodeData ? api.getNodeTree(effectiveVehicleId) : Promise.resolve(null),
+        shouldLoadNodeData ? api.getTopServiceNodes() : Promise.resolve(null),
       ]);
       setExpenses(expensesResult.expenses);
       setYears(expensesResult.years);
-      setNodeScopeIds(
-        nodeTreeResult && nodeIdFromQuery
-          ? collectNodeAndDescendantIds(nodeTreeResult.nodeTree ?? [], nodeIdFromQuery)
-          : null
-      );
+      setNodeTree(nodeTreeResult?.nodeTree ?? []);
+      setTopServiceNodes(topServiceNodesResult?.nodes ?? []);
       if (vehiclesResult) {
         setVehicles(vehiclesResult.vehicles ?? []);
         setForm((prev) => ({ ...prev, vehicleId: prev.vehicleId || vehiclesResult.vehicles?.[0]?.id || "" }));
@@ -537,12 +600,12 @@ export function ExpensesPageClient(props: {
       installStatus: "",
       installationStatus: "",
       currency: "",
-      nodeId: "",
       monthKey: "",
       source: "",
       search: "",
       serviceEventId: "",
     });
+    setSelectedNodeIds(nodeIdFromQuery ? [nodeIdFromQuery] : []);
   }
 
   function openBoughtPartsPage() {
@@ -710,10 +773,23 @@ export function ExpensesPageClient(props: {
                       <option value="INSTALLED">Установлено</option>
                       <option value="NOT_APPLICABLE">Не требует установки</option>
                     </select>
-                    <select aria-label="Фильтр по узлу" value={filters.nodeId} onChange={(e) => setFilters((prev) => ({ ...prev, nodeId: e.target.value }))} style={{ ...fieldStyle, ...compactFilterControlStyle }}>
-                      <option value="">Узел: все</option>
-                      {nodeOptions.map(([nodeId, nodeName]) => <option key={nodeId} value={nodeId}>{nodeName}</option>)}
-                    </select>
+                    <button
+                      type="button"
+                      aria-label="Фильтр по узлам"
+                      onClick={() => setNodePickerOpen(true)}
+                      style={{ ...controlStyle, ...compactFilterControlStyle, cursor: "pointer", textAlign: "left" }}
+                    >
+                      {nodeFilterLabel}
+                    </button>
+                    {selectedNodeIds.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNodeIds(nodeIdFromQuery ? [nodeIdFromQuery] : [])}
+                        style={{ ...ghostButtonStyle, marginTop: 0, whiteSpace: "nowrap" }}
+                      >
+                        Сброс узлов
+                      </button>
+                    ) : null}
                     <select aria-label="Фильтр по валюте" value={filters.currency} onChange={(e) => setFilters((prev) => ({ ...prev, currency: e.target.value }))} style={{ ...fieldStyle, ...compactFilterControlStyle }}>
                       <option value="">Валюта: все</option>
                       {currencyOptions.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
@@ -831,6 +907,18 @@ export function ExpensesPageClient(props: {
           )}
         </section>
       </div>
+      <NodePickerModal
+        key={nodePickerOpen ? `expenses-open:${selectedNodeIdsKey}` : "expenses-node-picker-shut"}
+        open={nodePickerOpen}
+        title="Фильтр по узлам"
+        options={nodePickerOptions}
+        topOptions={nodePickerTopOptions.length > 0 ? nodePickerTopOptions : undefined}
+        mode="multi"
+        selectedIds={selectedNodeIdSet}
+        confirmLabel="Применить"
+        onClose={() => setNodePickerOpen(false)}
+        onConfirm={(nodeIds) => setSelectedNodeIds(nodeIds)}
+      />
     </main>
   );
 }

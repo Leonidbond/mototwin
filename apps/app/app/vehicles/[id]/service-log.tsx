@@ -1083,6 +1083,7 @@ export default function ServiceLogScreen() {
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
   const [datePickField, setDatePickField] = useState<null | "from" | "to">(null);
+  const [headerScrollY, setHeaderScrollY] = useState(0);
 
   const apiBaseUrl = getApiBaseUrl();
   const scrollRef = useRef<ScrollView | null>(null);
@@ -1511,10 +1512,24 @@ export default function ServiceLogScreen() {
           { label: "Журнал обслуживания" },
         ]}
         title="Журнал обслуживания"
+        declutterMobile
+        scrollOffsetY={headerScrollY}
         belowNavRow={
           contextVehicleDetail ? (
-            <GarageVehicleContextPlaque vehicle={contextVehicleDetail} currentVehicleId={vehicleId} />
+            <GarageVehicleContextPlaque
+              vehicle={contextVehicleDetail}
+              currentVehicleId={vehicleId}
+              compactByDefault
+            />
           ) : null
+        }
+        actions={
+          <Pressable
+            style={({ pressed }) => [styles.journalAddButton, pressed && styles.addButtonPressed]}
+            onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
+          >
+            <Text style={styles.addButtonText}>Добавить событие</Text>
+          </Pressable>
         }
         onBack={() => {
           if (returnOrigin === "attention") {
@@ -1536,17 +1551,13 @@ export default function ServiceLogScreen() {
           router.replace(`/vehicles/${vehicleId}`);
         }}
       />
-      <View style={styles.journalToolbarBelow}>
-        <Pressable
-          style={({ pressed }) => [styles.journalAddButton, pressed && styles.addButtonPressed]}
-          onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
-        >
-          <Text style={styles.addButtonText}>Добавить сервисное событие</Text>
-        </Pressable>
-      </View>
       <KeyboardAwareScrollScreen
         contentContainerStyle={styles.scrollContent}
         scrollViewRef={scrollRef}
+        scrollViewProps={{
+          onScroll: (event) => setHeaderScrollY(event.nativeEvent.contentOffset.y),
+          scrollEventThrottle: 16,
+        }}
       >
         {actionMessage ? (
           <View
@@ -2016,6 +2027,7 @@ export default function ServiceLogScreen() {
         onOpenGarage={() => router.push("/")}
         onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
         onOpenJournal={() => undefined}
+        onOpenPicker={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
         onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
         onOpenProfile={() => router.push("/profile")}
         hasVehicleContext
@@ -2071,15 +2083,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
-  journalToolbarBelow: {
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-  },
   journalAddButton: {
     backgroundColor: c.primaryAction,
-    borderRadius: 12,
-    minHeight: 44,
-    paddingHorizontal: 14,
+    borderRadius: 10,
+    minHeight: 34,
+    paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2088,7 +2096,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: c.onPrimaryAction,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
     textAlign: "center",
   },

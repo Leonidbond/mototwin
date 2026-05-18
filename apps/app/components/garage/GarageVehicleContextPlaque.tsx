@@ -94,6 +94,8 @@ export type GarageVehicleContextPlaqueProps = {
   vehicle: VehicleDetail | null;
   currentVehicleId: string;
   style?: StyleProp<ViewStyle>;
+  /** Компактный режим: в строке только название + мини-силуэт, детали раскрываются отдельно. */
+  compactByDefault?: boolean;
 };
 
 /**
@@ -104,12 +106,14 @@ export function GarageVehicleContextPlaque({
   vehicle,
   currentVehicleId,
   style,
+  compactByDefault = false,
 }: GarageVehicleContextPlaqueProps) {
   const router = useRouter();
   const pathname = usePathname();
   const globalParams = useGlobalSearchParams();
   const [garageVehicles, setGarageVehicles] = useState<GarageVehicleItem[]>([]);
   const [switchOpen, setSwitchOpen] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -186,7 +190,11 @@ export function GarageVehicleContextPlaque({
       <View style={[styles.wrap, style]}>
         <Pressable
           onPress={openDashboard}
-          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+          style={({ pressed }) => [
+            styles.card,
+            compactByDefault && styles.cardCompact,
+            pressed && styles.cardPressed,
+          ]}
           accessibilityRole="button"
           accessibilityLabel={`Открыть мотоцикл: ${title}`}
         >
@@ -203,12 +211,42 @@ export function GarageVehicleContextPlaque({
             <Text numberOfLines={1} style={styles.title}>
               {title}
             </Text>
-            <Text numberOfLines={1} style={styles.subtitle}>
-              {subtitle}
-            </Text>
+            {!compactByDefault || detailsExpanded ? (
+              <Text numberOfLines={1} style={styles.subtitle}>
+                {subtitle}
+              </Text>
+            ) : null}
           </View>
+          {compactByDefault ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                setDetailsExpanded((prev) => !prev);
+              }}
+              hitSlop={10}
+              style={({ pressed }) => [styles.detailsToggle, pressed && styles.pickerBtnPressed]}
+              accessibilityRole="button"
+              accessibilityLabel={detailsExpanded ? "Скрыть детали мотоцикла" : "Показать детали мотоцикла"}
+            >
+              <MaterialIcons name={detailsExpanded ? "expand-less" : "expand-more"} size={18} color={c.textMuted} />
+            </Pressable>
+          ) : null}
+          {canPick ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                setSwitchOpen(true);
+              }}
+              hitSlop={10}
+              style={({ pressed }) => [styles.inlinePickerBtn, pressed && styles.pickerBtnPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Выбрать другой мотоцикл из гаража"
+            >
+              <MaterialIcons name="swap-horiz" size={16} color={c.textMuted} />
+            </Pressable>
+          ) : null}
         </Pressable>
-        {canPick ? (
+        {canPick && !compactByDefault ? (
           <Pressable
             onPress={() => setSwitchOpen(true)}
             hitSlop={12}
@@ -220,6 +258,13 @@ export function GarageVehicleContextPlaque({
           </Pressable>
         ) : null}
       </View>
+      {compactByDefault && detailsExpanded ? (
+        <View style={styles.detailsRow}>
+          <Text numberOfLines={1} style={styles.detailsRowText}>
+            {subtitle}
+          </Text>
+        </View>
+      ) : null}
 
       <Modal visible={switchOpen} animationType="fade" transparent onRequestClose={() => setSwitchOpen(false)}>
         <View style={styles.modalRoot}>
@@ -281,6 +326,9 @@ const styles = StyleSheet.create({
     borderColor: CARD_BORDER,
     backgroundColor: CARD_BG,
   },
+  cardCompact: {
+    borderRadius: 10,
+  },
   cardPressed: { opacity: 0.9 },
   silhouetteWrap: {
     width: 48,
@@ -306,6 +354,23 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#9CA3AF",
   },
+  detailsToggle: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inlinePickerBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
   pickerBtn: {
     width: 36,
     height: 36,
@@ -317,6 +382,21 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_BG,
   },
   pickerBtnPressed: { opacity: 0.88 },
+  detailsRow: {
+    marginTop: 4,
+    marginHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    backgroundColor: CARD_BG,
+  },
+  detailsRowText: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "#9CA3AF",
+  },
   modalRoot: {
     flex: 1,
     justifyContent: "center",

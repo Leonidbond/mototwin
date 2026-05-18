@@ -45,10 +45,12 @@ export function AdminDataTable<T>({
         border: `1px solid ${productSemanticColors.border}`,
         borderRadius: radiusScale.lg,
         overflow: "hidden",
+        minWidth: 0,
+        maxWidth: "100%",
       }}
     >
       <div style={{ overflowX: "auto", opacity: loading ? 0.6 : 1 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <table style={{ width: "100%", minWidth: 680, borderCollapse: "collapse" }}>
           <thead>
             {table.getHeaderGroups().map((group) => (
               <tr key={group.id}>
@@ -119,7 +121,13 @@ function DataRow<T>({ row, getRowHref }: { row: Row<T>; getRowHref?: (row: T) =>
             <Link
               href={href}
               prefetch={false}
-              style={{ color: "inherit", textDecoration: "none", display: "block" }}
+              style={{
+                color: "inherit",
+                textDecoration: "none",
+                display: "block",
+                minWidth: 0,
+                overflowWrap: "anywhere",
+              }}
             >
               {flexRender(cell.column.columnDef.cell, cell.getContext())}
             </Link>
@@ -153,12 +161,16 @@ const tdStyle: React.CSSProperties = {
   fontSize: 13,
   color: productSemanticColors.textPrimary,
   verticalAlign: "middle",
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
 };
 
 const pagerStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
+  flexWrap: "wrap",
+  gap: 8,
   padding: "12px 18px",
   borderTop: `1px solid ${productSemanticColors.border}`,
   backgroundColor: productSemanticColors.cardSubtle,

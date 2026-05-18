@@ -63,7 +63,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
         <section
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
             gap: 14,
           }}
         >
@@ -71,16 +71,34 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
             <KpiCard key={card.id} card={card} />
           ))}
         </section>
-        <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)", gap: 16 }}>
+        <section
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: 16,
+          }}
+        >
           <WorkQueueCard initialData={workQueue} />
           <FastestGrowingModelsCard data={fastest} />
         </section>
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16 }}>
+        <section
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 16,
+          }}
+        >
           <ProblemAreasCard data={problems} />
           <FitmentQualityDonut data={fitmentQuality} />
           <CatalogCoverageMatrix data={coverage} />
         </section>
-        <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 2.3fr) minmax(0, 1fr)", gap: 16 }}>
+        <section
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: 16,
+          }}
+        >
           <ActivitySignalsChart data={activity} />
           <QuickActionsCard />
         </section>

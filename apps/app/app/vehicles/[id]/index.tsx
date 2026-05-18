@@ -732,6 +732,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [nodeContextServiceKitsError, setNodeContextServiceKitsError] = useState("");
   const [nodeContextAddingRecommendedSkuId, setNodeContextAddingRecommendedSkuId] = useState("");
   const [nodeContextAddingKitCode, setNodeContextAddingKitCode] = useState("");
+  const [headerScrollY, setHeaderScrollY] = useState(0);
   const [statusExplanationNode, setStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
   const [serviceEvents, setServiceEvents] = useState<ServiceEventItem[]>([]);
@@ -1882,10 +1883,13 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         ref={dashboardScrollViewRef}
         contentContainerStyle={[
           styles.scrollContent,
-          isLandscape && styles.scrollContentLandscape,
+          isLandscape && !isNodeTreePage && styles.scrollContentLandscape,
+          isNodeTreePage && styles.scrollContentNodeTree,
           { maxWidth: contentMaxWidth, width: "100%", alignSelf: "center" },
         ]}
         keyboardShouldPersistTaps="handled"
+        onScroll={(event) => setHeaderScrollY(event.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
       >
         {isNodeTreePage ? (
           <>
@@ -1896,13 +1900,21 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                 { label: "Дерево узлов" },
               ]}
               title="Дерево узлов"
-              belowNavRow={<GarageVehicleContextPlaque vehicle={vehicle} currentVehicleId={vehicleId} />}
+              declutterMobile
+              scrollOffsetY={headerScrollY}
+              belowNavRow={
+                <GarageVehicleContextPlaque
+                  vehicle={vehicle}
+                  currentVehicleId={vehicleId}
+                  compactByDefault
+                />
+              }
               onBack={() => {
                 if (router.canGoBack()) {
                   router.back();
                   return;
                 }
-                router.replace(`/vehicles/${vehicleId}`);
+                router.replace("/");
               }}
             />
             <View style={styles.fullTreeSection}>
@@ -2324,6 +2336,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
           }
         }}
         onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
+        onOpenPicker={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
         onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
         onOpenProfile={() => router.push("/profile")}
         hasVehicleContext
@@ -3681,6 +3694,9 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 14,
   },
+  scrollContentNodeTree: {
+    paddingHorizontal: 0,
+  },
   dashboardTopGrid: {
     gap: 12,
     marginBottom: 12,
@@ -4524,6 +4540,7 @@ const styles = StyleSheet.create({
   },
   fullTreeSection: {
     marginTop: 2,
+    paddingHorizontal: 12,
   },
   stateContainer: {
     flex: 1,

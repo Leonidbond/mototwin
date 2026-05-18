@@ -108,6 +108,10 @@ export default function HomeScreen() {
     if (!navVehicleId) return;
     router.push(`/vehicles/${navVehicleId}/expenses`);
   }, [navVehicleId, router]);
+  const openPicker = useCallback(() => {
+    if (!navVehicleId) return;
+    router.push(`/vehicles/${navVehicleId}/wishlist`);
+  }, [navVehicleId, router]);
 
   if (isLoading) {
     return (
@@ -181,6 +185,7 @@ export default function HomeScreen() {
           onOpenGarage={openGarage}
           onOpenNodes={openNodes}
           onOpenJournal={openJournal}
+          onOpenPicker={openPicker}
           onOpenExpenses={openExpenses}
           onOpenProfile={openProfile}
           hasVehicleContext={!!navVehicleId}

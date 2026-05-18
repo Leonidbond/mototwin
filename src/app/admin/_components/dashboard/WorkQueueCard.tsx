@@ -92,7 +92,7 @@ function WorkQueueTabs({
   onChange: (tab: AdminWorkQueueTabKey) => void;
 }) {
   return (
-    <div style={{ display: "inline-flex", gap: 4 }}>
+    <div style={{ display: "inline-flex", gap: 4, flexWrap: "wrap", maxWidth: "100%" }}>
       {TAB_ORDER.map((key) => {
         const isActive = key === activeTab;
         return (
@@ -201,7 +201,7 @@ function WorkQueueTable({
       id: "actions",
       header: "",
       cell: ({ row }) => (
-        <div style={{ display: "inline-flex", gap: 8 }}>
+        <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
           <Link href={row.original.reviewHref} prefetch={false} style={primaryAction}>
             {ruAdmin.dashboard.workQueue.columns.review}
           </Link>
@@ -221,7 +221,7 @@ function WorkQueueTable({
 
   return (
     <div style={{ overflowX: "auto", opacity: loading ? 0.6 : 1, transition: "opacity 120ms ease" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <table style={{ width: "100%", minWidth: 760, borderCollapse: "collapse" }}>
         <thead>
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id}>
@@ -291,11 +291,14 @@ const tdStyle: React.CSSProperties = {
   fontSize: 13,
   color: productSemanticColors.textPrimary,
   verticalAlign: "middle",
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
 };
 
 const primaryAction: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
+  justifyContent: "center",
   height: 28,
   padding: "0 12px",
   borderRadius: radiusScale.sm,
@@ -304,11 +307,13 @@ const primaryAction: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
   textDecoration: "none",
+  whiteSpace: "nowrap",
 };
 
 const secondaryAction: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
+  justifyContent: "center",
   height: 28,
   padding: "0 12px",
   borderRadius: radiusScale.sm,
@@ -318,4 +323,5 @@ const secondaryAction: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 500,
   textDecoration: "none",
+  whiteSpace: "nowrap",
 };

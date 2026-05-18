@@ -50,6 +50,7 @@ import {
 } from "../../../../components/vehicle-wishlist/hrefs";
 import { InternalScreenChrome } from "../../../../components/expo-shell/internal-screen-chrome";
 import { GarageVehicleContextPlaque } from "../../../../components/garage/GarageVehicleContextPlaque";
+import { GarageBottomNav } from "../../../../components/garage/GarageBottomNav";
 import { WishlistItemCompatibilityBlock } from "../../../../components/vehicle-wishlist/wishlist-item-compatibility-block";
 
 type PartsStatusFilter = PartWishlistItemStatus | "ALL";
@@ -68,6 +69,15 @@ const PARTS_CART_REF = {
   textSubtle: "#6B7280",
   orange: "#FF6B00",
 } as const;
+
+/** Тексты статусов как в web-корзине (PartsCartPage). */
+const WEB_WISHLIST_STATUS_LABELS: Record<PartWishlistItemStatus, string> = {
+  NEEDED: "Нужно купить",
+  ORDERED: "Заказано",
+  BOUGHT: "Куплено",
+  INSTALLED: "Установлено",
+  REJECTED: "Не подошла",
+};
 
 /**
  * Панель списка и строки — как PartsCartPage.module.css
@@ -268,6 +278,7 @@ export default function VehicleWishlistScreen() {
     Partial<Record<PartWishlistItemStatus, number>>
   >({});
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [headerScrollY, setHeaderScrollY] = useState(0);
   const scrollRef = useRef<ScrollView | null>(null);
   const itemYByIdRef = useRef<Record<string, number>>({});
 
@@ -398,7 +409,7 @@ export default function VehicleWishlistScreen() {
       },
       ...PART_WISHLIST_STATUS_ORDER.map((status) => ({
         key: status,
-        label: partWishlistStatusLabelsRu[status],
+        label: WEB_WISHLIST_STATUS_LABELS[status],
         value: cartSummary[summaryMetricByStatus[status]],
         color: CART_STATUS_COLOR[status],
         icon: iconByStatus[status],
@@ -820,6 +831,12 @@ export default function VehicleWishlistScreen() {
   }
 
   const scrollBottomPad = 88 + insets.bottom;
+  const openGarage = () => router.push("/");
+  const openNodes = () => router.push(`/vehicles/${vehicleId}/nodes`);
+  const openJournal = () => router.push(`/vehicles/${vehicleId}/service-log`);
+  const openPicker = () => router.push(`/vehicles/${vehicleId}/wishlist`);
+  const openExpenses = () => router.push(`/vehicles/${vehicleId}/expenses`);
+  const openProfile = () => router.push("/profile");
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -833,9 +850,11 @@ export default function VehicleWishlistScreen() {
           { label: "Корзина замен" },
         ]}
         title="Корзина замен и расходников"
+        declutterMobile
+        scrollOffsetY={headerScrollY}
         belowNavRow={
           vehicle ? (
-            <GarageVehicleContextPlaque vehicle={vehicle} currentVehicleId={vehicleId} />
+            <GarageVehicleContextPlaque vehicle={vehicle} currentVehicleId={vehicleId} compactByDefault />
           ) : null
         }
       />
@@ -847,6 +866,8 @@ export default function VehicleWishlistScreen() {
           style={styles.scrollFlex}
           contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPad }]}
           keyboardShouldPersistTaps="handled"
+          onScroll={(event) => setHeaderScrollY(event.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
         >
           <Text style={styles.sectionHint}>
             Сводка и поиск — как на сайте; установленные позиции привязаны к журналу после
@@ -1058,7 +1079,7 @@ export default function VehicleWishlistScreen() {
                                 <Pressable
                                   disabled={isBusy}
                                   accessibilityRole="button"
-                                  accessibilityLabel={`Сменить статус: ${getPartWishlistStatusLabelRu(item.status)}`}
+                                  accessibilityLabel={`Сменить статус: ${WEB_WISHLIST_STATUS_LABELS[item.status]}`}
                                   onPress={() =>
                                     setWishlistStatusMenuItemId((prev) => (prev === item.id ? null : item.id))
                                   }
@@ -1083,7 +1104,7 @@ export default function VehicleWishlistScreen() {
                                     ]}
                                     numberOfLines={1}
                                   >
-                                    {getPartWishlistStatusLabelRu(item.status)}
+                                    {WEB_WISHLIST_STATUS_LABELS[item.status]}
                                   </Text>
                                 </Pressable>
                                 {canRepeatWishlistPurchase(item) ? (
@@ -1150,7 +1171,7 @@ export default function VehicleWishlistScreen() {
           <Text style={styles.communityLinkText}>Добавить свою деталь</Text>
         </Pressable>
 
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+        <View style={[styles.footer, { paddingBottom: 10 }]}>
           <Pressable
             onPress={() => router.push(buildVehicleWishlistNewHref(vehicleId))}
             style={({ pressed }) => [styles.footerSecondary, pressed && styles.footerSecondaryPressed]}
@@ -1165,6 +1186,17 @@ export default function VehicleWishlistScreen() {
             <Text style={styles.footerPrimaryText}>+ Добавить позицию</Text>
           </Pressable>
         </View>
+        <GarageBottomNav
+          activeKey="picker"
+          onOpenGarage={openGarage}
+          onOpenNodes={openNodes}
+          onOpenJournal={openJournal}
+          onOpenPicker={openPicker}
+          onOpenExpenses={openExpenses}
+          onOpenProfile={openProfile}
+          hasVehicleContext
+          currentVehicleId={vehicleId}
+        />
       </View>
 
       <Modal
@@ -1217,7 +1249,7 @@ export default function VehicleWishlistScreen() {
                     <Text
                       style={[styles.detailStatus, { color: CART_STATUS_COLOR[detailItem.status] }]}
                     >
-                      {detailItem.statusLabelRu}
+                      {WEB_WISHLIST_STATUS_LABELS[detailItem.status]}
                     </Text>
                   </View>
                   <Pressable
@@ -1571,7 +1603,7 @@ export default function VehicleWishlistScreen() {
                       >
                         <Text style={[styles.wishlistStatusMenuDot, { color: dotColor }]}>●</Text>
                         <Text style={styles.wishlistMenuRowText}>
-                          {partWishlistStatusLabelsRu[status]}
+                          {WEB_WISHLIST_STATUS_LABELS[status]}
                         </Text>
                         {isCurrent ? (
                           <Text style={styles.wishlistStatusMenuCurrentMark}>текущий</Text>
@@ -1675,7 +1707,7 @@ export default function VehicleWishlistScreen() {
                     </Text>
                   ) : null}
                   <Text style={styles.repeatPurchaseModalSummaryMeta}>
-                    Статус сейчас: {repeatPurchaseConfirmItem.statusLabelRu}
+                    Статус сейчас: {WEB_WISHLIST_STATUS_LABELS[repeatPurchaseConfirmItem.status]}
                   </Text>
                 </View>
                 <View style={styles.repeatPurchaseModalActions}>

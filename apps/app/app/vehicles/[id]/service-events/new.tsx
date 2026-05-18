@@ -89,6 +89,7 @@ export default function NewServiceEventScreen() {
   const [currentVehicleEngineHours, setCurrentVehicleEngineHours] = useState<number | null>(null);
   const [vehicleDisplayName, setVehicleDisplayName] = useState("");
   const [contextVehicleDetail, setContextVehicleDetail] = useState<VehicleDetail | null>(null);
+  const [headerScrollY, setHeaderScrollY] = useState(0);
 
   const isEditMode = editingEventId.length > 0;
   const isRepeatMode = !isEditMode && repeatFromId.length > 0;
@@ -385,13 +386,25 @@ export default function NewServiceEventScreen() {
         title={
           isEditMode ? "Редактировать сервисное событие" : "Добавить сервисное событие"
         }
+        declutterMobile
+        scrollOffsetY={headerScrollY}
         belowNavRow={
           contextVehicleDetail ? (
-            <GarageVehicleContextPlaque vehicle={contextVehicleDetail} currentVehicleId={vehicleId} />
+            <GarageVehicleContextPlaque
+              vehicle={contextVehicleDetail}
+              currentVehicleId={vehicleId}
+              compactByDefault
+            />
           ) : null
         }
       />
-      <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollScreen
+        contentContainerStyle={styles.content}
+        scrollViewProps={{
+          onScroll: (event) => setHeaderScrollY(event.nativeEvent.contentOffset.y),
+          scrollEventThrottle: 16,
+        }}
+      >
         <BasicServiceEventBundleForm
           key={bundleSessionKey}
           vehicleId={vehicleId}

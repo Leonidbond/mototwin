@@ -17,8 +17,25 @@ export function FitmentQualityDonut({ data }: FitmentQualityDonutProps) {
       seeAllLabel={ruAdmin.dashboard.fitmentQuality.seeAll}
       seeAllHref="/admin/reports"
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "4px 0" }}>
-        <div style={{ position: "relative", width: 168, height: 168, flexShrink: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 18,
+          padding: "4px 0",
+          flexWrap: "wrap",
+          minWidth: 0,
+        }}
+      >
+        <div
+          style={{
+            position: "relative",
+            width: 168,
+            height: 168,
+            flexShrink: 0,
+            marginInline: "auto",
+          }}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -79,8 +96,9 @@ export function FitmentQualityDonut({ data }: FitmentQualityDonutProps) {
             display: "flex",
             flexDirection: "column",
             gap: 8,
-            flex: 1,
+            flex: "1 1 220px",
             minWidth: 0,
+            width: "100%",
           }}
         >
           {data.slices.map((slice) => (
@@ -88,11 +106,12 @@ export function FitmentQualityDonut({ data }: FitmentQualityDonutProps) {
               key={slice.key}
               style={{
                 display: "grid",
-                gridTemplateColumns: "12px 1fr auto auto",
+                gridTemplateColumns: "12px minmax(0, 1fr) auto auto",
                 columnGap: 10,
                 alignItems: "center",
                 fontSize: 13,
                 color: productSemanticColors.textPrimary,
+                minWidth: 0,
               }}
             >
               <span
@@ -105,7 +124,16 @@ export function FitmentQualityDonut({ data }: FitmentQualityDonutProps) {
                   backgroundColor: slice.color,
                 }}
               />
-              <span style={{ color: productSemanticColors.textSecondary }}>{slice.label}</span>
+              <span
+                style={{
+                  color: productSemanticColors.textSecondary,
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+              >
+                {slice.label}
+              </span>
               <span
                 style={{
                   fontVariantNumeric: "tabular-nums",

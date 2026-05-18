@@ -41,7 +41,8 @@ export function DashboardSection({
       <header
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
           gap: 12,
           padding: "14px 18px 0",
         }}
@@ -53,11 +54,13 @@ export function DashboardSection({
             fontWeight: 600,
             color: productSemanticColors.textPrimary,
             letterSpacing: 0,
+            minWidth: 0,
+            overflowWrap: "anywhere",
           }}
         >
           {title}
         </h2>
-        <div style={{ marginLeft: "auto" }}>{rightSlot}</div>
+        <div style={{ marginLeft: "auto", minWidth: 0, maxWidth: "100%" }}>{rightSlot}</div>
       </header>
       <div
         style={{

@@ -82,14 +82,14 @@ export function AdminFilterBar({ fields, rightSlot }: AdminFilterBarProps) {
           );
         })}
       </div>
-      {rightSlot ? <div>{rightSlot}</div> : null}
+      {rightSlot ? <div style={{ minWidth: 0, maxWidth: "100%" }}>{rightSlot}</div> : null}
     </div>
   );
 }
 
 const containerStyle: React.CSSProperties = {
   display: "flex",
-  alignItems: "center",
+  alignItems: "flex-start",
   gap: 12,
   flexWrap: "wrap",
   padding: "12px 14px",
@@ -116,11 +116,14 @@ const inputWrapStyle: React.CSSProperties = {
   borderRadius: radiusScale.sm,
   backgroundColor: productSemanticColors.cardMuted,
   border: `1px solid ${productSemanticColors.border}`,
-  minWidth: 220,
+  flex: "1 1 220px",
+  minWidth: "min(220px, 100%)",
+  maxWidth: "100%",
 };
 
 const inputStyle: React.CSSProperties = {
   flex: 1,
+  minWidth: 0,
   background: "transparent",
   border: "none",
   outline: "none",
@@ -132,10 +135,12 @@ const selectWrapStyle: React.CSSProperties = {
   display: "inline-flex",
   flexDirection: "column",
   gap: 2,
-  minWidth: 160,
+  flex: "1 1 180px",
+  minWidth: "min(180px, 100%)",
 };
 
 const selectStyle: React.CSSProperties = {
+  width: "100%",
   height: 34,
   borderRadius: radiusScale.sm,
   backgroundColor: productSemanticColors.cardMuted,

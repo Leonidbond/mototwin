@@ -14,10 +14,15 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildExpenseAnalyticsFromItems,
+  filterLeafOptionsUnderTopNodeAncestors,
+  getLeafNodeOptions,
+  getOrderedTopNodeIdsPresentInNodeTree,
+  nodeAncestorPathLabelRu,
   vehicleDetailFromApiRecord,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
@@ -31,6 +36,8 @@ import type {
   ExpenseInstallStatus,
   ExpenseItem,
   NodeTreeItem,
+  TopServiceNodeItem,
+  PartWishlistItemStatus,
   VehicleDetail,
   VehicleDetailApiRecord,
 } from "@mototwin/types";
@@ -38,6 +45,7 @@ import { getApiBaseUrl } from "../../../src/api-base-url";
 import { InternalScreenChrome } from "../../../components/expo-shell/internal-screen-chrome";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import { GarageVehicleContextPlaque } from "../../../components/garage/GarageVehicleContextPlaque";
+import { MobileNodePickerModal, type MobileNodePickerOption } from "../../../components/vehicle-detail/mobile-node-picker-modal";
 
 const categoryOptions: ExpenseCategory[] = [
   "PART",
@@ -187,17 +195,22 @@ export default function VehicleExpensesScreen() {
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [years, setYears] = useState<number[]>([]);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [installStatusFilter, setInstallStatusFilter] = useState<ExpenseInstallStatus | "ALL">("ALL");
   const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | "ALL">("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("");
   const [monthFilters, setMonthFilters] = useState<string[]>([]);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(targetNodeId ? [targetNodeId] : []);
+  const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [isMobileFiltersCollapsed, setIsMobileFiltersCollapsed] = useState(true);
   const [filtersSectionY, setFiltersSectionY] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [vehicleDisplayName, setVehicleDisplayName] = useState("");
+  const [headerScrollY, setHeaderScrollY] = useState(0);
   const [contextVehicleDetail, setContextVehicleDetail] = useState<VehicleDetail | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [busyExpenseId, setBusyExpenseId] = useState<string | null>(null);
+  const [wishlistStatusByItemId, setWishlistStatusByItemId] = useState<Record<string, PartWishlistItemStatus>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -218,17 +231,27 @@ export default function VehicleExpensesScreen() {
       setContextVehicleDetail(null);
       const client = createApiClient({ baseUrl: getApiBaseUrl() });
       const endpoints = createMotoTwinEndpoints(client);
-      const [result, treeData, vehicleRes] = await Promise.all([
+      const [result, treeData, topNodesData, vehicleRes, wishlistRes] = await Promise.all([
         endpoints.getExpenses({ vehicleId, year: selectedYear }),
-        targetNodeId ? endpoints.getNodeTree(vehicleId) : Promise.resolve({ nodeTree: [] as NodeTreeItem[] }),
+        endpoints.getNodeTree(vehicleId),
+        endpoints.getTopServiceNodes(),
         endpoints.getVehicleDetail(vehicleId),
+        endpoints.getVehicleWishlist(vehicleId),
       ]);
       setNodeTree(treeData.nodeTree ?? []);
+      setTopServiceNodes(topNodesData.nodes ?? []);
       setVehicleDisplayName(vehicleRes.vehicle?.displayName?.trim() || "Мотоцикл");
       const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
       setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
       setExpenses(result.expenses);
       setYears(result.years ?? []);
+      setWishlistStatusByItemId(
+        Object.fromEntries(
+          (wishlistRes.items ?? [])
+            .filter((item) => Boolean(item.id))
+            .map((item) => [item.id, item.status])
+        )
+      );
     } catch (requestError) {
       console.error(requestError);
       setError("Не удалось загрузить расходы. Проверьте подключение к backend.");
@@ -236,6 +259,13 @@ export default function VehicleExpensesScreen() {
       setIsLoading(false);
     }
   }, [selectedYear, targetNodeId, vehicleId]);
+
+  useEffect(() => {
+    if (!targetNodeId) {
+      return;
+    }
+    setSelectedNodeIds((prev) => (prev.length === 0 ? [targetNodeId] : prev));
+  }, [targetNodeId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -258,6 +288,25 @@ export default function VehicleExpensesScreen() {
     }
     return Array.from(months.entries()).map(([key, label]) => ({ key, label })).sort((a, b) => b.key.localeCompare(a.key));
   }, [expenses]);
+
+  const leafRowsForNodePicker = useMemo<MobileNodePickerOption[]>(
+    () =>
+      getLeafNodeOptions(nodeTree).map((leaf) => ({
+        ...leaf,
+        pathLabel: nodeAncestorPathLabelRu(nodeTree, leaf.id),
+      })),
+    [nodeTree]
+  );
+
+  const orderedTopNodeIdsForPicker = useMemo(
+    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
+    [nodeTree, topServiceNodes]
+  );
+
+  const topLeafRowsForNodePicker = useMemo<MobileNodePickerOption[]>(
+    () => filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafRowsForNodePicker, orderedTopNodeIdsForPicker),
+    [leafRowsForNodePicker, nodeTree, orderedTopNodeIdsForPicker]
+  );
 
   const expensesHrefWithoutHighlightExpense = useMemo(() => {
     const q = new URLSearchParams();
@@ -295,7 +344,14 @@ export default function VehicleExpensesScreen() {
   }, [highlightExpenseId, router, expensesHrefWithoutHighlightExpense]);
 
   const scopedExpenses = useMemo(() => {
-    const nodeIds = targetNodeId ? collectNodeAndDescendantIds(nodeTree, targetNodeId) : null;
+    const nodeIds =
+      selectedNodeIds.length > 0
+        ? new Set(
+            selectedNodeIds.flatMap((id) =>
+              Array.from(collectNodeAndDescendantIds(nodeTree, id))
+            )
+          )
+        : null;
     const query = searchQuery.trim().toLowerCase();
     return expenses.filter((expense) => {
       if (filterServiceEventId && expense.serviceEventId !== filterServiceEventId) {
@@ -328,7 +384,7 @@ export default function VehicleExpensesScreen() {
     monthFilters,
     nodeTree,
     searchQuery,
-    targetNodeId,
+    selectedNodeIds,
   ]);
 
   const toggleMonthFilter = useCallback((monthKey: string) => {
@@ -394,9 +450,28 @@ export default function VehicleExpensesScreen() {
     return rows.map((row) => ({ ...row, percent: Math.round((row.amount / max) * 100) }));
   }, [analytics.byNode, primaryCurrency]);
 
-  const uninstalledExpenses = scopedExpenses
-    .filter((expense) => expense.purchaseStatus === "PURCHASED" && expense.installationStatus === "NOT_INSTALLED" && expense.serviceEventId == null)
-    .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime());
+  const uninstalledExpenses = useMemo(
+    () =>
+      scopedExpenses
+        .filter((expense) => {
+          if (
+            !(
+              expense.purchaseStatus === "PURCHASED" &&
+              expense.installationStatus === "NOT_INSTALLED" &&
+              expense.serviceEventId == null
+            )
+          ) {
+            return false;
+          }
+          const wishlistItemId = expense.shoppingListItemId?.trim();
+          if (!wishlistItemId) {
+            return false;
+          }
+          return wishlistStatusByItemId[wishlistItemId] === "BOUGHT";
+        })
+        .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime()),
+    [scopedExpenses, wishlistStatusByItemId]
+  );
   const topNode = nodeRows[0] ?? null;
   const latestExpense = [...scopedExpenses].sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime())[0] ?? null;
   const biggestMonth = monthlySeries.reduce((best, row) => row.amount > best.amount ? row : best, monthlySeries[0] ?? { key: "", label: "—", amount: 0 });
@@ -475,6 +550,15 @@ export default function VehicleExpensesScreen() {
     });
   }
 
+  const resetAllFilters = useCallback(() => {
+    setInstallStatusFilter("ALL");
+    setCategoryFilter("ALL");
+    setCurrencyFilter("");
+    setMonthFilters([]);
+    setSelectedNodeIds(targetNodeId ? [targetNodeId] : []);
+    router.setParams({ year: String(new Date().getFullYear()) });
+  }, [router, targetNodeId]);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <InternalScreenChrome
@@ -485,9 +569,15 @@ export default function VehicleExpensesScreen() {
         ]}
         title="Расходы"
         subtitle="Техническая стоимость владения: обслуживание, запчасти и ремонт."
+        declutterMobile
+        scrollOffsetY={headerScrollY}
         belowNavRow={
           contextVehicleDetail ? (
-            <GarageVehicleContextPlaque vehicle={contextVehicleDetail} currentVehicleId={vehicleId} />
+            <GarageVehicleContextPlaque
+              vehicle={contextVehicleDetail}
+              currentVehicleId={vehicleId}
+              compactByDefault
+            />
           ) : null
         }
         onBack={() => {
@@ -517,57 +607,9 @@ export default function VehicleExpensesScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        onScroll={(event) => setHeaderScrollY(event.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
       >
-        <View style={styles.headerCard}>
-          {isMobileLayout ? (
-            <ChipRow>
-              {years.length > 0 ? (
-                years.slice(0, 4).map((year) => (
-                  <Pressable
-                    key={year}
-                    onPress={() => router.setParams({ year: String(year) })}
-                    style={[styles.chip, selectedYear === year && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, selectedYear === year && styles.chipTextActive]}>{year}</Text>
-                  </Pressable>
-                ))
-              ) : (
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>Сезон {selectedYear}</Text>
-                </View>
-              )}
-              <FilterChip active={monthFilters.length === 0} label="Все месяцы" onPress={() => setMonthFilters([])} />
-              {monthOptions.slice(0, 12).map((month) => (
-                <FilterChip
-                  key={month.key}
-                  active={monthFilters.includes(month.key)}
-                  label={month.label}
-                  onPress={() => toggleMonthFilter(month.key)}
-                />
-              ))}
-            </ChipRow>
-          ) : (
-            <View style={styles.filterRow}>
-              {years.length > 0 ? (
-                years.slice(0, 4).map((year) => (
-                  <Pressable
-                    key={year}
-                    onPress={() => router.setParams({ year: String(year) })}
-                    style={[styles.chip, selectedYear === year && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, selectedYear === year && styles.chipTextActive]}>{year}</Text>
-                  </Pressable>
-                ))
-              ) : (
-                <Text style={styles.scopeText}>Сезон {selectedYear}</Text>
-              )}
-            </View>
-          )}
-          {targetNodeId ? (
-            <Text style={styles.scopeText}>Открыто из дерева: показан выбранный узел и дочерние узлы.</Text>
-          ) : null}
-        </View>
-
         {showAddForm ? (
           <Section title="Добавить технический расход">
             <Field label="Название">
@@ -605,18 +647,57 @@ export default function VehicleExpensesScreen() {
           </Section>
         ) : null}
 
-        <Section title="Фильтры">
-          <View onLayout={(event) => setFiltersSectionY(event.nativeEvent.layout.y)} style={styles.filtersSectionContent}>
-            {isMobileLayout ? (
-              <Pressable
-                onPress={() => setIsMobileFiltersCollapsed((prev) => !prev)}
-                style={({ pressed }) => [styles.filtersCollapseButton, pressed && styles.filtersCollapseButtonPressed]}
-              >
-                <Text style={styles.filtersCollapseButtonText}>{isMobileFiltersCollapsed ? "Показать фильтры" : "Скрыть фильтры"}</Text>
-              </Pressable>
-            ) : null}
-            {!isMobileLayout || !isMobileFiltersCollapsed ? (
+        <Section
+          title="Фильтры"
+          actionLabel={isMobileLayout ? (isMobileFiltersCollapsed ? "Показать" : "Скрыть") : undefined}
+          onAction={isMobileLayout ? () => setIsMobileFiltersCollapsed((prev) => !prev) : undefined}
+          secondaryActionLabel={isMobileLayout ? "Сбросить" : undefined}
+          onSecondaryAction={isMobileLayout ? resetAllFilters : undefined}
+          compactAction={isMobileLayout}
+          compactBody={isMobileLayout && isMobileFiltersCollapsed}
+        >
+          {!isMobileLayout || !isMobileFiltersCollapsed ? (
+            <View onLayout={(event) => setFiltersSectionY(event.nativeEvent.layout.y)} style={styles.filtersSectionContent}>
               <View style={styles.filtersExpandedContent}>
+                <ChipRow>
+                  <FilterChip
+                    active={selectedNodeIds.length > 0}
+                    label={selectedNodeIds.length > 0 ? `Узлы: ${selectedNodeIds.length}` : "Выбрать узлы"}
+                    onPress={() => setNodePickerOpen(true)}
+                  />
+                  {selectedNodeIds.length > 0 ? (
+                    <FilterChip
+                      active={false}
+                      label="Сброс узлов"
+                      onPress={() => setSelectedNodeIds(targetNodeId ? [targetNodeId] : [])}
+                    />
+                  ) : null}
+                </ChipRow>
+                <ChipRow>
+                  {years.length > 0 ? (
+                    years.slice(0, 4).map((year) => (
+                      <FilterChip
+                        key={year}
+                        active={selectedYear === year}
+                        label={String(year)}
+                        onPress={() => router.setParams({ year: String(year) })}
+                      />
+                    ))
+                  ) : (
+                    <FilterChip active label={`Сезон ${selectedYear}`} onPress={() => undefined} />
+                  )}
+                </ChipRow>
+                <ChipRow>
+                  <FilterChip active={monthFilters.length === 0} label="Все месяцы" onPress={() => setMonthFilters([])} />
+                  {monthOptions.slice(0, 12).map((month) => (
+                    <FilterChip
+                      key={month.key}
+                      active={monthFilters.includes(month.key)}
+                      label={month.label}
+                      onPress={() => toggleMonthFilter(month.key)}
+                    />
+                  ))}
+                </ChipRow>
                 <ChipRow>
                   {(["ALL", "BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"] as const).map((status) => (
                     <FilterChip
@@ -639,22 +720,12 @@ export default function VehicleExpensesScreen() {
                     <FilterChip key={currency} active={currencyFilter === currency} label={currency} onPress={() => setCurrencyFilter(currency)} />
                   ))}
                 </ChipRow>
-                {!isMobileLayout ? (
-                  <ChipRow>
-                    <FilterChip active={monthFilters.length === 0} label="Все месяцы" onPress={() => setMonthFilters([])} />
-                    {monthOptions.slice(0, 12).map((month) => (
-                      <FilterChip
-                        key={month.key}
-                        active={monthFilters.includes(month.key)}
-                        label={month.label}
-                        onPress={() => toggleMonthFilter(month.key)}
-                      />
-                    ))}
-                  </ChipRow>
+                {targetNodeId ? (
+                  <Text style={styles.scopeText}>Открыто из дерева: показан выбранный узел и дочерние узлы.</Text>
                 ) : null}
               </View>
-            ) : null}
-          </View>
+            </View>
+          ) : null}
         </Section>
 
         {isLoading ? (
@@ -673,7 +744,7 @@ export default function VehicleExpensesScreen() {
           </StateCard>
         ) : (
           <>
-            <View style={styles.metricsGrid}>
+            <View style={[styles.metricsGrid, isMobileLayout && styles.metricsGridCompact]}>
               <MetricCard tone="blue" label="Всего расходов" value={formatTotals(analytics.totalsByCurrency)} hint="за выбранный период" />
               <MetricCard tone="green" label={`За сезон ${selectedYear}`} value={formatTotals(analytics.selectedYearTotalsByCurrency)} hint="с начала сезона" />
               <MetricCard tone="violet" label="Событий" value={String(analytics.selectedYearExpenseCount)} hint="всего расходов" />
@@ -740,30 +811,42 @@ export default function VehicleExpensesScreen() {
                       highlightExpenseId && expense.id === highlightExpenseId ? styles.eventCardHighlighted : null,
                     ]}
                   >
-                    <Text style={styles.eventMeta}>
-                      {new Date(expense.expenseDate).toLocaleDateString("ru-RU")} · {expenseCategoryLabelsRu[expense.category]} · {getInstallationStatusLabel(expense)}
-                    </Text>
-                    <Text style={styles.eventTitle}>{expense.title}</Text>
-                    <Text style={styles.eventNode}>{expense.node?.name ?? "Без узла"}</Text>
-                    <Text style={styles.eventAmount}>{formatCurrencyAmount(expense.amount, expense.currency)}</Text>
-                    <View style={styles.eventActions}>
-                      {expense.installationStatus === "NOT_INSTALLED" && expense.purchaseStatus === "PURCHASED" && !expense.serviceEventId ? (
-                        <Pressable
-                          disabled={busyExpenseId === expense.id}
-                          onPress={() => void markInstalled(expense)}
-                          style={[styles.actionButton, busyExpenseId === expense.id && styles.disabledButton]}
-                        >
-                          <Text style={styles.actionButtonText}>{busyExpenseId === expense.id ? "Сохраняю..." : "Отметить установленным"}</Text>
-                        </Pressable>
-                      ) : null}
-                      {expense.serviceEventId ? (
-                        <Pressable
-                          onPress={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&serviceEventId=${encodeURIComponent(expense.serviceEventId ?? "")}`)}
-                          style={styles.secondaryButton}
-                        >
-                          <Text style={styles.secondaryButtonText}>Открыть сервисное событие</Text>
-                        </Pressable>
-                      ) : null}
+                    <View style={styles.eventTopRow}>
+                      <Text style={styles.eventMeta} numberOfLines={1}>
+                        {new Date(expense.expenseDate).toLocaleDateString("ru-RU")} · {expenseCategoryLabelsRu[expense.category]}
+                      </Text>
+                      <Text style={styles.eventStatus} numberOfLines={1}>
+                        {getInstallationStatusLabel(expense)}
+                      </Text>
+                    </View>
+                    <View style={styles.eventMainRow}>
+                      <View style={styles.eventTitleCol}>
+                        <Text style={styles.eventTitle} numberOfLines={2}>{expense.title}</Text>
+                        <Text style={styles.eventNode} numberOfLines={1}>{expense.node?.name ?? "Без узла"}</Text>
+                      </View>
+                      <View style={styles.eventRightCol}>
+                        <Text style={styles.eventAmount}>{formatCurrencyAmount(expense.amount, expense.currency)}</Text>
+                        {expense.serviceEventId ? (
+                          <Pressable
+                            onPress={() => router.push(`/vehicles/${vehicleId}/service-log?expandExpenses=1&serviceEventId=${encodeURIComponent(expense.serviceEventId ?? "")}`)}
+                            style={styles.secondaryButtonCompact}
+                          >
+                            <Text style={styles.secondaryButtonCompactText}>Журнал</Text>
+                          </Pressable>
+                        ) : expense.installationStatus === "NOT_INSTALLED" &&
+                          expense.purchaseStatus === "PURCHASED" &&
+                          !expense.serviceEventId ? (
+                          <Pressable
+                            disabled={busyExpenseId === expense.id}
+                            onPress={() => void markInstalled(expense)}
+                            style={[styles.actionButtonCompact, busyExpenseId === expense.id && styles.disabledButton]}
+                          >
+                            <Text style={styles.actionButtonCompactText}>
+                              {busyExpenseId === expense.id ? "..." : "Установить"}
+                            </Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
                     </View>
                   </View>
                 ))}
@@ -773,11 +856,22 @@ export default function VehicleExpensesScreen() {
         )}
       </ScrollView>
       </KeyboardAvoidingView>
+      <MobileNodePickerModal
+        visible={nodePickerOpen}
+        title="Фильтр по узлам"
+        options={leafRowsForNodePicker}
+        topOptions={topLeafRowsForNodePicker.length > 0 ? topLeafRowsForNodePicker : undefined}
+        selectedIds={selectedNodeIds}
+        onClose={() => setNodePickerOpen(false)}
+        onSelect={() => undefined}
+        onConfirmSelection={(nodeIds) => setSelectedNodeIds(nodeIds)}
+      />
       <GarageBottomNav
         activeKey="expenses"
         onOpenGarage={() => router.push("/")}
         onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
         onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
+        onOpenPicker={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
         onOpenExpenses={() => undefined}
         onOpenProfile={() => router.push("/profile")}
         hasVehicleContext
@@ -796,25 +890,45 @@ function Section(props: {
   children: ReactNode;
   actionLabel?: string;
   onAction?: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
   compactAction?: boolean;
+  compactBody?: boolean;
 }) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{props.title}</Text>
-        {props.onAction && props.actionLabel ? (
-          <Pressable
-            onPress={props.onAction}
-            hitSlop={8}
-            style={[styles.sectionAction, props.compactAction && styles.sectionActionCompact]}
-          >
-            <Text style={[styles.sectionActionText, props.compactAction && styles.sectionActionCompactText]}>
-              {props.actionLabel}
-            </Text>
-          </Pressable>
+        {(props.onAction && props.actionLabel) || (props.onSecondaryAction && props.secondaryActionLabel) ? (
+          <View style={styles.sectionActionGroup}>
+            {props.onSecondaryAction && props.secondaryActionLabel ? (
+              <Pressable
+                onPress={props.onSecondaryAction}
+                hitSlop={8}
+                style={[styles.sectionAction, props.compactAction && styles.sectionActionCompact]}
+              >
+                <Text style={[styles.sectionActionText, props.compactAction && styles.sectionActionCompactText]}>
+                  {props.secondaryActionLabel}
+                </Text>
+              </Pressable>
+            ) : null}
+            {props.onAction && props.actionLabel ? (
+              <Pressable
+                onPress={props.onAction}
+                hitSlop={8}
+                style={[styles.sectionAction, props.compactAction && styles.sectionActionCompact]}
+              >
+                <Text style={[styles.sectionActionText, props.compactAction && styles.sectionActionCompactText]}>
+                  {props.actionLabel}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
       </View>
-      <View style={styles.sectionBody}>{props.children}</View>
+      <View style={[styles.sectionBody, props.compactBody && styles.sectionBodyCompact]}>
+        {props.children}
+      </View>
     </View>
   );
 }
@@ -852,9 +966,18 @@ function MetricCard(props: { tone: "blue" | "green" | "violet" | "amber" | "oran
     props.tone === "amber" ? styles.metricIcon_amber :
     props.tone === "orange" ? styles.metricIcon_orange :
     styles.metricIcon_red;
+  const iconName: keyof typeof MaterialIcons.glyphMap =
+    props.tone === "blue" ? "account-balance-wallet" :
+    props.tone === "green" ? "calendar-month" :
+    props.tone === "violet" ? "receipt-long" :
+    props.tone === "amber" ? "query-stats" :
+    props.tone === "orange" ? "inventory-2" :
+    "hub";
   return (
     <View style={styles.metricCard}>
-      <View style={[styles.metricIcon, toneStyle]} />
+      <View style={[styles.metricIcon, toneStyle]}>
+        <MaterialIcons name={iconName} size={14} color="#fff" />
+      </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.metricLabel}>{props.label}</Text>
         <Text style={styles.metricValue}>{props.value}</Text>
@@ -1066,6 +1189,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
+  sectionActionGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   sectionAction: {
     minWidth: 28,
     minHeight: 28,
@@ -1098,6 +1226,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 10,
   },
+  sectionBodyCompact: {
+    marginTop: 0,
+    gap: 0,
+  },
   stateCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -1117,22 +1249,32 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   metricsGrid: {
-    gap: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  metricsGridCompact: {
+    gap: 8,
   },
   metricCard: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderRadius: 18,
+    alignItems: "flex-start",
+    gap: 8,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: c.border,
     backgroundColor: c.card,
-    padding: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    width: "48.8%",
+    minWidth: 156,
   },
   metricIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 999,
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   metricIcon_blue: { backgroundColor: "rgba(37,99,235,0.35)" },
   metricIcon_green: { backgroundColor: "rgba(34,197,94,0.3)" },
@@ -1142,19 +1284,19 @@ const styles = StyleSheet.create({
   metricIcon_red: { backgroundColor: "rgba(239,68,68,0.34)" },
   metricLabel: {
     color: c.textMeta,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
   },
   metricValue: {
-    marginTop: 4,
+    marginTop: 2,
     color: c.textPrimary,
-    fontSize: 21,
+    fontSize: 13,
     fontWeight: "900",
   },
   metricHint: {
-    marginTop: 2,
+    marginTop: 1,
     color: c.textMuted,
-    fontSize: 11,
+    fontSize: 9,
   },
   field: {
     gap: 5,
@@ -1383,59 +1525,86 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   eventCard: {
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: c.border,
     backgroundColor: c.cardMuted,
-    padding: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  eventTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
   },
   eventMeta: {
     color: c.textMeta,
-    fontSize: 11,
+    fontSize: 10,
+    fontWeight: "700",
+    flex: 1,
+    minWidth: 0,
+  },
+  eventStatus: {
+    color: c.textMuted,
+    fontSize: 9,
     fontWeight: "700",
   },
-  eventTitle: {
-    marginTop: 5,
-    color: c.textPrimary,
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  eventNode: {
-    marginTop: 4,
-    color: c.textSecondary,
-    fontSize: 12,
-  },
-  eventAmount: {
+  eventMainRow: {
     marginTop: 6,
-    color: c.primaryAction,
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  eventActions: {
-    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 8,
   },
-  actionButton: {
-    borderRadius: 14,
-    backgroundColor: c.primaryAction,
-    paddingVertical: 10,
-    alignItems: "center",
+  eventTitleCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
-  actionButtonText: {
-    color: c.onPrimaryAction,
+  eventRightCol: {
+    alignItems: "flex-end",
+    gap: 6,
+    flexShrink: 0,
+  },
+  eventTitle: {
+    color: c.textPrimary,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  eventNode: {
+    color: c.textSecondary,
+    fontSize: 10,
+  },
+  eventAmount: {
+    color: c.primaryAction,
     fontSize: 12,
     fontWeight: "900",
   },
-  secondaryButton: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    paddingVertical: 10,
+  actionButtonCompact: {
+    borderRadius: 999,
+    backgroundColor: c.primaryAction,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     alignItems: "center",
   },
-  secondaryButtonText: {
+  actionButtonCompactText: {
+    color: c.onPrimaryAction,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  secondaryButtonCompact: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    alignItems: "center",
+    backgroundColor: c.cardSubtle,
+  },
+  secondaryButtonCompactText: {
     color: c.textPrimary,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "900",
   },
   emptyInline: {

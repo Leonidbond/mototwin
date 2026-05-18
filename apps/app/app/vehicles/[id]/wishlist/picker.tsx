@@ -226,6 +226,7 @@ export default function WishlistPickerScreen() {
   const [saveUserKitOpen, setSaveUserKitOpen] = useState(false);
   const [submitPreviewModalOpen, setSubmitPreviewModalOpen] = useState(false);
   const [submitPreview, setSubmitPreview] = useState<PickerSubmitPreview | null>(null);
+  const [headerScrollY, setHeaderScrollY] = useState(0);
   const [quantityResolutionByDraftId, setQuantityResolutionByDraftId] = useState<
     Record<string, "addAllFromDraft" | "setQtyToDraft" | undefined>
   >({});
@@ -246,6 +247,10 @@ export default function WishlistPickerScreen() {
   const goExpenses = useCallback(() => {
     if (!navVehicleId) return;
     router.push(`/vehicles/${navVehicleId}/expenses`);
+  }, [navVehicleId, router]);
+  const goPicker = useCallback(() => {
+    if (!navVehicleId) return;
+    router.push(`/vehicles/${navVehicleId}/wishlist`);
   }, [navVehicleId, router]);
   const goProfile = useCallback(() => router.push("/profile"), [router]);
 
@@ -753,11 +758,13 @@ export default function WishlistPickerScreen() {
           { label: "Подбор детали" },
         ]}
         title="Подбор детали"
+        declutterMobile
+        scrollOffsetY={headerScrollY}
         onBack={() => router.replace(`/vehicles/${vehicleId}/wishlist`)}
         showHelp={false}
         belowNavRow={
           vehicle ? (
-            <GarageVehicleContextPlaque vehicle={vehicle} currentVehicleId={vehicleId} />
+            <GarageVehicleContextPlaque vehicle={vehicle} currentVehicleId={vehicleId} compactByDefault />
           ) : null
         }
       />
@@ -776,6 +783,8 @@ export default function WishlistPickerScreen() {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
           scrollViewProps={{
             onScrollBeginDrag: () => Keyboard.dismiss(),
+            onScroll: (event) => setHeaderScrollY(event.nativeEvent.contentOffset.y),
+            scrollEventThrottle: 16,
           }}
         >
           {treeLoading ? (
@@ -943,9 +952,11 @@ export default function WishlistPickerScreen() {
         </KeyboardAwareScrollScreen>
 
         <GarageBottomNav
+          activeKey="picker"
           onOpenGarage={goGarage}
           onOpenNodes={goNodes}
           onOpenJournal={goJournal}
+          onOpenPicker={goPicker}
           onOpenExpenses={goExpenses}
           onOpenProfile={goProfile}
           hasVehicleContext={Boolean(navVehicleId)}
