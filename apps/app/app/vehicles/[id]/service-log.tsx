@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -36,6 +37,9 @@ import type {
 } from "@mototwin/types";
 import {
   buildServiceLogTimelineProps,
+  buildYandexMapsUrlForInstallLocation,
+  canOpenServiceInstallLocationOnMap,
+  getServiceInstallLocationAddress,
   vehicleDetailFromApiRecord,
   expenseCategoryLabelsRu,
   filterLeafOptionsUnderTopNodeAncestors,
@@ -51,6 +55,8 @@ import {
   nodeAncestorPathLabelRu,
   resolveWishlistItemIdForServiceBundleItem,
   resolvePrimaryCatalogNodeForServiceLogIcon,
+  SERVICE_LOG_DETAIL_LEADING_ICON_PX,
+  SERVICE_LOG_JOURNAL_LEADING_ICON_PX,
   SERVICE_ACTION_TYPE_OPTIONS,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
@@ -261,6 +267,41 @@ function getPerformerLabel(performedBy: string | null | undefined): string {
   return "—";
 }
 
+function ServiceInstallLocationDetail({ event }: { event: ServiceEventItem | null }) {
+  const address = getServiceInstallLocationAddress(event);
+  if (!address) return null;
+
+  const mapsUrl = buildYandexMapsUrlForInstallLocation(event);
+  const canOpenMap = canOpenServiceInstallLocationOnMap(event) && mapsUrl != null;
+
+  const openOnMap = () => {
+    if (!mapsUrl) return;
+    void Linking.openURL(mapsUrl).catch(() => {
+      Alert.alert("Карта", "Не удалось открыть Яндекс.Карты на этом устройстве.");
+    });
+  };
+
+  return (
+    <View style={styles.detailInstallLocationBlock}>
+      <Text style={styles.detailPerformerService}>
+        <Text style={styles.detailMuted}>Адрес сервиса: </Text>
+        {address}
+      </Text>
+      {canOpenMap ? (
+        <Pressable
+          onPress={openOnMap}
+          accessibilityRole="link"
+          accessibilityLabel="Открыть адрес на карте"
+          style={({ pressed }) => [styles.detailMapLink, pressed && styles.cardPressed]}
+        >
+          <MaterialIcons name="place" size={14} color={c.primaryAction} />
+          <Text style={styles.detailMapLinkText}>На карте</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 function getIntervalLabel(event: ServiceEventItem | null): string {
   if (!event) return "—";
   if (event.nextReminderOdometer) return `${event.nextReminderOdometer.toLocaleString("ru-RU")} км`;
@@ -465,7 +506,7 @@ function JournalTimelineRow({
         >
           <View style={styles.journalCardInner}>
             <View style={styles.journalTitleBlock}>
-              <ServiceLogJournalLeadingIcon event={event} actionKind={actionKind} size={26} />
+              <ServiceLogJournalLeadingIcon event={event} actionKind={actionKind} size={SERVICE_LOG_JOURNAL_LEADING_ICON_PX} />
               <View style={styles.journalTitleTexts}>
                 <Text
                   style={[styles.journalMainTitle, isStateUpdate && styles.journalMainTitleState]}
@@ -733,7 +774,7 @@ function MobileEventDetailSheet({
           <View style={styles.detailSheetHandle} />
           <View style={styles.detailSheetHeader}>
             <View style={styles.detailSheetHeaderRow}>
-              <ServiceLogJournalLeadingIcon event={event} actionKind={actionKind} size={24} />
+              <ServiceLogJournalLeadingIcon event={event} actionKind={actionKind} size={SERVICE_LOG_DETAIL_LEADING_ICON_PX} />
               <View style={styles.detailSheetHeaderText}>
                 <Text style={styles.detailSheetTitle} numberOfLines={2}>
                   {entry.mainTitle}
@@ -914,6 +955,7 @@ function MobileEventDetailSheet({
                       {event.serviceProviderNote?.trim() ? event.serviceProviderNote.trim() : "—"}
                     </Text>
                   ) : null}
+                  <ServiceInstallLocationDetail event={event} />
                 </View>
               </View>
             </View>
@@ -1263,7 +1305,10 @@ export default function ServiceLogScreen() {
         setEvents(data.serviceEvents ?? []);
         setNodeTree(treeRes.nodeTree ?? []);
         setTopServiceNodes(topRes.nodes ?? []);
-        setVehicleDisplayName(vehicleRes.vehicle?.displayName?.trim() || "Мотоцикл");
+        const v = vehicleRes.vehicle;
+        setVehicleDisplayName(
+          v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelName}`.trim() : "") || "Мотоцикл"
+        );
         const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
         setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
       } catch (err) {
@@ -2782,11 +2827,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
   journalTypeIcon: {
-    width: 36,
-    height: 36,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
@@ -3446,6 +3489,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: c.textSecondary,
     lineHeight: 18,
+  },
+  detailInstallLocationBlock: {
+    gap: 6,
+    marginTop: 2,
+  },
+  detailMapLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+  },
+  detailMapLinkText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: c.primaryAction,
   },
   detailOriginRow: {
     flexDirection: "row",

@@ -1,7 +1,8 @@
 "use client";
 
-import { Area, AreaChart, ResponsiveContainer } from "recharts";
+import { Area, AreaChart } from "recharts";
 import type { AdminSparklinePoint } from "@mototwin/types";
+import { useChartContainerSize } from "./use-chart-container-size";
 
 interface SparklineProps {
   data: AdminSparklinePoint[];
@@ -12,14 +13,22 @@ interface SparklineProps {
 
 /** Tiny axis-less area chart used inside KPI cards. */
 export function Sparkline({ data, color, height = 36, fillOpacity = 0.18 }: SparklineProps) {
+  const { ref, size } = useChartContainerSize(height);
+
   if (!data || data.length < 2) {
-    return <div style={{ height, width: "100%" }} aria-hidden />;
+    return <div ref={ref} style={{ height, width: "100%", minWidth: 0 }} aria-hidden />;
   }
+
   const id = `spark-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
-    <div style={{ height, width: "100%" }} aria-hidden>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+    <div ref={ref} style={{ height, width: "100%", minWidth: 0 }} aria-hidden>
+      {size ? (
+        <AreaChart
+          width={size.width}
+          height={size.height}
+          data={data}
+          margin={{ top: 4, right: 0, left: 0, bottom: 0 }}
+        >
           <defs>
             <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={fillOpacity} />
@@ -35,7 +44,7 @@ export function Sparkline({ data, color, height = 36, fillOpacity = 0.18 }: Spar
             isAnimationActive={false}
           />
         </AreaChart>
-      </ResponsiveContainer>
+      ) : null}
     </div>
   );
 }

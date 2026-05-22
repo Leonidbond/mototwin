@@ -54,7 +54,7 @@ export function InstallLocationField({ form, onPatch }: InstallLocationFieldProp
             value={form.installLocationAddress}
             maxLength={INSTALL_LOCATION_MAX_LENGTH}
             onChange={(e) => onPatch({ installLocationAddress: e.target.value })}
-            placeholder="Адрес, гараж, сервис…"
+            placeholder="Название сервиса или адрес…"
             style={FIELD_IN_STACK}
             className={`min-w-0 flex-1 [&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
           />
@@ -69,7 +69,7 @@ export function InstallLocationField({ form, onPatch }: InstallLocationFieldProp
                 color: SERVICE_EVENT_PARTS_UI.text,
               }}
               aria-label="Выбрать место на Яндекс.Картах"
-              title="Выбрать на карте"
+              title="Найти сервис или адрес на карте"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <path

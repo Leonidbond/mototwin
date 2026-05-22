@@ -105,7 +105,7 @@ export function InternalScreenChrome(props: {
                   ) : null}
                   {crumb.href ? (
                     <Pressable
-                      onPress={() => router.push(crumb.href)}
+                      onPress={() => crumb.href && router.push(crumb.href)}
                       hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                       accessibilityRole="link"
                       accessibilityLabel={crumb.label}

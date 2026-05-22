@@ -411,6 +411,12 @@ export function buildServiceLogEntryViewModel(
   };
 }
 
+/** Иконка узла в строке журнала (web + mobile). */
+export const SERVICE_LOG_JOURNAL_LEADING_ICON_PX = 20;
+
+/** Иконка узла в шапке панели деталей события (web + mobile). */
+export const SERVICE_LOG_DETAIL_LEADING_ICON_PX = 18;
+
 /**
  * Узел каталога для иконки в журнале: привязка события (`event.node`), иначе узел первой строки bundle.
  * Без `code` — `null` (UI может показать fallback по типу работы).

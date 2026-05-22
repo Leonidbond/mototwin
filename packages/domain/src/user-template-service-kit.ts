@@ -81,10 +81,7 @@ export function inferKitItemPartBinding(args: {
       }
     }
     for (const r of recs) {
-      const hit = r.partNumbers.some((n) => {
-        const raw = typeof n?.number === "string" ? n.number : "";
-        return raw.trim().toLowerCase() === skuNeedle;
-      });
+      const hit = r.partNumbers.some((n) => String(n).trim().toLowerCase() === skuNeedle);
       if (hit) {
         return { partType: r.partType, preferredSkuId: r.skuId };
       }

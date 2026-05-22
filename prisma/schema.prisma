@@ -315,9 +315,45 @@ model User {
   fitmentVotes              FitmentVote[]
   adminAuditLogs            AdminAuditLog[]
   importBatches             ImportBatch[]
+  authSessions              AuthSession[]
+  refreshTokens             RefreshToken[]
 
   @@index([adminRole])
   @@map("users")
+}
+
+enum AuthSessionKind {
+  WEB
+  ACCESS
+}
+
+model AuthSession {
+  id        String          @id @default(cuid())
+  userId    String
+  kind      AuthSessionKind
+  tokenHash String          @unique
+  expiresAt DateTime
+  createdAt DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
 
 model UserServiceEventFormTemplate {

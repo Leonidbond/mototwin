@@ -10,8 +10,8 @@ const notificationsApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }
 
 function toneBySeverity(severity: NotificationItemWire["severity"]) {
   if (severity === "CRITICAL") return productSemanticColors.error;
-  if (severity === "WARNING") return productSemanticColors.warning;
-  return productSemanticColors.info;
+  if (severity === "WARNING") return productSemanticColors.primaryAction;
+  return productSemanticColors.textSecondary;
 }
 
 export default function NotificationsPage() {

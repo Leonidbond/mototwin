@@ -411,6 +411,16 @@ export type {
   AdminTeamMemberWire,
   AdminUpdateTeamRolePayload,
 } from "./admin";
+export type {
+  AuthUser,
+  AuthMeResponse,
+  AuthLoginResponse,
+  AuthRegisterInput,
+  AuthLoginInput,
+  AuthRefreshInput,
+  AuthRefreshResponse,
+} from "./auth";
+export { MOBILE_CLIENT_HEADER, MOBILE_CLIENT_EXPO } from "./auth";
 export type { DevUserOption } from "./dev-user";
 export {
   DEFAULT_DEV_USER_EMAIL,

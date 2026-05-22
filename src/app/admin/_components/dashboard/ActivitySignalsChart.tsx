@@ -4,7 +4,6 @@ import {
   CartesianGrid,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -13,6 +12,7 @@ import { productSemanticColors } from "@mototwin/design-tokens";
 import type { AdminActivityResponse } from "@mototwin/types";
 import { ruAdmin } from "../../_locales/ru";
 import { DashboardSection } from "./DashboardSection";
+import { useChartContainerSize } from "./use-chart-container-size";
 
 interface ActivitySignalsChartProps {
   data: AdminActivityResponse;
@@ -24,7 +24,11 @@ const SERIES = [
   { key: "fitmentReports", label: ruAdmin.dashboard.activitySignals.legend.fitmentReports, color: "#F97316" },
 ] as const;
 
+const CHART_HEIGHT = 220;
+
 export function ActivitySignalsChart({ data }: ActivitySignalsChartProps) {
+  const { ref, size } = useChartContainerSize(CHART_HEIGHT);
+
   return (
     <DashboardSection
       title={ruAdmin.dashboard.activitySignals.title}
@@ -41,9 +45,14 @@ export function ActivitySignalsChart({ data }: ActivitySignalsChartProps) {
         </div>
       }
     >
-      <div style={{ height: 220, width: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data.points} margin={{ top: 12, right: 12, bottom: 4, left: -12 }}>
+      <div ref={ref} style={{ height: CHART_HEIGHT, width: "100%", minWidth: 0 }}>
+        {size ? (
+          <LineChart
+            width={size.width}
+            height={size.height}
+            data={data.points}
+            margin={{ top: 12, right: 12, bottom: 4, left: -12 }}
+          >
             <CartesianGrid stroke={productSemanticColors.border} strokeDasharray="2 4" vertical={false} />
             <XAxis
               dataKey="t"
@@ -87,7 +96,7 @@ export function ActivitySignalsChart({ data }: ActivitySignalsChartProps) {
               />
             ))}
           </LineChart>
-        </ResponsiveContainer>
+        ) : null}
       </div>
     </DashboardSection>
   );

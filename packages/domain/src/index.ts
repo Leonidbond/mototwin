@@ -132,7 +132,15 @@ export {
   groupServiceLogByMonth,
   buildServiceLogTimelineViewModel,
   resolvePrimaryCatalogNodeForServiceLogIcon,
+  SERVICE_LOG_JOURNAL_LEADING_ICON_PX,
+  SERVICE_LOG_DETAIL_LEADING_ICON_PX,
 } from "./service-log-view-models";
+export {
+  buildYandexMapsUrlForInstallLocation,
+  canOpenServiceInstallLocationOnMap,
+  getServiceInstallLocationAddress,
+  type ServiceInstallLocationFields,
+} from "./install-location";
 export {
   buildVehicleSummaryViewModel,
   buildVehicleDetailViewModel,

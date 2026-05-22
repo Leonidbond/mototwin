@@ -1,6 +1,6 @@
 "use client";
 
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
+import { Cell, Pie, PieChart } from "recharts";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type { AdminFitmentQualityResponse } from "@mototwin/types";
 import { ruAdmin, formatNumber, formatPercent } from "../../_locales/ru";
@@ -9,6 +9,8 @@ import { DashboardSection } from "./DashboardSection";
 interface FitmentQualityDonutProps {
   data: AdminFitmentQualityResponse;
 }
+
+const DONUT_SIZE = 168;
 
 export function FitmentQualityDonut({ data }: FitmentQualityDonutProps) {
   return (
@@ -30,30 +32,28 @@ export function FitmentQualityDonut({ data }: FitmentQualityDonutProps) {
         <div
           style={{
             position: "relative",
-            width: 168,
-            height: 168,
+            width: DONUT_SIZE,
+            height: DONUT_SIZE,
             flexShrink: 0,
             marginInline: "auto",
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data.slices}
-                dataKey="count"
-                nameKey="label"
-                innerRadius={56}
-                outerRadius={80}
-                paddingAngle={2}
-                stroke="none"
-                isAnimationActive={false}
-              >
-                {data.slices.map((slice) => (
-                  <Cell key={slice.key} fill={slice.color} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
+          <PieChart width={DONUT_SIZE} height={DONUT_SIZE}>
+            <Pie
+              data={data.slices}
+              dataKey="count"
+              nameKey="label"
+              innerRadius={56}
+              outerRadius={80}
+              paddingAngle={2}
+              stroke="none"
+              isAnimationActive={false}
+            >
+              {data.slices.map((slice) => (
+                <Cell key={slice.key} fill={slice.color} />
+              ))}
+            </Pie>
+          </PieChart>
           <div
             aria-hidden
             style={{

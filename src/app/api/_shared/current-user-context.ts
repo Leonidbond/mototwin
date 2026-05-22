@@ -7,6 +7,7 @@ import {
 } from "@mototwin/types";
 import { isDevUserSwitcherEnabled } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
+import { resolveAuthenticatedUserId } from "@/lib/auth/request-auth";
 
 export const DEMO_USER_EMAIL = "demo@mototwin.local";
 export const DEMO_GARAGE_TITLE = "Мой гараж";
@@ -22,7 +23,8 @@ export class CurrentUserContextError extends Error {
     | "CURRENT_USER_NOT_FOUND"
     | "CURRENT_GARAGE_NOT_FOUND"
     | "INVALID_DEV_USER_HEADER"
-    | "DEV_SWITCHER_DISABLED";
+    | "DEV_SWITCHER_DISABLED"
+    | "UNAUTHORIZED";
   readonly status: number;
 
   constructor(
@@ -30,7 +32,8 @@ export class CurrentUserContextError extends Error {
       | "CURRENT_USER_NOT_FOUND"
       | "CURRENT_GARAGE_NOT_FOUND"
       | "INVALID_DEV_USER_HEADER"
-      | "DEV_SWITCHER_DISABLED",
+      | "DEV_SWITCHER_DISABLED"
+      | "UNAUTHORIZED",
     status: number,
     message: string
   ) {
@@ -42,14 +45,30 @@ export class CurrentUserContextError extends Error {
 }
 
 /**
- * Phase 1 ownership foundation:
- * until real auth is implemented, backend resolves a stable demo user context.
+ * Resolves the current user + primary garage for API ownership checks.
  *
- * Dev-only behavior:
- * in development, optional request header can switch context between seeded users.
+ * Production: session cookie or Bearer access token (auth required).
+ * Development: dev user switcher when enabled, else demo user; auth session overrides demo when present.
  */
 export async function getCurrentUserContext(): Promise<CurrentUserContext> {
-  const resolvedEmail = await resolveCurrentUserEmail();
+  if (process.env.NODE_ENV === "production") {
+    const userId = await resolveAuthenticatedUserId();
+    if (!userId) {
+      throw new CurrentUserContextError(
+        "UNAUTHORIZED",
+        401,
+        "Требуется вход в аккаунт."
+      );
+    }
+    return findUserContextByUserId(userId);
+  }
+
+  const authUserId = await resolveAuthenticatedUserId();
+  if (authUserId) {
+    return findUserContextByUserId(authUserId);
+  }
+
+  const resolvedEmail = await resolveDevUserEmail();
   return findUserContextByEmail(resolvedEmail);
 }
 
@@ -60,20 +79,9 @@ export function toCurrentUserContextErrorResponse(error: unknown): NextResponse 
   return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
 }
 
-async function resolveCurrentUserEmail(): Promise<string> {
+async function resolveDevUserEmail(): Promise<string> {
   const requestHeaders = await headers();
   const fromHeader = requestHeaders.get(DEV_USER_HEADER_NAME)?.trim().toLowerCase() ?? "";
-
-  if (process.env.NODE_ENV === "production") {
-    if (fromHeader) {
-      throw new CurrentUserContextError(
-        "DEV_SWITCHER_DISABLED",
-        400,
-        "Dev user override is disabled in production."
-      );
-    }
-    return DEMO_USER_EMAIL;
-  }
 
   const switcherEnabled = isDevUserSwitcherEnabled();
 
@@ -101,6 +109,39 @@ async function resolveCurrentUserEmail(): Promise<string> {
     );
   }
   return fromHeader;
+}
+
+async function findUserContextByUserId(userId: string): Promise<CurrentUserContext> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, isModerator: true },
+  });
+  if (!user) {
+    throw new CurrentUserContextError(
+      "CURRENT_USER_NOT_FOUND",
+      404,
+      "Пользователь не найден."
+    );
+  }
+
+  const garage = await prisma.garage.findFirst({
+    where: { ownerUserId: user.id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  if (!garage) {
+    throw new CurrentUserContextError(
+      "CURRENT_GARAGE_NOT_FOUND",
+      503,
+      "Гараж не найден. Обратитесь в поддержку."
+    );
+  }
+
+  return {
+    userId: user.id,
+    garageId: garage.id,
+    isModerator: user.isModerator,
+  };
 }
 
 async function findUserContextByEmail(email: string): Promise<CurrentUserContext> {

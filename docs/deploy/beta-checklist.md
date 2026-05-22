@@ -1,0 +1,35 @@
+# Чеклист закрытой беты
+
+## Перед приглашением тестировщиков
+
+- [ ] HTTPS работает (`curl -sI https://ваш-домен/`)
+- [ ] `MOTOTWIN_ENABLE_DEV_USER_SWITCHER` **не** задан в production `.env`
+- [ ] `AUTH_SECRET` задан (длинная случайная строка)
+- [ ] `MOTOTWIN_BETA_ALLOWED_EMAILS` содержит email всех тестеров
+- [ ] Регистрация с неразрешённым email отклоняется
+- [ ] Два аккаунта: `GET /api/garage` изолированы; чужой `vehicleId` → 404
+- [ ] Ежедневный бэкап Postgres (`deploy/scripts/backup.sh` в cron)
+- [ ] Cron уведомлений (опционально): `scripts/cron-recalculate-all-users.ts`
+- [ ] Expo-сборки с `EXPO_PUBLIC_API_BASE_URL=https://...`
+
+## Smoke (локально против staging)
+
+```bash
+BASE_URL=https://ваш-домен npx tsx scripts/qa-auth-smoke.ts
+BASE_URL=https://ваш-домен npm run qa:notifications-smoke   # после логина — см. скрипт
+```
+
+## Материалы для тестеров
+
+1. URL: `https://ваш-домен`
+2. Регистрация (email из allowlist) / логин
+3. Android: ссылка на APK / iOS: TestFlight
+4. Канал обратной связи
+5. Не тестируем: email/push (пока заглушки)
+
+## Порядок приглашения
+
+1. Вы + 1 тестер (web), 2–3 дня
+2. +2–3 тестера (web)
+3. Expo-сборка, 2–3 тестера с телефонами
+4. Расширение группы

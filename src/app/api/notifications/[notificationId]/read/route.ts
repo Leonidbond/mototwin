@@ -3,7 +3,7 @@ import { NotificationStatus } from "@prisma/client";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
-} from "../../../../_shared/current-user-context";
+} from "@/app/api/_shared/current-user-context";
 import { serializeNotification, transitionNotificationStatus } from "@/lib/notifications";
 
 type RouteContext = { params: Promise<{ notificationId: string }> };

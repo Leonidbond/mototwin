@@ -2,10 +2,18 @@ import {
   DEV_USER_HEADER_NAME,
   DEV_USER_STORAGE_KEY,
   DEV_USER_SWITCHER_ENV_FLAG,
+  MOBILE_CLIENT_EXPO,
+  MOBILE_CLIENT_HEADER,
 } from "@mototwin/types";
 
 export type ApiClientConfig = {
   baseUrl: string;
+  /** Send cookies (web same-origin). Default: include when baseUrl is empty. */
+  credentials?: RequestCredentials;
+  /** Bearer access token (Expo). */
+  getAccessToken?: () => string | null | Promise<string | null>;
+  /** Called on HTTP 401 in browser environments. */
+  onUnauthorized?: () => void;
 };
 
 function responseBodyLooksLikeHtml(body: string): boolean {
@@ -111,23 +119,52 @@ export async function readHttpErrorMessage(response: Response): Promise<string> 
   return trimmed.length > maxPlain ? `${trimmed.slice(0, maxPlain)}…` : trimmed;
 }
 
+function defaultCredentials(baseUrl: string): RequestCredentials {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  if (trimmed === "" || trimmed.startsWith("/")) {
+    return "include";
+  }
+  return "same-origin";
+}
+
 export class ApiClient {
   private readonly baseUrl: string;
+  private readonly credentials: RequestCredentials;
+  private readonly getAccessToken?: ApiClientConfig["getAccessToken"];
+  private readonly onUnauthorized?: ApiClientConfig["onUnauthorized"];
+  private readonly isMobileClient: boolean;
 
   constructor(config: ApiClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
+    this.credentials = config.credentials ?? defaultCredentials(config.baseUrl);
+    this.getAccessToken = config.getAccessToken;
+    this.onUnauthorized = config.onUnauthorized;
+    this.isMobileClient = Boolean(config.getAccessToken);
   }
 
   async request<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
     const devUserHeader = this.getDevUserHeaderValue();
+    const accessToken = this.getAccessToken ? await this.getAccessToken() : null;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(devUserHeader ? { [DEV_USER_HEADER_NAME]: devUserHeader } : {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...(this.isMobileClient ? { [MOBILE_CLIENT_HEADER]: MOBILE_CLIENT_EXPO } : {}),
+    };
+
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...init,
+      credentials: init?.credentials ?? this.credentials,
       headers: {
-        "Content-Type": "application/json",
-        ...(devUserHeader ? { [DEV_USER_HEADER_NAME]: devUserHeader } : {}),
-        ...(init?.headers || {}),
+        ...headers,
+        ...(init?.headers as Record<string, string> | undefined),
       },
     });
+
+    if (response.status === 401 && this.onUnauthorized) {
+      this.onUnauthorized();
+    }
 
     if (!response.ok) {
       const errorMessage = await readHttpErrorMessage(response);

@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { createWebApiClient } from "@/lib/create-web-api-client";
+import { AuthGate } from "@/components/auth/AuthGate";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
   getUserSettingsStorageKey,
@@ -30,7 +31,7 @@ type ProfileViewModel = {
   garageTitle: string;
 };
 
-const profileApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+const profileApi = createWebApiClient();
 const SIDEBAR_COLLAPSED_KEY = "profile.sidebar.collapsed";
 
 function buildProfileViewModel(selectedDevUserEmail: string, fromApi?: ProfileViewModel): ProfileViewModel {
@@ -182,7 +183,17 @@ export default function ProfilePage() {
     router.push("/garage");
   };
 
+  const handleLogout = async () => {
+    try {
+      await profileApi.logout();
+    } catch {
+      // Continue redirect even if API fails.
+    }
+    router.replace("/login");
+  };
+
   return (
+    <AuthGate>
     <main
       className="mt-internal-page min-h-screen text-gray-950"
       style={{ backgroundColor: productSemanticColors.canvas }}
@@ -333,6 +344,16 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+          >
+            Выйти из аккаунта
+          </button>
+        </section>
+
         {devLoginEnabled ? (
           <section
             className="rounded-2xl border border-amber-300 bg-amber-50 p-5"
@@ -367,6 +388,7 @@ export default function ProfilePage() {
       </section>
       </div>
     </main>
+    </AuthGate>
   );
 }
 

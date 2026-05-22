@@ -259,6 +259,20 @@ export function ExpensesPageClient(props: {
     return Array.from(set).filter(Number.isFinite).sort((a, b) => b - a);
   }, [selectedYear, selectedYearDefault, years]);
 
+  const selectedNodeScopeIds = useMemo(() => {
+    if (selectedNodeIds.length === 0 || nodeTree.length === 0) return null;
+    const scoped = new Set<string>();
+    for (const nodeId of selectedNodeIds) {
+      const descendants = collectNodeAndDescendantIds(nodeTree, nodeId);
+      if (descendants.size === 0) {
+        scoped.add(nodeId);
+      } else {
+        for (const id of descendants) scoped.add(id);
+      }
+    }
+    return scoped;
+  }, [nodeTree, selectedNodeIds]);
+
   const filteredExpenses = useMemo(
     () =>
       expenses.filter((expense) => {
@@ -348,20 +362,6 @@ export function ExpensesPageClient(props: {
     const topIds = getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes);
     return filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafRows, topIds);
   }, [nodeTree, topServiceNodes]);
-
-  const selectedNodeScopeIds = useMemo(() => {
-    if (selectedNodeIds.length === 0 || nodeTree.length === 0) return null;
-    const scoped = new Set<string>();
-    for (const nodeId of selectedNodeIds) {
-      const descendants = collectNodeAndDescendantIds(nodeTree, nodeId);
-      if (descendants.size === 0) {
-        scoped.add(nodeId);
-      } else {
-        for (const id of descendants) scoped.add(id);
-      }
-    }
-    return scoped;
-  }, [nodeTree, selectedNodeIds]);
 
   const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 

@@ -4,8 +4,8 @@ import { z } from "zod";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
-} from "../../../../_shared/current-user-context";
-import { notificationSnoozeSchema } from "../../../../_shared/notifications-http";
+} from "@/app/api/_shared/current-user-context";
+import { notificationSnoozeSchema } from "@/app/api/_shared/notifications-http";
 import { serializeNotification, transitionNotificationStatus } from "@/lib/notifications";
 
 type RouteContext = { params: Promise<{ notificationId: string }> };

@@ -19,8 +19,8 @@ import { getApiBaseUrl } from "../src/api-base-url";
 
 function severityColor(severity: NotificationItemWire["severity"]) {
   if (severity === "CRITICAL") return c.error;
-  if (severity === "WARNING") return c.warning;
-  return c.info;
+  if (severity === "WARNING") return c.primaryAction;
+  return c.textSecondary;
 }
 
 export default function NotificationsScreen() {

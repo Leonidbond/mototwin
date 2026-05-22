@@ -240,7 +240,10 @@ export default function VehicleExpensesScreen() {
       ]);
       setNodeTree(treeData.nodeTree ?? []);
       setTopServiceNodes(topNodesData.nodes ?? []);
-      setVehicleDisplayName(vehicleRes.vehicle?.displayName?.trim() || "Мотоцикл");
+      const v = vehicleRes.vehicle;
+      setVehicleDisplayName(
+        v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelName}`.trim() : "") || "Мотоцикл"
+      );
       const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
       setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
       setExpenses(result.expenses);

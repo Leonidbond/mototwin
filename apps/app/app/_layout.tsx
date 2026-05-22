@@ -1,16 +1,20 @@
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { AppHelpProvider } from "../src/components/app-help-fab";
+import { readAuthTokens } from "../src/auth-storage";
+import { refreshMobileSessionIfNeeded } from "../src/create-mobile-api-client";
 
 void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const router = useRouter();
+  const segments = useSegments();
+  const [authChecked, setAuthChecked] = useState(!__DEV__);
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -33,6 +37,29 @@ export default function RootLayout() {
   }, [fontsReady]);
 
   useEffect(() => {
+    if (__DEV__) {
+      setAuthChecked(true);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const tokens = await readAuthTokens();
+      const ok = tokens ? await refreshMobileSessionIfNeeded() : false;
+      if (cancelled) return;
+      const onLogin = segments[0] === "login";
+      if (!ok && !onLogin) {
+        router.replace("/login");
+      } else if (ok && onLogin) {
+        router.replace("/");
+      }
+      setAuthChecked(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, segments]);
+
+  useEffect(() => {
     let subscription: { remove: () => void } | null = null;
     let cancelled = false;
     void import("expo-notifications")
@@ -53,7 +80,7 @@ export default function RootLayout() {
     };
   }, [router]);
 
-  if (!fontsReady) {
+  if (!fontsReady || !authChecked) {
     return null;
   }
 

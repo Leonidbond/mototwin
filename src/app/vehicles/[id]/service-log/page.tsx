@@ -13,7 +13,10 @@ import {
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildServiceLogTimelineProps,
+  buildYandexMapsUrlForInstallLocation,
+  canOpenServiceInstallLocationOnMap,
   expenseCategoryLabelsRu,
+  getServiceInstallLocationAddress,
   filterLeafOptionsUnderTopNodeAncestors,
   filterPaidServiceEvents,
   findNodeTreeItemById,
@@ -25,6 +28,8 @@ import {
   getWishlistItemIdsFromInstalledPartsJson,
   resolveWishlistItemIdForServiceBundleItem,
   resolvePrimaryCatalogNodeForServiceLogIcon,
+  SERVICE_LOG_DETAIL_LEADING_ICON_PX,
+  SERVICE_LOG_JOURNAL_LEADING_ICON_PX,
   isServiceLogTimelineQueryActive,
   nodeAncestorPathLabelRu,
   SERVICE_ACTION_TYPE_OPTIONS,
@@ -470,6 +475,39 @@ function getPerformerLabel(performedBy: string | null | undefined): string {
   if (performedBy === "SERVICE") return "Сервис";
   if (performedBy === "OTHER") return "Другой";
   return "—";
+}
+
+function ServiceInstallLocationDetail({ event }: { event: ServiceEventItem | null }) {
+  const address = getServiceInstallLocationAddress(event);
+  if (!address) return null;
+
+  const mapsUrl = buildYandexMapsUrlForInstallLocation(event);
+  const canOpenMap = canOpenServiceInstallLocationOnMap(event) && mapsUrl != null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 2 }}>
+      <p style={{ margin: 0, fontSize: 12, color: C.text2, lineHeight: 1.45 }}>
+        <span style={{ color: C.text3 }}>Адрес сервиса: </span>
+        {address}
+      </p>
+      {canOpenMap ? (
+        <a
+          href={mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            ...mutedBtnStyle,
+            alignSelf: "flex-start",
+            height: 28,
+            fontSize: 11,
+            textDecoration: "none",
+          }}
+        >
+          На карте
+        </a>
+      ) : null}
+    </div>
+  );
 }
 
 function buildMultiNodeLabel(nodeTree: NodeTreeItem[], ids: string[]): string {
@@ -2360,8 +2398,8 @@ function ServiceLogRow({
           boxSizing: "border-box",
         }}
       >
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12, minWidth: 0 }}>
-          <ServiceLogLeadingEventIcon event={event} actionKind={actionKind} iconCfg={iconCfg} size={26} />
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <ServiceLogLeadingEventIcon event={event} actionKind={actionKind} iconCfg={iconCfg} size={SERVICE_LOG_JOURNAL_LEADING_ICON_PX} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <span
               style={{
@@ -2622,7 +2660,7 @@ function ServiceLogEventDetails({
       <div style={{ padding: detailPanelHeaderPad, borderBottom: SPEC.borderSubtle }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
-            <ServiceLogLeadingEventIcon event={event} actionKind={actionKind} iconCfg={iconCfg} size={24} />
+            <ServiceLogLeadingEventIcon event={event} actionKind={actionKind} iconCfg={iconCfg} size={SERVICE_LOG_DETAIL_LEADING_ICON_PX} />
             <div style={{ minWidth: 0 }}>
               <p style={{ fontSize: 15, fontWeight: 700, color: SPEC.textPrimary, lineHeight: 1.2 }}>
                 {entry.mainTitle}
@@ -2908,6 +2946,7 @@ function ServiceLogEventDetails({
                   {event.serviceProviderNote?.trim() ? event.serviceProviderNote.trim() : "—"}
                 </p>
               ) : null}
+              <ServiceInstallLocationDetail event={event} />
             </div>
           </div>
         </div>

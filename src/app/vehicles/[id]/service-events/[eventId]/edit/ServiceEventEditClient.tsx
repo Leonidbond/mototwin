@@ -53,7 +53,7 @@ export function ServiceEventEditClient() {
         if (vehicle) {
           const nm =
             vehicle.nickname?.trim() ||
-            `${vehicle.brand.name} ${vehicle.model.name}`.trim() ||
+            `${vehicle.brandName} ${vehicle.modelName}`.trim() ||
             "Мотоцикл";
           setVehicleDisplayName(nm);
         }

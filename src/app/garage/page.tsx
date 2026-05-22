@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { createWebApiClient } from "@/lib/create-web-api-client";
+import { AuthGate } from "@/components/auth/AuthGate";
 import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { Card } from "@/components/ui";
 import { productSemanticColors, typeScale } from "@mototwin/design-tokens";
@@ -15,7 +16,7 @@ import { GarageTasksStrip } from "./_components/GarageTasksStrip";
 import { VehicleCard } from "./_components/VehicleCard";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
-const garageApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+const garageApi = createWebApiClient();
 
 const SIDEBAR_COLLAPSED_KEY = "garage.sidebar.collapsed";
 
@@ -89,6 +90,7 @@ export default function GaragePage() {
   const showVehicleList = !isLoading && !error && hasVehicles;
 
   return (
+    <AuthGate>
     <main
       style={{
         width: "100%",
@@ -160,6 +162,7 @@ export default function GaragePage() {
         </section>
       </div>
     </main>
+    </AuthGate>
   );
 }
 

@@ -17,6 +17,8 @@
     "qa:service-event-full-smoke": "tsx scripts/qa-service-event-full-smoke.ts",
     "qa:service-log-web-routes-smoke": "tsx scripts/qa-service-log-web-routes-smoke.ts",
     "qa:notifications-smoke": "tsx scripts/qa-notifications-smoke.ts",
+    "qa:auth-smoke": "tsx scripts/qa-auth-smoke.ts",
+    "cron:notifications": "tsx scripts/cron-recalculate-all-users.ts",
     "mobile:dev": "npm run dev --workspace @mototwin/app",
     "mobile:dev:lan": "npm run dev:lan --workspace @mototwin/app",
     "mobile:dev:usb": "npm run dev:localhost --workspace @mototwin/app",
@@ -30,6 +32,7 @@
     "expo": "npm exec --workspace=@mototwin/app -- expo"
   },
   "dependencies": {
+    "@iminside/react-yandex-maps": "^1.2.7",
     "@mototwin/api-client": "*",
     "@mototwin/design-tokens": "*",
     "@mototwin/domain": "*",
@@ -38,6 +41,7 @@
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "@tanstack/react-table": "^8.21.3",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "lucide-react": "^1.16.0",
     "next": "^16.2.6",
@@ -53,7 +57,9 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

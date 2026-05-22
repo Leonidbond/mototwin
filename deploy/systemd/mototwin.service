@@ -1,0 +1,18 @@
+[Unit]
+Description=MotoTwin Next.js
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/opt/mototwin/app
+EnvironmentFile=/opt/mototwin/app/.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

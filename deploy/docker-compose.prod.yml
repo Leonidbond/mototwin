@@ -1,0 +1,18 @@
+# Production PostgreSQL — bind only to localhost on the VPS.
+# Usage (on server): docker compose -f deploy/docker-compose.prod.yml up -d
+services:
+  mototwin-postgres:
+    image: postgres:16
+    container_name: mototwin-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mototwin_app
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env beside this file}"
+      POSTGRES_DB: mototwin
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - mototwin_pg_data:/var/lib/postgresql/data
+
+volumes:
+  mototwin_pg_data:

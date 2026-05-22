@@ -78,6 +78,12 @@ import type {
   CreateFitmentEvidenceResponse,
   PartCompatibilityReportResponse,
   PartMasterPrefillResponse,
+  AuthMeResponse,
+  AuthLoginResponse,
+  AuthLoginInput,
+  AuthRegisterInput,
+  AuthRefreshInput,
+  AuthRefreshResponse,
 } from "@mototwin/types";
 import type { ApiClient } from "./fetcher";
 
@@ -87,6 +93,38 @@ import type { ApiClient } from "./fetcher";
  */
 export function createMotoTwinEndpoints(client: ApiClient) {
   return {
+    getAuthMe() {
+      return client.request<AuthMeResponse>("/api/auth/me");
+    },
+
+    login(input: AuthLoginInput) {
+      return client.request<AuthLoginResponse>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    register(input: AuthRegisterInput) {
+      return client.request<AuthLoginResponse>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    logout(refreshToken?: string) {
+      return client.request<{ ok: boolean }>("/api/auth/logout", {
+        method: "POST",
+        body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+      });
+    },
+
+    refreshAuth(input: AuthRefreshInput) {
+      return client.request<AuthRefreshResponse>("/api/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
     getProfile() {
       return client.request<ProfileResponse>("/api/profile");
     },

@@ -16,8 +16,16 @@
     "plugins": [
       "expo-router"
     ],
+    "android": {
+      "package": "ru.mototwin.app"
+    },
     "ios": {
-      "bundleIdentifier": "com.anonymous.mototwin-app"
+      "bundleIdentifier": "ru.mototwin.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_AFTER_eas_init"
+      }
     }
   }
 }

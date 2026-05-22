@@ -150,7 +150,9 @@ export default function NewServiceEventScreen() {
         setNodeTree(nextTree);
 
         const v = vehicleData.vehicle;
-        setVehicleDisplayName(v?.displayName?.trim() || "Мотоцикл");
+        setVehicleDisplayName(
+          v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelName}`.trim() : "") || "Мотоцикл"
+        );
         const rawV = v as VehicleDetailApiRecord | null | undefined;
         setContextVehicleDetail(rawV ? vehicleDetailFromApiRecord(rawV) : null);
         const vehicleOdometer = v?.odometer ?? null;

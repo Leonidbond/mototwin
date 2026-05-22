@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { useRouter } from "expo-router";
+import { createMobileApiClient, clearMobileSession } from "../src/create-mobile-api-client";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
   getDevUserOptions,
@@ -50,8 +51,10 @@ export default function ProfileScreen() {
     return identity?.trim().toLowerCase() || null;
   }, [apiProfile?.email, selectedDevUserEmail]);
 
+  const router = useRouter();
+
   const loadProfileAndSettings = useCallback(async () => {
-    const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+    const endpoints = createMobileApiClient();
     try {
       const [settingsResponse, profileResponse] = await Promise.all([
         endpoints.getUserSettings(),
@@ -92,7 +95,7 @@ export default function ProfileScreen() {
     const next = mergeUserLocalSettings(userSettings, patch);
     setUserSettings(next);
     try {
-      const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+      const endpoints = createMobileApiClient();
       const response = await endpoints.updateUserSettings(next);
       const resolved = mergeUserLocalSettings(DEFAULT_USER_LOCAL_SETTINGS, response.settings);
       setUserSettings(resolved);
@@ -122,9 +125,17 @@ export default function ProfileScreen() {
           <InfoRow label="Email" value={profile.email} />
           <InfoRow label="Дата регистрации" value={profile.createdAtLabel} />
           <InfoRow label="Гараж" value={profile.garageTitle} />
-          <Text style={styles.hintText}>
-            Авторизация пока не реализована, данные профиля отображаются в pre-auth режиме.
-          </Text>
+          {!__DEV__ ? (
+            <Pressable
+              style={styles.logoutButton}
+              onPress={async () => {
+                await clearMobileSession();
+                router.replace("/login");
+              }}
+            >
+              <Text style={styles.logoutButtonText}>Выйти из аккаунта</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.section}>
@@ -285,6 +296,15 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 13, color: c.textMuted },
   infoValue: { fontSize: 13, fontWeight: "600", color: c.textPrimary, flexShrink: 1, textAlign: "right" },
   hintText: { marginTop: 2, fontSize: 11, color: c.textMuted },
+  logoutButton: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  logoutButtonText: { fontSize: 14, fontWeight: "600", color: c.textPrimary },
   settingRow: { gap: 6 },
   settingLabel: { fontSize: 12, color: c.textSecondary },
   settingOptionsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },

@@ -94,7 +94,7 @@
 **Поведение:**
 
 - Подпись **«Место установки (опционально)»**; текстовое поле адреса (до 500 символов, `ADD_SERVICE_EVENT_INSTALL_LOCATION_MAX_LENGTH` в `@mototwin/domain`).
-- Кнопка **«На карте»** открывает модалку **`YandexMapPlacePickerModal`** — поиск адреса (Suggest), клик по карте, обратное геокодирование; по **«Выбрать»** в форму подставляются адрес и координаты.
+- Кнопка **«На карте»** открывает модалку **`YandexMapPlacePickerModal`** — встроенный поиск `SearchControl` Яндекса, клик по организации с подтверждением, клик по карте, обратное геокодирование; по **«Выбрать»** в форму подставляются адрес и координаты.
 - Кнопка **×** очищает адрес и координаты.
 - При заданных координатах под полем показывается строка «Координаты: …».
 
@@ -102,17 +102,19 @@
 
 | Путь | Назначение |
 |------|------------|
-| `src/components/integrations/yandex-maps/` | Загрузка JS API 2.1, модалка выбора точки, тип `YandexMapPlace`. |
-| `index.ts` | Экспорт: `YandexMapPlacePickerModal`, `loadYandexMapsApi`, `getYandexMapsApiKey`, `isYandexMapsConfigured`. |
+| `src/components/integrations/yandex-maps/` | Модалка выбора точки на `@iminside/react-yandex-maps`, клиент `/api/geocode`, тип `YandexMapPlace`. |
+| `index.ts` | Экспорт: `YandexMapPlacePickerModal`, `getYandexMapsApiKey`, `isYandexMapsConfigured`. |
 
 **Переменная окружения** (корневой `.env`, см. `.env.example`):
 
 ```bash
 NEXT_PUBLIC_YANDEX_MAPS_API_KEY="ключ-из-кабинета-разработчика"
+YANDEX_GEOCODER_API_KEY="ключ-http-геокодера"
 ```
 
-- Ключ: [Кабинет разработчика Яндекса](https://developer.tech.yandex.ru/) → сервис **«JavaScript API и HTTP Геокодер»** (нужны и карта, и геокодер/Suggest).
-- Без ключа поле адреса работает; кнопка «На карте» скрыта, под полем — подсказка про `NEXT_PUBLIC_YANDEX_MAPS_API_KEY`.
+- Нужны оба ключа: JS API (карта + SearchControl) и HTTP Геокодер (fallback-поиск и reverse через `/api/geocode`).
+- Без `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` поле адреса работает; кнопка «На карте» скрыта, под полем — подсказка про ключ.
+- Без `YANDEX_GEOCODER_API_KEY` карта откроется, но fallback-поиск и reverse геокодирование будут недоступны.
 - После добавления ключа перезапустите `npm run dev` (переменные `NEXT_PUBLIC_*` читаются при старте Next.js).
 - В кабинете Яндекса ограничьте ключ по **HTTP Referrer** (для локальной разработки — `localhost`).
 
@@ -266,7 +268,7 @@ Expo/mobile намеренно оставляет один экран **`apps/ap
 4. Из **service-log** — переходы new / repeat / edit с **`returnTo`**.
 5. Из **vehicle-detail** — new, edit, wishlist / узел (query-параметры), без регрессии навигации.
 6. Пробег/моточасы **выше текущих** → модалка; **«Не обновлять»** / фон / крестик → в полях снова **текущие** показатели ТС; **«Обновить»** → успешный PATCH и поля без отката.
-7. **Место установки:** ручной ввод адреса; с **`NEXT_PUBLIC_YANDEX_MAPS_API_KEY`** — «На карте» → выбор на карте → адрес и координаты в форме; после сохранения события поля в ответе API / при повторном edit.
+7. **Место установки:** ручной ввод адреса; с **`NEXT_PUBLIC_YANDEX_MAPS_API_KEY`** — «На карте» → поиск через SearchControl/клик по карте → адрес и координаты в форме; при ошибке SearchControl включается fallback через `/api/geocode`; после сохранения события поля приходят в API и при повторном edit.
 
 Линт по области формы (в zsh квадратные скобки в пути — в кавычках):
 
