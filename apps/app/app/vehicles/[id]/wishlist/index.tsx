@@ -831,7 +831,7 @@ export default function VehicleWishlistScreen() {
   }
 
   const scrollBottomPad = 88 + insets.bottom;
-  const openGarage = () => router.push("/");
+  const openGarage = () => router.push("/garage");
   const openNodes = () => router.push(`/vehicles/${vehicleId}/nodes`);
   const openJournal = () => router.push(`/vehicles/${vehicleId}/service-log`);
   const openPicker = () => router.push(`/vehicles/${vehicleId}/wishlist`);

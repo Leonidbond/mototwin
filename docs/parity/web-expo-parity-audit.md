@@ -37,7 +37,7 @@
 
 | Область | Web | Expo |
 |--------|-----|------|
-| Гараж | `src/app/garage/page.tsx` | `apps/app/app/index.tsx` |
+| Гараж | `src/app/garage/page.tsx` | `apps/app/app/garage.tsx` |
 | Добавление мотоцикла | `src/app/onboarding/page.tsx` | `apps/app/app/vehicles/new.tsx` |
 | Карточка ТС | `src/app/vehicles/[id]/page.tsx` | `apps/app/app/vehicles/[id]/index.tsx` |
 | Состояние (пробег / моточасы) | тот же `page.tsx` (инлайн) | `apps/app/app/vehicles/[id]/state.tsx` |

@@ -52,7 +52,7 @@ export function InternalScreenChrome(props: {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/");
+      router.replace("/garage");
     }
   };
 

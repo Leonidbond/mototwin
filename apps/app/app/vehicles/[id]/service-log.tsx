@@ -2069,7 +2069,7 @@ export default function ServiceLogScreen() {
       />
       <GarageBottomNav
         activeKey="journal"
-        onOpenGarage={() => router.push("/")}
+        onOpenGarage={() => router.push("/garage")}
         onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
         onOpenJournal={() => undefined}
         onOpenPicker={() => router.push(`/vehicles/${vehicleId}/wishlist`)}

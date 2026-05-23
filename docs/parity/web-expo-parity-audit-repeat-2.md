@@ -14,7 +14,7 @@
 
 | Область | Web | Expo |
 |--------|-----|------|
-| Гараж | `src/app/garage/page.tsx` | `apps/app/app/index.tsx` |
+| Гараж | `src/app/garage/page.tsx` | `apps/app/app/garage.tsx` |
 | Добавление мотоцикла | `src/app/onboarding/page.tsx` | `apps/app/app/vehicles/new.tsx` |
 | Карточка ТС | `src/app/vehicles/[id]/page.tsx` | `apps/app/app/vehicles/[id]/index.tsx` |
 | Состояние ТС | инлайн в `page.tsx` | `apps/app/app/vehicles/[id]/state.tsx` |
@@ -70,9 +70,9 @@
 |------|--------|---------------------------|
 | Дефолт валюты Add Service Event → **RUB** | **Fixed** | `packages/domain/src/forms.ts`: `DEFAULT_ADD_SERVICE_EVENT_CURRENCY`; web `page.tsx` и Expo `service-events/new.tsx` — `useState(() => createInitialAddServiceEventFormValues().currency)` |
 | Политика отображения дат | **Documented / aligned** | `buildServiceLogTimelineProps` + стили; `formatIsoCalendarDateRu` для пояснения статуса; JSDoc в `packages/types/src/service-log.ts` |
-| Политика spec highlights на гараже | **Fixed** | `filterMeaningfulGarageSpecHighlights` в `garage/page.tsx` и `app/index.tsx` |
+| Политика spec highlights на гараже | **Fixed** | `filterMeaningfulGarageSpecHighlights` в `garage/page.tsx` и `app/garage.tsx` |
 | Расширение `productSemanticColors` на web | **Partially done** | Гараж, onboarding, карточка ТС, **модалка журнала** (оверлей, таймлайн, бейджи); остальной UI преимущественно Tailwind |
-| Строка отладки API в Expo | **Gated** | `apps/app/app/index.tsx`: `{__DEV__ ? <Text>Текущий API: …` |
+| Строка отладки API в Expo | **Removed** | В текущем mobile UI debug-строка API не отображается |
 | Структура parity-документации | **Done** | Индекс [web-expo-parity-audit.md](./web-expo-parity-audit.md); детали в repeat / fix-доках |
 | TopNodeState / кэш статусов | **Вне объёма клиентского кода в этом шаге** | Логика на backend; клиенты потребляют дерево/статусы; регрессии — [status-cache-frontend-qa.md](../status-cache-frontend-qa.md) |
 | Клик/тап по **статусу узла** → журнал с фильтром по узлу/поддереву | **Implemented** (2026-04-18) | Shared: `createServiceLogNodeFilter`, `restrictToNodeIds` в `buildServiceLogTimelineProps` / `filterServiceLogEntries`; web — state в модалке; Expo — query `nodeIds` / `nodeLabel`; см. [web-expo-node-tree-parity-fixes.md](./web-expo-node-tree-parity-fixes.md), [web-expo-service-log-parity-fixes.md](./web-expo-service-log-parity-fixes.md) |
@@ -167,7 +167,7 @@
 ### 6.1. Доступно по инспекции кода
 
 - Наличие `filterMeaningfulGarageSpecHighlights`, `DEFAULT_ADD_SERVICE_EVENT_CURRENCY`, `buildServiceLogTimelineProps` с ожидаемым `dateStyle`.  
-- `__DEV__` вокруг строки API в `apps/app/app/index.tsx`.  
+- Debug-строка API в Expo-гараже удалена из пользовательского UI.
 - Использование `createMotoTwinEndpoints` в `src/app` без `fetch`.  
 - `formatIsoCalendarDateRu` / токены в модалке журнала на web.
 

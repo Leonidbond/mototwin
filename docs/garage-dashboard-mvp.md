@@ -117,8 +117,10 @@ When no motorcycles exist:
 
 ## Expo
 
-- Route: `apps/app/app/index.tsx`.
-- Same dashboard semantics with mobile-first header, summary KPI cards, and web-aligned garage cards.
+- Routes:
+  - `apps/app/app/index.tsx` — mobile start page (landing) with CTA to garage.
+  - `apps/app/app/garage.tsx` — garage dashboard screen.
+- Garage dashboard keeps same semantics with mobile-first header, summary KPI cards, and web-aligned garage cards.
 - Garage includes fixed bottom navigation with `Мой гараж`, `Узлы`, `Журнал`, `Расходы`, `Профиль`.
 - Garage has profile entry action in the bottom navigation that navigates to `profile` screen.
 - Garage has `Свалка` entry action that navigates to `trash` screen.

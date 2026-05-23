@@ -1799,7 +1799,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
               await createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).moveVehicleToTrash(
                 vehicleId
               );
-              router.replace("/");
+              router.replace("/garage");
             } catch (requestError) {
               console.error(requestError);
               setError("Не удалось переместить мотоцикл на Свалку.");
@@ -1914,7 +1914,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                   router.back();
                   return;
                 }
-                router.replace("/");
+                router.replace("/garage");
               }}
             />
             <View style={styles.fullTreeSection}>
@@ -2329,7 +2329,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       </ScrollView>
       <GarageBottomNav
         activeKey={isNodeTreePage ? "nodes" : "garage"}
-        onOpenGarage={() => router.push("/")}
+        onOpenGarage={() => router.push("/garage")}
         onOpenNodes={() => {
           if (!isNodeTreePage) {
             router.push(`/vehicles/${vehicleId}/nodes`);

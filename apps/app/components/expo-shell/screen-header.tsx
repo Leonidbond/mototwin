@@ -22,7 +22,7 @@ export function ScreenHeader(props: {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/");
+      router.replace("/garage");
     }
   };
 

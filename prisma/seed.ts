@@ -5,6 +5,7 @@ import path from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { normalizePartNumber } from "@mototwin/domain";
+import * as XLSX from "xlsx";
 import { backfillPartMastersFromSkus } from "./backfill-part-masters";
 
 const connectionString = process.env.DATABASE_URL;
@@ -1744,6 +1745,212 @@ async function seedExpenseDemoData(input: {
   return { demoExpensesCreated, demoExpensesSkipped: 0 };
 }
 
+function normalizeSeedCell(value: unknown): string | null {
+  if (value == null) {
+    return null;
+  }
+  const s = String(value).trim();
+  if (!s || s.toLowerCase() === "n/a" || s === "н/д") {
+    return null;
+  }
+  return s;
+}
+
+function slugifySeedValue(value: string): string {
+  return value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
+function parseStartYear(yearsRaw: string | null): number | null {
+  if (!yearsRaw) {
+    return null;
+  }
+  const yearMatches = yearsRaw.match(/\b(19|20)\d{2}\b/g);
+  if (!yearMatches || yearMatches.length === 0) {
+    return null;
+  }
+  const firstYear = Number.parseInt(yearMatches[0] ?? "", 10);
+  return Number.isFinite(firstYear) ? firstYear : null;
+}
+
+function parseCoolingType(engineRaw: string | null): string | null {
+  if (!engineRaw) {
+    return null;
+  }
+  const normalized = engineRaw.toLowerCase();
+  if (normalized.includes("air/liquid")) {
+    return "liquid/air";
+  }
+  if (
+    normalized.includes("water-cooled") ||
+    normalized.includes("liquid-cooled") ||
+    normalized.includes("liquid")
+  ) {
+    return "liquid";
+  }
+  if (normalized.includes("air-cooled") || normalized.includes("air cooled")) {
+    return "air";
+  }
+  return null;
+}
+
+type MotoTwinXlsxSeedStats = {
+  xlsxRowsTotal: number;
+  xlsxRowsProcessed: number;
+  xlsxRowsSkipped: number;
+  xlsxBrandsUpserted: number;
+  xlsxModelsUpserted: number;
+  xlsxVariantsUpserted: number;
+  xlsxVariantsSkippedNoYear: number;
+};
+
+async function seedMotoTwinModelsFromXlsx(): Promise<MotoTwinXlsxSeedStats> {
+  const filePath = path.join(process.cwd(), "data", "source", "Модели и конфигурации MotoTwin.xlsx");
+
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = XLSX.readFile(filePath, { raw: false });
+  } catch (error) {
+    console.warn(`[seed] MotoTwin XLSX skipped: unable to read file (${filePath})`, error);
+    return {
+      xlsxRowsTotal: 0,
+      xlsxRowsProcessed: 0,
+      xlsxRowsSkipped: 0,
+      xlsxBrandsUpserted: 0,
+      xlsxModelsUpserted: 0,
+      xlsxVariantsUpserted: 0,
+      xlsxVariantsSkippedNoYear: 0,
+    };
+  }
+
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) {
+    console.warn("[seed] MotoTwin XLSX skipped: no sheets found");
+    return {
+      xlsxRowsTotal: 0,
+      xlsxRowsProcessed: 0,
+      xlsxRowsSkipped: 0,
+      xlsxBrandsUpserted: 0,
+      xlsxModelsUpserted: 0,
+      xlsxVariantsUpserted: 0,
+      xlsxVariantsSkippedNoYear: 0,
+    };
+  }
+
+  const sheet = workbook.Sheets[firstSheetName];
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+    defval: null,
+    raw: false,
+  });
+
+  const seenBrands = new Set<string>();
+  const seenModels = new Set<string>();
+  let xlsxRowsProcessed = 0;
+  let xlsxRowsSkipped = 0;
+  let xlsxVariantsUpserted = 0;
+  let xlsxVariantsSkippedNoYear = 0;
+
+  for (const row of rows) {
+    const brandName = normalizeSeedCell(row["Brand"]);
+    const modelFamily = normalizeSeedCell(row["Model family"]);
+    const variantName = normalizeSeedCell(row["Variant / конфигурация"]) ?? modelFamily;
+
+    if (!brandName || !modelFamily || brandName.toLowerCase() === "brand") {
+      xlsxRowsSkipped += 1;
+      continue;
+    }
+
+    const brandSlug = slugifySeedValue(brandName);
+    if (!brandSlug) {
+      xlsxRowsSkipped += 1;
+      continue;
+    }
+
+    const brand = await prisma.brand.upsert({
+      where: { name: brandName },
+      update: { slug: brandSlug },
+      create: {
+        name: brandName,
+        slug: brandSlug,
+      },
+    });
+    seenBrands.add(brandName);
+
+    const modelSlug = slugifySeedValue(modelFamily);
+    if (!modelSlug) {
+      xlsxRowsSkipped += 1;
+      continue;
+    }
+
+    const model = await prisma.model.upsert({
+      where: { brandId_slug: { brandId: brand.id, slug: modelSlug } },
+      update: { name: modelFamily },
+      create: {
+        brandId: brand.id,
+        name: modelFamily,
+        slug: modelSlug,
+      },
+    });
+    seenModels.add(`${brand.id}\t${model.slug}`);
+
+    xlsxRowsProcessed += 1;
+
+    const year = parseStartYear(normalizeSeedCell(row["Годы"]));
+    if (!year || !variantName) {
+      xlsxVariantsSkippedNoYear += 1;
+      continue;
+    }
+
+    const className = normalizeSeedCell(row["Класс"]);
+    const engine = normalizeSeedCell(row["Двигатель"]);
+    const displacement = normalizeSeedCell(row["Объем"]);
+    const power = normalizeSeedCell(row["Мощность"]);
+    const torque = normalizeSeedCell(row["Момент"]);
+    const drive = normalizeSeedCell(row["Привод"]);
+    const frontWheel = normalizeSeedCell(row["Переднее колесо"]);
+    const rearWheel = normalizeSeedCell(row["Заднее колесо"]);
+    const wheelSizes =
+      frontWheel && rearWheel ? `${frontWheel}/${rearWheel}` : frontWheel ?? rearWheel ?? null;
+
+    const engineBits = [engine, displacement, power, torque].filter(
+      (value): value is string => Boolean(value)
+    );
+
+    await upsertModelVariant({
+      modelId: model.id,
+      year,
+      versionName: variantName,
+      generation: className,
+      market: null,
+      engineType: engineBits.length > 0 ? engineBits.join(" | ") : null,
+      coolingType: parseCoolingType(engine),
+      wheelSizes,
+      brakeSystem: null,
+      chainPitch: drive,
+      stockSprockets: null,
+    });
+    xlsxVariantsUpserted += 1;
+  }
+
+  console.log(
+    `[seed] MotoTwin XLSX: ${xlsxRowsProcessed} row(s) processed; ${xlsxRowsSkipped} skipped; ${xlsxVariantsUpserted} variant(s) upserted; ${xlsxVariantsSkippedNoYear} variant row(s) skipped (missing year).`
+  );
+
+  return {
+    xlsxRowsTotal: rows.length,
+    xlsxRowsProcessed,
+    xlsxRowsSkipped,
+    xlsxBrandsUpserted: seenBrands.size,
+    xlsxModelsUpserted: seenModels.size,
+    xlsxVariantsUpserted,
+    xlsxVariantsSkippedNoYear,
+  };
+}
+
 async function main() {
   const demoUser = await prisma.user.upsert({
     where: { email: "demo@mototwin.local" },
@@ -2002,6 +2209,8 @@ async function main() {
       status: "ACTIVE",
     },
   });
+
+  const motoTwinXlsxStats = await seedMotoTwinModelsFromXlsx();
 
   const bmw = await prisma.brand.upsert({
     where: { name: "BMW" },
@@ -2476,7 +2685,7 @@ async function main() {
 
   console.log("Seed completed");
   console.log({
-    brands: ["BMW", "KTM"],
+    coreBrands: ["BMW", "KTM"],
     demoUserEmail: demoUser.email,
     userAEmail: userA.email,
     userBEmail: userB.email,
@@ -2498,6 +2707,7 @@ async function main() {
     ...treeExpenseDemoStats,
     ...serviceBundleTemplateStats,
     qaDemoCatalogVehicles,
+    ...motoTwinXlsxStats,
   });
 }
 

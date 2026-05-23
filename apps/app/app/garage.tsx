@@ -1,0 +1,251 @@
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { buildGarageDashboardSummary } from "@mototwin/domain";
+import { productSemanticColors as c } from "@mototwin/design-tokens";
+import type { GarageVehicleItem } from "@mototwin/types";
+import { createMobileApiClient } from "../src/create-mobile-api-client";
+import { readLastViewedVehicleId } from "../src/ui-last-viewed-vehicle";
+import { AppScreenHelpBar } from "../components/expo-shell/app-screen-help-bar";
+import { GarageBottomNav } from "../components/garage/GarageBottomNav";
+import { GarageEmptyState } from "../components/garage/GarageEmptyState";
+import { GarageHeader } from "../components/garage/GarageHeader";
+import { GarageSummary } from "../components/garage/GarageSummary";
+import { VehicleCard } from "../components/garage/VehicleCard";
+
+export default function GarageScreen() {
+  const router = useRouter();
+  const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [trashCount, setTrashCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [lastViewedVehicleId, setLastViewedVehicleId] = useState<string | null>(null);
+
+  const loadGarage = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+      const endpoints = createMobileApiClient();
+      const [garageResult, trashResult, notificationsResult] = await Promise.allSettled([
+        endpoints.getGarageVehicles(),
+        endpoints.getTrashedVehicles(),
+        endpoints.getNotifications({ limit: 1 }),
+      ]);
+
+      if (garageResult.status === "rejected") {
+        throw garageResult.reason;
+      }
+
+      setVehicles(garageResult.value.vehicles ?? []);
+      if (trashResult.status === "fulfilled") {
+        setTrashCount(trashResult.value.vehicles?.length ?? 0);
+      } else {
+        setTrashCount(0);
+      }
+      if (notificationsResult.status === "fulfilled") {
+        setNotificationCount(notificationsResult.value.unreadCount ?? 0);
+      } else {
+        setNotificationCount(0);
+      }
+    } catch (requestError) {
+      console.error(requestError);
+      if (
+        requestError instanceof Error &&
+        requestError.message.toLowerCase().includes("требуется вход")
+      ) {
+        router.replace("/login");
+        return;
+      }
+      setError("Не удалось загрузить гараж. Проверьте подключение к backend.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadGarage();
+    }, [loadGarage])
+  );
+
+  useEffect(() => {
+    setLastViewedVehicleId(readLastViewedVehicleId());
+  }, [vehicles.length]);
+
+  const dashboardSummary = buildGarageDashboardSummary(vehicles);
+  const openTrash = useCallback(() => router.push("/trash"), [router]);
+  const openNotifications = useCallback(() => router.push("/notifications"), [router]);
+  const openProfile = useCallback(() => router.push("/profile"), [router]);
+  const openAddVehicle = useCallback(() => router.push("/vehicles/new"), [router]);
+  const reloadGarage = useCallback(() => void loadGarage(), [loadGarage]);
+  const openVehicle = useCallback((id: string) => router.push(`/vehicles/${id}`), [router]);
+  const openServiceEvent = useCallback(
+    (id: string) => router.push(`/vehicles/${id}/service-events/new`),
+    [router]
+  );
+  const openServiceLog = useCallback(
+    (id: string) => router.push(`/vehicles/${id}/service-log`),
+    [router]
+  );
+  const primaryVehicleId = vehicles[0]?.id ?? null;
+  const navVehicleId = primaryVehicleId ?? lastViewedVehicleId;
+  const openGarage = useCallback(() => router.push("/garage"), [router]);
+  const openNodes = useCallback(() => {
+    if (!navVehicleId) return;
+    router.push(`/vehicles/${navVehicleId}`);
+  }, [navVehicleId, router]);
+  const openJournal = useCallback(() => {
+    if (!navVehicleId) return;
+    router.push(`/vehicles/${navVehicleId}/service-log`);
+  }, [navVehicleId, router]);
+  const openExpenses = useCallback(() => {
+    if (!navVehicleId) return;
+    router.push(`/vehicles/${navVehicleId}/expenses`);
+  }, [navVehicleId, router]);
+  const openPicker = useCallback(() => {
+    if (!navVehicleId) return;
+    router.push(`/vehicles/${navVehicleId}/wishlist`);
+  }, [navVehicleId, router]);
+
+  if (isLoading) {
+    return (
+      <GarageScreenState>
+        <ActivityIndicator size="large" color={c.textPrimary} />
+        <Text style={styles.stateText}>Загрузка гаража...</Text>
+      </GarageScreenState>
+    );
+  }
+
+  if (error) {
+    return (
+      <GarageScreenState>
+        <Text style={styles.errorTitle}>Не удалось загрузить гараж</Text>
+        <Text style={styles.errorText}>{error}</Text>
+      </GarageScreenState>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <StatusBar style="light" />
+      <View style={styles.screen}>
+        <AppScreenHelpBar />
+        {vehicles.length === 0 ? (
+          <View style={styles.contentWrap}>
+            <GarageHeader
+              trashCount={trashCount}
+              notificationCount={notificationCount}
+              onOpenTrash={openTrash}
+              onOpenNotifications={openNotifications}
+              onOpenProfile={openProfile}
+              onAddVehicle={openAddVehicle}
+            />
+            <GarageEmptyState onReload={reloadGarage} />
+          </View>
+        ) : (
+          <FlatList
+            data={vehicles}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <VehicleCard
+                vehicle={item}
+                onOpenVehicle={openVehicle}
+                onAddServiceEvent={openServiceEvent}
+                onOpenServiceLog={openServiceLog}
+              />
+            )}
+            ListHeaderComponent={
+              <View>
+                <GarageHeader
+                  trashCount={trashCount}
+                  notificationCount={notificationCount}
+                  onOpenTrash={openTrash}
+                  onOpenNotifications={openNotifications}
+                  onOpenProfile={openProfile}
+                  onAddVehicle={openAddVehicle}
+                />
+                <GarageSummary
+                  motorcyclesCount={dashboardSummary.motorcyclesCount}
+                  motorcyclesWithAttentionCount={dashboardSummary.motorcyclesWithAttentionCount}
+                  attentionItemsTotalCount={dashboardSummary.attentionItemsTotalCount}
+                  expensesLabel={dashboardSummary.currentMonthExpensesLabel}
+                />
+              </View>
+            }
+          />
+        )}
+        <GarageBottomNav
+          onOpenGarage={openGarage}
+          onOpenNodes={openNodes}
+          onOpenJournal={openJournal}
+          onOpenPicker={openPicker}
+          onOpenExpenses={openExpenses}
+          onOpenProfile={openProfile}
+          hasVehicleContext={!!navVehicleId}
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function GarageScreenState(props: { children: ReactNode }) {
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <AppScreenHelpBar />
+      <View style={styles.center}>{props.children}</View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: c.canvas,
+  },
+  screen: {
+    flex: 1,
+  },
+  contentWrap: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 24,
+  },
+  stateText: {
+    color: c.textMuted,
+    fontSize: 14,
+  },
+  errorTitle: {
+    color: c.error,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  errorText: {
+    color: c.textMuted,
+    fontSize: 14,
+    textAlign: "center",
+    maxWidth: 320,
+  },
+});
+

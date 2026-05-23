@@ -235,7 +235,7 @@ export default function WishlistPickerScreen() {
   const searchSectionLayoutY = useRef(0);
 
   const navVehicleId = vehicleId || null;
-  const goGarage = useCallback(() => router.push("/"), [router]);
+  const goGarage = useCallback(() => router.push("/garage"), [router]);
   const goNodes = useCallback(() => {
     if (!navVehicleId) return;
     router.push(`/vehicles/${navVehicleId}`);

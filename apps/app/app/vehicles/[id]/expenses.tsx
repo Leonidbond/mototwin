@@ -871,7 +871,7 @@ export default function VehicleExpensesScreen() {
       />
       <GarageBottomNav
         activeKey="expenses"
-        onOpenGarage={() => router.push("/")}
+        onOpenGarage={() => router.push("/garage")}
         onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
         onOpenJournal={() => router.push(`/vehicles/${vehicleId}/service-log`)}
         onOpenPicker={() => router.push(`/vehicles/${vehicleId}/wishlist`)}

@@ -50,7 +50,7 @@ Flow сделан как **single-screen** c progressive sections:
 
 ## Обновление Garage после создания
 
-На экране `apps/app/app/index.tsx` загрузка гаража переведена на `useFocusEffect`.
+На экране `apps/app/app/garage.tsx` загрузка гаража переведена на `useFocusEffect`.
 Это гарантирует refresh списка при возврате из Add Motorcycle flow, и новый мотоцикл появляется в гараже сразу после успешного создания.
 
 ## Что отложено

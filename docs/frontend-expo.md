@@ -15,7 +15,8 @@
 ## 2. Route map (Expo Router)
 
 Defined in `apps/app/app/_layout.tsx`:
-- `index` — Garage
+- `index` — Mobile Start (landing / entry CTA)
+- `garage` — Garage
 - `vehicles/new` — Add Motorcycle
 - `vehicles/[id]/index` — Vehicle Detail
 - `vehicles/[id]/service-log` — Service Log
@@ -35,18 +36,26 @@ Defined in `apps/app/app/_layout.tsx`:
 
 ## 3. Main Expo flows
 
-### 3.1 Garage (`index.tsx`)
-- Uses shared `@mototwin/api-client` + dynamic base URL (`api-base-url.ts`)
-- Loads `/api/garage`
-- States: loading / error / empty / list
-- Primary action: "Добавить мотоцикл" -> `vehicles/new`
-- Refresh on focus (`useFocusEffect`)
+### 3.1 Start screen (`index.tsx`)
+- Mobile entry landing in web-inspired style.
+- Includes hero copy + CTA:
+  - `Перейти в гараж` -> `/garage`
+  - secondary action `Профиль` -> `/profile`
+- Contains short product feature cards.
+- Does not load garage API data directly.
+
+### 3.2 Garage (`garage.tsx`)
+- Uses shared `@mototwin/domain` + mobile API client (`createMobileApiClient`).
+- Loads `/api/garage` (+ trash count and notifications).
+- States: loading / error / empty / list.
+- Primary action: `Добавить мотоцикл` -> `vehicles/new`.
+- Refresh on focus (`useFocusEffect`).
 - Header matches current Garage product hierarchy:
   - large title `Мой гараж`
   - concise subtitle
   - top action `Свалка`
   - global help action `?` in the top-right corner
-- Uses compact 2x2 KPI cards with the same garage summary icons as web
+- Uses compact 2x2 KPI cards with the same garage summary icons as web.
 - Uses fixed bottom navigation:
   - `Мой гараж`
   - `Узлы`
@@ -54,7 +63,7 @@ Defined in `apps/app/app/_layout.tsx`:
   - `Расходы`
   - `Профиль`
 - Empty state uses illustration `images/empty_garage.png` and caption
-  `В вашем гараже пока нет мотоциклов`
+  `В вашем гараже пока нет мотоциклов`.
 - Vehicle cards are web-aligned by information architecture:
   - title + compact meta line
   - silhouette block
@@ -67,7 +76,7 @@ Defined in `apps/app/app/_layout.tsx`:
   - `Просрочено`
   - `Недавно`
 
-### 3.2 Add Motorcycle (`vehicles/new.tsx`)
+### 3.3 Add Motorcycle (`vehicles/new.tsx`)
 - Progressive single-screen flow
 - Cascading fetch:
   - `getBrands()`
@@ -80,9 +89,9 @@ Defined in `apps/app/app/_layout.tsx`:
   - nickname, vin, engineHours
 - Ride profile selection included
 - Create via `createVehicle()` -> `POST /api/vehicles`
-- Success: `router.replace("/")`
+- Success: `router.replace("/garage")`
 
-### 3.3 Vehicle Detail (`vehicles/[id]/index.tsx`)
+### 3.4 Vehicle Detail (`vehicles/[id]/index.tsx`)
 - Loads:
   - `getVehicleDetail()`
   - `getNodeTree()`
@@ -108,7 +117,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - TOP-node icons use the shared Expo `TopNodeIcon` renderer (`@mototwin/icons` MaterialCommunityIcons fallback). The app does not import the web PNG icon set directly in this screen.
 - Leaf node actions still navigate to add service event / wishlist flows with preselected node; service log remains the journal route.
 
-### 3.4 Service Log (`vehicles/[id]/service-log.tsx`)
+### 3.5 Service Log (`vehicles/[id]/service-log.tsx`)
 - Loads `getServiceEvents()`
 - Uses shared domain helpers:
   - `filterAndSortServiceEvents`
@@ -120,22 +129,22 @@ Defined in `apps/app/app/_layout.tsx`:
 - Шапка: **`InternalScreenChrome`**; кнопка **«Добавить сервисное событие»** — отдельной полосой **под** заголовком (не в одной строке с заголовком). Кнопка перехода к экрану расходов из шапки журнала убрана (расходы доступны из нижней навигации и сценариев карточек).
 - Action to `vehicles/[id]/service-events/new`
 
-### 3.5 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `components/vehicle-detail/basic-service-event-bundle-form.tsx`)
+### 3.6 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `components/vehicle-detail/basic-service-event-bundle-form.tsx`)
 - Screen loads node tree / vehicle / existing event (edit/repeat); builds initial **`AddServiceEventFormValues`** with shared domain helpers (same contract as web **`ServiceEventForm`**).
 - Bundle UI: multiple leaf rows in BASIC, parts + labor + total, SKU lookup, uninstalled expenses, JSON — see [web-expo-service-log-parity-fixes.md](./parity/web-expo-service-log-parity-fixes.md).
 - Submit to `/api/vehicles/[id]/service-events` (create) or update route when editing.
 - Supports return `source` (service-log, tree, attention, wishlist, …).
 
-### 3.6 Update Vehicle State (`vehicles/[id]/state.tsx`)
+### 3.7 Update Vehicle State (`vehicles/[id]/state.tsx`)
 - Prefills current state
 - Validates numeric input
 - Calls `updateVehicleState()` -> `/api/vehicles/[id]/state`
 
-### 3.7 Edit Vehicle Profile (`vehicles/[id]/profile.tsx`)
+### 3.8 Edit Vehicle Profile (`vehicles/[id]/profile.tsx`)
 - Prefills nickname, vin, ride profile
 - Calls `updateVehicleProfile()` -> `/api/vehicles/[id]/profile`
 
-### 3.8 Parts wishlist / «корзина замен» (`vehicles/[id]/wishlist/index.tsx`, алиас `vehicles/[id]/parts.tsx`)
+### 3.9 Parts wishlist / «корзина замен» (`vehicles/[id]/wishlist/index.tsx`, алиас `vehicles/[id]/parts.tsx`)
 - Full-vehicle wishlist list + status groups, summary cards, search, detail bottom sheet, and swipe actions; behavior and contracts match [parts-wishlist-mvp.md](./parts-wishlist-mvp.md). В блоке **«Действия»** детальной модалки — короткие подписи **Редактировать / Заказать / Купить / Установить / Повторить / Удалить**, к журналу — **Перейти** (с `accessibilityLabel` полной фразы).
 - **Deep link из журнала** (`wishlistItemId` и др. через `vehicles/[id]/parts.tsx`): после фокуса на строке и открытия детальной панели экран **не** делает `router.replace` на `/vehicles/[id]/wishlist` без query — иначе срабатывает повторный `useFocusEffect` → `load()`, возможен сброс состояния и скачок фильтра **«Установленные» → «Все»**. Поведение согласовано с комментарием у `applyWishlistRowFocus`: лишняя смена URL не нужна для стабильного UI.
 - **Repeat purchase** from the cart matches web `PartsCartPage`: confirmation modal, `createWishlistItem` with `NEEDED`, comment suffix «Повтор из корзины замен», no cost copy, then filter to NEEDED. Фокус на новую строку (**`applyWishlistRowFocus`**) вызывается **после** закрытия системного **`Alert`** (кнопка «OK»), чтобы не совмещать **`Modal`** детали и **`Alert`** в одном кадре — иначе на React Native возможен «пустой» экран и подвисание. Перед показом модалки подтверждения «Повторить покупку» вызывается **`openRepeatPurchaseConfirm`**: закрыть лист детали / меню статуса, затем **`InteractionManager.runAfterInteractions`** — иначе второй **`Modal`** поверх первого часто не отображается.
@@ -161,8 +170,8 @@ Defined in `apps/app/app/_layout.tsx`:
 ### 4.2 API / debug line policy (product UI)
 
 - **Production-like builds** (`__DEV__ === false`, e.g. release): the app **must not** show raw API base URLs or other developer-only diagnostics in normal screens.
-- **Development** (`__DEV__ === true`): the garage **error** state may show **«Текущий API: …»** so engineers can confirm which host `getApiBaseUrl()` resolved to. User-facing copy (title, explanation, «Повторить») is unchanged.
-- **Behavior:** gating is display-only; `getApiBaseUrl()` and `createApiClient` are unaffected.
+- **Development** (`__DEV__ === true`): temporary diagnostics are allowed only for troubleshooting and should be removed after issue resolution.
+- **Behavior:** this policy is display-only and must not change auth/session logic.
 
 ## 5. Current parity status
 

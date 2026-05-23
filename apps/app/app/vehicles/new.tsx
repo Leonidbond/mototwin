@@ -231,7 +231,7 @@ export default function NewVehicleScreen() {
 
       await endpoints.createVehicle(normalizeAddMotorcyclePayload(motorcycleForm));
 
-      router.replace("/");
+      router.replace("/garage");
     } catch (error) {
       console.error(error);
       setScreenError("Не удалось добавить мотоцикл. Проверьте данные и попробуйте снова.");

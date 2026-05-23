@@ -50,7 +50,7 @@
 
 | Файл |
 |------|
-| `apps/app/app/index.tsx` |
+| `apps/app/app/garage.tsx` |
 | `apps/app/app/vehicles/[id]/service-log.tsx` |
 | `apps/app/app/vehicles/new.tsx` |
 | `apps/app/app/vehicles/[id]/profile.tsx` |

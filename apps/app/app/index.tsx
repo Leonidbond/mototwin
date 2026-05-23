@@ -1,205 +1,66 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useMemo } from "react";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
-import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import type { GarageVehicleItem } from "@mototwin/types";
-import { getApiBaseUrl } from "../src/api-base-url";
-import { readLastViewedVehicleId } from "../src/ui-last-viewed-vehicle";
 import { AppScreenHelpBar } from "../components/expo-shell/app-screen-help-bar";
-import { GarageBottomNav } from "../components/garage/GarageBottomNav";
-import { GarageEmptyState } from "../components/garage/GarageEmptyState";
-import { GarageHeader } from "../components/garage/GarageHeader";
-import { GarageSummary } from "../components/garage/GarageSummary";
-import { VehicleCard } from "../components/garage/VehicleCard";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [trashCount, setTrashCount] = useState(0);
-  const [notificationCount, setNotificationCount] = useState(0);
-  const [lastViewedVehicleId, setLastViewedVehicleId] = useState<string | null>(null);
-
-  const apiBaseUrl = getApiBaseUrl();
-
-  const loadGarage = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError("");
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-      const [garageResult, trashResult, notificationsResult] = await Promise.allSettled([
-        endpoints.getGarageVehicles(),
-        endpoints.getTrashedVehicles(),
-        endpoints.getNotifications({ limit: 1 }),
-      ]);
-
-      if (garageResult.status === "rejected") {
-        throw garageResult.reason;
-      }
-
-      setVehicles(garageResult.value.vehicles ?? []);
-      if (trashResult.status === "fulfilled") {
-        setTrashCount(trashResult.value.vehicles?.length ?? 0);
-      } else {
-        setTrashCount(0);
-      }
-      if (notificationsResult.status === "fulfilled") {
-        setNotificationCount(notificationsResult.value.unreadCount ?? 0);
-      } else {
-        setNotificationCount(0);
-      }
-    } catch (requestError) {
-      console.error(requestError);
-      setError("Не удалось загрузить гараж. Проверьте подключение к backend.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [apiBaseUrl]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadGarage();
-    }, [loadGarage])
+  const featureCards = useMemo(
+    () => [
+      {
+        title: "История обслуживания",
+        description: "Все ТО и работы по мотоциклу в одном месте.",
+      },
+      {
+        title: "Контроль расходов",
+        description: "Понимайте реальную стоимость владения техникой.",
+      },
+      {
+        title: "Узлы и детали",
+        description: "Быстро переходите к ключевой информации по мотоциклу.",
+      },
+    ],
+    []
   );
-
-  useEffect(() => {
-    setLastViewedVehicleId(readLastViewedVehicleId());
-  }, [vehicles.length]);
-
-  const dashboardSummary = buildGarageDashboardSummary(vehicles);
-  const openTrash = useCallback(() => router.push("/trash"), [router]);
-  const openNotifications = useCallback(() => router.push("/notifications"), [router]);
-  const openProfile = useCallback(() => router.push("/profile"), [router]);
-  const openAddVehicle = useCallback(() => router.push("/vehicles/new"), [router]);
-  const reloadGarage = useCallback(() => void loadGarage(), [loadGarage]);
-  const openVehicle = useCallback((id: string) => router.push(`/vehicles/${id}`), [router]);
-  const openServiceEvent = useCallback(
-    (id: string) => router.push(`/vehicles/${id}/service-events/new`),
-    [router]
-  );
-  const openServiceLog = useCallback(
-    (id: string) => router.push(`/vehicles/${id}/service-log`),
-    [router]
-  );
-  const primaryVehicleId = vehicles[0]?.id ?? null;
-  const navVehicleId = primaryVehicleId ?? lastViewedVehicleId;
-  const openGarage = useCallback(() => router.push("/"), [router]);
-  const openNodes = useCallback(() => {
-    if (!navVehicleId) return;
-    router.push(`/vehicles/${navVehicleId}`);
-  }, [navVehicleId, router]);
-  const openJournal = useCallback(() => {
-    if (!navVehicleId) return;
-    router.push(`/vehicles/${navVehicleId}/service-log`);
-  }, [navVehicleId, router]);
-  const openExpenses = useCallback(() => {
-    if (!navVehicleId) return;
-    router.push(`/vehicles/${navVehicleId}/expenses`);
-  }, [navVehicleId, router]);
-  const openPicker = useCallback(() => {
-    if (!navVehicleId) return;
-    router.push(`/vehicles/${navVehicleId}/wishlist`);
-  }, [navVehicleId, router]);
-
-  if (isLoading) {
-    return (
-      <GarageScreenState>
-        <ActivityIndicator size="large" color={c.textPrimary} />
-        <Text style={styles.stateText}>Загрузка гаража...</Text>
-      </GarageScreenState>
-    );
-  }
-
-  if (error) {
-    return (
-      <GarageScreenState>
-        <Text style={styles.errorTitle}>Не удалось загрузить гараж</Text>
-        <Text style={styles.errorText}>{error}</Text>
-      </GarageScreenState>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <StatusBar style="light" />
       <View style={styles.screen}>
         <AppScreenHelpBar />
-        {vehicles.length === 0 ? (
-          <View style={styles.contentWrap}>
-            <GarageHeader
-              trashCount={trashCount}
-              notificationCount={notificationCount}
-              onOpenTrash={openTrash}
-              onOpenNotifications={openNotifications}
-              onOpenProfile={openProfile}
-              onAddVehicle={openAddVehicle}
-            />
-            <GarageEmptyState onReload={reloadGarage} />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.hero}>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>MotoTwin | Цифровой гараж</Text>
+            </View>
+            <Text style={styles.heroTitle}>MotoTwin для вашего мотоцикла</Text>
+            <Text style={styles.heroDescription}>
+              Профиль техники, сервис, расходы и важные напоминания в одном мобильном интерфейсе.
+            </Text>
+            <Pressable style={styles.primaryButton} onPress={() => router.push("/garage")}>
+              <Text style={styles.primaryButtonText}>Перейти в гараж</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => router.push("/profile")}>
+              <Text style={styles.secondaryButtonText}>Профиль</Text>
+            </Pressable>
           </View>
-        ) : (
-          <FlatList
-            data={vehicles}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
-              <VehicleCard
-                vehicle={item}
-                onOpenVehicle={openVehicle}
-                onAddServiceEvent={openServiceEvent}
-                onOpenServiceLog={openServiceLog}
-              />
-            )}
-            ListHeaderComponent={
-              <View>
-                <GarageHeader
-                  trashCount={trashCount}
-                  notificationCount={notificationCount}
-                  onOpenTrash={openTrash}
-                  onOpenNotifications={openNotifications}
-                  onOpenProfile={openProfile}
-                  onAddVehicle={openAddVehicle}
-                />
-                <GarageSummary
-                  motorcyclesCount={dashboardSummary.motorcyclesCount}
-                  motorcyclesWithAttentionCount={dashboardSummary.motorcyclesWithAttentionCount}
-                  attentionItemsTotalCount={dashboardSummary.attentionItemsTotalCount}
-                  expensesLabel={dashboardSummary.currentMonthExpensesLabel}
-                />
-              </View>
-            }
-          />
-        )}
-        <GarageBottomNav
-          onOpenGarage={openGarage}
-          onOpenNodes={openNodes}
-          onOpenJournal={openJournal}
-          onOpenPicker={openPicker}
-          onOpenExpenses={openExpenses}
-          onOpenProfile={openProfile}
-          hasVehicleContext={!!navVehicleId}
-        />
-      </View>
-    </SafeAreaView>
-  );
-}
 
-function GarageScreenState(props: { children: ReactNode }) {
-  return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <AppScreenHelpBar />
-      <View style={styles.center}>{props.children}</View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Что внутри</Text>
+            <View style={styles.cards}>
+              {featureCards.map((card) => (
+                <View key={card.title} style={styles.card}>
+                  <Text style={styles.cardTitle}>{card.title}</Text>
+                  <Text style={styles.cardDescription}>{card.description}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -211,37 +72,101 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
+    backgroundColor: c.canvas,
   },
-  contentWrap: {
-    flex: 1,
+  scrollContent: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 24,
+    gap: 16,
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  hero: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+    padding: 20,
     gap: 12,
   },
-  center: {
-    flex: 1,
+  heroBadge: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.cardMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  heroBadgeText: {
+    color: c.textMuted,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  heroTitle: {
+    color: c.textPrimary,
+    fontSize: 28,
+    fontWeight: "800",
+    lineHeight: 34,
+  },
+  heroDescription: {
+    color: c.textMuted,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  primaryButton: {
+    marginTop: 6,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    padding: 24,
+    borderRadius: 14,
+    backgroundColor: c.primaryAction,
+    paddingVertical: 13,
   },
-  stateText: {
-    color: c.textMuted,
-    fontSize: 14,
+  primaryButtonText: {
+    color: c.canvas,
+    fontSize: 15,
+    fontWeight: "700",
   },
-  errorTitle: {
-    color: c.error,
+  secondaryButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.cardSubtle,
+    paddingVertical: 13,
+  },
+  secondaryButtonText: {
+    color: c.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  section: {
+    gap: 10,
+  },
+  sectionTitle: {
+    color: c.textPrimary,
     fontSize: 20,
     fontWeight: "700",
   },
-  errorText: {
+  cards: {
+    gap: 10,
+  },
+  card: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+    padding: 14,
+    gap: 4,
+  },
+  cardTitle: {
+    color: c.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  cardDescription: {
     color: c.textMuted,
     fontSize: 14,
-    textAlign: "center",
-    maxWidth: 320,
+    lineHeight: 20,
   },
 });
