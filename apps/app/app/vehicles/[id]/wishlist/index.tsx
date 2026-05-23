@@ -15,7 +15,6 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   PART_WISHLIST_STATUS_ORDER,
   buildPartWishlistItemViewModel,
@@ -41,7 +40,8 @@ import type {
   VehicleDetail,
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import { getApiBaseUrl } from "../../../../src/api-base-url";
+import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../../../src/mobile-auth-guard";
 import {
   buildServiceEventNewFromWishlistHref,
   buildVehicleServiceLogEventHref,
@@ -253,8 +253,6 @@ export default function VehicleWishlistScreen() {
   const pickedParam = typeof params.picked === "string" ? params.picked : "";
   const partsSearchFromRoute =
     typeof params.partsSearch === "string" ? params.partsSearch.trim() : "";
-  const apiBaseUrl = getApiBaseUrl();
-
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
@@ -291,14 +289,21 @@ export default function VehicleWishlistScreen() {
     try {
       setIsLoading(true);
       setError("");
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-      const [wishlistData, vehicleData, serviceData, nodeTreeData] = await Promise.all([
-        endpoints.getVehicleWishlist(vehicleId),
-        endpoints.getVehicleDetail(vehicleId),
-        endpoints.getServiceEvents(vehicleId),
-        endpoints.getNodeTree(vehicleId),
-      ]);
+      const endpoints = createMobileApiClient();
+      const payload = await withAuthGuard(
+        () =>
+          Promise.all([
+            endpoints.getVehicleWishlist(vehicleId),
+            endpoints.getVehicleDetail(vehicleId),
+            endpoints.getServiceEvents(vehicleId),
+            endpoints.getNodeTree(vehicleId),
+          ]),
+        () => router.replace("/login")
+      );
+      if (!payload) {
+        return null;
+      }
+      const [wishlistData, vehicleData, serviceData, nodeTreeData] = payload;
       setVehicle(vehicleData.vehicle ?? null);
       setNodeTree(nodeTreeData.nodeTree ?? []);
       const mappedItems = (wishlistData.items ?? []).map(buildPartWishlistItemViewModel);
@@ -326,7 +331,6 @@ export default function VehicleWishlistScreen() {
       setServiceEventIdByWishlistItemId(byWishlistItemId);
       return mappedItems;
     } catch (e) {
-      console.error(e);
       setError("Не удалось загрузить список покупок.");
       setItems([]);
       setVehicle(null);
@@ -335,7 +339,7 @@ export default function VehicleWishlistScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [apiBaseUrl, vehicleId]);
+  }, [router, vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -651,9 +655,14 @@ export default function VehicleWishlistScreen() {
     }
     try {
       setBusyId(item.id);
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-      const res = await endpoints.updateWishlistItem(vehicleId, item.id, { status, nodeId });
+      const endpoints = createMobileApiClient();
+      const res = await withAuthGuard(
+        () => endpoints.updateWishlistItem(vehicleId, item.id, { status, nodeId }),
+        () => router.replace("/login")
+      );
+      if (!res) {
+        return;
+      }
       const nextItems = await load();
       if (isWishlistTransitionToInstalled(previousStatus, res.item.status)) {
         setDetailItemId(null);
@@ -666,7 +675,6 @@ export default function VehicleWishlistScreen() {
         applyWishlistRowFocus(res.item.id, nextItems);
       }
     } catch (e) {
-      console.error(e);
       const message = e instanceof Error ? e.message : "Не удалось обновить статус.";
       Alert.alert("Ошибка", message);
     } finally {
@@ -692,25 +700,31 @@ export default function VehicleWishlistScreen() {
     if (!vehicleId) {
       return;
     }
+    const currency = item.currency;
     const lineTotal = wishlistLineTotalAmount(item);
-    if (lineTotal == null || lineTotal <= 0 || !item.currency) {
+    if (lineTotal == null || lineTotal <= 0 || !currency) {
       Alert.alert("Расходы", "Укажите цену за шт. и валюту в карточке позиции перед переносом в расходы.");
       return;
     }
     try {
       setBusyId(item.id);
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-      await endpoints.createExpenseFromShoppingListItem(item.id, {
-        amount: lineTotal,
-        currency: item.currency,
-        purchasedAt: new Date().toISOString().slice(0, 10),
-        comment: item.commentBodyRu ?? item.comment ?? null,
-      });
+      const endpoints = createMobileApiClient();
+      const created = await withAuthGuard(
+        () =>
+          endpoints.createExpenseFromShoppingListItem(item.id, {
+            amount: lineTotal,
+            currency,
+            purchasedAt: new Date().toISOString().slice(0, 10),
+            comment: item.commentBodyRu ?? item.comment ?? null,
+          }),
+        () => router.replace("/login")
+      );
+      if (!created) {
+        return;
+      }
       await load();
       Alert.alert("Расходы", "Позиция отмечена купленной и добавлена в расходы.");
     } catch (e) {
-      console.error(e);
       const message = e instanceof Error ? e.message : "Не удалось создать расход.";
       Alert.alert("Ошибка", message);
     } finally {
@@ -743,18 +757,24 @@ export default function VehicleWishlistScreen() {
       const remark = "Повтор из корзины замен";
       const baseComment = source.comment?.trim() ?? "";
       const comment = baseComment ? `${baseComment} · ${remark}` : remark;
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-      const res = await endpoints.createWishlistItem(vehicleId, {
-        nodeId,
-        title: source.title.trim() || undefined,
-        skuId: source.skuId ?? null,
-        quantity: source.quantity >= 1 ? source.quantity : 1,
-        comment,
-        status: "NEEDED",
-        costAmount: null,
-        currency: null,
-      });
+      const endpoints = createMobileApiClient();
+      const res = await withAuthGuard(
+        () =>
+          endpoints.createWishlistItem(vehicleId, {
+            nodeId,
+            title: source.title.trim() || undefined,
+            skuId: source.skuId ?? null,
+            quantity: source.quantity >= 1 ? source.quantity : 1,
+            comment,
+            status: "NEEDED",
+            costAmount: null,
+            currency: null,
+          }),
+        () => router.replace("/login")
+      );
+      if (!res) {
+        return;
+      }
       const nextItems = await load();
       const newItemId = res.item.id;
       setRepeatPurchaseConfirmItem(null);
@@ -772,7 +792,6 @@ export default function VehicleWishlistScreen() {
         },
       ]);
     } catch (e) {
-      console.error(e);
       const message = e instanceof Error ? e.message : "Не удалось повторить покупку.";
       Alert.alert("Ошибка", message);
     } finally {
@@ -786,12 +805,16 @@ export default function VehicleWishlistScreen() {
     }
     try {
       setBusyId(itemId);
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-      await endpoints.deleteWishlistItem(vehicleId, itemId);
+      const endpoints = createMobileApiClient();
+      const deleted = await withAuthGuard(
+        () => endpoints.deleteWishlistItem(vehicleId, itemId),
+        () => router.replace("/login")
+      );
+      if (!deleted) {
+        return;
+      }
       await load();
     } catch (e) {
-      console.error(e);
       const message = e instanceof Error ? e.message : "Не удалось удалить.";
       Alert.alert("Ошибка", message);
     } finally {

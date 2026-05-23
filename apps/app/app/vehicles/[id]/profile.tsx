@@ -11,7 +11,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildInitialVehicleProfileFormValues,
   normalizeVehicleProfileFormValues,
@@ -30,7 +29,8 @@ import type {
   RideUsageType,
   VehicleRideProfile,
 } from "@mototwin/types";
-import { getApiBaseUrl } from "../../../src/api-base-url";
+import { createMobileApiClient } from "../../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../../src/mobile-auth-guard";
 import { KeyboardAwareScrollScreen } from "../../../components/expo-shell/keyboard-aware-scroll-screen";
 import { ScreenHeader } from "../../../components/expo-shell/screen-header";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
@@ -57,7 +57,6 @@ export default function EditVehicleProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
-  const apiBaseUrl = getApiBaseUrl();
 
   const [nickname, setNickname] = useState("");
   const [vin, setVin] = useState("");
@@ -83,9 +82,14 @@ export default function EditVehicleProfileScreen() {
       try {
         setIsLoading(true);
         setError("");
-        const client = createApiClient({ baseUrl: apiBaseUrl });
-        const endpoints = createMotoTwinEndpoints(client);
-        const data = await endpoints.getVehicleDetail(vehicleId);
+        const endpoints = createMobileApiClient();
+        const data = await withAuthGuard(
+          () => endpoints.getVehicleDetail(vehicleId),
+          () => router.replace("/login")
+        );
+        if (!data) {
+          return;
+        }
         if (!data.vehicle) {
           setError("Мотоцикл не найден.");
           return;
@@ -100,15 +104,14 @@ export default function EditVehicleProfileScreen() {
           data.vehicle.rideProfile?.usageIntensity ?? DEFAULT_RIDE_PROFILE.usageIntensity
         );
       } catch (requestError) {
-        console.error(requestError);
         setError("Не удалось загрузить профиль мотоцикла.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    load();
-  }, [apiBaseUrl, vehicleId]);
+    void load();
+  }, [router, vehicleId]);
 
   async function save() {
     if (!vehicleId) {
@@ -134,13 +137,17 @@ export default function EditVehicleProfileScreen() {
     try {
       setIsSaving(true);
       setError("");
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-      await endpoints.updateVehicleProfile(vehicleId, input);
+      const endpoints = createMobileApiClient();
+      const updated = await withAuthGuard(
+        () => endpoints.updateVehicleProfile(vehicleId, input),
+        () => router.replace("/login")
+      );
+      if (!updated) {
+        return;
+      }
       Alert.alert("Готово", "Мотоцикл обновлен");
       router.replace(`/vehicles/${vehicleId}`);
     } catch (requestError) {
-      console.error(requestError);
       const message =
         requestError instanceof Error
           ? requestError.message

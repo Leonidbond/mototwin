@@ -13,11 +13,10 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect, useGlobalSearchParams, usePathname, useRouter } from "expo-router";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildVehicleDetailViewModel, formatRideStyleChipRu, resolveGarageVehicleSilhouette } from "@mototwin/domain";
 import type { GarageVehicleItem, VehicleDetail } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import { getApiBaseUrl } from "../../src/api-base-url";
+import { createMobileApiClient } from "../../src/create-mobile-api-client";
 import { replaceVehicleIdInPath } from "../../src/garage-vehicle-route";
 import { writeLastViewedVehicleId } from "../../src/ui-last-viewed-vehicle";
 import adventureTouring from "../../../../images/Motocycles/adventure_touring.png";
@@ -120,8 +119,7 @@ export function GarageVehicleContextPlaque({
       let cancelled = false;
       void (async () => {
         try {
-          const client = createApiClient({ baseUrl: getApiBaseUrl() });
-          const endpoints = createMotoTwinEndpoints(client);
+          const endpoints = createMobileApiClient();
           const res = await endpoints.getGarageVehicles();
           if (!cancelled) {
             setGarageVehicles((res.vehicles ?? []).filter((v) => !v.trashedAt));

@@ -16,7 +16,6 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildExpenseAnalyticsFromItems,
   filterLeafOptionsUnderTopNodeAncestors,
@@ -41,7 +40,8 @@ import type {
   VehicleDetail,
   VehicleDetailApiRecord,
 } from "@mototwin/types";
-import { getApiBaseUrl } from "../../../src/api-base-url";
+import { createMobileApiClient } from "../../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../../src/mobile-auth-guard";
 import { InternalScreenChrome } from "../../../components/expo-shell/internal-screen-chrome";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import { GarageVehicleContextPlaque } from "../../../components/garage/GarageVehicleContextPlaque";
@@ -229,15 +229,22 @@ export default function VehicleExpensesScreen() {
       setIsLoading(true);
       setError("");
       setContextVehicleDetail(null);
-      const client = createApiClient({ baseUrl: getApiBaseUrl() });
-      const endpoints = createMotoTwinEndpoints(client);
-      const [result, treeData, topNodesData, vehicleRes, wishlistRes] = await Promise.all([
-        endpoints.getExpenses({ vehicleId, year: selectedYear }),
-        endpoints.getNodeTree(vehicleId),
-        endpoints.getTopServiceNodes(),
-        endpoints.getVehicleDetail(vehicleId),
-        endpoints.getVehicleWishlist(vehicleId),
-      ]);
+      const endpoints = createMobileApiClient();
+      const payload = await withAuthGuard(
+        () =>
+          Promise.all([
+            endpoints.getExpenses({ vehicleId, year: selectedYear }),
+            endpoints.getNodeTree(vehicleId),
+            endpoints.getTopServiceNodes(),
+            endpoints.getVehicleDetail(vehicleId),
+            endpoints.getVehicleWishlist(vehicleId),
+          ]),
+        () => router.replace("/login")
+      );
+      if (!payload) {
+        return;
+      }
+      const [result, treeData, topNodesData, vehicleRes, wishlistRes] = payload;
       setNodeTree(treeData.nodeTree ?? []);
       setTopServiceNodes(topNodesData.nodes ?? []);
       const v = vehicleRes.vehicle;
@@ -256,7 +263,6 @@ export default function VehicleExpensesScreen() {
         )
       );
     } catch (requestError) {
-      console.error(requestError);
       setError("Не удалось загрузить расходы. Проверьте подключение к backend.");
     } finally {
       setIsLoading(false);
@@ -488,23 +494,28 @@ export default function VehicleExpensesScreen() {
     try {
       setIsSaving(true);
       setError("");
-      const client = createApiClient({ baseUrl: getApiBaseUrl() });
-      const endpoints = createMotoTwinEndpoints(client);
-      await endpoints.createExpense({
-        vehicleId,
-        title: form.title.trim(),
-        amount,
-        currency: form.currency.trim().toUpperCase(),
-        category: form.category,
-        installStatus: form.installStatus,
-        expenseDate: form.expenseDate,
-        comment: form.comment.trim() || null,
-      });
+      const endpoints = createMobileApiClient();
+      const created = await withAuthGuard(
+        () =>
+          endpoints.createExpense({
+            vehicleId,
+            title: form.title.trim(),
+            amount,
+            currency: form.currency.trim().toUpperCase(),
+            category: form.category,
+            installStatus: form.installStatus,
+            expenseDate: form.expenseDate,
+            comment: form.comment.trim() || null,
+          }),
+        () => router.replace("/login")
+      );
+      if (!created) {
+        return;
+      }
       setForm((prev) => ({ ...prev, title: "", amount: "", comment: "" }));
       setShowAddForm(false);
       await load();
     } catch (requestError) {
-      console.error(requestError);
       setError("Не удалось сохранить расход.");
     } finally {
       setIsSaving(false);
@@ -514,16 +525,21 @@ export default function VehicleExpensesScreen() {
   async function markInstalled(expense: ExpenseItem) {
     try {
       setBusyExpenseId(expense.id);
-      const client = createApiClient({ baseUrl: getApiBaseUrl() });
-      const endpoints = createMotoTwinEndpoints(client);
-      await endpoints.markExpenseInstalled(expense.id, {
-        installedAt: todayYmd(),
-        odometer: expense.odometer ?? null,
-        engineHours: expense.engineHours ?? null,
-      });
+      const endpoints = createMobileApiClient();
+      const installed = await withAuthGuard(
+        () =>
+          endpoints.markExpenseInstalled(expense.id, {
+            installedAt: todayYmd(),
+            odometer: expense.odometer ?? null,
+            engineHours: expense.engineHours ?? null,
+          }),
+        () => router.replace("/login")
+      );
+      if (!installed) {
+        return;
+      }
       await load();
     } catch (requestError) {
-      console.error(requestError);
       Alert.alert("Расходы", "Не удалось отметить расход установленным.");
     } finally {
       setBusyExpenseId(null);

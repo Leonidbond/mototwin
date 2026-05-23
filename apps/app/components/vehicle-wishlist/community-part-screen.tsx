@@ -16,7 +16,6 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   RIDE_LOAD_TYPE_OPTIONS,
   RIDE_RIDING_STYLE_OPTIONS,
@@ -38,7 +37,8 @@ import type {
   VehicleDetailApiRecord,
   VehicleRideProfile,
 } from "@mototwin/types";
-import { getApiBaseUrl } from "../../src/api-base-url";
+import { createMobileApiClient } from "../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../src/mobile-auth-guard";
 import { getNodeTreeIconAsset } from "../../../../src/node-tree-icons";
 import { InternalScreenChrome } from "../expo-shell/internal-screen-chrome";
 import { GarageVehicleContextPlaque } from "../garage/GarageVehicleContextPlaque";
@@ -147,11 +147,7 @@ export function CommunityPartScreen(props: {
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const apiBaseUrl = getApiBaseUrl();
-  const endpoints = useMemo(
-    () => createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })),
-    [apiBaseUrl]
-  );
+  const endpoints = useMemo(() => createMobileApiClient(), []);
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [vehicleError, setVehicleError] = useState("");
@@ -216,7 +212,13 @@ export function CommunityPartScreen(props: {
     void (async () => {
       setVehicleError("");
       try {
-        const res = await endpoints.getVehicleDetail(props.vehicleId);
+        const res = await withAuthGuard(
+          () => endpoints.getVehicleDetail(props.vehicleId),
+          () => router.replace("/login")
+        );
+        if (!res) {
+          return;
+        }
         if (cancelled) return;
         const raw = res.vehicle as unknown as VehicleDetailApiRecord | null;
         if (raw) {
@@ -438,25 +440,39 @@ export function CommunityPartScreen(props: {
       let skuId: string | null = null;
 
       if (existingMasterId) {
-        const ensured = await endpoints.ensurePartMasterSku({
-          partMasterId: existingMasterId,
-          nodeId: selectedNodeId.trim(),
-          vehicleId: props.vehicleId,
-          partType: category.trim(),
-        });
+        const ensured = await withAuthGuard(
+          () =>
+            endpoints.ensurePartMasterSku({
+              partMasterId: existingMasterId,
+              nodeId: selectedNodeId.trim(),
+              vehicleId: props.vehicleId,
+              partType: category.trim(),
+            }),
+          () => router.replace("/login")
+        );
+        if (!ensured) {
+          return;
+        }
         skuId = ensured.skuId;
       } else {
         try {
-          const created = await endpoints.createPartMaster({
-            brandName: brandName.trim(),
-            sku: sku.trim(),
-            title: title.trim(),
-            category: category.trim(),
-            description: null,
-            vehicleId: props.vehicleId,
-            nodeId: selectedNodeId.trim(),
-            attachSkuToNode: true,
-          });
+          const created = await withAuthGuard(
+            () =>
+              endpoints.createPartMaster({
+                brandName: brandName.trim(),
+                sku: sku.trim(),
+                title: title.trim(),
+                category: category.trim(),
+                description: null,
+                vehicleId: props.vehicleId,
+                nodeId: selectedNodeId.trim(),
+                attachSkuToNode: true,
+              }),
+            () => router.replace("/login")
+          );
+          if (!created) {
+            return;
+          }
           partMasterId = created.partMaster?.id ?? null;
           skuId = created.skuId ?? null;
         } catch (e) {
@@ -484,15 +500,22 @@ export function CommunityPartScreen(props: {
               ? "INSTALLED"
               : "REJECTED";
 
-      const wl = await endpoints.createWishlistItem(props.vehicleId, {
-        skuId,
-        nodeId: selectedNodeId.trim(),
-        title: title.trim(),
-        quantity: 1,
-        status: wishlistStatus,
-        source: "USER_ADDED",
-        comment: comment.trim() || null,
-      });
+      const wl = await withAuthGuard(
+        () =>
+          endpoints.createWishlistItem(props.vehicleId, {
+            skuId,
+            nodeId: selectedNodeId.trim(),
+            title: title.trim(),
+            quantity: 1,
+            status: wishlistStatus,
+            source: "USER_ADDED",
+            comment: comment.trim() || null,
+          }),
+        () => router.replace("/login")
+      );
+      if (!wl) {
+        return;
+      }
 
       if (showFitmentBlock && partMasterId) {
         const fitmentResult: FitmentReportResultWire =
@@ -501,21 +524,28 @@ export function CommunityPartScreen(props: {
             : fitmentChoice === "OEM_REPLACEMENT"
               ? "OEM_REPLACEMENT"
               : fitmentChoice;
-        const fr = await endpoints.createFitmentReport(props.vehicleId, {
-          partMasterId,
-          nodeId: selectedNodeId.trim(),
-          fitmentResult,
-          installationStatus:
-            lifeStatus === "rejected" ? "TESTED_NOT_INSTALLED" : "INSTALLED",
-          modificationRequired:
-            lifeStatus === "installed" && fitmentChoice === "FIT_WITH_MODIFICATION",
-          modificationDetails:
-            lifeStatus === "installed" && fitmentChoice === "FIT_WITH_MODIFICATION"
-              ? modificationDetails.trim() || null
-              : null,
-          comment: comment.trim() || null,
-          rideProfile: reportRideProfile,
-        });
+        const fr = await withAuthGuard(
+          () =>
+            endpoints.createFitmentReport(props.vehicleId, {
+              partMasterId,
+              nodeId: selectedNodeId.trim(),
+              fitmentResult,
+              installationStatus:
+                lifeStatus === "rejected" ? "TESTED_NOT_INSTALLED" : "INSTALLED",
+              modificationRequired:
+                lifeStatus === "installed" && fitmentChoice === "FIT_WITH_MODIFICATION",
+              modificationDetails:
+                lifeStatus === "installed" && fitmentChoice === "FIT_WITH_MODIFICATION"
+                  ? modificationDetails.trim() || null
+                  : null,
+              comment: comment.trim() || null,
+              rideProfile: reportRideProfile,
+            }),
+          () => router.replace("/login")
+        );
+        if (!fr) {
+          return;
+        }
         const reportId = fr.report?.id;
         if (reportId) {
           const evidenceRows: Array<{
@@ -532,11 +562,18 @@ export function CommunityPartScreen(props: {
             evidenceRows.push({ type: "RECEIPT", url: photoReceiptUrl.trim() });
           }
           for (const row of evidenceRows) {
-            await endpoints.createFitmentEvidence({
-              reportId,
-              type: row.type,
-              fileUrl: row.url,
-            });
+            const evidence = await withAuthGuard(
+              () =>
+                endpoints.createFitmentEvidence({
+                  reportId,
+                  type: row.type,
+                  fileUrl: row.url,
+                }),
+              () => router.replace("/login")
+            );
+            if (!evidence) {
+              return;
+            }
           }
         }
       }

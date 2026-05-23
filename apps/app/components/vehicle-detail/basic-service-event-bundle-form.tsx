@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { createMobileApiClientForBaseUrl } from "../../src/create-mobile-api-client";
 import {
   ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH,
   ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH,
@@ -529,8 +529,7 @@ export function BasicServiceEventBundleForm({
   useEffect(() => {
     let cancelled = false;
     setBundleTemplatesErr("");
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
+    const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
     void endpoints
       .getServiceBundleTemplates()
       .then((res) => {
@@ -550,8 +549,7 @@ export function BasicServiceEventBundleForm({
   useEffect(() => {
     let cancelled = false;
     setUserTemplatesErr("");
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
+    const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
     void endpoints
       .getUserServiceEventFormTemplates()
       .then((res) => {
@@ -570,8 +568,7 @@ export function BasicServiceEventBundleForm({
 
   useEffect(() => {
     let cancelled = false;
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
+    const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
     void endpoints
       .getTopServiceNodes()
       .then((res) => {
@@ -595,8 +592,7 @@ export function BasicServiceEventBundleForm({
     let cancelled = false;
     setInstallableLoading(true);
     setInstallableError("");
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
+    const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
     void endpoints
       .getInstallableForServiceEvent(vehicleId)
       .then((res) => {
@@ -766,8 +762,7 @@ export function BasicServiceEventBundleForm({
     skuGen.current = gen;
     setSkuLoading(true);
     setSkuError("");
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
+    const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
     void endpoints
       .getPartSkus({
         search: query,
@@ -887,8 +882,7 @@ export function BasicServiceEventBundleForm({
     try {
       setVehicleStateSaving(true);
       setVehicleStateError("");
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
+      const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
       const res = await endpoints.updateVehicleState(
         vehicleId,
         normalizeVehicleStatePayload({
@@ -1749,8 +1743,7 @@ export function BasicServiceEventBundleForm({
                   if (saveUserTemplateBusy) return;
                   setSaveUserTemplateBusy(true);
                   setSaveUserTemplateErr("");
-                  const client = createApiClient({ baseUrl: apiBaseUrl });
-                  const endpoints = createMotoTwinEndpoints(client);
+                  const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
                   const snapshot = stripAddServiceEventFormValuesForUserTemplate(form);
                   void endpoints
                     .createUserServiceEventFormTemplate({

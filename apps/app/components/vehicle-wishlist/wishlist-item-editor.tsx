@@ -13,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   PART_WISHLIST_STATUS_ORDER,
   applyPartSkuViewModelToPartWishlistFormValues,
@@ -49,7 +48,8 @@ import type {
   VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import { getApiBaseUrl } from "../../src/api-base-url";
+import { createMobileApiClient } from "../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../src/mobile-auth-guard";
 import { InternalScreenChrome } from "../expo-shell/internal-screen-chrome";
 import { GarageVehicleContextPlaque } from "../garage/GarageVehicleContextPlaque";
 import { buildServiceEventNewFromWishlistHref } from "./hrefs";
@@ -69,7 +69,6 @@ function findOptionById(
 
 export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProps) {
   const router = useRouter();
-  const apiBaseUrl = getApiBaseUrl();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -140,19 +139,26 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
       setIsLoading(true);
       setLoadError("");
       setContextVehicleDetail(null);
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
+      const endpoints = createMobileApiClient();
       const itemIdSafe = itemId.trim();
       if (!itemIdSafe) {
         setLoadError("Не указана позиция списка.");
         setIsLoading(false);
         return;
       }
-      const [tree, wishlist, vehicleRes] = await Promise.all([
-        endpoints.getNodeTree(vehicleId),
-        endpoints.getVehicleWishlist(vehicleId),
-        endpoints.getVehicleDetail(vehicleId),
-      ]);
+      const payload = await withAuthGuard(
+        () =>
+          Promise.all([
+            endpoints.getNodeTree(vehicleId),
+            endpoints.getVehicleWishlist(vehicleId),
+            endpoints.getVehicleDetail(vehicleId),
+          ]),
+        () => router.replace("/login")
+      );
+      if (!payload) {
+        return;
+      }
+      const [tree, wishlist, vehicleRes] = payload;
       const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
       setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
       const nodes = tree.nodeTree ?? [];
@@ -172,12 +178,11 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
         setLoadedWishlistItem(row);
       }
     } catch (e) {
-      console.error(e);
       setLoadError("Не удалось загрузить данные.");
     } finally {
       setIsLoading(false);
     }
-  }, [apiBaseUrl, vehicleId, itemId]);
+  }, [router, vehicleId, itemId]);
 
   useEffect(() => {
     void load();
@@ -207,8 +212,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
     wishlistSkuSearchGen.current = gen;
     setWishlistSkuLoading(true);
     setWishlistSkuFetchError("");
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
+    const endpoints = createMobileApiClient();
     void endpoints
       .getPartSkus({
         search: q.length >= 2 ? q : undefined,
@@ -233,7 +237,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
         }
         setWishlistSkuLoading(false);
       });
-  }, [apiBaseUrl, isLoading, wishlistSkuDebouncedQuery, form.nodeId]);
+  }, [isLoading, wishlistSkuDebouncedQuery, form.nodeId]);
 
   useEffect(() => {
     if (isLoading) {
@@ -248,8 +252,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
     }
     setRecommendationsLoading(true);
     setRecommendationsError("");
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
+    const endpoints = createMobileApiClient();
     void endpoints
       .getRecommendedSkusForNode(vehicleId, nodeId)
       .then((res) => {
@@ -262,7 +265,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
       .finally(() => {
         setRecommendationsLoading(false);
       });
-  }, [apiBaseUrl, form.nodeId, isLoading, vehicleId]);
+  }, [form.nodeId, isLoading, vehicleId]);
 
   const applyRecommendedSkuToForm = (rec: PartRecommendationViewModel) => {
     const skuFromRecommendation: PartSkuViewModel = {
@@ -319,8 +322,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
     try {
       setIsSaving(true);
       setSaveError("");
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
+      const endpoints = createMobileApiClient();
 
       const prevStatus = statusWhenLoadedRef.current ?? "NEEDED";
       const shouldDeferInstalledStatus = isWishlistTransitionToInstalled(prevStatus, form.status);
@@ -333,7 +335,13 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
       const input = normalizeUpdatePartWishlistPayload(
         shouldDeferInstalledStatus ? { ...form, status: prevStatus } : form
       );
-      const res = await endpoints.updateWishlistItem(vehicleId, itemIdSafe, input);
+      const res = await withAuthGuard(
+        () => endpoints.updateWishlistItem(vehicleId, itemIdSafe, input),
+        () => router.replace("/login")
+      );
+      if (!res) {
+        return;
+      }
       if (shouldDeferInstalledStatus) {
         if (res.item.nodeId) {
           router.replace(buildServiceEventNewFromWishlistHref(vehicleId, res.item, { pendingInstall: true }));
@@ -345,7 +353,6 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
         router.replace(`/vehicles/${vehicleId}/wishlist`);
       }
     } catch (e) {
-      console.error(e);
       const message =
         e instanceof Error ? e.message : "Не удалось сохранить. Попробуйте ещё раз.";
       setSaveError(message);

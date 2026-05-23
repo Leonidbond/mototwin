@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   createInitialAddServiceEventFormValues,
   createInitialAddServiceEventFromNode,
@@ -27,6 +26,8 @@ import type {
   VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { getApiBaseUrl } from "../../../../src/api-base-url";
+import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../../../src/mobile-auth-guard";
 import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
 import {
   InternalScreenChrome,
@@ -76,7 +77,6 @@ export default function NewServiceEventScreen() {
   const wishlistPendingInstall =
     pendingInstallRaw === "1" || pendingInstallRaw.toLowerCase() === "true";
   const apiBaseUrl = getApiBaseUrl();
-
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -138,14 +138,23 @@ export default function NewServiceEventScreen() {
         setError("");
         setContextVehicleDetail(null);
         const defaultCurrency = DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
-        const client = createApiClient({ baseUrl: apiBaseUrl });
-        const endpoints = createMotoTwinEndpoints(client);
+        const endpoints = createMobileApiClient();
         const needsServiceEventsForForm = isEditMode || isRepeatMode;
-        const [vehicleData, treeData, eventsData] = await Promise.all([
-          endpoints.getVehicleDetail(vehicleId),
-          endpoints.getNodeTree(vehicleId),
-          needsServiceEventsForForm ? endpoints.getServiceEvents(vehicleId) : Promise.resolve(null),
-        ]);
+        const payload = await withAuthGuard(
+          () =>
+            Promise.all([
+              endpoints.getVehicleDetail(vehicleId),
+              endpoints.getNodeTree(vehicleId),
+              needsServiceEventsForForm
+                ? endpoints.getServiceEvents(vehicleId)
+                : Promise.resolve(null),
+            ]),
+          () => router.replace("/login")
+        );
+        if (!payload) {
+          return;
+        }
+        const [vehicleData, treeData, eventsData] = payload;
         const nextTree = treeData.nodeTree ?? [];
         setNodeTree(nextTree);
 
@@ -279,7 +288,6 @@ export default function NewServiceEventScreen() {
         setBundleInitial(nextForm);
         setBundleSessionKey((k) => k + 1);
       } catch (requestError) {
-        console.error(requestError);
         setError("Не удалось загрузить данные для формы.");
       } finally {
         setIsLoading(false);
@@ -288,7 +296,6 @@ export default function NewServiceEventScreen() {
 
     void load();
   }, [
-    apiBaseUrl,
     vehicleId,
     initialNodeId,
     source,
@@ -313,8 +320,7 @@ export default function NewServiceEventScreen() {
 
     const anchorNodeId = form.items[0]?.nodeId?.trim() ?? "";
 
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
+    const endpoints = createMobileApiClient();
     const input = normalizeAddServiceEventPayload(form);
     let savedServiceEventId = editingEventId;
 
@@ -322,20 +328,40 @@ export default function NewServiceEventScreen() {
       setIsSaving(true);
       setError("");
       if (isEditMode) {
-        const response = await endpoints.updateServiceEvent(
-          vehicleId,
-          editingEventId,
-          normalizeEditServiceEventPayload(form)
+        const response = await withAuthGuard(
+          () =>
+            endpoints.updateServiceEvent(
+              vehicleId,
+              editingEventId,
+              normalizeEditServiceEventPayload(form)
+            ),
+          () => router.replace("/login")
         );
+        if (!response) {
+          return;
+        }
         savedServiceEventId = response.serviceEvent.id;
       } else {
-        const response = await endpoints.createServiceEvent(vehicleId, input);
+        const response = await withAuthGuard(
+          () => endpoints.createServiceEvent(vehicleId, input),
+          () => router.replace("/login")
+        );
+        if (!response) {
+          return;
+        }
         savedServiceEventId = response.serviceEvent.id;
         if (wishlistPendingInstall && wlId.trim()) {
-          await endpoints.updateWishlistItem(vehicleId, wlId.trim(), {
-            status: "INSTALLED",
-            nodeId: anchorNodeId,
-          });
+          const updated = await withAuthGuard(
+            () =>
+              endpoints.updateWishlistItem(vehicleId, wlId.trim(), {
+                status: "INSTALLED",
+                nodeId: anchorNodeId,
+              }),
+            () => router.replace("/login")
+          );
+          if (!updated) {
+            return;
+          }
         }
       }
       const feedback = isEditMode ? "updated" : "created";
@@ -359,7 +385,6 @@ export default function NewServiceEventScreen() {
         router.replace(`/vehicles/${vehicleId}/service-log?${q.toString()}`);
       }
     } catch (requestError) {
-      console.error(requestError);
       setError(
         requestError instanceof Error
           ? requestError.message

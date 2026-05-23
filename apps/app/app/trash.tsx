@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildTrashedVehicleViewModel } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import { getApiBaseUrl } from "../src/api-base-url";
+import { createMobileApiClient } from "../src/create-mobile-api-client";
+import { withAuthGuard } from "../src/mobile-auth-guard";
 import { ScreenHeader } from "../components/expo-shell/screen-header";
 
 export default function TrashScreen() {
-  const apiBaseUrl = getApiBaseUrl();
+  const router = useRouter();
   const [items, setItems] = useState<Array<ReturnType<typeof buildTrashedVehicleViewModel>>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -19,16 +20,21 @@ export default function TrashScreen() {
     try {
       setIsLoading(true);
       setError("");
-      const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
-      const response = await endpoints.getTrashedVehicles();
+      const endpoints = createMobileApiClient();
+      const response = await withAuthGuard(
+        () => endpoints.getTrashedVehicles(),
+        () => router.replace("/login")
+      );
+      if (!response) {
+        return;
+      }
       setItems((response.vehicles ?? []).map((item) => buildTrashedVehicleViewModel(item)));
     } catch (requestError) {
-      console.error(requestError);
       setError("Не удалось загрузить Свалку.");
     } finally {
       setIsLoading(false);
     }
-  }, [apiBaseUrl]);
+  }, [router]);
 
   useEffect(() => {
     void loadTrash();
@@ -37,11 +43,16 @@ export default function TrashScreen() {
   const restore = async (vehicleId: string) => {
     try {
       setBusyVehicleId(vehicleId);
-      const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
-      await endpoints.restoreVehicleFromTrash(vehicleId);
+      const endpoints = createMobileApiClient();
+      const restored = await withAuthGuard(
+        () => endpoints.restoreVehicleFromTrash(vehicleId),
+        () => router.replace("/login")
+      );
+      if (!restored) {
+        return;
+      }
       setItems((prev) => prev.filter((item) => item.id !== vehicleId));
     } catch (requestError) {
-      console.error(requestError);
       setError("Не удалось восстановить мотоцикл.");
     } finally {
       setBusyVehicleId("");
@@ -58,11 +69,16 @@ export default function TrashScreen() {
           void (async () => {
             try {
               setBusyVehicleId(vehicleId);
-              const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
-              await endpoints.permanentlyDeleteVehicle(vehicleId);
+              const endpoints = createMobileApiClient();
+              const deleted = await withAuthGuard(
+                () => endpoints.permanentlyDeleteVehicle(vehicleId),
+                () => router.replace("/login")
+              );
+              if (!deleted) {
+                return;
+              }
               setItems((prev) => prev.filter((item) => item.id !== vehicleId));
             } catch (requestError) {
-              console.error(requestError);
               setError("Не удалось удалить мотоцикл окончательно.");
             } finally {
               setBusyVehicleId("");

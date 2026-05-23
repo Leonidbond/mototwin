@@ -12,10 +12,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { NotificationItemWire } from "@mototwin/types";
-import { getApiBaseUrl } from "../src/api-base-url";
+import { createMobileApiClient } from "../src/create-mobile-api-client";
+import { withAuthGuard } from "../src/mobile-auth-guard";
 
 function severityColor(severity: NotificationItemWire["severity"]) {
   if (severity === "CRITICAL") return c.error;
@@ -25,7 +25,6 @@ function severityColor(severity: NotificationItemWire["severity"]) {
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const apiBaseUrl = getApiBaseUrl();
   const [items, setItems] = useState<NotificationItemWire[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -35,16 +34,21 @@ export default function NotificationsScreen() {
     try {
       setIsLoading(true);
       setError("");
-      const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
-      const res = await endpoints.getNotifications({ limit: 100, includeResolved: true });
+      const endpoints = createMobileApiClient();
+      const res = await withAuthGuard(
+        () => endpoints.getNotifications({ limit: 100, includeResolved: true }),
+        () => router.replace("/login")
+      );
+      if (!res) {
+        return;
+      }
       setItems(res.notifications ?? []);
     } catch (requestError) {
-      console.error(requestError);
       setError("Не удалось загрузить уведомления.");
     } finally {
       setIsLoading(false);
     }
-  }, [apiBaseUrl]);
+  }, [router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -74,49 +78,67 @@ export default function NotificationsScreen() {
       }
       const tokenResult = await Notifications.getExpoPushTokenAsync();
       const token = tokenResult.data;
-      const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
-      await endpoints.upsertPushSubscription({
-        channelType: "MOBILE_PUSH",
-        provider: "EXPO",
-        platform: Device.osName === "iOS" ? "IOS" : "ANDROID",
-        token,
-        deviceName: Device.deviceName ?? null,
-        osVersion: Device.osVersion ?? null,
-        appVersion: "0.1.0",
-      });
+      const endpoints = createMobileApiClient();
+      const connected = await withAuthGuard(
+        () =>
+          endpoints.upsertPushSubscription({
+            channelType: "MOBILE_PUSH",
+            provider: "EXPO",
+            platform: Device.osName === "iOS" ? "IOS" : "ANDROID",
+            token,
+            deviceName: Device.deviceName ?? null,
+            osVersion: Device.osVersion ?? null,
+            appVersion: "0.1.0",
+          }),
+        () => router.replace("/login")
+      );
+      if (!connected) {
+        return;
+      }
       Alert.alert("Push подключен", "Устройство зарегистрировано для push-уведомлений.");
     } catch (requestError) {
-      console.error(requestError);
       Alert.alert("Ошибка", "Не удалось подключить push.");
     } finally {
       setIsConnectingPush(false);
     }
-  }, [apiBaseUrl]);
+  }, [router]);
 
   const markRead = useCallback(
     async (notificationId: string) => {
       try {
-        const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
-        await endpoints.markNotificationRead(notificationId);
+        const endpoints = createMobileApiClient();
+        const marked = await withAuthGuard(
+          () => endpoints.markNotificationRead(notificationId),
+          () => router.replace("/login")
+        );
+        if (!marked) {
+          return;
+        }
         await load();
       } catch (requestError) {
-        console.error(requestError);
+        // Ignore non-auth errors for inline row action.
       }
     },
-    [apiBaseUrl, load]
+    [load, router]
   );
 
   const dismiss = useCallback(
     async (notificationId: string) => {
       try {
-        const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
-        await endpoints.dismissNotification(notificationId);
+        const endpoints = createMobileApiClient();
+        const dismissed = await withAuthGuard(
+          () => endpoints.dismissNotification(notificationId),
+          () => router.replace("/login")
+        );
+        if (!dismissed) {
+          return;
+        }
         await load();
       } catch (requestError) {
-        console.error(requestError);
+        // Ignore non-auth errors for inline row action.
       }
     },
-    [apiBaseUrl, load]
+    [load, router]
   );
 
   const openAction = useCallback(

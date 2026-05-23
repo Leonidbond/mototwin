@@ -14,7 +14,7 @@ void SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
-  const [authChecked, setAuthChecked] = useState(!__DEV__);
+  const [authChecked, setAuthChecked] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -37,10 +37,6 @@ export default function RootLayout() {
   }, [fontsReady]);
 
   useEffect(() => {
-    if (__DEV__) {
-      setAuthChecked(true);
-      return;
-    }
     let cancelled = false;
     void (async () => {
       const tokens = await readAuthTokens();

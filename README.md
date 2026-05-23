@@ -51,3 +51,15 @@ Important: do not run `npx expo` from monorepo root without workspace context, o
 - `docs/frontend-expo.md` — Expo routes, architecture, platform notes.
 - `docs/frontend-web.md` — web client structure and behavior.
 - `docs/garage-dashboard-mvp.md` — garage semantics and parity notes.
+
+
+для обновления кода на сервере
+sudo -iu deploy
+cd /opt/mototwin/app/mototwin
+git status
+git pull origin main
+
+для запуска мобилного в режиме туннеля
+
+cd /Users/lbondarenko/Mototwin/mototwin/apps/app
+npx expo start --tunnel -c

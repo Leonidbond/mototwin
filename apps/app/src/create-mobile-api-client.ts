@@ -9,6 +9,10 @@ import {
 
 export function createMobileApiClient() {
   const baseUrl = getApiBaseUrl();
+  return createMobileApiClientForBaseUrl(baseUrl);
+}
+
+export function createMobileApiClientForBaseUrl(baseUrl: string) {
   const client = createApiClient({
     baseUrl,
     getAccessToken: () => getAccessToken(),

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { buildWishlistDetailCompatibilitySummary } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { PartCompatibilityReportWire } from "@mototwin/types";
-import { getApiBaseUrl } from "../../src/api-base-url";
+import { createMobileApiClient } from "../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../src/mobile-auth-guard";
 import { buildVehicleWishlistFitmentReportHref } from "./hrefs";
 
 const REF = {
@@ -23,11 +23,7 @@ export function WishlistItemCompatibilityBlock(props: {
   skuId: string | null;
 }) {
   const router = useRouter();
-  const apiBaseUrl = getApiBaseUrl();
-  const endpoints = useMemo(
-    () => createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })),
-    [apiBaseUrl]
-  );
+  const endpoints = useMemo(() => createMobileApiClient(), []);
 
   const [resolvedPartMasterId, setResolvedPartMasterId] = useState<string | null>(
     props.partMasterId
@@ -50,11 +46,18 @@ export function WishlistItemCompatibilityBlock(props: {
     setSkuResolving(true);
     void (async () => {
       try {
-        const { sku } = await endpoints.getPartSku(props.skuId!.trim());
+        const payload = await withAuthGuard(
+          () => endpoints.getPartSku(props.skuId!.trim()),
+          () => router.replace("/login")
+        );
+        if (!payload) {
+          return;
+        }
+        const { sku } = payload;
         if (!cancelled) {
           setResolvedPartMasterId(sku.partMasterId ?? null);
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) {
           setResolvedPartMasterId(null);
         }
@@ -83,10 +86,17 @@ export function WishlistItemCompatibilityBlock(props: {
       setLoading(true);
       setLoadError("");
       try {
-        const data = await endpoints.getPartCompatibilityReport(props.vehicleId, {
-          partMasterId: resolvedPartMasterId!,
-          nodeId: props.nodeId!,
-        });
+        const data = await withAuthGuard(
+          () =>
+            endpoints.getPartCompatibilityReport(props.vehicleId, {
+              partMasterId: resolvedPartMasterId!,
+              nodeId: props.nodeId!,
+            }),
+          () => router.replace("/login")
+        );
+        if (!data) {
+          return;
+        }
         if (!cancelled) {
           setReport(data);
         }

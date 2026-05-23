@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   deriveDominantFitmentResult,
   evidenceTypeShortRu,
@@ -28,7 +27,8 @@ import type {
   FitmentReportResultWire,
   PartCompatibilityReportWire,
 } from "@mototwin/types";
-import { getApiBaseUrl } from "../../src/api-base-url";
+import { createMobileApiClient } from "../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../src/mobile-auth-guard";
 import { InternalScreenChrome } from "../expo-shell/internal-screen-chrome";
 import {
   buildVehicleWishlistCommunityHref,
@@ -78,11 +78,7 @@ export function FitmentReportScreen(props: {
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const apiBaseUrl = getApiBaseUrl();
-  const endpoints = useMemo(
-    () => createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })),
-    [apiBaseUrl]
-  );
+  const endpoints = useMemo(() => createMobileApiClient(), []);
 
   const [data, setData] = useState<PartCompatibilityReportWire | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -109,10 +105,17 @@ export function FitmentReportScreen(props: {
       setLoading(true);
       setLoadError("");
       try {
-        const report = await endpoints.getPartCompatibilityReport(props.vehicleId, {
-          partMasterId: props.partMasterId,
-          nodeId: props.nodeId,
-        });
+        const report = await withAuthGuard(
+          () =>
+            endpoints.getPartCompatibilityReport(props.vehicleId, {
+              partMasterId: props.partMasterId,
+              nodeId: props.nodeId,
+            }),
+          () => router.replace("/login")
+        );
+        if (!report) {
+          return;
+        }
         if (!cancelled) setData(report);
       } catch (e) {
         if (!cancelled) {

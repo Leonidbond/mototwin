@@ -29,7 +29,8 @@ import {
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { createMobileApiClient } from "../../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../../src/mobile-auth-guard";
 import {
   buildAttentionSummaryFromNodeTree,
   buildVehicleDashboardExpensesViewModel,
@@ -89,7 +90,6 @@ import {
   statusSemanticTokens,
   statusTextLabelsRu,
 } from "@mototwin/design-tokens";
-import { getApiBaseUrl } from "../../../src/api-base-url";
 import {
   readNodeSnoozePreferences,
   writeNodeSnoozePreference,
@@ -741,8 +741,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
   const [isMovingToTrash, setIsMovingToTrash] = useState(false);
 
-  const apiBaseUrl = getApiBaseUrl();
-
   const load = useCallback(async () => {
     if (!vehicleId) {
       setError("Не удалось определить ID мотоцикла.");
@@ -750,8 +748,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       return;
     }
 
-    const client = createApiClient({ baseUrl: apiBaseUrl });
-    const endpoints = createMotoTwinEndpoints(client);
+    const endpoints = createMobileApiClient();
 
     setIsLoading(true);
     setError("");
@@ -762,10 +759,15 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     setYearExpenses([]);
 
     try {
-      const detailData = await endpoints.getVehicleDetail(vehicleId);
+      const detailData = await withAuthGuard(
+        () => endpoints.getVehicleDetail(vehicleId),
+        () => router.replace("/login")
+      );
+      if (!detailData) {
+        return;
+      }
       setVehicle(detailData.vehicle ?? null);
     } catch (err) {
-      console.error(err);
       setError("Не удалось загрузить данные мотоцикла.");
       setVehicle(null);
       setNodeTree([]);
@@ -836,7 +838,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
     setIsNodeTreeLoading(false);
     setIsTopServiceNodesLoading(false);
-  }, [apiBaseUrl, currentExpenseYear, vehicleId]);
+  }, [currentExpenseYear, router, vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -870,7 +872,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     }
     setNodeContextRecommendationsLoading(true);
     setNodeContextRecommendationsError("");
-    void createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }))
+    void createMobileApiClient()
       .getRecommendedSkusForNode(vehicleId, selectedNodeContextId)
       .then((res) => {
         setNodeContextRecommendations(res.recommendations ?? []);
@@ -882,7 +884,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       .finally(() => {
         setNodeContextRecommendationsLoading(false);
       });
-  }, [apiBaseUrl, vehicleId, selectedNodeContextId]);
+  }, [vehicleId, selectedNodeContextId]);
 
   useEffect(() => {
     if (!vehicleId || !selectedNodeContextId) {
@@ -893,7 +895,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     }
     setNodeContextServiceKitsLoading(true);
     setNodeContextServiceKitsError("");
-    void createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }))
+    void createMobileApiClient()
       .getServiceKits({ nodeId: selectedNodeContextId, vehicleId })
       .then((res) => {
         setNodeContextServiceKits(res.kits ?? []);
@@ -905,7 +907,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       .finally(() => {
         setNodeContextServiceKitsLoading(false);
       });
-  }, [apiBaseUrl, vehicleId, selectedNodeContextId]);
+  }, [vehicleId, selectedNodeContextId]);
 
   const { roots: nodeTreeViewModel } = useMemo(
     () => buildNodeTreeSectionProps(nodeTree),
@@ -1574,22 +1576,28 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       }
       try {
         setNodeContextAddingRecommendedSkuId(rec.skuId);
-        await createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).createWishlistItem(
-          vehicleId,
-          {
-            nodeId: selectedNodeContextId,
-            skuId: rec.skuId,
-            status: "NEEDED",
-            quantity: 1,
-          }
+        const created = await withAuthGuard(
+          () =>
+            createMobileApiClient().createWishlistItem(
+              vehicleId,
+              {
+                nodeId: selectedNodeContextId,
+                skuId: rec.skuId,
+                status: "NEEDED",
+                quantity: 1,
+              }
+            ),
+          () => router.replace("/login")
         );
+        if (!created) {
+          return;
+        }
       } catch (e) {
-        console.error(e);
       } finally {
         setNodeContextAddingRecommendedSkuId("");
       }
     },
-    [apiBaseUrl, vehicleId, selectedNodeContextId]
+    [router, vehicleId, selectedNodeContextId]
   );
   const addServiceKitFromNodeContext = useCallback(
     async (kit: ServiceKitViewModel) => {
@@ -1598,12 +1606,17 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       }
       try {
         setNodeContextAddingKitCode(kit.code);
-        const response = await createMotoTwinEndpoints(
-          createApiClient({ baseUrl: apiBaseUrl })
-        ).addServiceKitToWishlist(
-          vehicleId,
-          { kitCode: kit.code, contextNodeId: selectedNodeContextId }
+        const response = await withAuthGuard(
+          () =>
+            createMobileApiClient().addServiceKitToWishlist(
+              vehicleId,
+              { kitCode: kit.code, contextNodeId: selectedNodeContextId }
+            ),
+          () => router.replace("/login")
         );
+        if (!response) {
+          return;
+        }
         Alert.alert(
           "Комплект добавлен",
           `Добавлено: ${response.result.createdItems.length}\nПропущено: ${response.result.skippedItems.length}`
@@ -1618,7 +1631,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         setNodeContextAddingKitCode("");
       }
     },
-    [apiBaseUrl, vehicleId, selectedNodeContextId]
+    [router, vehicleId, selectedNodeContextId]
   );
   const openWishlistFormForRecommendedSku = useCallback(
     (rec: PartRecommendationViewModel) => {
@@ -1682,7 +1695,8 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   );
   const advanceWishlistItemStatusFromNodeContext = useCallback(
     async (item: PartWishlistItemViewModel) => {
-      if (!vehicleId || !item.nodeId) {
+      const itemNodeId = item.nodeId;
+      if (!vehicleId || !itemNodeId) {
         return;
       }
       const nextStatus: PartWishlistItemStatus =
@@ -1692,17 +1706,24 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
             ? "BOUGHT"
             : "INSTALLED";
       if (nextStatus === "INSTALLED") {
-        persistNodeTreeReturnState(item.nodeId);
+        persistNodeTreeReturnState(itemNodeId);
         closeNodeContextModal();
         router.push(buildServiceEventNewFromWishlistHref(vehicleId, item, { pendingInstall: true }));
         return;
       }
       try {
-        const res = await createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).updateWishlistItem(
-          vehicleId,
-          item.id,
-          { status: nextStatus, nodeId: item.nodeId }
+        const res = await withAuthGuard(
+          () =>
+            createMobileApiClient().updateWishlistItem(
+              vehicleId,
+              item.id,
+              { status: nextStatus, nodeId: itemNodeId }
+            ),
+          () => router.replace("/login")
         );
+        if (!res) {
+          return;
+        }
         setWishlistItems((prev) =>
           prev.map((candidate) => (candidate.id === item.id ? res.item : candidate))
         );
@@ -1711,7 +1732,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         Alert.alert("Список покупок", message);
       }
     },
-    [apiBaseUrl, closeNodeContextModal, persistNodeTreeReturnState, router, vehicleId]
+    [closeNodeContextModal, persistNodeTreeReturnState, router, vehicleId]
   );
   const handleNodeContextAction = useCallback(
     (actionKey: string) => {
@@ -1796,12 +1817,15 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
           void (async () => {
             try {
               setIsMovingToTrash(true);
-              await createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).moveVehicleToTrash(
-                vehicleId
+              const moved = await withAuthGuard(
+                () => createMobileApiClient().moveVehicleToTrash(vehicleId),
+                () => router.replace("/login")
               );
+              if (!moved) {
+                return;
+              }
               router.replace("/garage");
             } catch (requestError) {
-              console.error(requestError);
               setError("Не удалось переместить мотоцикл на Свалку.");
             } finally {
               setIsMovingToTrash(false);
@@ -1810,7 +1834,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
         },
       },
     ]);
-  }, [apiBaseUrl, isMovingToTrash, router, vehicleId]);
+  }, [isMovingToTrash, router, vehicleId]);
   /** Сводка расходов на дашборде: та же логика, что на вебе ({@link buildVehicleDashboardExpensesViewModel}). */
   const dashboardVehicleExpenses = useMemo(
     () => buildVehicleDashboardExpensesViewModel(yearExpenses, { selectedYear: currentExpenseYear }),

@@ -19,7 +19,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { createMobileApiClient } from "../../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../../src/mobile-auth-guard";
 import type {
   NodeTreeItem,
   VehicleDetail,
@@ -61,7 +62,6 @@ import {
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { getNodeTreeIconAsset } from "../../../../../src/node-tree-icons";
-import { getApiBaseUrl } from "../../../src/api-base-url";
 import { KeyboardAwareScrollScreen } from "../../../components/expo-shell/keyboard-aware-scroll-screen";
 import { InternalScreenChrome } from "../../../components/expo-shell/internal-screen-chrome";
 import { GarageVehicleContextPlaque } from "../../../components/garage/GarageVehicleContextPlaque";
@@ -1127,7 +1127,6 @@ export default function ServiceLogScreen() {
   const [datePickField, setDatePickField] = useState<null | "from" | "to">(null);
   const [headerScrollY, setHeaderScrollY] = useState(0);
 
-  const apiBaseUrl = getApiBaseUrl();
   const scrollRef = useRef<ScrollView | null>(null);
   const eventYByIdRef = useRef<Record<string, number>>({});
   /** Как web: не перетирать выбор при каждом изменении `selectedEventId`, пока открыт deep link. */
@@ -1294,14 +1293,21 @@ export default function ServiceLogScreen() {
         setIsLoading(true);
         setError("");
         setContextVehicleDetail(null);
-        const client = createApiClient({ baseUrl: apiBaseUrl });
-        const endpoints = createMotoTwinEndpoints(client);
-        const [data, treeRes, topRes, vehicleRes] = await Promise.all([
-          endpoints.getServiceEvents(vehicleId),
-          endpoints.getNodeTree(vehicleId),
-          endpoints.getTopServiceNodes(),
-          endpoints.getVehicleDetail(vehicleId),
-        ]);
+        const endpoints = createMobileApiClient();
+        const payload = await withAuthGuard(
+          () =>
+            Promise.all([
+              endpoints.getServiceEvents(vehicleId),
+              endpoints.getNodeTree(vehicleId),
+              endpoints.getTopServiceNodes(),
+              endpoints.getVehicleDetail(vehicleId),
+            ]),
+          () => router.replace("/login")
+        );
+        if (!payload) {
+          return;
+        }
+        const [data, treeRes, topRes, vehicleRes] = payload;
         setEvents(data.serviceEvents ?? []);
         setNodeTree(treeRes.nodeTree ?? []);
         setTopServiceNodes(topRes.nodes ?? []);
@@ -1312,12 +1318,11 @@ export default function ServiceLogScreen() {
         const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
         setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
       } catch (err) {
-        console.error(err);
         setError("Не удалось загрузить журнал обслуживания.");
       } finally {
         setIsLoading(false);
       }
-    }, [apiBaseUrl, vehicleId]);
+    }, [router, vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1489,8 +1494,14 @@ export default function ServiceLogScreen() {
             void (async () => {
               try {
                 setError("");
-                const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
-                await endpoints.deleteServiceEvent(vehicleId, eventId);
+                const endpoints = createMobileApiClient();
+                const deleted = await withAuthGuard(
+                  () => endpoints.deleteServiceEvent(vehicleId, eventId),
+                  () => router.replace("/login")
+                );
+                if (!deleted) {
+                  return;
+                }
                 closeDetailSheet();
                 await load();
                 setActionMessage({
@@ -1499,7 +1510,6 @@ export default function ServiceLogScreen() {
                   details: "Статусы и расходы обновлены",
                 });
               } catch (deleteError) {
-                console.error(deleteError);
                 setError("Не удалось удалить сервисное событие.");
                 setActionMessage({
                   tone: "error",

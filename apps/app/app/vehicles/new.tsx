@@ -9,7 +9,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   createInitialAddMotorcycleFormValues,
   normalizeAddMotorcyclePayload,
@@ -30,7 +29,8 @@ import type {
   RideUsageIntensity,
   RideUsageType,
 } from "@mototwin/types";
-import { getApiBaseUrl } from "../../src/api-base-url";
+import { createMobileApiClient } from "../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../src/mobile-auth-guard";
 import { KeyboardAwareScrollScreen } from "../../components/expo-shell/keyboard-aware-scroll-screen";
 import { ScreenHeader } from "../../components/expo-shell/screen-header";
 
@@ -91,7 +91,6 @@ const defaultNewMotorcycleForm = createInitialAddMotorcycleFormValues();
 
 export default function NewVehicleScreen() {
   const router = useRouter();
-  const apiBaseUrl = getApiBaseUrl();
 
   const [brands, setBrands] = useState<BrandItem[]>([]);
   const [models, setModels] = useState<ModelItem[]>([]);
@@ -126,20 +125,24 @@ export default function NewVehicleScreen() {
       try {
         setIsLoadingBrands(true);
         setScreenError("");
-        const client = createApiClient({ baseUrl: apiBaseUrl });
-        const endpoints = createMotoTwinEndpoints(client);
-        const response = await endpoints.getBrands();
+        const endpoints = createMobileApiClient();
+        const response = await withAuthGuard(
+          () => endpoints.getBrands(),
+          () => router.replace("/login")
+        );
+        if (!response) {
+          return;
+        }
         setBrands(response.brands || []);
       } catch (error) {
-        console.error(error);
         setScreenError("Не удалось загрузить марки. Проверьте подключение к backend.");
       } finally {
         setIsLoadingBrands(false);
       }
     };
 
-    loadBrands();
-  }, [apiBaseUrl]);
+    void loadBrands();
+  }, [router]);
 
   useEffect(() => {
     if (!brandId) {
@@ -154,12 +157,16 @@ export default function NewVehicleScreen() {
       try {
         setIsLoadingModels(true);
         setScreenError("");
-        const client = createApiClient({ baseUrl: apiBaseUrl });
-        const endpoints = createMotoTwinEndpoints(client);
-        const response = await endpoints.getModels(brandId);
+        const endpoints = createMobileApiClient();
+        const response = await withAuthGuard(
+          () => endpoints.getModels(brandId),
+          () => router.replace("/login")
+        );
+        if (!response) {
+          return;
+        }
         setModels(response.models || []);
       } catch (error) {
-        console.error(error);
         setScreenError("Не удалось загрузить модели выбранной марки.");
       } finally {
         setIsLoadingModels(false);
@@ -169,8 +176,8 @@ export default function NewVehicleScreen() {
     setModelId("");
     setVariants([]);
     setModelVariantId("");
-    loadModels();
-  }, [apiBaseUrl, brandId]);
+    void loadModels();
+  }, [brandId, router]);
 
   useEffect(() => {
     if (!modelId) {
@@ -183,12 +190,16 @@ export default function NewVehicleScreen() {
       try {
         setIsLoadingVariants(true);
         setScreenError("");
-        const client = createApiClient({ baseUrl: apiBaseUrl });
-        const endpoints = createMotoTwinEndpoints(client);
-        const response = await endpoints.getModelVariants(modelId);
+        const endpoints = createMobileApiClient();
+        const response = await withAuthGuard(
+          () => endpoints.getModelVariants(modelId),
+          () => router.replace("/login")
+        );
+        if (!response) {
+          return;
+        }
         setVariants(response.variants || []);
       } catch (error) {
-        console.error(error);
         setScreenError("Не удалось загрузить модификации выбранной модели.");
       } finally {
         setIsLoadingVariants(false);
@@ -196,8 +207,8 @@ export default function NewVehicleScreen() {
     };
 
     setModelVariantId("");
-    loadVariants();
-  }, [apiBaseUrl, modelId]);
+    void loadVariants();
+  }, [modelId, router]);
 
   const submitCreateVehicle = async () => {
     const motorcycleForm: AddMotorcycleFormValues = {
@@ -226,14 +237,17 @@ export default function NewVehicleScreen() {
       setScreenError("");
       setFormErrors({});
 
-      const client = createApiClient({ baseUrl: apiBaseUrl });
-      const endpoints = createMotoTwinEndpoints(client);
-
-      await endpoints.createVehicle(normalizeAddMotorcyclePayload(motorcycleForm));
+      const endpoints = createMobileApiClient();
+      const created = await withAuthGuard(
+        () => endpoints.createVehicle(normalizeAddMotorcyclePayload(motorcycleForm)),
+        () => router.replace("/login")
+      );
+      if (!created) {
+        return;
+      }
 
       router.replace("/garage");
     } catch (error) {
-      console.error(error);
       setScreenError("Не удалось добавить мотоцикл. Проверьте данные и попробуйте снова.");
     } finally {
       setIsSaving(false);

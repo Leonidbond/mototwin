@@ -18,9 +18,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import {
-  createApiClient,
-  createMotoTwinEndpoints,
-  createPickerSubmitApi,
   submitPickerDraft,
 } from "@mototwin/api-client";
 import {
@@ -61,7 +58,8 @@ import type {
   VehicleDetail,
   VehicleDetailApiRecord,
 } from "@mototwin/types";
-import { getApiBaseUrl } from "../../../../src/api-base-url";
+import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
+import { withAuthGuard } from "../../../../src/mobile-auth-guard";
 import { InternalScreenChrome } from "../../../../components/expo-shell/internal-screen-chrome";
 import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
 import { GarageBottomNav } from "../../../../components/garage/GarageBottomNav";
@@ -187,7 +185,6 @@ export default function WishlistPickerScreen() {
   const initialFocusKits = params.focus === "kits";
   const initialPartsSearch =
     typeof params.partsSearch === "string" ? params.partsSearch.trim() : "";
-  const apiBaseUrl = getApiBaseUrl();
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
@@ -276,7 +273,7 @@ export default function WishlistPickerScreen() {
       }
       setTreeLoading(true);
       try {
-        const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+        const endpoints = createMobileApiClient();
         const [treeRes, wishRes, detailRes] = await Promise.all([
           endpoints.getNodeTree(vehicleId),
           endpoints.getVehicleWishlist(vehicleId),
@@ -302,14 +299,14 @@ export default function WishlistPickerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, vehicleId]);
+  }, [vehicleId]);
 
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
     (async () => {
       try {
-        const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+        const endpoints = createMobileApiClient();
         const data = await endpoints.getTopServiceNodes();
         if (!cancelled) {
           setTopServiceNodes(data.nodes ?? []);
@@ -323,7 +320,7 @@ export default function WishlistPickerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, vehicleId]);
+  }, [vehicleId]);
 
   const leafOptions = useMemo(() => getLeafNodeOptions(nodeTree), [nodeTree]);
 
@@ -382,7 +379,7 @@ export default function WishlistPickerScreen() {
     (async () => {
       setRecLoading(true);
       try {
-        const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+        const endpoints = createMobileApiClient();
         const data = await endpoints.getRecommendedSkusForNode(vehicleId, selectedNodeId);
         if (!cancelled) setRecommendations(data.recommendations ?? []);
       } catch {
@@ -394,7 +391,7 @@ export default function WishlistPickerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, vehicleId, selectedNodeId]);
+  }, [vehicleId, selectedNodeId]);
 
   useEffect(() => {
     if (!vehicleId) return;
@@ -402,7 +399,7 @@ export default function WishlistPickerScreen() {
     (async () => {
       setKitsLoading(true);
       try {
-        const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+        const endpoints = createMobileApiClient();
         const data = await endpoints.getServiceKits({
           vehicleId,
           nodeId: selectedNodeId ?? undefined,
@@ -417,7 +414,7 @@ export default function WishlistPickerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, vehicleId, selectedNodeId, kitsReloadNonce]);
+  }, [vehicleId, selectedNodeId, kitsReloadNonce]);
 
   useEffect(() => {
     if (debouncedSearch.length < 2) {
@@ -428,7 +425,7 @@ export default function WishlistPickerScreen() {
     (async () => {
       setSkuLoading(true);
       try {
-        const endpoints = createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl }));
+        const endpoints = createMobileApiClient();
         const data = await endpoints.getPartSkus({
           search: debouncedSearch,
           nodeId: searchWithoutNodeScope ? undefined : (selectedNodeId ?? undefined),
@@ -445,7 +442,6 @@ export default function WishlistPickerScreen() {
       cancelled = true;
     };
   }, [
-    apiBaseUrl,
     debouncedSearch,
     selectedNodeId,
     includeInactiveSkus,
@@ -654,8 +650,14 @@ export default function WishlistPickerScreen() {
           existingQty: d.existingQty,
         });
       }
-      const api = createPickerSubmitApi(apiBaseUrl);
-      const result = await submitPickerDraft(api, draftSnapshot, { quantityResolutions });
+      const api = createMobileApiClient();
+      const result = await withAuthGuard(
+        () => submitPickerDraft(api, draftSnapshot, { quantityResolutions }),
+        () => router.replace("/login")
+      );
+      if (!result) {
+        return;
+      }
       const ok = submitHasAnySuccess(result);
       if (!ok && draftSnapshot.items.length > 0) {
         Alert.alert(
@@ -686,7 +688,6 @@ export default function WishlistPickerScreen() {
       setSubmitting(false);
     }
   }, [
-    apiBaseUrl,
     draft,
     quantityResolutionByDraftId,
     router,
@@ -1250,9 +1251,7 @@ export default function WishlistPickerScreen() {
         initialTitle={userKitModalInitialTitle}
         lines={draftSkuLinesForKit}
         onSubmit={(body) =>
-          createMotoTwinEndpoints(createApiClient({ baseUrl: apiBaseUrl })).createUserServiceEventFormTemplate(
-            body
-          )
+          createMobileApiClient().createUserServiceEventFormTemplate(body)
         }
         onSuccess={() => {
           setKitsReloadNonce((n) => n + 1);
