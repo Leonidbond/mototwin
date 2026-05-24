@@ -92,7 +92,8 @@ Practical direction:
 
 ## 7. Current constraints
 
-- Auth/session flows are not implemented as production multi-user flow; garage creation uses demo user contract on backend routes where applicable.
+- Production auth/session flows are implemented (web Auth.js sessions + mobile token/refresh flow), while dev/demo switcher modes remain for QA/local workflows.
+- Admin user management now includes account blocking; blocked users lose active sessions and cannot re-authenticate until unblocked.
 - Status calculation is read-time in `node-tree` route; no background recalculation worker.
 - `TopNodeState` and `NodeState` coexist during migration.
 

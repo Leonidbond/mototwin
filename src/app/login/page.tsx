@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { createWebApiClient } from "@/lib/create-web-api-client";
+import { signIn } from "next-auth/react";
 import { productSemanticColors } from "@mototwin/design-tokens";
-
-const api = createWebApiClient();
 
 function LoginForm() {
   const router = useRouter();
@@ -23,7 +21,14 @@ function LoginForm() {
     setError("");
     setLoading(true);
     try {
-      await api.login({ email, password });
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+      if (!result || result.error) {
+        throw new Error("Неверный email или пароль.");
+      }
       router.replace(nextPath.startsWith("/") ? nextPath : "/garage");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось войти.");
@@ -87,6 +92,37 @@ function LoginForm() {
             {loading ? "Вход…" : "Войти"}
           </button>
         </form>
+        <div className="mt-4 grid grid-cols-1 gap-2">
+          <button
+            type="button"
+            onClick={() => void signIn("google", { callbackUrl: nextPath })}
+            className="rounded-lg border py-2 text-sm"
+            style={{ borderColor: "rgba(255,255,255,0.15)" }}
+          >
+            Войти через Google
+          </button>
+          <button
+            type="button"
+            onClick={() => void signIn("apple", { callbackUrl: nextPath })}
+            className="rounded-lg border py-2 text-sm"
+            style={{ borderColor: "rgba(255,255,255,0.15)" }}
+          >
+            Войти через Apple
+          </button>
+          <button
+            type="button"
+            onClick={() => void signIn("yandex", { callbackUrl: nextPath })}
+            className="rounded-lg border py-2 text-sm"
+            style={{ borderColor: "rgba(255,255,255,0.15)" }}
+          >
+            Войти через Yandex
+          </button>
+        </div>
+        <p className="text-sm mt-4" style={{ color: productSemanticColors.textMuted }}>
+          <Link href="/forgot-password" className="underline">
+            Забыли пароль?
+          </Link>
+        </p>
         <p className="text-sm mt-6" style={{ color: productSemanticColors.textMuted }}>
           Нет аккаунта?{" "}
           <Link href="/register" className="underline" style={{ color: productSemanticColors.primaryAction }}>

@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system/legacy";
+import * as SecureStore from "expo-secure-store";
 
 export type StoredAuthTokens = {
   accessToken: string;
@@ -6,10 +6,7 @@ export type StoredAuthTokens = {
   expiresAt: string;
 };
 
-const FILE_PATH =
-  FileSystem.documentDirectory != null
-    ? `${FileSystem.documentDirectory}mototwin-auth-tokens.json`
-    : null;
+const AUTH_TOKENS_KEY = "mototwin-auth-tokens";
 
 let memoryTokens: StoredAuthTokens | null = null;
 
@@ -17,15 +14,11 @@ export async function readAuthTokens(): Promise<StoredAuthTokens | null> {
   if (memoryTokens) {
     return memoryTokens;
   }
-  if (!FILE_PATH) {
-    return null;
-  }
   try {
-    const info = await FileSystem.getInfoAsync(FILE_PATH);
-    if (!info.exists) {
+    const raw = await SecureStore.getItemAsync(AUTH_TOKENS_KEY);
+    if (!raw) {
       return null;
     }
-    const raw = await FileSystem.readAsStringAsync(FILE_PATH);
     const parsed = JSON.parse(raw) as StoredAuthTokens;
     if (parsed?.accessToken && parsed?.refreshToken) {
       memoryTokens = parsed;
@@ -39,11 +32,8 @@ export async function readAuthTokens(): Promise<StoredAuthTokens | null> {
 
 export async function writeAuthTokens(tokens: StoredAuthTokens): Promise<void> {
   memoryTokens = tokens;
-  if (!FILE_PATH) {
-    return;
-  }
   try {
-    await FileSystem.writeAsStringAsync(FILE_PATH, JSON.stringify(tokens));
+    await SecureStore.setItemAsync(AUTH_TOKENS_KEY, JSON.stringify(tokens));
   } catch {
     // Ignore persistence errors.
   }
@@ -51,14 +41,8 @@ export async function writeAuthTokens(tokens: StoredAuthTokens): Promise<void> {
 
 export async function clearAuthTokens(): Promise<void> {
   memoryTokens = null;
-  if (!FILE_PATH) {
-    return;
-  }
   try {
-    const info = await FileSystem.getInfoAsync(FILE_PATH);
-    if (info.exists) {
-      await FileSystem.deleteAsync(FILE_PATH, { idempotent: true });
-    }
+    await SecureStore.deleteItemAsync(AUTH_TOKENS_KEY);
   } catch {
     // Ignore.
   }

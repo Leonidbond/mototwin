@@ -48,9 +48,12 @@ Important: do not run `npx expo` from monorepo root without workspace context, o
 
 ## Docs
 
-- `docs/frontend-expo.md` — Expo routes, architecture, platform notes.
-- `docs/frontend-web.md` — web client structure and behavior.
-- `docs/garage-dashboard-mvp.md` — garage semantics and parity notes.
+- [`docs/README.md`](docs/README.md) — индекс документации
+- [`docs/frontend-expo.md`](docs/frontend-expo.md) — Expo routes, architecture, platform notes
+- [`docs/frontend-web.md`](docs/frontend-web.md) — web client structure and behavior
+- [`docs/user-settings-mvp.md`](docs/user-settings-mvp.md) — настройки профиля
+- [`docs/custom-top-nodes-mvp.md`](docs/custom-top-nodes-mvp.md) — персональный ТОП узлов и вид дерева
+- [`docs/garage-dashboard-mvp.md`](docs/garage-dashboard-mvp.md) — garage semantics and parity notes
 
 ssh root@195.24.71.143  
 

@@ -132,6 +132,66 @@
 - Response `404`: vehicle not found
 - Response `500`: fetch failure
 
+## 3.6 Global node catalog (user TOP)
+
+### `GET /api/nodes/top`
+- Returns curated TOP service nodes for current user
+- Uses `UserSettings.favoriteNodeCodes` when non-empty; otherwise `DEFAULT_TOP_SERVICE_NODE_CODES` from [`src/lib/top-service-nodes.ts`](../src/lib/top-service-nodes.ts)
+- Requires `getCurrentUserContext()`
+- Response `200`: `{ nodes: TopServiceNodeItem[] }`
+- Response `500`: fetch failure
+
+### `GET /api/nodes/service`
+- Flat list of all `isActive && isServiceRelevant` nodes (profile picker)
+- Response `200`: `{ nodes: ServiceNodeItem[] }`
+- Response `500`: fetch failure
+
+## 3.7 User settings
+
+### `GET /api/user-settings`
+- Returns normalized settings for current user (`UserSettings` row must exist — seed/bootstrap)
+- Includes `favoriteNodeCodes`, `defaultNodeView` among other profile fields
+- Response `200`: `{ settings }`
+- Response `503`: settings row missing
+
+### `PATCH /api/user-settings`
+- Partial update; zod-validated fields including:
+  - `favoriteNodeCodes`: `string[]`, max 15 items
+  - `defaultNodeView`: `"top"` | `"all"`
+- Response `200`: `{ settings }` (merged + normalized)
+- Response `400`: validation error
+
+See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md).
+
+## 3.8 Admin users
+
+### `GET /api/admin/users`
+- Requires admin access (`requireAnyAdmin`).
+- Filters:
+  - `q` (email/displayName search),
+  - `plan` (`FREE|PRO|all`),
+  - `hasVehicles` (`yes|no`),
+  - `role` (`SUPER_ADMIN|CATALOG_MANAGER|MODERATOR|ANALYST|all`),
+  - `status` (`active|blocked|all`).
+- Response `200`: paginated list with role/plan/activity metrics and blocking fields (`isBlocked`, `blockedAt`, `blockReason`).
+
+### `GET /api/admin/users/[id]`
+- Requires admin access (`requireAnyAdmin`).
+- Response `200`: detailed profile (garages, recent vehicles, fitment, service events) + blocking fields.
+- Response `404`: `{ error: "Пользователь не найден" }`
+
+### `PATCH /api/admin/users/[id]`
+- Requires admin access (`requireAnyAdmin`).
+- Request body:
+  - `isBlocked: boolean`
+  - `reason: string` (min 3, max 500)
+- Business rules:
+  - current admin cannot block self;
+  - when `isBlocked=true`, backend revokes all active sessions (app + Auth.js).
+- Response `200`: `{ id, isBlocked, blockedAt, blockReason }`
+- Response `400`: validation/self-block errors
+- Response `404`: target user not found
+
 ## 4. Core backend business rules
 
 1. Service events can be created only for leaf nodes.

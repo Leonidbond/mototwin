@@ -1,4 +1,4 @@
-# Auth Implementation Plan (planned, not implemented)
+# Auth Implementation Plan (implementation status updated)
 
 ## 1. Purpose
 
@@ -6,9 +6,9 @@ This document defines a practical implementation plan for real authentication in
 
 Scope:
 
-- planning only;
-- no code/schema/UI changes in this step;
-- web + Expo parity by auth outcome (not identical UI).
+- web + Expo parity by auth outcome (not identical UI);
+- concrete implementation notes for already delivered auth baseline;
+- remaining hardening and rollout work.
 
 ## 2. Current baseline
 
@@ -16,7 +16,7 @@ Scope:
 - Base and nested vehicle APIs are already ownership-filtered.
 - `getCurrentUserContext()` currently resolves demo user/garage.
 - `UserSettings` persistence is already implemented server-side (`UserSettings` model + `/api/user-settings`).
-- Real auth/session is not implemented yet.
+- Real auth/session is implemented for local accounts.
 
 ## 2.1 Development-only user switcher (implemented for QA)
 
@@ -67,7 +67,7 @@ Cons:
 - requires reliable email delivery from day one;
 - worse offline/dev ergonomics for Expo/device testing.
 
-### C) OAuth/social login
+### C) OAuth/social login (implemented baseline)
 
 Pros:
 
@@ -76,9 +76,9 @@ Pros:
 
 Cons:
 
-- provider setup and compliance overhead;
-- callback complexity across web + Expo;
-- weaker fit for first MVP auth milestone.
+- provider setup and compliance overhead remains;
+- callback complexity across web + Expo remains;
+- implemented with Auth.js providers (web) + mobile provider token exchange endpoint.
 
 ### D) Dev-only login
 
@@ -93,7 +93,7 @@ Cons:
 
 Use only as explicit local fallback mode.
 
-### E) Auth.js / NextAuth for web
+### E) Auth.js / NextAuth for web (implemented)
 
 Pros:
 
@@ -102,10 +102,10 @@ Pros:
 
 Cons:
 
-- Expo still needs token strategy and bridging decisions;
-- must avoid web-only assumptions in backend user resolution.
+- Expo still uses token strategy (mobile callback bridge implemented);
+- backend user resolution now supports both legacy cookie + Auth.js session + Bearer access token.
 
-### F) Expo session/token approach
+### F) Expo session/token approach (implemented and extended)
 
 Pros:
 
@@ -114,8 +114,8 @@ Pros:
 
 Cons:
 
-- requires secure token storage and refresh handling;
-- session invalidation semantics must stay aligned with web.
+- secure storage implemented via `expo-secure-store`;
+- refresh handling and invalidation implemented.
 
 ## 4. Recommended MVP approach
 
@@ -123,7 +123,7 @@ Recommendation:
 
 1. Start with **email/password + server sessions** as primary MVP auth.
 2. Use **Auth.js on web** with credentials provider.
-3. For Expo, use **token-based session** (short-lived access token + refresh token).
+3. For Expo, use **token-based session** (short-lived access token + refresh token) and OAuth provider token exchange endpoint.
 4. Keep **dev-only demo fallback** behind explicit dev flag only.
 
 Why this approach:
@@ -140,46 +140,58 @@ Why not overbuild roles yet:
 
 ## 5. Target auth flow (web + Expo)
 
-### Register
+### Register (implemented)
 
 - create user with normalized email and hashed password;
 - create default garage for the new user (`Мой гараж` or localized equivalent);
 - optionally initialize empty server-side `UserSettings` record in later phase.
 
-### Login
+### Login (implemented)
 
 - verify credentials;
 - issue session (web cookie session, Expo token session);
 - return/resolve current user context for API layer.
 - load existing server `UserSettings` for authenticated profile/settings UX.
 
-### Logout
+### Logout (implemented)
 
 - invalidate server session / refresh token;
 - clear client auth state;
 - protected routes return unauthorized after logout.
 
-### Current user
+### Current user (implemented)
 
 - add a current-user endpoint (for profile and auth state bootstrap);
 - response must be minimal and safe (id, displayName, email, auth flags).
 
-### Session expiration
+### Session expiration (implemented)
 
 - short access lifetime, renewable session via refresh;
 - expired sessions require re-auth;
 - consistent behavior across web and Expo.
 
-### Web cookie/session handling
+### Web cookie/session handling (implemented)
 
 - `HttpOnly`, `Secure`, `SameSite` cookies in production;
 - CSRF protection for state-changing requests if cookie session is used.
 
-### Expo token/session storage
+### Expo token/session storage (implemented)
 
-- store refresh token in secure storage;
-- keep access token in memory where practical;
+- store token bundle in secure storage (`expo-secure-store`);
 - rotate tokens and handle refresh failure by forcing re-login.
+
+### OAuth providers (implemented baseline)
+
+- Web: Auth.js providers for Google/Apple/Yandex (enabled by env credentials).
+- Mobile: provider token verification and exchange at `POST /api/auth/oauth/mobile`.
+- Account linking policy: one user can have multiple provider accounts (`auth_accounts`).
+
+### Password recovery (implemented baseline)
+
+- `POST /api/auth/forgot-password`: generic response (anti-enumeration).
+- `POST /api/auth/reset-password`: one-time hashed token, TTL, password update.
+- Token model: `password_reset_tokens`.
+- In non-production, forgot endpoint can include `debugResetUrl` for QA smoke.
 
 ## 6. API user resolution plan
 
@@ -263,37 +275,37 @@ Conflict policy for MVP:
 
 ## 11. Implementation phases
 
-### Phase 3A — Auth decision and contracts
+### Phase 3A — Auth decision and contracts (done)
 
 - finalize auth stack choices;
 - define auth/session contracts for web + Expo;
 - add any minimal schema updates if truly required.
 
-### Phase 3B — Web auth implementation
+### Phase 3B — Web auth implementation (done)
 
 - register/login/logout on web;
 - cookie-backed session handling;
 - current-user bootstrap for web client.
 
-### Phase 3C — Expo auth implementation
+### Phase 3C — Expo auth implementation (done baseline)
 
 - Expo login/logout;
 - token + refresh flow;
 - secure token storage and session restore.
 
-### Phase 3D — Replace demo context
+### Phase 3D — Replace demo context (done in production mode)
 
 - switch `getCurrentUserContext()` from demo resolver to auth resolver;
 - preserve existing ownership guards and `404` behavior.
 - keep canonical ownership source `garage.ownerUserId` (with `Vehicle.userId` treated as transitional/denormalized field until cleanup migration).
 - resolver replacement must stay read-only: user creation belongs to explicit registration/migration flows, not token parsing path.
 
-### Phase 3E — Settings session integration
+### Phase 3E — Settings session integration (done baseline)
 
 - keep existing server `UserSettings`;
 - implement login-time/local-cache merge policy.
 
-### Phase 3F — Account UI
+### Phase 3F — Account UI (in progress)
 
 - account/profile surfaces;
 - replace guest placeholders with authenticated identity;
@@ -317,10 +329,11 @@ Cross-platform parity checks:
 - same unauthorized behavior semantics;
 - same resource-not-found semantics for out-of-scope vehicles.
 
-## 13. Out of scope for this plan
+## 13. Remaining out of scope
 
-- implementing auth code now;
-- introducing roles/teams/sharing model now;
+- advanced account management UI (providers/sessions);
+- passkeys / 2FA;
+- roles/teams/sharing model;
 - marketplace/social account concepts.
 
 ## 14. Related docs

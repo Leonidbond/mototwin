@@ -38,6 +38,11 @@ export async function loadAdminUserList(params: {
   } else if (filters.hasVehicles === "no") {
     where.vehicles = { none: { trashedAt: null } };
   }
+  if (filters.status === "blocked") {
+    where.isBlocked = true;
+  } else if (filters.status === "active") {
+    where.isBlocked = false;
+  }
 
   const [total, users] = await Promise.all([
     prisma.user.count({ where }),
@@ -51,6 +56,9 @@ export async function loadAdminUserList(params: {
         email: true,
         displayName: true,
         createdAt: true,
+        isBlocked: true,
+        blockedAt: true,
+        blockReason: true,
         isModerator: true,
         adminRole: true,
         subscription: { select: { planType: true } },
@@ -104,6 +112,9 @@ export async function loadAdminUserList(params: {
     email: user.email,
     displayName: user.displayName,
     createdAt: user.createdAt.toISOString(),
+    isBlocked: user.isBlocked,
+    blockedAt: user.blockedAt?.toISOString() ?? null,
+    blockReason: user.blockReason,
     isModerator: user.isModerator,
     adminRole: (user.adminRole as AdminRoleWire | null) ?? null,
     plan: (user.subscription?.planType as "FREE" | "PRO" | null) ?? null,
@@ -182,6 +193,9 @@ export async function loadAdminUserDetail(userId: string): Promise<AdminUserDeta
     displayName: user.displayName,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
+    isBlocked: user.isBlocked,
+    blockedAt: user.blockedAt?.toISOString() ?? null,
+    blockReason: user.blockReason,
     isModerator: user.isModerator,
     adminRole: (user.adminRole as AdminRoleWire | null) ?? null,
     plan: (user.subscription?.planType as "FREE" | "PRO" | null) ?? null,

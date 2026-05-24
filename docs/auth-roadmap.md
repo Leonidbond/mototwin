@@ -1,4 +1,4 @@
-# Auth Roadmap (planned, not implemented)
+# Auth Roadmap
 
 Detailed ownership architecture and migration strategy:
 
@@ -7,9 +7,13 @@ Detailed ownership architecture and migration strategy:
 
 ## Current state
 
-- Authorization is **not implemented**.
-- Product currently behaves as single-user/demo/local-account semantics.
-- Garage UI is framed as personal space, but data access is still pre-auth MVP mode.
+- Authorization is **implemented for local accounts** on web + Expo:
+  - `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me`.
+- Web now supports Auth.js sessions and OAuth providers (Google/Apple/Yandex) when env credentials are configured.
+- Expo keeps token-based auth (access + refresh), and can sign in through provider tokens via `POST /api/auth/oauth/mobile`.
+- Password recovery flow is implemented:
+  - `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`;
+  - reset tokens are one-time, hashed, and time-limited.
 - Profile `UserSettings` are persisted server-side per user (`UserSettings` model + `/api/user-settings`), with local cache/fallback on clients.
 - Phase 1 ownership foundation is implemented (User/Garage + demo ownership context).
 - Phase 2A base route scoping is implemented.
@@ -82,24 +86,30 @@ Future iterations should add:
 
 ### Phase 3 — Auth session layer (planned)
 
-- See detailed rollout in [auth-implementation-plan.md](./auth-implementation-plan.md):
-  - Phase 3A: auth decision + contracts;
-  - Phase 3B: web auth;
-  - Phase 3C: Expo auth;
-  - Phase 3D: replace demo resolver with session/token resolver;
-  - Phase 3E: auth session integration + optional conflict policy for existing local cache;
-  - Phase 3F: account UI.
+Implemented:
 
-### Phase 4 — UI account flows
+- web credentials + session login;
+- Expo token + refresh flow;
+- Auth.js integration for web session/OAuth;
+- mobile OAuth exchange endpoint;
+- password recovery endpoints and UI.
 
-- Add sign in / sign up / sign out.
-- Replace `Гость` placeholder with real account identity.
-- Move local Garage settings to authenticated user profile settings.
+Open hardening tasks:
 
-### Phase 5 — Hardening
+- add provider-specific e2e smoke tests (Google/Apple/Yandex);
+- add per-IP/email rate limiter storage for auth endpoints;
+- add optional 2FA / passkeys roadmap phase.
 
-- Add audit/monitoring for auth errors and unauthorized access attempts.
-- Add regression QA for cross-platform ownership enforcement.
+### Phase 4 — Extended auth UX
+
+- Account linking management UI (multiple providers per account).
+- Session/device management (list and revoke active sessions).
+- Optional passwordless magic link.
+
+### Phase 5 — Security hardening
+
+- Audit/monitoring for auth errors and suspicious attempts.
+- Regression QA for cross-platform ownership enforcement.
 
 ## Migration note
 

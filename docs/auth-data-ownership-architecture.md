@@ -8,13 +8,12 @@ Scope of this document:
 
 - describe the migration path from current single-user/local MVP semantics;
 - define future ownership entities and relationships;
-- define phased rollout without enabling real login/session now.
+- document phased rollout history and current ownership/auth architecture.
 
 Out of scope in current phase:
 
-- real authentication (login/register/session);
-- web/Expo auth UI;
-- auth dependencies/session provider.
+- advanced account-security features (2FA/passkeys/device-management);
+- team/organization sharing model.
 
 ## 1.1 Phase status
 
@@ -22,16 +21,17 @@ Out of scope in current phase:
 - Phase 2A (base Garage/Vehicle API ownership scope) is implemented.
 - Phase 2B (nested vehicle routes ownership scope) is implemented.
 - Phase 2D (context + ownership hardening) is implemented.
+- Phase 3 baseline (auth/session + web/mobile parity + OAuth + password recovery) is implemented.
 
 ## 2. Current state (as-is)
 
-- MotoTwin currently behaves as single-user/demo-local MVP.
+- MotoTwin keeps dev/demo compatibility modes, but production auth is implemented.
 - Garage already acts as a personal dashboard (`Мой гараж`).
-- Real auth (login/register/session) is not implemented.
+- Real auth is implemented (credentials + OAuth + session/tokens).
 - `UserSettings` is implemented server-side and scoped per user.
 - Profile settings API is implemented: `GET/PATCH /api/user-settings`.
 - Local settings are now cache/fallback layer on clients (not primary persistence).
-- Existing APIs are not fully enforced by user isolation semantics yet.
+- User isolation on vehicle-scoped APIs is enforced through current-user context.
 
 ## 3. Target concepts (to-be)
 
@@ -92,7 +92,7 @@ Justification:
 - `defaultSnoozeDays`
 - implemented as DB-backed per-user settings in current pre-auth foundation.
 
-## 5. Recommended MVP direction (before auth)
+## 5. Historical MVP direction (before auth)
 
 1. Add `User` + `Garage` ownership foundation in schema/migrations.
 2. Create stable demo/local user and demo garage.
@@ -179,12 +179,15 @@ Deferred:
 
 - any remaining non-vehicle-global routes can be reviewed in a separate hardening pass if new nested endpoints are added later.
 
-### Phase 3 — Real auth implementation
+### Phase 3 — Real auth implementation (implemented baseline)
 
-- add login/register/session;
-- replace demo user resolver with session user resolver;
-- keep existing ownership filtering logic, only user-context source changes.
-- detailed implementation sequence is defined in [auth-implementation-plan.md](./auth-implementation-plan.md) (Phase 3A-3F).
+- implemented:
+  - login/register/logout/session for web + mobile;
+  - Auth.js integration for web sessions and OAuth providers;
+  - mobile token-based auth with refresh;
+  - password recovery flow;
+  - blocked account enforcement in auth/context resolver.
+- detailed sequence and status are tracked in [auth-implementation-plan.md](./auth-implementation-plan.md).
 
 ### Phase 4 — Account settings session integration
 
@@ -234,9 +237,9 @@ Current Phase 1 usage:
 
 ## 9. Security and honesty constraints
 
-- until auth/session is implemented, there is no real multi-user security boundary;
-- documentation and UI must not claim user isolation before it actually exists;
-- transitional state must be explicitly marked as pre-auth/demo ownership mode.
+- documentation and UI must distinguish production auth from dev-only switcher modes;
+- account blocking and RBAC checks must remain server-side enforced;
+- transitional/demo modes must stay explicitly marked and disabled for production security assumptions.
 
 ## 10. Web/Expo impact by phase
 

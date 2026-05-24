@@ -9,6 +9,7 @@
 - `src/app/page.tsx` — landing page
 - `src/app/onboarding/page.tsx` — add motorcycle flow (web)
 - `src/app/garage/page.tsx` — garage list
+- `src/app/profile/page.tsx` — user profile (settings, custom TOP nodes)
 - `src/app/vehicles/[id]/page.tsx` — vehicle operational page
 
 ## 3. Main web flows
@@ -28,7 +29,13 @@
   - ride profile fields
 - Submit to `/api/vehicles`
 
-### 3.3 Garage
+### 3.3 User profile (`/profile`)
+
+- Loads `GET /api/user-settings`, `GET /api/profile`, `GET /api/nodes/top`.
+- Same settings surface as Expo: currency, units, snooze, trash retention, **вид узлов**, **Мой ТОП узлов** (grouped, replace/add/remove, reset).
+- See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md), [user-settings-mvp.md](./user-settings-mvp.md).
+
+### 3.4 Garage
 - Loads `/api/garage`
 - States: loading / error / empty / list
 - Shows vehicle cards with summary and navigation to `/vehicles/[id]`
@@ -42,7 +49,7 @@
   (`В норме`, `Скоро`, `Просрочено`, `Недавно`)
 - Durable Garage behavior/spec lives in `garage-dashboard-mvp.md`
 
-### 3.4 Vehicle detail (web workspace)
+### 3.5 Vehicle detail (web workspace)
 
 The page consolidates multiple operational blocks and modal flows:
 - vehicle identity/profile
@@ -58,6 +65,8 @@ The page consolidates multiple operational blocks and modal flows:
 Vehicle page uses:
 - `GET /api/vehicles/[id]`
 - `GET /api/vehicles/[id]/node-tree`
+- `GET /api/nodes/top` (user-specific TOP list for overview cards)
+- `GET /api/user-settings` (default node tree view)
 - `GET /api/vehicles/[id]/service-events`
 - `POST /api/vehicles/[id]/service-events`
 - `PATCH /api/vehicles/[id]/state`

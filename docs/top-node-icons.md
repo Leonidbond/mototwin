@@ -47,7 +47,7 @@ Keep the same relative path in both theme sets when adding or replacing an icon.
 
 ## Group Icons
 
-Group icons represent the six TOP-node groups shown in `Состояние узлов`.
+Group icons represent TOP-node groups shown in `Состояние узлов` and in Profile «Мой ТОП узлов». Fixed categories: six groups below; dynamic category **Прочее** (`other`) appears when the user's TOP set includes nodes outside those groups.
 
 | UI group | Runtime key | File |
 | --- | --- | --- |
@@ -57,8 +57,9 @@ Group icons represent the six TOP-node groups shown in `Состояние уз�
 | Шины | `tires` | `tires/tires.png` |
 | Цепь | `chain` | `chain_sprockets/chain_sprockets.png` |
 | Подвеска | `suspension` | `suspension/suspension.png` |
+| Прочее | `other` | reuses `engine_cooling/engine_cooling.png` (web PNG); Expo `@mototwin/icons` key `other` |
 
-The vehicle-detail page maps these runtime keys in `TOP_NODE_CARD_ICON_SRC` inside `src/app/vehicles/[id]/_components/VehicleDashboard.tsx`.
+The vehicle-detail page maps these runtime keys in `TOP_NODE_CARD_ICON_SRC` inside `src/app/vehicles/[id]/_components/VehicleDashboard.tsx` (mobile: `TOP_NODE_GROUP_ICON_SRC` in `apps/app/app/vehicles/[id]/index.tsx`).
 
 ## Leaf Icons
 

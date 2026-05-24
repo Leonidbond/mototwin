@@ -22,6 +22,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - `vehicles/[id]/service-log` — Service Log
 - `vehicles/[id]/service-events/new` — Add Service Event
 - `vehicles/[id]/state` — Update Vehicle State
+- `profile` — User Profile (account settings, custom TOP nodes)
 - `vehicles/[id]/profile` — Edit Vehicle Profile
 - `vehicles/[id]/parts` — «Корзина замен» (алиас маршрута к wishlist с паритетом web `/parts`)
 - `vehicles/[id]/wishlist/*` — полный список покупок, picker, редактирование позиции
@@ -44,7 +45,17 @@ Defined in `apps/app/app/_layout.tsx`:
 - Contains short product feature cards.
 - Does not load garage API data directly.
 
-### 3.2 Garage (`garage.tsx`)
+### 3.2 User Profile (`profile.tsx`)
+
+- Route: `/profile` (bottom nav / start screen CTA).
+- Loads `GET /api/user-settings`, `GET /api/profile`; after settings load — `GET /api/nodes/top` for grouped TOP preview.
+- Settings: currency, distance unit, date format, snooze, trash retention, **вид узлов по умолчанию** (`top` / `all`).
+- **Мой ТОП узлов:** grouped list (Смазка … Прочее), per-node **Заменить** / **Удалить**, **+ Добавить узел**, **Сбросить** to default.
+- Picker: `GET /api/nodes/service`; replace mode (single pick) vs add mode (multi toggle).
+- Persists via `PATCH /api/user-settings`; local cache in `ui-user-local-settings.ts`.
+- See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md), [user-settings-mvp.md](./user-settings-mvp.md).
+
+### 3.3 Garage (`garage.tsx`)
 - Uses shared `@mototwin/domain` + mobile API client (`createMobileApiClient`).
 - Loads `/api/garage` (+ trash count and notifications).
 - States: loading / error / empty / list.
@@ -76,7 +87,7 @@ Defined in `apps/app/app/_layout.tsx`:
   - `Просрочено`
   - `Недавно`
 
-### 3.3 Add Motorcycle (`vehicles/new.tsx`)
+### 3.4 Add Motorcycle (`vehicles/new.tsx`)
 - Progressive single-screen flow
 - Cascading fetch:
   - `getBrands()`
@@ -91,7 +102,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - Create via `createVehicle()` -> `POST /api/vehicles`
 - Success: `router.replace("/garage")`
 
-### 3.4 Vehicle Detail (`vehicles/[id]/index.tsx`)
+### 3.5 Vehicle Detail (`vehicles/[id]/index.tsx`)
 - Loads:
   - `getVehicleDetail()`
   - `getNodeTree()`
@@ -103,12 +114,12 @@ Defined in `apps/app/app/_layout.tsx`:
     - quick actions: `Добавить ТО`, `Расход`, `Деталь`
     - KPI strip: `Garage Score`, current mileage/engine hours, `Ride readiness`, season readiness
     - compact `Требует внимания` rows from shared attention summary
-    - compact `Состояние узлов` cards from `buildTopNodeOverviewCards`: the card itself is static, the group icon drills into issue nodes (`SOON` / `OVERDUE`), and each leaf badge opens the exact node in the tree
+    - compact `Состояние узлов` cards from `buildTopNodeOverviewCards` (only groups with nodes; includes **Прочее** when needed): the card itself is static, the group icon drills into issue nodes (`SOON` / `OVERDUE`), and each leaf badge opens the exact node in the tree
     - compact recent service events
     - expenses and wishlist entry cards
   - collapsible ride profile section
   - collapsible technical summary section
-  - full hierarchical node tree only after `Все узлы`
+  - full hierarchical node tree only after `Все узлы`; initial **ТОП-узлы** filter from `UserSettings.defaultNodeView` (see [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md))
 - Uses `useWindowDimensions()` to adapt the dashboard:
   - phone portrait: single-column cards, TOP-node overview in compact wrapped cards
   - phone landscape / wide screens: hero + KPI and dashboard sections are arranged in denser horizontal groups
@@ -117,7 +128,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - TOP-node icons use the shared Expo `TopNodeIcon` renderer (`@mototwin/icons` MaterialCommunityIcons fallback). The app does not import the web PNG icon set directly in this screen.
 - Leaf node actions still navigate to add service event / wishlist flows with preselected node; service log remains the journal route.
 
-### 3.5 Service Log (`vehicles/[id]/service-log.tsx`)
+### 3.6 Service Log (`vehicles/[id]/service-log.tsx`)
 - Loads `getServiceEvents()`
 - Uses shared domain helpers:
   - `filterAndSortServiceEvents`
@@ -129,22 +140,22 @@ Defined in `apps/app/app/_layout.tsx`:
 - Шапка: **`InternalScreenChrome`**; кнопка **«Добавить сервисное событие»** — отдельной полосой **под** заголовком (не в одной строке с заголовком). Кнопка перехода к экрану расходов из шапки журнала убрана (расходы доступны из нижней навигации и сценариев карточек).
 - Action to `vehicles/[id]/service-events/new`
 
-### 3.6 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `components/vehicle-detail/basic-service-event-bundle-form.tsx`)
+### 3.7 Add Service Event (`vehicles/[id]/service-events/new.tsx` + `components/vehicle-detail/basic-service-event-bundle-form.tsx`)
 - Screen loads node tree / vehicle / existing event (edit/repeat); builds initial **`AddServiceEventFormValues`** with shared domain helpers (same contract as web **`ServiceEventForm`**).
 - Bundle UI: multiple leaf rows in BASIC, parts + labor + total, SKU lookup, uninstalled expenses, JSON — see [web-expo-service-log-parity-fixes.md](./parity/web-expo-service-log-parity-fixes.md).
 - Submit to `/api/vehicles/[id]/service-events` (create) or update route when editing.
 - Supports return `source` (service-log, tree, attention, wishlist, …).
 
-### 3.7 Update Vehicle State (`vehicles/[id]/state.tsx`)
+### 3.8 Update Vehicle State (`vehicles/[id]/state.tsx`)
 - Prefills current state
 - Validates numeric input
 - Calls `updateVehicleState()` -> `/api/vehicles/[id]/state`
 
-### 3.8 Edit Vehicle Profile (`vehicles/[id]/profile.tsx`)
+### 3.9 Edit Vehicle Profile (`vehicles/[id]/profile.tsx`)
 - Prefills nickname, vin, ride profile
 - Calls `updateVehicleProfile()` -> `/api/vehicles/[id]/profile`
 
-### 3.9 Parts wishlist / «корзина замен» (`vehicles/[id]/wishlist/index.tsx`, алиас `vehicles/[id]/parts.tsx`)
+### 3.10 Parts wishlist / «корзина замен» (`vehicles/[id]/wishlist/index.tsx`, алиас `vehicles/[id]/parts.tsx`)
 - Full-vehicle wishlist list + status groups, summary cards, search, detail bottom sheet, and swipe actions; behavior and contracts match [parts-wishlist-mvp.md](./parts-wishlist-mvp.md). В блоке **«Действия»** детальной модалки — короткие подписи **Редактировать / Заказать / Купить / Установить / Повторить / Удалить**, к журналу — **Перейти** (с `accessibilityLabel` полной фразы).
 - **Deep link из журнала** (`wishlistItemId` и др. через `vehicles/[id]/parts.tsx`): после фокуса на строке и открытия детальной панели экран **не** делает `router.replace` на `/vehicles/[id]/wishlist` без query — иначе срабатывает повторный `useFocusEffect` → `load()`, возможен сброс состояния и скачок фильтра **«Установленные» → «Все»**. Поведение согласовано с комментарием у `applyWishlistRowFocus`: лишняя смена URL не нужна для стабильного UI.
 - **Repeat purchase** from the cart matches web `PartsCartPage`: confirmation modal, `createWishlistItem` with `NEEDED`, comment suffix «Повтор из корзины замен», no cost copy, then filter to NEEDED. Фокус на новую строку (**`applyWishlistRowFocus`**) вызывается **после** закрытия системного **`Alert`** (кнопка «OK»), чтобы не совмещать **`Modal`** детали и **`Alert`** в одном кадре — иначе на React Native возможен «пустой» экран и подвисание. Перед показом модалки подтверждения «Повторить покупку» вызывается **`openRepeatPurchaseConfirm`**: закрыть лист детали / меню статуса, затем **`InteractionManager.runAfterInteractions`** — иначе второй **`Modal`** поверх первого часто не отображается.

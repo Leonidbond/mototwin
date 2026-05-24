@@ -85,6 +85,11 @@ import type {
   AuthRegisterInput,
   AuthRefreshInput,
   AuthRefreshResponse,
+  MobileOAuthInput,
+  ForgotPasswordInput,
+  ForgotPasswordResponse,
+  ResetPasswordInput,
+  ResetPasswordResponse,
 } from "@mototwin/types";
 import type { ApiClient } from "./fetcher";
 
@@ -121,6 +126,27 @@ export function createMotoTwinEndpoints(client: ApiClient) {
 
     refreshAuth(input: AuthRefreshInput) {
       return client.request<AuthRefreshResponse>("/api/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    loginWithMobileOAuth(input: MobileOAuthInput) {
+      return client.request<AuthLoginResponse>("/api/auth/oauth/mobile", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    forgotPassword(input: ForgotPasswordInput) {
+      return client.request<ForgotPasswordResponse>("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    resetPassword(input: ResetPasswordInput) {
+      return client.request<ResetPasswordResponse>("/api/auth/reset-password", {
         method: "POST",
         body: JSON.stringify(input),
       });

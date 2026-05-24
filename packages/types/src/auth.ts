@@ -43,3 +43,29 @@ export type AuthRefreshResponse = {
   refreshToken: string;
   expiresAt: string;
 };
+
+export type OAuthProvider = "google" | "apple" | "yandex";
+
+export type MobileOAuthInput = {
+  provider: OAuthProvider;
+  idToken?: string;
+  accessToken?: string;
+};
+
+export type ForgotPasswordInput = {
+  email: string;
+};
+
+export type ForgotPasswordResponse = {
+  ok: boolean;
+  message: string;
+};
+
+export type ResetPasswordInput = {
+  token: string;
+  password: string;
+};
+
+export type ResetPasswordResponse = {
+  ok: boolean;
+};

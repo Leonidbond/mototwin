@@ -24,7 +24,8 @@ export class CurrentUserContextError extends Error {
     | "CURRENT_GARAGE_NOT_FOUND"
     | "INVALID_DEV_USER_HEADER"
     | "DEV_SWITCHER_DISABLED"
-    | "UNAUTHORIZED";
+    | "UNAUTHORIZED"
+    | "ACCOUNT_BLOCKED";
   readonly status: number;
 
   constructor(
@@ -33,7 +34,8 @@ export class CurrentUserContextError extends Error {
       | "CURRENT_GARAGE_NOT_FOUND"
       | "INVALID_DEV_USER_HEADER"
       | "DEV_SWITCHER_DISABLED"
-      | "UNAUTHORIZED",
+      | "UNAUTHORIZED"
+      | "ACCOUNT_BLOCKED",
     status: number,
     message: string
   ) {
@@ -114,13 +116,20 @@ async function resolveDevUserEmail(): Promise<string> {
 async function findUserContextByUserId(userId: string): Promise<CurrentUserContext> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, isModerator: true },
+    select: { id: true, isModerator: true, isBlocked: true },
   });
   if (!user) {
     throw new CurrentUserContextError(
       "CURRENT_USER_NOT_FOUND",
       404,
       "Пользователь не найден."
+    );
+  }
+  if (user.isBlocked) {
+    throw new CurrentUserContextError(
+      "ACCOUNT_BLOCKED",
+      403,
+      "Аккаунт заблокирован. Обратитесь в поддержку."
     );
   }
 
@@ -147,13 +156,20 @@ async function findUserContextByUserId(userId: string): Promise<CurrentUserConte
 async function findUserContextByEmail(email: string): Promise<CurrentUserContext> {
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, isModerator: true },
+    select: { id: true, isModerator: true, isBlocked: true },
   });
   if (!user) {
     throw new CurrentUserContextError(
       "CURRENT_USER_NOT_FOUND",
       503,
       "Current user context is not initialized. Run prisma seed."
+    );
+  }
+  if (user.isBlocked) {
+    throw new CurrentUserContextError(
+      "ACCOUNT_BLOCKED",
+      403,
+      "Аккаунт заблокирован. Обратитесь в поддержку."
     );
   }
 

@@ -52,6 +52,19 @@ export async function PATCH(request: Request) {
     if (!before) {
       return NextResponse.json({ error: "Пользователь не найден" }, { status: 404 });
     }
+    const demotesSuperAdmin =
+      before.adminRole === "SUPER_ADMIN" && parsed.data.adminRole !== "SUPER_ADMIN";
+    if (demotesSuperAdmin) {
+      const superAdminCount = await prisma.user.count({
+        where: { adminRole: "SUPER_ADMIN" },
+      });
+      if (superAdminCount <= 1) {
+        return NextResponse.json(
+          { error: "Нельзя снять роль у последнего SUPER_ADMIN." },
+          { status: 400 }
+        );
+      }
+    }
 
     const updated = await prisma.user.update({
       where: { id: parsed.data.userId },

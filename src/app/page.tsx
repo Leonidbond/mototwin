@@ -1,11 +1,5 @@
-"use client";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { productSemanticColors } from "@mototwin/design-tokens";
-import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
-import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
-import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
 const features = [
   {
@@ -56,36 +50,8 @@ const audience = [
 ];
 
 export default function Home() {
-  const router = useRouter();
-  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed("home.sidebar.collapsed");
-
   return (
     <main className="min-h-screen text-gray-950" style={{ backgroundColor: productSemanticColors.canvas }}>
-      <div
-        style={{
-          width: "100%",
-          display: "grid",
-          gridTemplateColumns: `${sidebarCollapsed ? 64 : 220}px minmax(0, 1fr)`,
-          alignItems: "start",
-          transition: "grid-template-columns 0.18s ease",
-        }}
-      >
-        <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
-        <section>
-          <div className="px-6 py-8">
-            <div className="mx-auto max-w-6xl">
-              <InternalPageChrome
-                variant="garageTokens"
-                onBack={() => router.push("/garage")}
-                breadcrumbs={[
-                  { label: "Гараж", href: "/garage" },
-                  { label: "Главная" },
-                ]}
-                title="MotoTwin"
-                subtitle="Цифровой гараж для владельца мотоцикла"
-              />
-            </div>
-          </div>
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8 lg:py-28">
           <div className="max-w-3xl">
@@ -241,8 +207,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-        </section>
-      </div>
     </main>
   );
 }

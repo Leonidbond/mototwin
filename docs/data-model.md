@@ -44,8 +44,11 @@
 - `UserSettings` belongs to `User` via unique `userId` (1:1).
 - Stores `defaultCurrency`, `distanceUnit`, `engineHoursUnit`, `dateFormat`, `defaultSnoozeDays`.
 - Stores `vehicleTrashRetentionDays` for trash retention policy.
+- Stores `favoriteNodeCodes` (`String[]`, default `[]`) — пользовательский ТОП; пустой массив = стандартные 15 кодов на API.
+- Stores `defaultNodeView` (`String`, default `"top"`) — стартовый режим дерева узлов: `top` | `all`.
 - Runtime reads/writes are done via `/api/user-settings` and scoped through current user context.
 - Local client storage is fallback/cache only; DB is primary source when API is available.
+- See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md) for TOP customization UX and API.
 
 ### Brand / Model / ModelVariant
 

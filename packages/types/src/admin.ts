@@ -284,6 +284,7 @@ export interface AdminUserListFilters {
   plan?: AdminUserPlanFilter;
   hasVehicles?: "yes" | "no";
   role?: AdminRoleWire | "all";
+  status?: "active" | "blocked" | "all";
 }
 
 export interface AdminUserListItemWire {
@@ -291,6 +292,9 @@ export interface AdminUserListItemWire {
   email: string | null;
   displayName: string | null;
   createdAt: string;
+  isBlocked: boolean;
+  blockedAt: string | null;
+  blockReason: string | null;
   isModerator: boolean;
   adminRole: AdminRoleWire | null;
   plan: "FREE" | "PRO" | null;
@@ -314,6 +318,9 @@ export interface AdminUserDetailWire {
   displayName: string | null;
   createdAt: string;
   updatedAt: string;
+  isBlocked: boolean;
+  blockedAt: string | null;
+  blockReason: string | null;
   isModerator: boolean;
   adminRole: AdminRoleWire | null;
   plan: "FREE" | "PRO" | null;
@@ -755,5 +762,10 @@ export interface AdminTeamMemberWire {
 export interface AdminUpdateTeamRolePayload {
   userId: string;
   adminRole: AdminRoleWire | null;
+  reason: string;
+}
+
+export interface AdminUpdateUserBlockPayload {
+  isBlocked: boolean;
   reason: string;
 }

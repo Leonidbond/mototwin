@@ -12,6 +12,7 @@ interface AdminUsersPageProps {
     plan?: string;
     hasVehicles?: string;
     role?: string;
+    status?: string;
     page?: string;
   }>;
 }
@@ -23,6 +24,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
     plan: parsePlan(params.plan),
     hasVehicles: parseHasVehicles(params.hasVehicles),
     role: parseRole(params.role),
+    status: parseStatus(params.status),
   };
   const page = Number(params.page ?? 1);
 
@@ -62,6 +64,14 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
               { value: "ANALYST", label: "Analyst" },
             ],
           },
+          {
+            key: "status",
+            label: "Статус",
+            options: [
+              { value: "active", label: "Активен" },
+              { value: "blocked", label: "Заблокирован" },
+            ],
+          },
         ]}
       />
       <UsersTable data={list} />
@@ -87,5 +97,10 @@ function parseRole(value: string | undefined): AdminUserListFilters["role"] {
   ) {
     return value as AdminUserListFilters["role"];
   }
+  return undefined;
+}
+
+function parseStatus(value: string | undefined): AdminUserListFilters["status"] {
+  if (value === "active" || value === "blocked" || value === "all") return value;
   return undefined;
 }

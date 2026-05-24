@@ -33,7 +33,7 @@
 
 ## 2. Feature specs (MVP)
 
-[`garage-dashboard-mvp.md`](./garage-dashboard-mvp.md) · [`service-log-mvp.md`](./service-log-mvp.md) · [`expense-tracking-mvp.md`](./expense-tracking-mvp.md) · [`attention-flow-mvp.md`](./attention-flow-mvp.md) · [`vehicle-profile-mvp.md`](./vehicle-profile-mvp.md) · [`vehicle-trash-mvp.md`](./vehicle-trash-mvp.md) · [`upcoming-maintenance-mvp.md`](./upcoming-maintenance-mvp.md) · [`parts-wishlist-mvp.md`](./parts-wishlist-mvp.md) · [`parts-catalog-mvp.md`](./parts-catalog-mvp.md) · [`service-kits-mvp.md`](./service-kits-mvp.md) · [`user-settings-mvp.md`](./user-settings-mvp.md)
+[`garage-dashboard-mvp.md`](./garage-dashboard-mvp.md) · [`service-log-mvp.md`](./service-log-mvp.md) · [`expense-tracking-mvp.md`](./expense-tracking-mvp.md) · [`attention-flow-mvp.md`](./attention-flow-mvp.md) · [`vehicle-profile-mvp.md`](./vehicle-profile-mvp.md) · [`vehicle-trash-mvp.md`](./vehicle-trash-mvp.md) · [`upcoming-maintenance-mvp.md`](./upcoming-maintenance-mvp.md) · [`parts-wishlist-mvp.md`](./parts-wishlist-mvp.md) · [`parts-catalog-mvp.md`](./parts-catalog-mvp.md) · [`service-kits-mvp.md`](./service-kits-mvp.md) · [`user-settings-mvp.md`](./user-settings-mvp.md) · [`custom-top-nodes-mvp.md`](./custom-top-nodes-mvp.md)
 
 При расхождении с canonical — править спеки или canonical так, чтобы остался один согласованный источник.
 
@@ -74,7 +74,7 @@
 
 ---
 
-## 6. Auth (дорожная карта)
+## 6. Auth и доступ
 
 [`auth-roadmap.md`](./auth-roadmap.md) · [`auth-data-ownership-architecture.md`](./auth-data-ownership-architecture.md) · [`auth-implementation-plan.md`](./auth-implementation-plan.md)
 

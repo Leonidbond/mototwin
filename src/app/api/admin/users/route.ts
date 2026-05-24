@@ -15,6 +15,7 @@ export async function GET(request: Request) {
       plan: parsePlan(url.searchParams.get("plan")),
       hasVehicles: parseHasVehicles(url.searchParams.get("hasVehicles")),
       role: parseRole(url.searchParams.get("role")),
+      status: parseStatus(url.searchParams.get("status")),
     };
     const page = Number(url.searchParams.get("page") ?? 1);
     const data = await loadAdminUserList({ filters, page });
@@ -47,5 +48,10 @@ function parseRole(value: string | null): AdminUserListFilters["role"] {
   ) {
     return value as AdminRoleWire | "all";
   }
+  return undefined;
+}
+
+function parseStatus(value: string | null): AdminUserListFilters["status"] {
+  if (value === "active" || value === "blocked" || value === "all") return value;
   return undefined;
 }

@@ -414,6 +414,7 @@ export type {
   AdminNodeRefRow,
   AdminTeamMemberWire,
   AdminUpdateTeamRolePayload,
+  AdminUpdateUserBlockPayload,
 } from "./admin";
 export type {
   AuthUser,
@@ -423,6 +424,12 @@ export type {
   AuthLoginInput,
   AuthRefreshInput,
   AuthRefreshResponse,
+  OAuthProvider,
+  MobileOAuthInput,
+  ForgotPasswordInput,
+  ForgotPasswordResponse,
+  ResetPasswordInput,
+  ResetPasswordResponse,
 } from "./auth";
 export { MOBILE_CLIENT_HEADER, MOBILE_CLIENT_EXPO } from "./auth";
 export type { DevUserOption } from "./dev-user";

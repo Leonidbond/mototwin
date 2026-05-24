@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { signOut } from "next-auth/react";
 import { createWebApiClient } from "@/lib/create-web-api-client";
 import { AuthGate } from "@/components/auth/AuthGate";
 import {
@@ -214,6 +215,7 @@ export default function ProfilePage() {
     } catch {
       // Continue redirect even if API fails.
     }
+    await signOut({ redirect: false });
     router.replace("/login");
   };
 
@@ -374,7 +376,7 @@ export default function ProfilePage() {
             <ProfileRow label="Гараж" value={profile.garageTitle} />
           </dl>
           <p className="mt-3 text-xs text-gray-500">
-            Авторизация пока не реализована, данные профиля отображаются в pre-auth режиме.
+            В профиле можно управлять персональными настройками аккаунта и гаража.
           </p>
         </section>
 

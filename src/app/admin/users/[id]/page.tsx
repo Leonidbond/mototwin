@@ -10,6 +10,7 @@ import {
   formatNumberRu,
 } from "../../_components/format";
 import { ruAdmin } from "../../_locales/ru";
+import { UserBlockPanel } from "./_components/UserBlockPanel";
 
 interface AdminUserDetailPageProps {
   params: Promise<{ id: string }>;
@@ -42,6 +43,12 @@ export default async function AdminUserDetailPage({ params }: AdminUserDetailPag
       </section>
 
       <section style={twoColGrid}>
+        <UserBlockPanel
+          userId={detail.id}
+          isBlocked={detail.isBlocked}
+          blockedAt={detail.blockedAt}
+          blockReason={detail.blockReason}
+        />
         <Card title="Гаражи">
           {detail.garages.length === 0 ? (
             <Empty />
@@ -175,6 +182,15 @@ function ProfileSummary({
             План {detail.plan}
           </span>
         ) : null}
+        <span
+          style={
+            detail.isBlocked
+              ? chipBase("#F87171", "rgba(248,113,113,0.14)", "rgba(248,113,113,0.30)")
+              : chipBase("#86EFAC", "rgba(34,197,94,0.14)", "rgba(34,197,94,0.30)")
+          }
+        >
+          {detail.isBlocked ? "Заблокирован" : "Активен"}
+        </span>
         {detail.isModerator ? (
           <span style={chipBase("#86EFAC", "rgba(34,197,94,0.14)", "rgba(34,197,94,0.30)")}>
             Moderator

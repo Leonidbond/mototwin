@@ -19,6 +19,8 @@ Current MVP limitations:
 - `Формат даты`: `DD.MM.YYYY` (allowed: `DD.MM.YYYY`, `YYYY-MM-DD`)
 - `Напоминание по умолчанию`: `7` (allowed days: `7`, `14`, `30`)
 - `Срок хранения мотоцикла на Свалке`: `30` (allowed days: `7`, `14`, `30`, `60`, `90`)
+- `Вид узлов по умолчанию`: `top` (allowed: `top` — только ТОП на экране дерева, `all` — все узлы)
+- `Мой ТОП узлов` (`favoriteNodeCodes`): `[]` — стандартный набор 15 узлов; персональный список — до 15 кодов (см. [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md))
 
 ## Persistence
 
@@ -30,6 +32,8 @@ Current MVP limitations:
 ## Current integration
 
 - Settings are editable and persisted in Profile page/screen on both platforms through API.
+- **Мой ТОП узлов:** grouped preview (Смазка, Тормоза, …, Прочее), replace/add/remove, reset to default; drives `GET /api/nodes/top` for all vehicles of the user.
+- **Вид узлов по умолчанию:** initial state of «ТОП-узлы» filter on vehicle node-tree screen (`/vehicles/[id]/nodes`).
 - `Валюта по умолчанию` is used as default currency in:
   - wishlist create form;
   - add service event form (direct add and node-context add).

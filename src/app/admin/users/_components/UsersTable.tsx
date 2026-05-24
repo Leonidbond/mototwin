@@ -55,6 +55,16 @@ const columns: ColumnDef<AdminUserListItemWire, unknown>[] = [
       ),
   },
   {
+    id: "status",
+    header: "Статус",
+    cell: ({ row }) =>
+      row.original.isBlocked ? (
+        <span style={statusChipStyle(true)}>Заблокирован</span>
+      ) : (
+        <span style={statusChipStyle(false)}>Активен</span>
+      ),
+  },
+  {
     id: "vehicles",
     header: "Мотоциклы",
     cell: ({ row }) => formatNumberRu(row.original.vehicleCount),
@@ -133,4 +143,11 @@ function chipBase(fg: string, bg: string, border: string): React.CSSProperties {
     backgroundColor: bg,
     border: `1px solid ${border}`,
   };
+}
+
+function statusChipStyle(isBlocked: boolean): React.CSSProperties {
+  if (isBlocked) {
+    return chipBase("#F87171", "rgba(248,113,113,0.14)", "rgba(248,113,113,0.30)");
+  }
+  return chipBase("#86EFAC", "rgba(34,197,94,0.14)", "rgba(34,197,94,0.30)");
 }

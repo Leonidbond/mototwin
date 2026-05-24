@@ -41,7 +41,7 @@ The script hits every admin page (17 routes) and every read-only admin API (17 e
 | Path                                  | Purpose                                              |
 | ------------------------------------- | ---------------------------------------------------- |
 | `/admin`                              | Dashboard with 8 widgets matching the design ref     |
-| `/admin/users`, `/admin/users/[id]`   | Users list + detail (garages, fitments, events)      |
+| `/admin/users`, `/admin/users/[id]`   | Users list + detail + block/unblock actions           |
 | `/admin/vehicles`                     | Filterable list of all garage vehicles               |
 | `/admin/models`, `/admin/models/[id]` | brand × model × variant table + support-level editor |
 | `/admin/catalog`, `/admin/catalog/[id]` | PartMaster CRUD, aliases, fitments, merge          |
@@ -66,7 +66,13 @@ Authentication is the existing dev-stub (`apps/.../api/_shared/current-user-cont
   - `getAdminContext()` resolves the current user's admin role (or throws `AdminAccessError` for non-admins).
   - `requireAdminRole(['SUPER_ADMIN', ...])` gates `/api/admin/*` route handlers.
   - `requireAnyAdmin()` is the read-only equivalent.
-  - `canMutate(role)` is the small UI helper used by buttons/forms to disable mutating affordances for `ANALYST`.
+  - `canMutate(role)` is the helper used by mutating controls that remain read-only for `ANALYST`.
+
+User management actions:
+
+- `GET /api/admin/users`, `GET /api/admin/users/[id]` — read user directory and profile.
+- `PATCH /api/admin/users/[id]` — block/unblock account (requires any admin role, reason is mandatory, action is written to audit log).
+- Blocking a user revokes app sessions (`auth_sessions`, `refresh_tokens`, `authjs_sessions`) and denies further auth until unblocked.
 
 `src/app/admin/layout.tsx` runs `getAdminContext()` and renders `AdminAccessGuard` for unauthorized users — Next.js 16 `proxy.ts` is **not** used because edge runtime cannot do Prisma queries.
 
