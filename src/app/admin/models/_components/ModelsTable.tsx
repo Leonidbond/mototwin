@@ -13,13 +13,15 @@ const columns: ColumnDef<AdminModelListItemWire, unknown>[] = [
     header: "Модель",
     cell: ({ row }) => {
       const v = row.original;
+      const years = formatYears(v.productionYearFrom, v.productionYearTo);
       return (
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: productSemanticColors.textPrimary }}>
-            {v.brandLabel} {v.modelLabel}
+            {v.brandLabel} {v.modelFamilyLabel} {v.variantLabel}
           </div>
           <div style={{ fontSize: 12, color: productSemanticColors.textMuted }}>
-            {v.year} · {v.versionName}
+            {v.generationLabel}
+            {years ? ` · ${years}` : ""}
           </div>
         </div>
       );
@@ -80,9 +82,15 @@ export function ModelsTable({ data }: ModelsTableProps) {
     <AdminDataTable
       data={data.items}
       columns={columns}
-      getRowHref={(row) => `/admin/models/${row.modelVariantId}`}
+      getRowHref={(row) => `/admin/models/${row.motorcycleGenerationId}`}
       total={data.total}
       pageInfo={{ page: data.page, pageSize: data.pageSize, pageCount: data.pageCount }}
     />
   );
+}
+
+function formatYears(from: number | null, to: number | null): string | null {
+  if (from == null && to == null) return null;
+  if (from != null && to != null) return from === to ? String(from) : `${from}–${to}`;
+  return from != null ? `${from}+` : `…${to}`;
 }

@@ -15,11 +15,11 @@ const STATUS_PAINT: Record<AdminWorkQueueStatusKey, ChipPaint> = {
 };
 
 const SUPPORT_PAINT: Record<AdminSupportLevel, ChipPaint> = {
-  FULL_SUPPORT: { fg: "#86EFAC", bg: "rgba(34,197,94,0.14)", border: "rgba(34,197,94,0.30)" },
+  MVP_CORE: { fg: "#86EFAC", bg: "rgba(34,197,94,0.14)", border: "rgba(34,197,94,0.30)" },
+  MVP_CORE_LEGACY: { fg: "#FACC15", bg: "rgba(250,204,21,0.16)", border: "rgba(250,204,21,0.32)" },
   COMMUNITY_SUPPORT: { fg: "#A5B4FC", bg: "rgba(99,102,241,0.16)", border: "rgba(99,102,241,0.32)" },
   EARLY_BETA: { fg: "#FBBF24", bg: "rgba(251,191,36,0.14)", border: "rgba(251,191,36,0.32)" },
-  NO_DATA: { fg: "#94A3B8", bg: "rgba(148,163,184,0.10)", border: "rgba(148,163,184,0.22)" },
-  UNSUPPORTED: { fg: "#94A3B8", bg: "rgba(148,163,184,0.10)", border: "rgba(148,163,184,0.22)" },
+  NO_FITMENT_DATA_YET: { fg: "#94A3B8", bg: "rgba(148,163,184,0.10)", border: "rgba(148,163,184,0.22)" },
 };
 
 interface StatusChipProps {
@@ -54,6 +54,6 @@ export function WorkQueueStatusChip({ statusKey }: { statusKey: AdminWorkQueueSt
 }
 
 export function SupportLevelChip({ level }: { level: AdminSupportLevel }) {
-  const paint = SUPPORT_PAINT[level] ?? SUPPORT_PAINT.NO_DATA;
+  const paint = SUPPORT_PAINT[level] ?? SUPPORT_PAINT.NO_FITMENT_DATA_YET;
   return <StatusChip paint={paint}>{ruAdmin.support[level] ?? level}</StatusChip>;
 }

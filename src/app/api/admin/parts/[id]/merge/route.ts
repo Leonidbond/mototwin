@@ -4,11 +4,14 @@ import { z } from "zod";
 import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { prisma } from "@/lib/prisma";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
-const MergeSchema = z.object({
-  intoPartMasterId: z.string().min(1),
-  reason: z.string().min(3).max(500),
-});
+const MergeSchema = z
+  .object({
+    intoPartMasterId: z.string().min(1).max(64),
+    reason: z.string().min(3).max(500),
+  })
+  .strict();
 
 /**
  * Merge `[id]` (the duplicate) **into** `intoPartMasterId` (the survivor).
@@ -26,7 +29,7 @@ export async function POST(
   try {
     const ctx = await requireAdminRole(["SUPER_ADMIN", "CATALOG_MANAGER"]);
     const { id } = await context.params;
-    const body = await request.json();
+    const body = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
     const parsed = MergeSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -54,20 +57,25 @@ export async function POST(
 
       const dupConfidences = await tx.fitmentConfidence.findMany({
         where: { partMasterId: duplicate.id },
-        select: { modelVariantId: true, nodeId: true, reportCount: true, confirmationCount: true },
+        select: {
+          motorcycleGenerationId: true,
+          nodeId: true,
+          reportCount: true,
+          confirmationCount: true,
+        },
       });
       for (const fc of dupConfidences) {
         await tx.fitmentConfidence.upsert({
           where: {
-            partMasterId_modelVariantId_nodeId: {
+            partMasterId_motorcycleGenerationId_nodeId: {
               partMasterId: survivor.id,
-              modelVariantId: fc.modelVariantId,
+              motorcycleGenerationId: fc.motorcycleGenerationId,
               nodeId: fc.nodeId,
             },
           },
           create: {
             partMasterId: survivor.id,
-            modelVariantId: fc.modelVariantId,
+            motorcycleGenerationId: fc.motorcycleGenerationId,
             nodeId: fc.nodeId,
             reportCount: fc.reportCount,
             confirmationCount: fc.confirmationCount,
@@ -146,6 +154,9 @@ export async function POST(
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const handled = toAdminErrorResponse(error);
     if (handled) return handled;
     console.error("admin/parts/[id]/merge POST:", error);

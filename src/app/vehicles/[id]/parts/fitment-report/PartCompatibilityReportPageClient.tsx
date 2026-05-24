@@ -387,9 +387,10 @@ export function PartCompatibilityReportPageClient(props: {
 
   const verdictParagraphs = verdictSupportParagraphsRu(data);
   const variantLine = [
-    String(data.vehicle.variantYear),
+    data.vehicle.modelYear != null ? String(data.vehicle.modelYear) : null,
     data.vehicle.variantName,
-    data.vehicle.market,
+    data.vehicle.generationName,
+    data.vehicle.marketRegion,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -422,7 +423,7 @@ export function PartCompatibilityReportPageClient(props: {
         navRowEnd={headerActions}
         breadcrumbs={[
           { label: "Гараж", href: "/garage" },
-          { label: `${data.vehicle.brandName} ${data.vehicle.modelName}`.trim(), href: `/vehicles/${encodeURIComponent(props.vehicleId)}` },
+          { label: `${data.vehicle.brandName} ${data.vehicle.modelFamilyName}`.trim(), href: `/vehicles/${encodeURIComponent(props.vehicleId)}` },
           { label: "Подбор", href: pickerHref },
           { label: data.node.name, href: pickerHref },
           { label: data.partMaster.sku },
@@ -463,7 +464,7 @@ export function PartCompatibilityReportPageClient(props: {
               <div>
                 <div style={{ fontSize: 11, color: MUTED, fontWeight: 800 }}>МОТОЦИКЛ И УЗЕЛ</div>
                 <div style={{ marginTop: 8, fontSize: 18, fontWeight: 900, color: TEXT }}>
-                  {data.vehicle.brandName} {data.vehicle.modelName}
+                  {data.vehicle.brandName} {data.vehicle.modelFamilyName}
                 </div>
                 <div style={{ fontSize: 14, color: MUTED, marginTop: 4 }}>{variantLine}</div>
                 {data.vehicle.nickname ? (
@@ -779,8 +780,8 @@ export function PartCompatibilityReportPageClient(props: {
                 <tbody>
                   <tr>
                     <td style={{ padding: "10px", borderBottom: `1px solid ${BORDER}`, color: TEXT }}>
-                      {data.vehicle.variantYear} · {data.vehicle.variantName}
-                      {data.vehicle.market ? ` · ${data.vehicle.market}` : ""}
+                      {data.vehicle.modelYear ?? "—"} · {data.vehicle.variantName}
+                      {data.vehicle.marketRegion ? ` · ${data.vehicle.marketRegion}` : ""}
                     </td>
                     <td style={{ padding: "10px", borderBottom: `1px solid ${BORDER}`, color: TEXT }}>{verdictTitle}</td>
                     <td style={{ padding: "10px", borderBottom: `1px solid ${BORDER}`, color: MUTED }}>{bd.totalReports}</td>
@@ -980,7 +981,7 @@ export function PartCompatibilityReportPageClient(props: {
                       ) : null}
                     </div>
                     <div style={{ marginTop: 8, fontSize: 14, fontWeight: 800, color: TEXT }}>
-                      {r.vehicleLabel ?? `${data.vehicle.brandName} ${data.vehicle.modelName}`}
+                      {r.vehicleLabel ?? `${data.vehicle.brandName} ${data.vehicle.modelFamilyName}`}
                     </div>
                     <div style={{ marginTop: 4, fontSize: 12, color: MUTED }}>{variantLine}</div>
                     <div style={{ marginTop: 6, fontSize: 12, color: MUTED }}>
@@ -1208,7 +1209,7 @@ export function PartCompatibilityReportPageClient(props: {
           <div style={{ ...sectionCard, padding: 16 }}>
             <div style={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>МОТОЦИКЛ</div>
             <div style={{ marginTop: 8, fontSize: 16, fontWeight: 800, color: TEXT }}>
-              {data.vehicle.brandName} {data.vehicle.modelName}
+              {data.vehicle.brandName} {data.vehicle.modelFamilyName}
             </div>
             <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}>{variantLine}</div>
             {data.vehicle.nickname ? <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>{data.vehicle.nickname}</div> : null}

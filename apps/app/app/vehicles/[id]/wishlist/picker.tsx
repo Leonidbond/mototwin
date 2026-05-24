@@ -162,7 +162,7 @@ function vehicleDisplayName(vehicle: VehicleDetail | null): string {
   if (!vehicle) return "";
   return (
     vehicle.nickname?.trim() ||
-    `${vehicle.brandName} ${vehicle.modelName}`.trim() ||
+    `${vehicle.brandName} ${vehicle.modelFamilyName}`.trim() ||
     "Мотоцикл"
   );
 }
@@ -516,7 +516,7 @@ export default function WishlistPickerScreen() {
 
   const whyMatches = useMemo(() => {
     if (!vehicle) return [];
-    const modelLabel = `${vehicle.brandName} ${vehicle.modelName}`.trim();
+    const modelLabel = `${vehicle.brandName} ${vehicle.modelFamilyName}`.trim();
     return buildWhyMatchesReasons({
       vehicleModelLabel: modelLabel,
       draft,

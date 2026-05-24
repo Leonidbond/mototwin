@@ -208,7 +208,14 @@ export function FitmentReportScreen(props: {
   }
 
   const partTitle = `${data.partMaster.brandName} · ${data.partMaster.title}`.trim();
-  const vehicleLabel = `${data.vehicle.brandName} ${data.vehicle.modelName} ${data.vehicle.variantYear}`;
+  const vehicleLabel = [
+    data.vehicle.brandName,
+    data.vehicle.modelFamilyName,
+    data.vehicle.variantName,
+    data.vehicle.modelYear ?? "",
+  ]
+    .filter((chunk): chunk is string | number => Boolean(chunk))
+    .join(" ");
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>

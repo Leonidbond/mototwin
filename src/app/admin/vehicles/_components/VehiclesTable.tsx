@@ -16,10 +16,10 @@ const columns: ColumnDef<AdminVehicleListItemWire, unknown>[] = [
       return (
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: productSemanticColors.textPrimary }}>
-            {v.brandLabel} {v.modelLabel}
+            {v.brandLabel} {v.modelFamilyLabel} {v.variantLabel}
           </div>
           <div style={{ fontSize: 12, color: productSemanticColors.textMuted }}>
-            {v.year} · {v.versionName}
+            {v.year} · {v.generationLabel}
             {v.nickname ? ` · «${v.nickname}»` : ""}
           </div>
         </div>

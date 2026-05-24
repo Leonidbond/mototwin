@@ -18,6 +18,10 @@ import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import type {
   AddMotorcycleFormValues,
+  MotorcycleBrandPickerItem,
+  MotorcycleGenerationPickerItem,
+  MotorcycleModelFamilyPickerItem,
+  MotorcycleVariantPickerItem,
   RideLoadType,
   RideStyle,
   RideUsageIntensity,
@@ -26,34 +30,6 @@ import type {
 
 const onboardingApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 const SIDEBAR_COLLAPSED_KEY = "onboarding.sidebar.collapsed";
-
-type Brand = {
-  id: string;
-  name: string;
-  slug: string;
-};
-
-type Model = {
-  id: string;
-  name: string;
-  slug: string;
-  brandId: string;
-};
-
-type ModelVariant = {
-  id: string;
-  modelId: string;
-  year: number;
-  generation: string | null;
-  versionName: string;
-  market: string | null;
-  engineType: string | null;
-  coolingType: string | null;
-  wheelSizes: string | null;
-  brakeSystem: string | null;
-  chainPitch: string | null;
-  stockSprockets: string | null;
-};
 
 /** Ride profile slice aligned with `AddMotorcycleFormProps["values"]` (see `docs/shared-component-contracts.md`). */
 type RideProfileForm = Pick<
@@ -71,16 +47,31 @@ function initialRideProfileForm(): RideProfileForm {
   };
 }
 
+function pickGenerationYearLabel(
+  generation: MotorcycleGenerationPickerItem
+): string {
+  const curated = generation.yearsLabel?.trim();
+  if (curated) {
+    return curated;
+  }
+  if (generation.yearTo != null) {
+    return `${generation.yearFrom}–${generation.yearTo}`;
+  }
+  return `${generation.yearFrom}–`;
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [models, setModels] = useState<Model[]>([]);
-  const [variants, setVariants] = useState<ModelVariant[]>([]);
+  const [brands, setBrands] = useState<MotorcycleBrandPickerItem[]>([]);
+  const [families, setFamilies] = useState<MotorcycleModelFamilyPickerItem[]>([]);
+  const [variants, setVariants] = useState<MotorcycleVariantPickerItem[]>([]);
+  const [generations, setGenerations] = useState<MotorcycleGenerationPickerItem[]>([]);
 
   const [selectedBrandId, setSelectedBrandId] = useState("");
-  const [selectedModelId, setSelectedModelId] = useState("");
+  const [selectedFamilyId, setSelectedFamilyId] = useState("");
   const [selectedVariantId, setSelectedVariantId] = useState("");
+  const [selectedGenerationId, setSelectedGenerationId] = useState("");
 
   const [nickname, setNickname] = useState("");
   const [vin, setVin] = useState("");
@@ -90,8 +81,9 @@ export default function OnboardingPage() {
   const [rideProfile, setRideProfile] = useState<RideProfileForm>(initialRideProfileForm);
 
   const [isLoadingBrands, setIsLoadingBrands] = useState(true);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isLoadingFamilies, setIsLoadingFamilies] = useState(false);
   const [isLoadingVariants, setIsLoadingVariants] = useState(false);
+  const [isLoadingGenerations, setIsLoadingGenerations] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -101,7 +93,7 @@ export default function OnboardingPage() {
     const loadBrands = async () => {
       try {
         setIsLoadingBrands(true);
-        const data = await onboardingApi.getBrands();
+        const data = await onboardingApi.getMotorcycleBrands();
         setBrands(data.brands ?? []);
       } catch (error) {
         console.error("Failed to load brands", error);
@@ -115,36 +107,42 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!selectedBrandId) {
-      setModels([]);
-      setSelectedModelId("");
+      setFamilies([]);
+      setSelectedFamilyId("");
       setVariants([]);
       setSelectedVariantId("");
+      setGenerations([]);
+      setSelectedGenerationId("");
       return;
     }
 
-    const loadModels = async () => {
+    const loadFamilies = async () => {
       try {
-        setIsLoadingModels(true);
-        setSelectedModelId("");
+        setIsLoadingFamilies(true);
+        setSelectedFamilyId("");
         setVariants([]);
         setSelectedVariantId("");
+        setGenerations([]);
+        setSelectedGenerationId("");
 
-        const data = await onboardingApi.getModels(selectedBrandId);
-        setModels(data.models ?? []);
+        const data = await onboardingApi.getMotorcycleModelFamilies(selectedBrandId);
+        setFamilies(data.families ?? []);
       } catch (error) {
-        console.error("Failed to load models", error);
+        console.error("Failed to load model families", error);
       } finally {
-        setIsLoadingModels(false);
+        setIsLoadingFamilies(false);
       }
     };
 
-    loadModels();
+    loadFamilies();
   }, [selectedBrandId]);
 
   useEffect(() => {
-    if (!selectedModelId) {
+    if (!selectedFamilyId) {
       setVariants([]);
       setSelectedVariantId("");
+      setGenerations([]);
+      setSelectedGenerationId("");
       return;
     }
 
@@ -152,8 +150,10 @@ export default function OnboardingPage() {
       try {
         setIsLoadingVariants(true);
         setSelectedVariantId("");
+        setGenerations([]);
+        setSelectedGenerationId("");
 
-        const data = await onboardingApi.getModelVariants(selectedModelId);
+        const data = await onboardingApi.getMotorcycleVariants(selectedFamilyId);
         setVariants(data.variants ?? []);
       } catch (error) {
         console.error("Failed to load variants", error);
@@ -163,21 +163,50 @@ export default function OnboardingPage() {
     };
 
     loadVariants();
-  }, [selectedModelId]);
+  }, [selectedFamilyId]);
+
+  useEffect(() => {
+    if (!selectedVariantId) {
+      setGenerations([]);
+      setSelectedGenerationId("");
+      return;
+    }
+
+    const loadGenerations = async () => {
+      try {
+        setIsLoadingGenerations(true);
+        setSelectedGenerationId("");
+
+        const data = await onboardingApi.getMotorcycleGenerations(selectedVariantId);
+        setGenerations(data.generations ?? []);
+      } catch (error) {
+        console.error("Failed to load generations", error);
+      } finally {
+        setIsLoadingGenerations(false);
+      }
+    };
+
+    loadGenerations();
+  }, [selectedVariantId]);
 
   const selectedBrand = useMemo(
     () => brands.find((brand) => brand.id === selectedBrandId) ?? null,
     [brands, selectedBrandId]
   );
 
-  const selectedModel = useMemo(
-    () => models.find((model) => model.id === selectedModelId) ?? null,
-    [models, selectedModelId]
+  const selectedFamily = useMemo(
+    () => families.find((family) => family.id === selectedFamilyId) ?? null,
+    [families, selectedFamilyId]
   );
 
   const selectedVariant = useMemo(
     () => variants.find((variant) => variant.id === selectedVariantId) ?? null,
     [variants, selectedVariantId]
+  );
+
+  const selectedGeneration = useMemo(
+    () => generations.find((generation) => generation.id === selectedGenerationId) ?? null,
+    [generations, selectedGenerationId]
   );
 
   const handleSubmit = async () => {
@@ -186,9 +215,10 @@ export default function OnboardingPage() {
       setSubmitSuccess("");
 
       const motorcycleForm: AddMotorcycleFormValues = {
-        brandId: selectedBrandId,
-        modelId: selectedModelId,
-        modelVariantId: selectedVariantId,
+        motorcycleBrandId: selectedBrandId,
+        motorcycleModelFamilyId: selectedFamilyId,
+        motorcycleVariantId: selectedVariantId,
+        motorcycleGenerationId: selectedGenerationId,
         nickname,
         vin,
         odometer,
@@ -259,9 +289,9 @@ export default function OnboardingPage() {
           </h1>
 
           <p className="mt-4 text-base leading-7 text-gray-600 sm:text-lg">
-            Выберите бренд, модель и модификацию, затем укажите пробег, VIN и
-            профиль эксплуатации. На этом шаге мы собираем основу цифрового
-            профиля вашего мотоцикла.
+            Выберите бренд, семейство модели, модификацию и поколение, затем
+            укажите пробег, VIN и профиль эксплуатации. На этом шаге мы
+            собираем основу цифрового профиля вашего мотоцикла.
           </p>
         </div>
 
@@ -290,24 +320,24 @@ export default function OnboardingPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-900">
-                  Модель
+                  Семейство модели
                 </label>
                 <select
-                  value={selectedModelId}
-                  onChange={(e) => setSelectedModelId(e.target.value)}
-                  disabled={!selectedBrandId || isLoadingModels}
+                  value={selectedFamilyId}
+                  onChange={(e) => setSelectedFamilyId(e.target.value)}
+                  disabled={!selectedBrandId || isLoadingFamilies}
                   className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950 disabled:bg-gray-100"
                 >
                   <option value="">
                     {!selectedBrandId
                       ? "Сначала выберите бренд"
-                      : isLoadingModels
-                      ? "Загрузка моделей..."
-                      : "Выберите модель"}
+                      : isLoadingFamilies
+                      ? "Загрузка семейств..."
+                      : "Выберите семейство"}
                   </option>
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
+                  {families.map((family) => (
+                    <option key={family.id} value={family.id}>
+                      {family.name}
                     </option>
                   ))}
                 </select>
@@ -320,21 +350,59 @@ export default function OnboardingPage() {
                 <select
                   value={selectedVariantId}
                   onChange={(e) => setSelectedVariantId(e.target.value)}
-                  disabled={!selectedModelId || isLoadingVariants}
+                  disabled={!selectedFamilyId || isLoadingVariants}
                   className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950 disabled:bg-gray-100"
                 >
                   <option value="">
-                    {!selectedModelId
-                      ? "Сначала выберите модель"
+                    {!selectedFamilyId
+                      ? "Сначала выберите семейство"
                       : isLoadingVariants
                       ? "Загрузка модификаций..."
                       : "Выберите модификацию"}
                   </option>
                   {variants.map((variant) => (
                     <option key={variant.id} value={variant.id}>
-                      {variant.year} | {variant.versionName}
+                      {variant.name}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-900">
+                  Поколение
+                </label>
+                <select
+                  value={selectedGenerationId}
+                  onChange={(e) => setSelectedGenerationId(e.target.value)}
+                  disabled={!selectedVariantId || isLoadingGenerations}
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-950 disabled:bg-gray-100"
+                >
+                  <option value="">
+                    {!selectedVariantId
+                      ? "Сначала выберите модификацию"
+                      : isLoadingGenerations
+                      ? "Загрузка поколений..."
+                      : "Выберите поколение"}
+                  </option>
+                  {generations.map((generation) => {
+                    const yearLabel = pickGenerationYearLabel(generation);
+                    const specs = generation.technicalSpecs;
+                    const driveLabel =
+                      specs?.drive && specs.drive !== "UNKNOWN" ? specs.drive : null;
+                    const specChunks = [specs?.engine, driveLabel].filter(
+                      (chunk): chunk is string => Boolean(chunk?.trim())
+                    );
+                    const specLabel = specChunks.length > 0 ? ` · ${specChunks.join(" · ")}` : "";
+                    const yearPrefix = yearLabel ? `${yearLabel} · ` : "";
+                    return (
+                      <option key={generation.id} value={generation.id}>
+                        {yearPrefix}
+                        {generation.name}
+                        {specLabel}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -526,10 +594,10 @@ export default function OnboardingPage() {
 
               <div>
                 <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Модель
+                  Семейство модели
                 </div>
                 <div className="mt-1 font-medium text-gray-950">
-                  {selectedModel?.name || "Не выбрана"}
+                  {selectedFamily?.name || "Не выбрано"}
                 </div>
               </div>
 
@@ -538,9 +606,18 @@ export default function OnboardingPage() {
                   Модификация
                 </div>
                 <div className="mt-1 font-medium text-gray-950">
-                  {selectedVariant
-                    ? `${selectedVariant.year} | ${selectedVariant.versionName}`
-                    : "Не выбрана"}
+                  {selectedVariant?.name || "Не выбрана"}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Поколение
+                </div>
+                <div className="mt-1 font-medium text-gray-950">
+                  {selectedGeneration
+                    ? `${pickGenerationYearLabel(selectedGeneration) ?? "—"} · ${selectedGeneration.name}`
+                    : "Не выбрано"}
                 </div>
               </div>
 
@@ -581,46 +658,59 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            {selectedVariant && (
+            {selectedGeneration && (
               <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5">
                 <h3 className="text-base font-semibold text-gray-950">
-                  Данные модификации
+                  Данные поколения
                 </h3>
 
                 <div className="mt-4 space-y-3 text-sm leading-6 text-gray-700">
                   <div>
+                    <span className="font-medium text-gray-950">Годы выпуска:</span>{" "}
+                    {pickGenerationYearLabel(selectedGeneration) ?? "Не указаны"}
+                  </div>
+                  <div>
                     <span className="font-medium text-gray-950">Рынок:</span>{" "}
-                    {selectedVariant.market || "Не указан"}
+                    {selectedGeneration.marketRegion || "Не указан"}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-950">Сегмент:</span>{" "}
+                    {selectedGeneration.segment || "Не указан"}
                   </div>
                   <div>
                     <span className="font-medium text-gray-950">Двигатель:</span>{" "}
-                    {selectedVariant.engineType || "Не указан"}
+                    {selectedGeneration.technicalSpecs?.engine || "Не указан"}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-950">
-                      Охлаждение:
-                    </span>{" "}
-                    {selectedVariant.coolingType || "Не указано"}
+                    <span className="font-medium text-gray-950">Объем, см³:</span>{" "}
+                    {selectedGeneration.technicalSpecs?.displacementCc ?? "Не указан"}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-950">Колеса:</span>{" "}
-                    {selectedVariant.wheelSizes || "Не указаны"}
+                    <span className="font-medium text-gray-950">Мощность, л.с.:</span>{" "}
+                    {selectedGeneration.technicalSpecs?.powerHpNormalized ?? "Не указана"}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-950">
-                      Тормозная система:
-                    </span>{" "}
-                    {selectedVariant.brakeSystem || "Не указана"}
+                    <span className="font-medium text-gray-950">Привод:</span>{" "}
+                    {selectedGeneration.technicalSpecs?.drive || "Не указан"}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-950">Шаг цепи:</span>{" "}
-                    {selectedVariant.chainPitch || "Не указан"}
+                    <span className="font-medium text-gray-950">Колеса (Ф/З):</span>{" "}
+                    {[
+                      selectedGeneration.technicalSpecs?.frontWheelIn,
+                      selectedGeneration.technicalSpecs?.rearWheelIn,
+                    ]
+                      .filter((value): value is number => value != null)
+                      .map((value) => `${value}″`)
+                      .join(" / ") || "Не указаны"}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-950">
-                      Стоковые звезды:
-                    </span>{" "}
-                    {selectedVariant.stockSprockets || "Не указаны"}
+                    <span className="font-medium text-gray-950">Шины (Ф/З):</span>{" "}
+                    {[
+                      selectedGeneration.technicalSpecs?.frontTire,
+                      selectedGeneration.technicalSpecs?.rearTire,
+                    ]
+                      .filter((value): value is string => Boolean(value?.trim()))
+                      .join(" / ") || "Не указаны"}
                   </div>
                 </div>
               </div>

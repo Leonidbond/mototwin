@@ -5,8 +5,8 @@ import path from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { normalizePartNumber } from "@mototwin/domain";
-import * as XLSX from "xlsx";
 import { backfillPartMastersFromSkus } from "./backfill-part-masters";
+import { loadMotorcycleTechnicalMaster } from "./seed-data/loaders/load-motorcycle-technical-master";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -383,11 +383,10 @@ type PartSkuSeedRow = {
   partNumbers?: Array<{ number: string; numberType: string; brandName?: string | null }>;
   nodeLinks?: Array<{ nodeCode: string; relationType: string; confidence?: number }>;
   fitments?: Array<{
-    brandId?: string | null;
-    modelId?: string | null;
-    modelVariantId?: string | null;
-    yearFrom?: number | null;
-    yearTo?: number | null;
+    motorcycleBrandId?: string | null;
+    motorcycleModelFamilyId?: string | null;
+    motorcycleVariantId?: string | null;
+    motorcycleGenerationId?: string | null;
     market?: string | null;
     engineCode?: string | null;
     vinFrom?: string | null;
@@ -410,16 +409,20 @@ type PartSkuSeedRow = {
   }>;
 };
 
-/** QA catalog JSON: fitments use human-readable brand/model/variant (see parts-skus.qa.json). */
+/**
+ * QA catalog JSON: fitments reference the unified hierarchy by name.
+ * The deepest non-null field determines the fitment granularity:
+ * generation > variant > family > brand.
+ */
 type PartSkuQaFitmentSeed = {
   brandName?: string | null;
-  modelName?: string | null;
-  modelVariantName?: string | null;
-  brandId?: string | null;
-  modelId?: string | null;
-  modelVariantId?: string | null;
-  yearFrom?: number | null;
-  yearTo?: number | null;
+  modelFamilyName?: string | null;
+  variantName?: string | null;
+  generationName?: string | null;
+  motorcycleBrandId?: string | null;
+  motorcycleModelFamilyId?: string | null;
+  motorcycleVariantId?: string | null;
+  motorcycleGenerationId?: string | null;
   market?: string | null;
   engineCode?: string | null;
   vinFrom?: string | null;
@@ -442,24 +445,6 @@ function skuCatalogDedupKey(row: { brandName: string; canonicalName: string; par
   return `${row.brandName.trim()}|${row.canonicalName.trim()}|${row.partType.trim()}`;
 }
 
-function parseQaVariantLabel(raw?: string | null): { year?: number; versionName?: string } {
-  if (!raw?.trim()) {
-    return {};
-  }
-  const parts = raw
-    .split("|")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  if (parts.length >= 2) {
-    const y = Number.parseInt(parts[0] ?? "", 10);
-    return {
-      year: Number.isFinite(y) ? y : undefined,
-      versionName: parts.slice(1).join(" | "),
-    };
-  }
-  return { versionName: raw.trim() };
-}
-
 function qaOfferExternalId(
   skuDedupKey: string,
   offer: { sourceName: string; title: string; externalOfferId?: string | null }
@@ -475,11 +460,10 @@ function qaOfferExternalId(
 }
 
 type FitmentPayload = {
-  brandId: string | null;
-  modelId: string | null;
-  modelVariantId: string | null;
-  yearFrom: number | null;
-  yearTo: number | null;
+  motorcycleBrandId: string | null;
+  motorcycleModelFamilyId: string | null;
+  motorcycleVariantId: string | null;
+  motorcycleGenerationId: string | null;
   market: string | null;
   engineCode: string | null;
   vinFrom: string | null;
@@ -491,11 +475,10 @@ type FitmentPayload = {
 
 function fitmentPayloadKey(p: FitmentPayload): string {
   return [
-    p.brandId ?? "",
-    p.modelId ?? "",
-    p.modelVariantId ?? "",
-    p.yearFrom ?? "",
-    p.yearTo ?? "",
+    p.motorcycleBrandId ?? "",
+    p.motorcycleModelFamilyId ?? "",
+    p.motorcycleVariantId ?? "",
+    p.motorcycleGenerationId ?? "",
     p.market ?? "",
     p.engineCode ?? "",
     p.vinFrom ?? "",
@@ -506,11 +489,10 @@ function fitmentPayloadKey(p: FitmentPayload): string {
 }
 
 function fitmentRowKey(row: {
-  brandId: string | null;
-  modelId: string | null;
-  modelVariantId: string | null;
-  yearFrom: number | null;
-  yearTo: number | null;
+  motorcycleBrandId: string | null;
+  motorcycleModelFamilyId: string | null;
+  motorcycleVariantId: string | null;
+  motorcycleGenerationId: string | null;
   market: string | null;
   engineCode: string | null;
   vinFrom: string | null;
@@ -519,11 +501,10 @@ function fitmentRowKey(row: {
   note: string | null;
 }): string {
   return fitmentPayloadKey({
-    brandId: row.brandId,
-    modelId: row.modelId,
-    modelVariantId: row.modelVariantId,
-    yearFrom: row.yearFrom,
-    yearTo: row.yearTo,
+    motorcycleBrandId: row.motorcycleBrandId,
+    motorcycleModelFamilyId: row.motorcycleModelFamilyId,
+    motorcycleVariantId: row.motorcycleVariantId,
+    motorcycleGenerationId: row.motorcycleGenerationId,
     market: row.market,
     engineCode: row.engineCode,
     vinFrom: row.vinFrom,
@@ -534,20 +515,77 @@ function fitmentRowKey(row: {
   });
 }
 
+/**
+ * Lookup tables derived once from the new `motorcycle_*` catalog. Used by the
+ * QA fitment resolver to map human-readable references to FK columns.
+ */
+type MotorcycleResolverIndex = {
+  brandIdByName: Map<string, string>;
+  familyIdByBrandAndName: Map<string, string>;
+  variantIdByFamilyAndName: Map<string, string>;
+  generationIdByVariantAndName: Map<string, string>;
+};
+
+async function buildMotorcycleResolverIndex(
+  prismaClient: PrismaClient
+): Promise<MotorcycleResolverIndex> {
+  const brands = await prismaClient.motorcycleBrand.findMany({
+    select: { id: true, name: true },
+  });
+  const brandIdByName = new Map(brands.map((b) => [b.name, b.id]));
+
+  const families = await prismaClient.motorcycleModelFamily.findMany({
+    select: { id: true, name: true, brandId: true },
+  });
+  const familyIdByBrandAndName = new Map(
+    families.map((f) => [`${f.brandId}\t${f.name}`, f.id])
+  );
+
+  const variants = await prismaClient.motorcycleVariant.findMany({
+    select: { id: true, name: true, familyId: true },
+  });
+  const variantIdByFamilyAndName = new Map(
+    variants.map((v) => [`${v.familyId}\t${v.name}`, v.id])
+  );
+
+  const generations = await prismaClient.motorcycleGeneration.findMany({
+    select: { id: true, name: true, variantId: true },
+  });
+  const generationIdByVariantAndName = new Map(
+    generations.map((g) => [`${g.variantId}\t${g.name}`, g.id])
+  );
+
+  return {
+    brandIdByName,
+    familyIdByBrandAndName,
+    variantIdByFamilyAndName,
+    generationIdByVariantAndName,
+  };
+}
+
+/**
+ * Resolves a QA fitment row from `parts-skus.qa.json` to the deepest non-null FK.
+ * Falls back to broader granularity (generation → variant → family → brand) when
+ * the requested level isn't present in the seeded catalog. Returns null only when
+ * the input has no valid anchor at all.
+ */
 function resolveQaFitmentPayload(
   f: PartSkuQaFitmentSeed,
-  brandIdByName: Map<string, string>,
-  modelIdByBrandAndName: Map<string, string>,
-  variantIdByKey: Map<string, string>,
+  index: MotorcycleResolverIndex,
   stats: { fitmentsSkipped: number; fitmentWarnings: number }
 ): FitmentPayload | null {
-  if (f.brandId != null || f.modelId != null || f.modelVariantId != null) {
+  // Direct ID overrides (used by QA tooling).
+  if (
+    f.motorcycleBrandId != null ||
+    f.motorcycleModelFamilyId != null ||
+    f.motorcycleVariantId != null ||
+    f.motorcycleGenerationId != null
+  ) {
     return {
-      brandId: f.brandId ?? null,
-      modelId: f.modelId ?? null,
-      modelVariantId: f.modelVariantId ?? null,
-      yearFrom: f.yearFrom ?? null,
-      yearTo: f.yearTo ?? null,
+      motorcycleBrandId: f.motorcycleBrandId ?? null,
+      motorcycleModelFamilyId: f.motorcycleModelFamilyId ?? null,
+      motorcycleVariantId: f.motorcycleVariantId ?? null,
+      motorcycleGenerationId: f.motorcycleGenerationId ?? null,
       market: f.market ?? null,
       engineCode: f.engineCode ?? null,
       vinFrom: f.vinFrom ?? null,
@@ -558,16 +596,18 @@ function resolveQaFitmentPayload(
     };
   }
 
-  const hasBrand = Boolean(f.brandName?.trim());
-  const hasModel = Boolean(f.modelName?.trim());
+  const brandName = f.brandName?.trim() || null;
+  const familyName = f.modelFamilyName?.trim() || null;
+  const variantName = f.variantName?.trim() || null;
+  const generationName = f.generationName?.trim() || null;
 
-  if (!hasBrand && !hasModel) {
+  // No vehicle context — generic catalog fitment.
+  if (!brandName && !familyName && !variantName && !generationName) {
     return {
-      brandId: null,
-      modelId: null,
-      modelVariantId: null,
-      yearFrom: f.yearFrom ?? null,
-      yearTo: f.yearTo ?? null,
+      motorcycleBrandId: null,
+      motorcycleModelFamilyId: null,
+      motorcycleVariantId: null,
+      motorcycleGenerationId: null,
       market: f.market ?? null,
       engineCode: f.engineCode ?? null,
       vinFrom: f.vinFrom ?? null,
@@ -578,57 +618,66 @@ function resolveQaFitmentPayload(
     };
   }
 
-  if (hasModel && !hasBrand) {
+  // Anything below brand requires brandName.
+  if (!brandName) {
     console.warn(
-      `[seed] QA PartFitment skip: modelName without brandName (${f.modelName ?? ""})`
+      `[seed] QA PartFitment skip: family/variant/generation reference without brandName (${
+        familyName ?? variantName ?? generationName ?? ""
+      })`
     );
     stats.fitmentsSkipped += 1;
     return null;
   }
 
-  const brandId = hasBrand ? brandIdByName.get(f.brandName!.trim()) ?? null : null;
-  if (hasBrand && !brandId) {
-    console.warn(
-      `[seed] QA PartFitment skip: brand not in DB (${f.brandName})`
-    );
+  const brandId = index.brandIdByName.get(brandName) ?? null;
+  if (!brandId) {
+    console.warn(`[seed] QA PartFitment skip: brand not in DB (${brandName})`);
     stats.fitmentsSkipped += 1;
     return null;
   }
 
-  let modelId: string | null = null;
-  if (hasModel && brandId) {
-    const mk = `${brandId}\t${f.modelName!.trim()}`;
-    modelId = modelIdByBrandAndName.get(mk) ?? null;
-    if (!modelId) {
+  let familyId: string | null = null;
+  if (familyName) {
+    familyId =
+      index.familyIdByBrandAndName.get(`${brandId}\t${familyName}`) ?? null;
+    if (!familyId) {
       console.warn(
-        `[seed] QA PartFitment: model not found (${f.brandName} / ${f.modelName}) — using brand-only row`
+        `[seed] QA PartFitment: family not found (${brandName} / ${familyName}) — keeping brand-only row`
       );
       stats.fitmentWarnings += 1;
     }
   }
 
-  let modelVariantId: string | null = null;
-  const parsed = parseQaVariantLabel(f.modelVariantName);
-  const year = f.yearFrom ?? parsed.year ?? null;
-  const versionName = parsed.versionName ?? null;
-
-  if (modelId && year != null && versionName) {
-    const vk = `${modelId}|${year}|${versionName}`;
-    modelVariantId = variantIdByKey.get(vk) ?? null;
-    if (!modelVariantId) {
+  let variantId: string | null = null;
+  if (variantName && familyId) {
+    variantId =
+      index.variantIdByFamilyAndName.get(`${familyId}\t${variantName}`) ?? null;
+    if (!variantId) {
       console.warn(
-        `[seed] QA PartFitment: variant not found (${f.modelName} / ${year} / ${versionName}) — dropping modelVariantId`
+        `[seed] QA PartFitment: variant not found (${brandName} / ${familyName} / ${variantName}) — falling back to family`
+      );
+      stats.fitmentWarnings += 1;
+    }
+  }
+
+  let generationId: string | null = null;
+  if (generationName && variantId) {
+    generationId =
+      index.generationIdByVariantAndName.get(`${variantId}\t${generationName}`) ??
+      null;
+    if (!generationId) {
+      console.warn(
+        `[seed] QA PartFitment: generation not found (${variantName} / ${generationName}) — falling back to variant`
       );
       stats.fitmentWarnings += 1;
     }
   }
 
   return {
-    brandId,
-    modelId,
-    modelVariantId,
-    yearFrom: f.yearFrom ?? null,
-    yearTo: f.yearTo ?? null,
+    motorcycleBrandId: brandId,
+    motorcycleModelFamilyId: familyId,
+    motorcycleVariantId: variantId,
+    motorcycleGenerationId: generationId,
     market: f.market ?? null,
     engineCode: f.engineCode ?? null,
     vinFrom: f.vinFrom ?? null,
@@ -652,18 +701,7 @@ async function seedPartCatalogQaFromJson(nodeIdByCode: Map<string, string>): Pro
   const raw = await readFile(filePath, "utf8");
   const rows = JSON.parse(raw) as PartSkuQaSeedRow[];
 
-  const brands = await prisma.brand.findMany({ select: { id: true, name: true } });
-  const brandIdByName = new Map(brands.map((b) => [b.name, b.id]));
-
-  const models = await prisma.model.findMany({ select: { id: true, name: true, brandId: true } });
-  const modelIdByBrandAndName = new Map(models.map((m) => [`${m.brandId}\t${m.name}`, m.id]));
-
-  const variants = await prisma.modelVariant.findMany({
-    select: { id: true, modelId: true, year: true, versionName: true },
-  });
-  const variantIdByKey = new Map(
-    variants.map((v) => [`${v.modelId}|${v.year}|${v.versionName}`, v.id])
-  );
+  const motorcycleIndex = await buildMotorcycleResolverIndex(prisma);
 
   let qaCatalogSkusUpserted = 0;
   let qaCatalogSkusSkippedPrimaryNode = 0;
@@ -818,13 +856,7 @@ async function seedPartCatalogQaFromJson(nodeIdByCode: Map<string, string>): Pro
     const fits = row.fitments ?? [];
     const resolvedFitments: FitmentPayload[] = [];
     for (const f of fits) {
-      const payload = resolveQaFitmentPayload(
-        f,
-        brandIdByName,
-        modelIdByBrandAndName,
-        variantIdByKey,
-        fitmentStats
-      );
+      const payload = resolveQaFitmentPayload(f, motorcycleIndex, fitmentStats);
       if (payload) {
         resolvedFitments.push(payload);
       }
@@ -837,11 +869,10 @@ async function seedPartCatalogQaFromJson(nodeIdByCode: Map<string, string>): Pro
       where: { skuId: sku.id },
       select: {
         id: true,
-        brandId: true,
-        modelId: true,
-        modelVariantId: true,
-        yearFrom: true,
-        yearTo: true,
+        motorcycleBrandId: true,
+        motorcycleModelFamilyId: true,
+        motorcycleVariantId: true,
+        motorcycleGenerationId: true,
         market: true,
         engineCode: true,
         vinFrom: true,
@@ -860,11 +891,10 @@ async function seedPartCatalogQaFromJson(nodeIdByCode: Map<string, string>): Pro
       const existing = await prisma.partFitment.findFirst({
         where: {
           skuId: sku.id,
-          brandId: payload.brandId,
-          modelId: payload.modelId,
-          modelVariantId: payload.modelVariantId,
-          yearFrom: payload.yearFrom,
-          yearTo: payload.yearTo,
+          motorcycleBrandId: payload.motorcycleBrandId,
+          motorcycleModelFamilyId: payload.motorcycleModelFamilyId,
+          motorcycleVariantId: payload.motorcycleVariantId,
+          motorcycleGenerationId: payload.motorcycleGenerationId,
           market: payload.market,
           engineCode: payload.engineCode,
           vinFrom: payload.vinFrom,
@@ -883,11 +913,10 @@ async function seedPartCatalogQaFromJson(nodeIdByCode: Map<string, string>): Pro
         await prisma.partFitment.create({
           data: {
             skuId: sku.id,
-            brandId: payload.brandId,
-            modelId: payload.modelId,
-            modelVariantId: payload.modelVariantId,
-            yearFrom: payload.yearFrom,
-            yearTo: payload.yearTo,
+            motorcycleBrandId: payload.motorcycleBrandId,
+            motorcycleModelFamilyId: payload.motorcycleModelFamilyId,
+            motorcycleVariantId: payload.motorcycleVariantId,
+            motorcycleGenerationId: payload.motorcycleGenerationId,
             market: payload.market,
             engineCode: payload.engineCode,
             vinFrom: payload.vinFrom,
@@ -1073,11 +1102,10 @@ async function seedPartCatalogFromJson(nodeIdByCode: Map<string, string>): Promi
       await prisma.partFitment.createMany({
         data: fits.map((f) => ({
           skuId: sku.id,
-          brandId: f.brandId ?? null,
-          modelId: f.modelId ?? null,
-          modelVariantId: f.modelVariantId ?? null,
-          yearFrom: f.yearFrom ?? null,
-          yearTo: f.yearTo ?? null,
+          motorcycleBrandId: f.motorcycleBrandId ?? null,
+          motorcycleModelFamilyId: f.motorcycleModelFamilyId ?? null,
+          motorcycleVariantId: f.motorcycleVariantId ?? null,
+          motorcycleGenerationId: f.motorcycleGenerationId ?? null,
           market: f.market ?? null,
           engineCode: f.engineCode ?? null,
           vinFrom: f.vinFrom ?? null,
@@ -1118,15 +1146,21 @@ async function seedPartCatalogFromJson(nodeIdByCode: Map<string, string>): Promi
   return { partCatalogSkusUpserted, partCatalogSkusSkipped };
 }
 
+type MotorcycleVehicleAnchor = {
+  motorcycleBrandId: string;
+  motorcycleModelFamilyId: string;
+  motorcycleVariantId: string;
+  motorcycleGenerationId: string;
+};
+
 /** Стабильные QA-мотоциклы для проверки рекомендаций каталога (паритет fitment с parts-skus.qa.json). */
-async function upsertDemoCatalogVehicle(input: {
-  userId: string;
-  garageId: string;
-  nickname: string;
-  brandId: string;
-  modelId: string;
-  modelVariantId: string;
-}): Promise<void> {
+async function upsertDemoCatalogVehicle(
+  input: {
+    userId: string;
+    garageId: string;
+    nickname: string;
+  } & MotorcycleVehicleAnchor
+): Promise<void> {
   const existing = await prisma.vehicle.findFirst({
     where: { userId: input.userId, nickname: input.nickname },
     select: { id: true },
@@ -1139,9 +1173,10 @@ async function upsertDemoCatalogVehicle(input: {
             where: { id: existing.id },
             data: {
               garageId: input.garageId,
-              brandId: input.brandId,
-              modelId: input.modelId,
-              modelVariantId: input.modelVariantId,
+              motorcycleBrandId: input.motorcycleBrandId,
+              motorcycleModelFamilyId: input.motorcycleModelFamilyId,
+              motorcycleVariantId: input.motorcycleVariantId,
+              motorcycleGenerationId: input.motorcycleGenerationId,
             },
             select: { id: true },
           })
@@ -1151,9 +1186,10 @@ async function upsertDemoCatalogVehicle(input: {
             data: {
               userId: input.userId,
               garageId: input.garageId,
-              brandId: input.brandId,
-              modelId: input.modelId,
-              modelVariantId: input.modelVariantId,
+              motorcycleBrandId: input.motorcycleBrandId,
+              motorcycleModelFamilyId: input.motorcycleModelFamilyId,
+              motorcycleVariantId: input.motorcycleVariantId,
+              motorcycleGenerationId: input.motorcycleGenerationId,
               nickname: input.nickname,
               odometer: 8500,
               engineHours: null,
@@ -1181,15 +1217,14 @@ async function upsertDemoCatalogVehicle(input: {
   });
 }
 
-async function upsertOwnedVehicle(input: {
-  userId: string;
-  garageId: string;
-  nickname: string;
-  brandId: string;
-  modelId: string;
-  modelVariantId: string;
-  odometer: number;
-}) {
+async function upsertOwnedVehicle(
+  input: {
+    userId: string;
+    garageId: string;
+    nickname: string;
+    odometer: number;
+  } & MotorcycleVehicleAnchor
+) {
   const existing = await prisma.vehicle.findFirst({
     where: {
       userId: input.userId,
@@ -1203,9 +1238,10 @@ async function upsertOwnedVehicle(input: {
       where: { id: existing.id },
       data: {
         garageId: input.garageId,
-        brandId: input.brandId,
-        modelId: input.modelId,
-        modelVariantId: input.modelVariantId,
+        motorcycleBrandId: input.motorcycleBrandId,
+        motorcycleModelFamilyId: input.motorcycleModelFamilyId,
+        motorcycleVariantId: input.motorcycleVariantId,
+        motorcycleGenerationId: input.motorcycleGenerationId,
         odometer: input.odometer,
       },
     });
@@ -1216,9 +1252,10 @@ async function upsertOwnedVehicle(input: {
     data: {
       userId: input.userId,
       garageId: input.garageId,
-      brandId: input.brandId,
-      modelId: input.modelId,
-      modelVariantId: input.modelVariantId,
+      motorcycleBrandId: input.motorcycleBrandId,
+      motorcycleModelFamilyId: input.motorcycleModelFamilyId,
+      motorcycleVariantId: input.motorcycleVariantId,
+      motorcycleGenerationId: input.motorcycleGenerationId,
       nickname: input.nickname,
       odometer: input.odometer,
       engineHours: null,
@@ -1745,209 +1782,48 @@ async function seedExpenseDemoData(input: {
   return { demoExpensesCreated, demoExpensesSkipped: 0 };
 }
 
-function normalizeSeedCell(value: unknown): string | null {
-  if (value == null) {
-    return null;
-  }
-  const s = String(value).trim();
-  if (!s || s.toLowerCase() === "n/a" || s === "н/д") {
-    return null;
-  }
-  return s;
-}
-
-function slugifySeedValue(value: string): string {
-  return value
-    .normalize("NFKD")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-{2,}/g, "-");
-}
-
-function parseStartYear(yearsRaw: string | null): number | null {
-  if (!yearsRaw) {
-    return null;
-  }
-  const yearMatches = yearsRaw.match(/\b(19|20)\d{2}\b/g);
-  if (!yearMatches || yearMatches.length === 0) {
-    return null;
-  }
-  const firstYear = Number.parseInt(yearMatches[0] ?? "", 10);
-  return Number.isFinite(firstYear) ? firstYear : null;
-}
-
-function parseCoolingType(engineRaw: string | null): string | null {
-  if (!engineRaw) {
-    return null;
-  }
-  const normalized = engineRaw.toLowerCase();
-  if (normalized.includes("air/liquid")) {
-    return "liquid/air";
-  }
-  if (
-    normalized.includes("water-cooled") ||
-    normalized.includes("liquid-cooled") ||
-    normalized.includes("liquid")
-  ) {
-    return "liquid";
-  }
-  if (normalized.includes("air-cooled") || normalized.includes("air cooled")) {
-    return "air";
-  }
-  return null;
-}
-
-type MotoTwinXlsxSeedStats = {
-  xlsxRowsTotal: number;
-  xlsxRowsProcessed: number;
-  xlsxRowsSkipped: number;
-  xlsxBrandsUpserted: number;
-  xlsxModelsUpserted: number;
-  xlsxVariantsUpserted: number;
-  xlsxVariantsSkippedNoYear: number;
-};
-
-async function seedMotoTwinModelsFromXlsx(): Promise<MotoTwinXlsxSeedStats> {
-  const filePath = path.join(process.cwd(), "data", "source", "Модели и конфигурации MotoTwin.xlsx");
-
-  let workbook: XLSX.WorkBook;
-  try {
-    workbook = XLSX.readFile(filePath, { raw: false });
-  } catch (error) {
-    console.warn(`[seed] MotoTwin XLSX skipped: unable to read file (${filePath})`, error);
-    return {
-      xlsxRowsTotal: 0,
-      xlsxRowsProcessed: 0,
-      xlsxRowsSkipped: 0,
-      xlsxBrandsUpserted: 0,
-      xlsxModelsUpserted: 0,
-      xlsxVariantsUpserted: 0,
-      xlsxVariantsSkippedNoYear: 0,
-    };
-  }
-
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) {
-    console.warn("[seed] MotoTwin XLSX skipped: no sheets found");
-    return {
-      xlsxRowsTotal: 0,
-      xlsxRowsProcessed: 0,
-      xlsxRowsSkipped: 0,
-      xlsxBrandsUpserted: 0,
-      xlsxModelsUpserted: 0,
-      xlsxVariantsUpserted: 0,
-      xlsxVariantsSkippedNoYear: 0,
-    };
-  }
-
-  const sheet = workbook.Sheets[firstSheetName];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-    defval: null,
-    raw: false,
+/**
+ * Looks up the four FK ids for a specific motorcycle generation by human-readable
+ * names. Returns null if the chain isn't fully present (e.g. CSV missing or row
+ * not yet imported).
+ */
+async function resolveDemoMotorcycleAnchor(
+  brandName: string,
+  familyName: string,
+  variantName: string,
+  generationName: string
+): Promise<MotorcycleVehicleAnchor | null> {
+  const generation = await prisma.motorcycleGeneration.findFirst({
+    where: {
+      name: generationName,
+      variant: {
+        name: variantName,
+        family: {
+          name: familyName,
+          brand: { name: brandName },
+        },
+      },
+    },
+    select: {
+      id: true,
+      variant: {
+        select: {
+          id: true,
+          family: {
+            select: { id: true, brandId: true },
+          },
+        },
+      },
+    },
   });
-
-  const seenBrands = new Set<string>();
-  const seenModels = new Set<string>();
-  let xlsxRowsProcessed = 0;
-  let xlsxRowsSkipped = 0;
-  let xlsxVariantsUpserted = 0;
-  let xlsxVariantsSkippedNoYear = 0;
-
-  for (const row of rows) {
-    const brandName = normalizeSeedCell(row["Brand"]);
-    const modelFamily = normalizeSeedCell(row["Model family"]);
-    const variantName = normalizeSeedCell(row["Variant / конфигурация"]) ?? modelFamily;
-
-    if (!brandName || !modelFamily || brandName.toLowerCase() === "brand") {
-      xlsxRowsSkipped += 1;
-      continue;
-    }
-
-    const brandSlug = slugifySeedValue(brandName);
-    if (!brandSlug) {
-      xlsxRowsSkipped += 1;
-      continue;
-    }
-
-    const brand = await prisma.brand.upsert({
-      where: { name: brandName },
-      update: { slug: brandSlug },
-      create: {
-        name: brandName,
-        slug: brandSlug,
-      },
-    });
-    seenBrands.add(brandName);
-
-    const modelSlug = slugifySeedValue(modelFamily);
-    if (!modelSlug) {
-      xlsxRowsSkipped += 1;
-      continue;
-    }
-
-    const model = await prisma.model.upsert({
-      where: { brandId_slug: { brandId: brand.id, slug: modelSlug } },
-      update: { name: modelFamily },
-      create: {
-        brandId: brand.id,
-        name: modelFamily,
-        slug: modelSlug,
-      },
-    });
-    seenModels.add(`${brand.id}\t${model.slug}`);
-
-    xlsxRowsProcessed += 1;
-
-    const year = parseStartYear(normalizeSeedCell(row["Годы"]));
-    if (!year || !variantName) {
-      xlsxVariantsSkippedNoYear += 1;
-      continue;
-    }
-
-    const className = normalizeSeedCell(row["Класс"]);
-    const engine = normalizeSeedCell(row["Двигатель"]);
-    const displacement = normalizeSeedCell(row["Объем"]);
-    const power = normalizeSeedCell(row["Мощность"]);
-    const torque = normalizeSeedCell(row["Момент"]);
-    const drive = normalizeSeedCell(row["Привод"]);
-    const frontWheel = normalizeSeedCell(row["Переднее колесо"]);
-    const rearWheel = normalizeSeedCell(row["Заднее колесо"]);
-    const wheelSizes =
-      frontWheel && rearWheel ? `${frontWheel}/${rearWheel}` : frontWheel ?? rearWheel ?? null;
-
-    const engineBits = [engine, displacement, power, torque].filter(
-      (value): value is string => Boolean(value)
-    );
-
-    await upsertModelVariant({
-      modelId: model.id,
-      year,
-      versionName: variantName,
-      generation: className,
-      market: null,
-      engineType: engineBits.length > 0 ? engineBits.join(" | ") : null,
-      coolingType: parseCoolingType(engine),
-      wheelSizes,
-      brakeSystem: null,
-      chainPitch: drive,
-      stockSprockets: null,
-    });
-    xlsxVariantsUpserted += 1;
+  if (!generation) {
+    return null;
   }
-
-  console.log(
-    `[seed] MotoTwin XLSX: ${xlsxRowsProcessed} row(s) processed; ${xlsxRowsSkipped} skipped; ${xlsxVariantsUpserted} variant(s) upserted; ${xlsxVariantsSkippedNoYear} variant row(s) skipped (missing year).`
-  );
-
   return {
-    xlsxRowsTotal: rows.length,
-    xlsxRowsProcessed,
-    xlsxRowsSkipped,
-    xlsxBrandsUpserted: seenBrands.size,
-    xlsxModelsUpserted: seenModels.size,
-    xlsxVariantsUpserted,
-    xlsxVariantsSkippedNoYear,
+    motorcycleBrandId: generation.variant.family.brandId,
+    motorcycleModelFamilyId: generation.variant.family.id,
+    motorcycleVariantId: generation.variant.id,
+    motorcycleGenerationId: generation.id,
   };
 }
 
@@ -2210,195 +2086,63 @@ async function main() {
     },
   });
 
-  const motoTwinXlsxStats = await seedMotoTwinModelsFromXlsx();
+  const motorcycleMasterStats = await loadMotorcycleTechnicalMaster(prisma);
 
-  const bmw = await prisma.brand.upsert({
-    where: { name: "BMW" },
-    update: { slug: "bmw" },
-    create: {
-      name: "BMW",
-      slug: "bmw",
-    },
-  });
-
-  const ktm = await prisma.brand.upsert({
-    where: { name: "KTM" },
-    update: { slug: "ktm" },
-    create: {
-      name: "KTM",
-      slug: "ktm",
-    },
-  });
-
-  const r1250gs = await prisma.model.upsert({
-    where: { brandId_slug: { brandId: bmw.id, slug: "r-1250-gs" } },
-    update: {
-      name: "R 1250 GS",
-    },
-    create: {
-      brandId: bmw.id,
-      name: "R 1250 GS",
-      slug: "r-1250-gs",
-    },
-  });
-
-  const f850gs = await prisma.model.upsert({
-    where: { brandId_slug: { brandId: bmw.id, slug: "f-850-gs" } },
-    update: {
-      name: "F 850 GS",
-    },
-    create: {
-      brandId: bmw.id,
-      name: "F 850 GS",
-      slug: "f-850-gs",
-    },
-  });
-
-  const adventure890 = await prisma.model.upsert({
-    where: { brandId_slug: { brandId: ktm.id, slug: "890-adventure" } },
-    update: {
-      name: "890 Adventure",
-    },
-    create: {
-      brandId: ktm.id,
-      name: "890 Adventure",
-      slug: "890-adventure",
-    },
-  });
-
-  const enduro690 = await prisma.model.upsert({
-    where: { brandId_slug: { brandId: ktm.id, slug: "690-enduro-r" } },
-    update: {
-      name: "690 Enduro R",
-    },
-    create: {
-      brandId: ktm.id,
-      name: "690 Enduro R",
-      slug: "690-enduro-r",
-    },
-  });
-
-  await upsertModelVariant({
-    modelId: r1250gs.id,
-    year: 2023,
-    versionName: "R 1250 GS Standard",
-    generation: "K50",
-    market: "EU",
-    engineType: "4-stroke boxer",
-    coolingType: "liquid/air",
-    wheelSizes: "19/17",
-    brakeSystem: "dual disc front / single disc rear",
-    chainPitch: "shaft",
-    stockSprockets: "shaft drive",
-  });
-
-  await upsertModelVariant({
-    modelId: f850gs.id,
-    year: 2022,
-    versionName: "F 850 GS Standard",
-    generation: "K81",
-    market: "EU",
-    engineType: "4-stroke parallel twin",
-    coolingType: "liquid",
-    wheelSizes: "21/17",
-    brakeSystem: "dual disc front / single disc rear",
-    chainPitch: "525",
-    stockSprockets: "16/43",
-  });
-
-  await upsertModelVariant({
-    modelId: adventure890.id,
-    year: 2023,
-    versionName: "890 Adventure Standard",
-    generation: "Adventure",
-    market: "EU",
-    engineType: "4-stroke parallel twin",
-    coolingType: "liquid",
-    wheelSizes: "21/18",
-    brakeSystem: "dual disc front / single disc rear",
-    chainPitch: "525",
-    stockSprockets: "16/45",
-  });
-
-  await upsertModelVariant({
-    modelId: enduro690.id,
-    year: 2022,
-    versionName: "690 Enduro R Standard",
-    generation: "Enduro",
-    market: "EU",
-    engineType: "4-stroke single",
-    coolingType: "liquid",
-    wheelSizes: "21/18",
-    brakeSystem: "single disc front / single disc rear",
-    chainPitch: "520",
-    stockSprockets: "15/45",
-  });
-
-  const variantR12502023 = await prisma.modelVariant.findFirst({
-    where: {
-      modelId: r1250gs.id,
-      year: 2023,
-      versionName: "R 1250 GS Standard",
-    },
-    select: { id: true },
-  });
-  const variant6902022 = await prisma.modelVariant.findFirst({
-    where: {
-      modelId: enduro690.id,
-      year: 2022,
-      versionName: "690 Enduro R Standard",
-    },
-    select: { id: true },
-  });
+  // Resolve canonical demo anchors against the freshly loaded technical master.
+  // Names match exactly what the CSVs contain (see prisma/seed-data/*.csv).
+  const demoBmwR1250GsAnchor = await resolveDemoMotorcycleAnchor(
+    "BMW",
+    "R 1250 GS",
+    "R 1250 GS",
+    "R 1250 GS / K50 EU5"
+  );
+  const demoKtm690EnduroRAnchor = await resolveDemoMotorcycleAnchor(
+    "KTM",
+    "690 Enduro R",
+    "690 Enduro R",
+    "690 Enduro R / 2019-current"
+  );
 
   let qaDemoCatalogVehicles = 0;
-  if (variantR12502023) {
+  if (demoBmwR1250GsAnchor) {
     await upsertDemoCatalogVehicle({
       userId: demoUser.id,
       garageId: demoGarage.id,
       nickname: "QA — BMW R 1250 GS 2023",
-      brandId: bmw.id,
-      modelId: r1250gs.id,
-      modelVariantId: variantR12502023.id,
+      ...demoBmwR1250GsAnchor,
     });
     qaDemoCatalogVehicles += 1;
   } else {
-    console.warn("[seed] QA demo vehicle skipped: R 1250 GS 2023 variant not found");
+    console.warn("[seed] QA demo vehicle skipped: BMW R 1250 GS generation not found");
   }
-  if (variant6902022) {
+  if (demoKtm690EnduroRAnchor) {
     await upsertDemoCatalogVehicle({
       userId: demoUser.id,
       garageId: demoGarage.id,
-      nickname: "QA — KTM 690 Enduro R 2022",
-      brandId: ktm.id,
-      modelId: enduro690.id,
-      modelVariantId: variant6902022.id,
+      nickname: "QA — KTM 690 Enduro R",
+      ...demoKtm690EnduroRAnchor,
     });
     qaDemoCatalogVehicles += 1;
   } else {
-    console.warn("[seed] QA demo vehicle skipped: 690 Enduro R 2022 variant not found");
+    console.warn("[seed] QA demo vehicle skipped: KTM 690 Enduro R generation not found");
   }
 
-  if (variantR12502023) {
+  if (demoBmwR1250GsAnchor) {
     await upsertOwnedVehicle({
       userId: userA.id,
       garageId: garageA.id,
-      nickname: "Test A — BMW R 1250 GS 2023",
-      brandId: bmw.id,
-      modelId: r1250gs.id,
-      modelVariantId: variantR12502023.id,
+      nickname: "Test A — BMW R 1250 GS",
+      ...demoBmwR1250GsAnchor,
       odometer: 4100,
     });
   }
 
-  if (variant6902022) {
+  if (demoKtm690EnduroRAnchor) {
     await upsertOwnedVehicle({
       userId: userB.id,
       garageId: garageB.id,
-      nickname: "Test B — KTM 690 Enduro R 2022",
-      brandId: ktm.id,
-      modelId: enduro690.id,
-      modelVariantId: variant6902022.id,
+      nickname: "Test B — KTM 690 Enduro R",
+      ...demoKtm690EnduroRAnchor,
       odometer: 5200,
     });
   }
@@ -2707,42 +2451,7 @@ async function main() {
     ...treeExpenseDemoStats,
     ...serviceBundleTemplateStats,
     qaDemoCatalogVehicles,
-    ...motoTwinXlsxStats,
-  });
-}
-
-async function upsertModelVariant(data: {
-  modelId: string;
-  year: number;
-  versionName: string;
-  generation: string | null;
-  market: string | null;
-  engineType: string | null;
-  coolingType: string | null;
-  wheelSizes: string | null;
-  brakeSystem: string | null;
-  chainPitch: string | null;
-  stockSprockets: string | null;
-}) {
-  const existing = await prisma.modelVariant.findFirst({
-    where: {
-      modelId: data.modelId,
-      year: data.year,
-      versionName: data.versionName,
-    },
-    select: { id: true },
-  });
-
-  if (existing) {
-    await prisma.modelVariant.update({
-      where: { id: existing.id },
-      data,
-    });
-    return;
-  }
-
-  await prisma.modelVariant.create({
-    data,
+    ...motorcycleMasterStats,
   });
 }
 

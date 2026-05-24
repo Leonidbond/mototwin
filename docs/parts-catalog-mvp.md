@@ -367,7 +367,7 @@ TOOL_OR_CHEMICAL
 
 ### 5.4. PartFitment
 
-`PartFitment` описывает применимость SKU к мотоциклам.
+`PartFitment` описывает применимость SKU к мотоциклам по новой 4-уровневой иерархии (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`, см. [data-model.md](./data-model.md)).
 
 Рекомендуемые поля:
 
@@ -375,42 +375,51 @@ TOOL_OR_CHEMICAL
 PartFitment
 - id
 - skuId
-- brandId?
-- modelId?
-- modelVariantId?
+- motorcycleBrandId?
+- motorcycleModelFamilyId?
+- motorcycleVariantId?
+- motorcycleGenerationId?
 - yearFrom?
 - yearTo?
 - market?
 - engineCode?
 - vinFrom?
 - vinTo?
+- fitmentType
 - confidence
 - sourceId?
 - note?
 - createdAt
 ```
 
-Уровни точности применимости:
+Уровни точности применимости (поле `fitmentType`):
 
 ```text
-EXACT_VARIANT
-MODEL_YEAR
-MODEL_RANGE
-GENERIC_NODE
+GENERATION   // привязка к конкретному motorcycleGenerationId
+VARIANT      // motorcycleVariantId, без поколения
+FAMILY       // motorcycleModelFamilyId
+BRAND        // motorcycleBrandId
+GENERIC_NODE // только узел/тип, без бренда
 UNKNOWN
 ```
 
 Примеры:
 
 ```text
-Exact:
-- KTM 500 EXC-F 2022
+GENERATION:
+- KTM 690 Enduro R, gen 2014–2018
 
-Range:
-- KTM EXC-F 2017-2023
+VARIANT:
+- KTM 690 Enduro R (все поколения)
 
-Generic:
-- Универсально, если вязкость/спецификация подходит
+FAMILY:
+- KTM EXC-F (все модификации/поколения)
+
+BRAND:
+- Универсально для KTM (например, brand-specific смазка)
+
+GENERIC_NODE:
+- Универсально для узла, если вязкость/спецификация подходит
 ```
 
 ### 5.5. PartOffer
@@ -478,15 +487,16 @@ INTERNAL_SEED
 
 #### CatalogAssembly
 
-Сборка/раздел OEM-каталога:
+Сборка/раздел OEM-каталога (привязка по новой 4-уровневой иерархии каталога моделей):
 
 ```text
 CatalogAssembly
 - id
 - sourceId
-- brandId?
-- modelId?
-- modelVariantId?
+- motorcycleBrandId?
+- motorcycleModelFamilyId?
+- motorcycleVariantId?
+- motorcycleGenerationId?
 - externalAssemblyId?
 - name
 - normalizedName?
@@ -661,32 +671,34 @@ model PartSkuNodeLink {
 }
 
 model PartFitment {
-  id             String  @id @default(cuid())
-  skuId          String
-  sku            PartSku @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  id                       String  @id @default(cuid())
+  skuId                    String
+  sku                      PartSku @relation(fields: [skuId], references: [id], onDelete: Cascade)
 
-  brandId        String?
-  modelId        String?
-  modelVariantId String?
+  motorcycleBrandId        String?
+  motorcycleModelFamilyId  String?
+  motorcycleVariantId      String?
+  motorcycleGenerationId   String?
 
-  yearFrom       Int?
-  yearTo         Int?
+  yearFrom                 Int?
+  yearTo                   Int?
 
-  market         String?
-  engineCode     String?
-  vinFrom        String?
-  vinTo          String?
+  market                   String?
+  engineCode               String?
+  vinFrom                  String?
+  vinTo                    String?
 
-  fitmentType    String?
-  confidence     Int     @default(80)
-  note           String?
+  fitmentType              String?  // GENERATION | VARIANT | FAMILY | BRAND | GENERIC_NODE | UNKNOWN
+  confidence               Int      @default(80)
+  note                     String?
 
-  createdAt      DateTime @default(now())
+  createdAt                DateTime @default(now())
 
   @@index([skuId])
-  @@index([brandId])
-  @@index([modelId])
-  @@index([modelVariantId])
+  @@index([motorcycleBrandId])
+  @@index([motorcycleModelFamilyId])
+  @@index([motorcycleVariantId])
+  @@index([motorcycleGenerationId])
 }
 
 model PartOffer {
@@ -899,9 +911,11 @@ confidence = 40
 6. Если это точная применимость:
 
 ```text
-fitmentType = EXACT_VARIANT
-confidence = 90
+fitmentType = GENERATION    // привязка к конкретному motorcycleGenerationId
+confidence  = 90
 ```
+
+(или `VARIANT` / `FAMILY` / `BRAND`, если данные ещё не сводятся к точному поколению).
 
 7. Marketplace URL не хранить как основной SKU, а добавлять в `PartOffer`.
 
@@ -975,13 +989,15 @@ VERIFY_REQUIRED
    - `PRIMARY`;
    - `RELATED_CONSUMABLE`;
    - `KIT_COMPONENT`.
-3. Проверить `PartFitment`:
-   - exact `modelVariantId`;
-   - затем `modelId + year`;
-   - затем generic node fitment.
+3. Проверить `PartFitment` против ТС, последовательно от точного к общему:
+   - exact `motorcycleGenerationId` (`fitmentType = GENERATION`);
+   - exact `motorcycleVariantId` (`VARIANT`);
+   - `motorcycleModelFamilyId` (`FAMILY`);
+   - `motorcycleBrandId` (`BRAND`);
+   - generic node fitment (`GENERIC_NODE`).
 4. Присвоить тип рекомендации (`PartRecommendationType`) и **консервативные** подписи (не обещать гарантированную совместимость без данных):
-   - `EXACT_FIT` — «Подходит к этой модификации»;
-   - `MODEL_FIT` — «Подходит к модели»;
+   - `EXACT_FIT` — «Подходит к этому поколению»;
+   - `MODEL_FIT` — «Подходит к модификации/семейству»;
    - `GENERIC_NODE_MATCH` — «Универсальная позиция для узла»;
    - `RELATED_CONSUMABLE` — «Сопутствующий расходник»;
    - `VERIFY_REQUIRED` — «Проверьте совместимость».

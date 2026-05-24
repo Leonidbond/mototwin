@@ -122,18 +122,24 @@ export interface AdminWorkQueueResponse {
   tab: AdminWorkQueueTabKey;
 }
 
+/**
+ * Admin-side support-level enum, mirroring the unified `ModelSupportLevel` enum from
+ * Prisma (after the motorcycle-master refactor — see standard §6).
+ */
 export type AdminSupportLevel =
-  | "FULL_SUPPORT"
+  | "MVP_CORE"
+  | "MVP_CORE_LEGACY"
   | "COMMUNITY_SUPPORT"
   | "EARLY_BETA"
-  | "NO_DATA"
-  | "UNSUPPORTED";
+  | "NO_FITMENT_DATA_YET";
 
 export interface AdminFastestModelRowWire {
   rank: number;
-  modelVariantId: string;
+  motorcycleGenerationId: string;
   brandLabel: string;
-  modelLabel: string;
+  modelFamilyLabel: string;
+  variantLabel: string;
+  generationLabel: string;
   garageCount: number;
   garageDelta: number;
   activeOwners: number;
@@ -362,8 +368,10 @@ export type AdminVehicleSortKey =
   | "odometerDesc";
 
 export interface AdminVehicleListFilters {
-  brandId?: string;
-  modelId?: string;
+  motorcycleBrandId?: string;
+  motorcycleModelFamilyId?: string;
+  motorcycleVariantId?: string;
+  motorcycleGenerationId?: string;
   year?: number;
   q?: string;
   sort?: AdminVehicleSortKey;
@@ -374,9 +382,10 @@ export interface AdminVehicleListItemWire {
   ownerLabel: string;
   ownerId: string;
   brandLabel: string;
-  modelLabel: string;
+  modelFamilyLabel: string;
+  variantLabel: string;
+  generationLabel: string;
   year: number;
-  versionName: string;
   nickname: string | null;
   vinLast: string | null;
   odometer: number;
@@ -395,13 +404,17 @@ export interface AdminVehicleListResponse {
 }
 
 export interface AdminModelListItemWire {
-  modelVariantId: string;
+  motorcycleGenerationId: string;
+  motorcycleBrandId: string;
+  motorcycleModelFamilyId: string;
+  motorcycleVariantId: string;
   brandLabel: string;
-  brandId: string;
-  modelLabel: string;
-  modelId: string;
-  year: number;
-  versionName: string;
+  modelFamilyLabel: string;
+  variantLabel: string;
+  generationLabel: string;
+  modelYear: number | null;
+  productionYearFrom: number | null;
+  productionYearTo: number | null;
   garageCount: number;
   reportsCount: number;
   verifiedCount: number;
@@ -411,10 +424,11 @@ export interface AdminModelListItemWire {
 }
 
 export interface AdminModelSupportSummaryWire {
-  full: number;
+  mvpCore: number;
+  mvpCoreLegacy: number;
   community: number;
   earlyBeta: number;
-  noData: number;
+  noFitmentDataYet: number;
 }
 
 export interface AdminModelListResponse {
@@ -427,13 +441,18 @@ export interface AdminModelListResponse {
 }
 
 export interface AdminModelDetailWire {
-  modelVariantId: string;
+  motorcycleGenerationId: string;
+  motorcycleBrandId: string;
+  motorcycleModelFamilyId: string;
+  motorcycleVariantId: string;
   brandLabel: string;
-  modelLabel: string;
-  year: number;
-  versionName: string;
-  generation: string | null;
-  market: string | null;
+  modelFamilyLabel: string;
+  variantLabel: string;
+  generationLabel: string;
+  modelYear: number | null;
+  productionYearFrom: number | null;
+  productionYearTo: number | null;
+  marketRegion: string | null;
   engineType: string | null;
   coolingType: string | null;
   wheelSizes: string | null;
@@ -508,10 +527,12 @@ export interface AdminPartAliasWire {
 }
 
 export interface AdminPartFitmentSummaryWire {
-  modelVariantId: string;
+  motorcycleGenerationId: string;
   brandLabel: string;
-  modelLabel: string;
-  year: number;
+  modelFamilyLabel: string;
+  variantLabel: string;
+  generationLabel: string;
+  modelYear: number | null;
   status: string;
   reportCount: number;
   confidenceScore: number;
@@ -519,7 +540,7 @@ export interface AdminPartFitmentSummaryWire {
 
 export interface AdminPartReportSummaryWire {
   id: string;
-  modelLabel: string;
+  generationLabel: string;
   nodeLabel: string;
   fitmentResult: string;
   moderationStatus: string;
@@ -737,7 +758,7 @@ export interface AdminBrandRefRow {
   id: string;
   name: string;
   slug: string;
-  modelCount: number;
+  modelFamilyCount: number;
 }
 
 export interface AdminNodeRefRow {

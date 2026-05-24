@@ -5,6 +5,9 @@ import type { ExpenseItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "../_shared/current-user-context";
 import { getVehicleInCurrentContext } from "../_shared/vehicle-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedInt, boundedNumber, boundedText, boundedTextOptional, strictObject } from "@/lib/http/input-validation";
+import { parseSearchParamInt, parseSearchParamText } from "@/lib/http/input-validation";
 
 type ExpenseRow = Omit<
   ExpenseItem,
@@ -43,26 +46,31 @@ const installStatusSchema = z.enum([
 const purchaseStatusSchema = z.enum(["PLANNED", "PURCHASED"]);
 const installationStatusSchema = z.enum(["NOT_INSTALLED", "INSTALLED"]);
 
-const createExpenseSchema = z.object({
-  vehicleId: z.string().trim().min(1),
-  nodeId: z.string().trim().nullable().optional(),
+// MT-SEC-068 + MT-SEC-070: strictObject blocks mass-assignment; every free-text
+// field is length-capped; numerics use sane upper bounds so a single user
+// cannot poison the DB with absurd values.
+const createExpenseSchema = strictObject({
+  vehicleId: boundedText({ max: 64 }),
+  nodeId: boundedTextOptional({ max: 64 }),
   category: categorySchema,
   installStatus: installStatusSchema,
   purchaseStatus: purchaseStatusSchema.optional(),
   installationStatus: installationStatusSchema.optional(),
   expenseDate: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))),
-  title: z.string().trim().min(1).max(300),
-  amount: z.number().positive(),
-  currency: z.string().trim().min(1).max(12),
-  quantity: z.number().int().min(1).optional(),
-  comment: z.string().trim().nullable().optional(),
-  partSku: z.string().trim().nullable().optional(),
-  partName: z.string().trim().nullable().optional(),
-  vendor: z.string().trim().nullable().optional(),
+  title: boundedText({ min: 1, max: 300 }),
+  amount: boundedNumber({ min: 0, max: 1_000_000_000 }).refine((value) => value > 0, {
+    message: "amount must be > 0",
+  }),
+  currency: boundedText({ min: 1, max: 12 }),
+  quantity: boundedInt({ min: 1, max: 10_000 }).optional(),
+  comment: boundedTextOptional({ max: 2_000 }),
+  partSku: boundedTextOptional({ max: 200 }),
+  partName: boundedTextOptional({ max: 300 }),
+  vendor: boundedTextOptional({ max: 200 }),
   purchasedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
   installedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
-  odometer: z.number().int().min(0).nullable().optional(),
-  engineHours: z.number().int().min(0).nullable().optional(),
+  odometer: boundedInt({ min: 0, max: 10_000_000 }).nullable().optional(),
+  engineHours: boundedInt({ min: 0, max: 1_000_000 }).nullable().optional(),
 });
 
 function toWire(row: ExpenseRow): ExpenseItem {
@@ -127,8 +135,13 @@ async function loadExpenses(vehicleId?: string | null): Promise<ExpenseItem[]> {
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const year = Number(searchParams.get("year") ?? getCurrentExpenseYear());
-    const vehicleId = searchParams.get("vehicleId")?.trim() || null;
+    // MT-SEC-071: validate search params with explicit bounds.
+    const year = parseSearchParamInt(searchParams.get("year"), {
+      min: 1990,
+      max: 2100,
+      fallback: getCurrentExpenseYear(),
+    });
+    const vehicleId = parseSearchParamText(searchParams.get("vehicleId"), { max: 64 });
 
     if (vehicleId) {
       const allowed = await getVehicleInCurrentContext(vehicleId, { id: true });
@@ -138,8 +151,7 @@ export async function GET(request: NextRequest) {
     }
 
     const expenses = await loadExpenses(vehicleId);
-    const selectedYear = Number.isFinite(year) ? year : getCurrentExpenseYear();
-    const analytics = buildExpenseAnalyticsFromItems(expenses, selectedYear);
+    const analytics = buildExpenseAnalyticsFromItems(expenses, year);
     const years = Array.from(new Set(expenses.map((expense) => new Date(expense.expenseDate).getFullYear())))
       .filter((value) => Number.isFinite(value))
       .sort((a, b) => b - a);
@@ -157,7 +169,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const data = createExpenseSchema.parse(await request.json());
+    // MT-SEC-069: cap body at 32 KB.
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 32 * 1024 });
+    const data = createExpenseSchema.parse(raw);
     const vehicle = await getVehicleInCurrentContext(data.vehicleId, { id: true });
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
@@ -223,6 +237,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ expense: toWire(row), analytics }, { status: 201 });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

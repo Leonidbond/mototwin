@@ -80,7 +80,7 @@ export function ServiceEventCreateClient() {
         if (vehicle) {
           const nm =
             vehicle.nickname?.trim() ||
-            `${vehicle.brandName} ${vehicle.modelName}`.trim() ||
+            `${vehicle.brandName} ${vehicle.modelFamilyName}`.trim() ||
             "Мотоцикл";
           setVehicleDisplayName(nm);
         }

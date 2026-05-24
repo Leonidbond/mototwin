@@ -120,10 +120,11 @@ export type PartCompatibilityVehicleWire = {
   id: string;
   nickname: string | null;
   brandName: string;
-  modelName: string;
-  variantYear: number;
+  modelFamilyName: string;
   variantName: string;
-  market: string | null;
+  generationName: string;
+  modelYear: number | null;
+  marketRegion: string | null;
 };
 
 export type PartCompatibilityNodeWire = {
@@ -157,7 +158,7 @@ export type PartCompatibilityReportWire = {
   partMaster: PartCompatibilityPartMasterWire;
   node: PartCompatibilityNodeWire;
   vehicle: PartCompatibilityVehicleWire;
-  modelVariantId: string;
+  motorcycleGenerationId: string;
   structured: PartCompatibilityStructuredSummaryWire;
   confidence: PartCompatibilityConfidenceWire | null;
   breakdown: PartCompatibilityBreakdownWire;

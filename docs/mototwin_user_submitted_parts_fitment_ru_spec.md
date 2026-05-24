@@ -3,6 +3,10 @@
 
 ---
 
+> **Терминология (актуальный маппинг на схему):** в этом документе термин **`ModelVariant`** соответствует паре **`MotorcycleVariant + MotorcycleGeneration`** из текущего унифицированного стандарта моделей (см. [data-model.md](./data-model.md)). Поле `modelVariantId` в API/БД сейчас называется **`motorcycleGenerationId`** — именно к конкретному поколению (`MotorcycleGeneration`) привязываются `Vehicle`, `FitmentReport` и `FitmentConfidence`. Иерархия каталога: `MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration` (+ sidecar `MotorcycleTechnicalSpecs`). Сам спек ниже не переписан построчно — функциональные правила остаются актуальными, поменялись только имена сущностей и FK.
+
+---
+
 # 1. Назначение
 
 Документ описывает функционал пользовательского добавления деталей и community-driven системы проверки совместимости деталей в MotoTwin.

@@ -8,14 +8,26 @@ import {
   registerUser,
 } from "@/lib/auth/session-service";
 import { headers } from "next/headers";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { rateLimit, rateLimit429 } from "@/lib/http/rate-limit";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as {
+    // MT-SEC-002 + MT-SEC-004: cap registration probes per IP so the
+    // unavoidable 409 on existing accounts can't be used for enumeration.
+    const decision = rateLimit({
+      bucket: "auth:register",
+      request,
+      limit: 5,
+      windowMs: 5 * 60_000,
+    });
+    if (!decision.allowed) return rateLimit429(decision);
+
+    const body = await parseJsonBody<{
       email?: string;
       password?: string;
       displayName?: string;
-    };
+    }>(request, { maxBytes: 8 * 1024 });
 
     const email = typeof body.email === "string" ? body.email : "";
     const password = typeof body.password === "string" ? body.password : "";
@@ -70,10 +82,21 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     if (error instanceof AuthServiceError) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
-    console.error("Register failed:", error);
+    // MT-SEC-022: Prisma errors may include unique-constraint field values
+    // (i.e. the user's e-mail). Log a sanitized shape only.
+    console.error(
+      "[auth] register failed",
+      JSON.stringify({
+        name: (error as { name?: string })?.name,
+        code: (error as { code?: string })?.code,
+      })
+    );
     return NextResponse.json({ error: "Не удалось зарегистрироваться." }, { status: 500 });
   }
 }

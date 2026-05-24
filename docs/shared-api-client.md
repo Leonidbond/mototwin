@@ -33,10 +33,13 @@ const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" })); // web
 | `createServiceEvent(vehicleId, input)` | `POST /api/vehicles/:id/service-events` |
 | `updateVehicleState(vehicleId, input)` | `PATCH /api/vehicles/:id/state` |
 | `updateVehicleProfile(vehicleId, input)` | `PATCH /api/vehicles/:id/profile` |
-| `getBrands()` | `GET /api/brands` |
-| `getModels(brandId)` | `GET /api/models?brandId=` |
-| `getModelVariants(modelId)` | `GET /api/model-variants?modelId=` |
+| `getMotorcycleBrands()` | `GET /api/motorcycle-brands` |
+| `getMotorcycleModelFamilies({ motorcycleBrandId })` | `GET /api/motorcycle-model-families?motorcycleBrandId=` |
+| `getMotorcycleVariants({ motorcycleModelFamilyId })` | `GET /api/motorcycle-variants?motorcycleModelFamilyId=` |
+| `getMotorcycleGenerations({ motorcycleVariantId })` | `GET /api/motorcycle-generations?motorcycleVariantId=` |
 | `createVehicle(input)` | `POST /api/vehicles` |
+
+Каталог моделей унифицирован по 4-уровневой иерархии (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`). Старые методы `getBrands()` / `getModels()` / `getModelVariants()` (и соответствующие роуты) удалены — см. [data-model.md](./data-model.md).
 
 Типы ответов экспортируются из `@mototwin/types` (модуль `api`): `GarageVehiclesResponse`, `VehicleDetailResponse`, и т.д.
 
@@ -62,4 +65,4 @@ const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" })); // web
 
 ## Переименования методов (parity)
 
-Ранее использовались имена вроде `getGarage`, `getVehicleNodeTree`, `getVehicleServiceEvents`, `createVehicleServiceEvent`. Текущие канонические имена — в таблице выше; старые имена удалены, чтобы везде был один контракт.
+Ранее использовались имена вроде `getGarage`, `getVehicleNodeTree`, `getVehicleServiceEvents`, `createVehicleServiceEvent`, а также `getBrands` / `getModels` / `getModelVariants` (3-уровневый каталог). Текущие канонические имена — в таблице выше; старые имена удалены, чтобы везде был один контракт. Для каталога моделей канон — `getMotorcycle*` (4 уровня).

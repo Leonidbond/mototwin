@@ -16,9 +16,10 @@ import type {
 } from "./service-log";
 import type { GarageAttentionIndicatorViewModel } from "./attention";
 import type {
-  BrandItem,
-  ModelItem,
-  ModelVariantItem,
+  MotorcycleBrandPickerItem,
+  MotorcycleGenerationPickerItem,
+  MotorcycleModelFamilyPickerItem,
+  MotorcycleVariantPickerItem,
   RideLoadType,
   RideProfileViewModel,
   RideStyle,
@@ -161,12 +162,14 @@ export type EditVehicleProfileFormProps = {
 
 export type AddMotorcycleFormProps = {
   values: AddMotorcycleFormValues;
-  brands: BrandItem[];
-  models: ModelItem[];
-  variants: ModelVariantItem[];
+  brands: MotorcycleBrandPickerItem[];
+  modelFamilies: MotorcycleModelFamilyPickerItem[];
+  variants: MotorcycleVariantPickerItem[];
+  generations: MotorcycleGenerationPickerItem[];
   isLoadingBrands: boolean;
-  isLoadingModels: boolean;
+  isLoadingModelFamilies: boolean;
   isLoadingVariants: boolean;
+  isLoadingGenerations: boolean;
   validationErrors: string[];
   submitError?: string;
   isSubmitting: boolean;

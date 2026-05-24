@@ -6,16 +6,20 @@ import { requireAdminRole, requireAnyAdmin, toAdminErrorResponse } from "@/lib/a
 import { logAdminAction } from "@/lib/admin-audit";
 import { loadAdminPartDetail, normalizeBrand } from "@/lib/admin-parts";
 import { prisma } from "@/lib/prisma";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
-const UpdateSchema = z.object({
-  brandName: z.string().min(1).max(80).optional(),
-  sku: z.string().min(1).max(80).optional(),
-  title: z.string().min(1).max(200).optional(),
-  subcategory: z.string().max(80).nullable().optional(),
-  description: z.string().max(2000).nullable().optional(),
-  imageUrl: z.string().url().max(400).nullable().optional(),
-  status: z.enum(["DRAFT", "PENDING_REVIEW", "ACTIVE", "MERGED", "REJECTED"]).optional(),
-});
+// MT-SEC-068: strict mode prevents mass assignment on partial updates.
+const UpdateSchema = z
+  .object({
+    brandName: z.string().min(1).max(80).optional(),
+    sku: z.string().min(1).max(80).optional(),
+    title: z.string().min(1).max(200).optional(),
+    subcategory: z.string().max(80).nullable().optional(),
+    description: z.string().max(2000).nullable().optional(),
+    imageUrl: z.string().url().max(400).nullable().optional(),
+    status: z.enum(["DRAFT", "PENDING_REVIEW", "ACTIVE", "MERGED", "REJECTED"]).optional(),
+  })
+  .strict();
 
 export async function GET(
   _request: Request,
@@ -42,7 +46,7 @@ export async function PATCH(
   try {
     const ctx = await requireAdminRole(["SUPER_ADMIN", "CATALOG_MANAGER", "MODERATOR"]);
     const { id } = await context.params;
-    const body = await request.json();
+    const body = await parseJsonBody<unknown>(request, { maxBytes: 8 * 1024 });
     const parsed = UpdateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -82,6 +86,9 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const handled = toAdminErrorResponse(error);
     if (handled) return handled;
     console.error("admin/parts/[id] PATCH:", error);

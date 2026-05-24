@@ -88,17 +88,27 @@ export async function loadAdminPartDetail(partMasterId: string): Promise<AdminPa
       aliases: { orderBy: { createdAt: "desc" } },
       fitmentConfidences: {
         include: {
-          modelVariant: { include: { model: { include: { brand: true } } } },
+          motorcycleGeneration: {
+            include: {
+              variant: { include: { family: { include: { brand: true } } } },
+            },
+          },
           node: { select: { name: true } },
         },
       },
-      _count: { select: { fitmentReports: true } },
+      _count: {
+        select: { fitmentReports: true, fitmentConfidences: true, aliases: true },
+      },
       fitmentReports: {
         orderBy: { createdAt: "desc" },
         take: 8,
         include: {
-          modelVariant: { include: { model: { include: { brand: true } } } },
-          node: { select: { name: true } },
+          node: true,
+          motorcycleGeneration: {
+            include: {
+              variant: { include: { family: { include: { brand: true } } } },
+            },
+          },
         },
       },
     },
@@ -134,17 +144,19 @@ export async function loadAdminPartDetail(partMasterId: string): Promise<AdminPa
       createdAt: a.createdAt.toISOString(),
     })),
     fitments: part.fitmentConfidences.map((fc) => ({
-      modelVariantId: fc.modelVariantId,
-      brandLabel: fc.modelVariant.model.brand.name,
-      modelLabel: `${fc.modelVariant.model.name} ${fc.modelVariant.versionName}`,
-      year: fc.modelVariant.year,
+      motorcycleGenerationId: fc.motorcycleGenerationId,
+      brandLabel: fc.motorcycleGeneration.variant.family.brand.name,
+      modelFamilyLabel: fc.motorcycleGeneration.variant.family.name,
+      variantLabel: fc.motorcycleGeneration.variant.name,
+      generationLabel: fc.motorcycleGeneration.name,
+      modelYear: fc.motorcycleGeneration.yearFrom,
       status: fc.status,
       reportCount: fc.reportCount,
       confidenceScore: fc.confidenceScore,
     })),
     recentReports: part.fitmentReports.map((r) => ({
       id: r.id,
-      modelLabel: `${r.modelVariant.model.brand.name} ${r.modelVariant.model.name} ${r.modelVariant.year}`,
+      generationLabel: `${r.motorcycleGeneration.variant.family.brand.name} ${r.motorcycleGeneration.variant.family.name} ${r.motorcycleGeneration.variant.name} ${r.motorcycleGeneration.name}`.trim(),
       nodeLabel: r.node?.name ?? "—",
       fitmentResult: r.fitmentResult,
       moderationStatus: r.moderationStatus,

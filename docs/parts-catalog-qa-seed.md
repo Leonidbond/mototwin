@@ -13,11 +13,11 @@
 
 ## Как загружается
 
-1. В `prisma/seed.ts` после сидов **User**, **Brand**, **Model**, **ModelVariant**, **Node** и после базового каталога `parts-skus.json` вызывается загрузчик QA JSON.
+1. В `prisma/seed.ts` после сидов **User**, каталога моделей (`MotorcycleBrand` → `MotorcycleModelFamily` → `MotorcycleVariant` → `MotorcycleGeneration` + `MotorcycleTechnicalSpecs` через CSV-loader, см. [data-model.md](./data-model.md)), **Node** и после базового каталога `parts-skus.json` вызывается загрузчик QA JSON.
 2. `PartSku` находится или создаётся по стабильному ключу: **`brandName` + `canonicalName` + `partType`** (trim, без отдельного уникального `seedKey` в JSON).
 3. `PartNumber`: нормализация для QA — trim, upper case, удаление пробелов и **дефисов**; уникальность в БД: `(skuId, normalizedNumber, numberType)`.
 4. `PartSkuNodeLink`: узел резолвится по **`nodeCode`**; если узла нет — связь пропускается, сид **не падает**.
-5. `PartFitment`: в JSON задаются **`brandName` / `modelName` / `modelVariantName`** (и при необходимости годы); сид резолвит их в `Brand` / `Model` / `ModelVariant`. Если модель или модификация не найдены — пишется предупреждение, по возможности создаётся более общая строка (например, только бренд) или запись пропускается.
+5. `PartFitment`: в JSON задаются `fitmentType` (`GENERATION | VARIANT | FAMILY | BRAND | GENERIC_NODE`) и slug-и/имена соответствующего уровня (например, `motorcycleBrandSlug` / `motorcycleModelFamilyName` / `motorcycleVariantName` / `motorcycleGenerationName` или `yearFrom`/`yearTo` для матча по диапазону внутри варианта). Сид резолвит их в `MotorcycleBrand` / `MotorcycleModelFamily` / `MotorcycleVariant` / `MotorcycleGeneration`. Если уровень не найден — пишется предупреждение, по возможности fitment создаётся на более общем уровне (например, BRAND вместо GENERATION) или запись пропускается.
 6. `PartOffer`: для источника **QA Seed** используется стабильный **`externalOfferId`** (детерминированный хеш от SKU-ключа и заголовка оффера), чтобы **повторный прогон сида не плодил дубликаты**.
 
 ## Демо-мотоциклы в гараже

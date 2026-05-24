@@ -43,9 +43,9 @@ The script hits every admin page (17 routes) and every read-only admin API (17 e
 | `/admin`                              | Dashboard with 8 widgets matching the design ref     |
 | `/admin/users`, `/admin/users/[id]`   | Users list + detail + block/unblock actions           |
 | `/admin/vehicles`                     | Filterable list of all garage vehicles               |
-| `/admin/models`, `/admin/models/[id]` | brand × model × variant table + support-level editor |
+| `/admin/models`, `/admin/models/[id]` | brand × family × variant × generation table + support-level editor (4-уровневая иерархия, см. [data-model.md](./data-model.md)) |
 | `/admin/catalog`, `/admin/catalog/[id]` | PartMaster CRUD, aliases, fitments, merge          |
-| `/admin/fitment`                      | Brand × node coverage matrix and conflict lists      |
+| `/admin/fitment`                      | MotorcycleBrand × node coverage matrix and conflict lists |
 | `/admin/moderation`                   | 7 queues + right-side inspector                      |
 | `/admin/imports`, `/admin/imports/new`, `/admin/imports/[id]` | Bulk import wizard (PARTS + PART_ALIASES) |
 | `/admin/audit`                        | Searchable audit log (read-only)                     |

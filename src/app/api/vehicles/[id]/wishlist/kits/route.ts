@@ -24,15 +24,18 @@ import {
   toCurrentUserContextErrorResponse,
 } from "../../../../_shared/current-user-context";
 import { getVehicleInCurrentContext, isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedText, strictObject, parseSearchParamText } from "@/lib/http/input-validation";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-const addKitSchema = z.object({
-  kitCode: z.string().trim().min(1, "kitCode обязателен"),
-  contextNodeId: z.union([z.string(), z.null(), z.undefined()]).optional(),
+// MT-SEC-068 + MT-SEC-070: strict schema with capped strings.
+const addKitSchema = strictObject({
+  kitCode: boundedText({ min: 1, max: 100 }),
+  contextNodeId: z.union([z.string().max(64), z.null(), z.undefined()]).optional(),
 });
 
 const wishlistSkuSelect = {
@@ -131,14 +134,16 @@ function toWire(row: {
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId } = await context.params;
-    const body = addKitSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
+    const body = addKitSchema.parse(raw);
     const contextNodeId = body.contextNodeId ? String(body.contextNodeId).trim() : null;
 
     const vehicle = await getVehicleInCurrentContext(vehicleId, {
       id: true,
-      modelId: true,
-      modelVariantId: true,
-      modelVariant: { select: { year: true } },
+      motorcycleBrandId: true,
+      motorcycleModelFamilyId: true,
+      motorcycleVariantId: true,
+      motorcycleGenerationId: true,
     });
     if (!vehicle) {
       return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
@@ -383,6 +388,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ result });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;
@@ -409,7 +417,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
     }
     const { searchParams } = new URL(request.url);
-    const nodeId = searchParams.get("nodeId")?.trim();
+    // MT-SEC-071: validate nodeId length before propagating to downstream call.
+    const nodeId = parseSearchParamText(searchParams.get("nodeId"), { max: 64 });
     const query = new URLSearchParams();
     query.set("vehicleId", vehicleId);
     if (nodeId) {

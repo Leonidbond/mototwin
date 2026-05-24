@@ -39,20 +39,40 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const vehicle = await getVehicleInCurrentContext(vehicleId, {
       id: true,
       nickname: true,
-      modelId: true,
-      modelVariantId: true,
-      brand: { select: { name: true } },
-      model: { select: { name: true } },
-      modelVariant: { select: { year: true, versionName: true, market: true } },
+      motorcycleBrandId: true,
+      motorcycleModelFamilyId: true,
+      motorcycleVariantId: true,
+      motorcycleGenerationId: true,
+      motorcycleBrand: { select: { name: true } },
+      motorcycleModelFamily: { select: { name: true } },
+      motorcycleVariant: { select: { name: true } },
+      motorcycleGeneration: {
+        select: {
+          name: true,
+          yearFrom: true,
+          marketRegion: true,
+        },
+      },
     });
-    if (!vehicle?.modelVariantId || !vehicle.modelVariant) {
-      return NextResponse.json({ error: "Мотоцикл не найден или без модификации." }, { status: 404 });
+    if (
+      !vehicle?.motorcycleGenerationId ||
+      !vehicle.motorcycleBrand ||
+      !vehicle.motorcycleModelFamily ||
+      !vehicle.motorcycleVariant ||
+      !vehicle.motorcycleGeneration
+    ) {
+      return NextResponse.json(
+        { error: "Мотоцикл не найден или без поколения." },
+        { status: 404 }
+      );
     }
+
+    const motorcycleGenerationId = vehicle.motorcycleGenerationId;
 
     const visibleModerationStatuses: FitmentReportModerationStatus[] = ["PUBLISHED", "PENDING"];
     const reportWhereBase = {
       partMasterId,
-      modelVariantId: vehicle.modelVariantId,
+      motorcycleGenerationId,
       nodeId,
       /** Показываем и ожидающие модерации — иначе свежий отчёт «пропадает» до ручного approve. */
       moderationStatus: { in: visibleModerationStatuses },
@@ -79,9 +99,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       }),
       prisma.fitmentConfidence.findUnique({
         where: {
-          partMasterId_modelVariantId_nodeId: {
+          partMasterId_motorcycleGenerationId_nodeId: {
             partMasterId,
-            modelVariantId: vehicle.modelVariantId,
+            motorcycleGenerationId,
             nodeId,
           },
         },
@@ -91,10 +111,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
         select: {
           fitments: {
             select: {
-              modelVariantId: true,
-              modelId: true,
-              yearFrom: true,
-              yearTo: true,
+              motorcycleBrandId: true,
+              motorcycleModelFamilyId: true,
+              motorcycleVariantId: true,
+              motorcycleGenerationId: true,
               fitmentType: true,
             },
           },
@@ -118,8 +138,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
           vehicle: {
             select: {
               nickname: true,
-              brand: { select: { name: true } },
-              model: { select: { name: true } },
+              motorcycleBrand: { select: { name: true } },
+              motorcycleModelFamily: { select: { name: true } },
               rideProfile: {
                 select: {
                   usageType: true,
@@ -169,9 +189,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const flatFitments = skusForCatalog.flatMap((s) => s.fitments);
     const structured = analyzeStructuredCatalogSignals(flatFitments, {
-      modelVariantId: vehicle.modelVariantId,
-      modelId: vehicle.modelId,
-      modelYear: vehicle.modelVariant.year,
+      motorcycleBrandId: vehicle.motorcycleBrandId,
+      motorcycleModelFamilyId: vehicle.motorcycleModelFamilyId,
+      motorcycleVariantId: vehicle.motorcycleVariantId,
+      motorcycleGenerationId,
     });
 
     const counts: Partial<Record<FitmentReportResultWire, number>> = {};
@@ -258,19 +279,22 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const vehicleWire: PartCompatibilityReportWire["vehicle"] = {
       id: vehicle.id,
       nickname: vehicle.nickname,
-      brandName: vehicle.brand.name,
-      modelName: vehicle.model.name,
-      variantYear: vehicle.modelVariant.year,
-      variantName: vehicle.modelVariant.versionName,
-      market: vehicle.modelVariant.market,
+      brandName: vehicle.motorcycleBrand.name,
+      modelFamilyName: vehicle.motorcycleModelFamily.name,
+      variantName: vehicle.motorcycleVariant.name,
+      generationName: vehicle.motorcycleGeneration.name,
+      modelYear: vehicle.motorcycleGeneration.yearFrom ?? null,
+      marketRegion: vehicle.motorcycleGeneration.marketRegion
+        ? String(vehicle.motorcycleGeneration.marketRegion)
+        : null,
     };
 
     const reports = reportsRaw.map((r) => {
       const v = r.vehicle;
       const vehicleLabel = v
         ? v.nickname?.trim()
-          ? `${v.nickname.trim()} · ${v.brand.name} ${v.model.name}`
-          : `${v.brand.name} ${v.model.name}`
+          ? `${v.nickname.trim()} · ${v.motorcycleBrand.name} ${v.motorcycleModelFamily.name}`
+          : `${v.motorcycleBrand.name} ${v.motorcycleModelFamily.name}`
         : null;
       return {
         id: r.id,
@@ -313,9 +337,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
         prisma,
         {
           id: vehicle.id,
-          modelId: vehicle.modelId,
-          modelVariantId: vehicle.modelVariantId,
-          modelVariant: { year: vehicle.modelVariant.year },
+          motorcycleBrandId: vehicle.motorcycleBrandId,
+          motorcycleModelFamilyId: vehicle.motorcycleModelFamilyId,
+          motorcycleVariantId: vehicle.motorcycleVariantId,
+          motorcycleGenerationId,
         },
         nodeId,
         { code: node.code, serviceGroup: node.serviceGroup }
@@ -341,7 +366,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       partMaster,
       node,
       vehicle: vehicleWire,
-      modelVariantId: vehicle.modelVariantId,
+      motorcycleGenerationId,
       structured,
       confidence: confidenceBlock,
       breakdown,

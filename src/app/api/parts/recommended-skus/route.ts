@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  buildRecommendationsForNodeWithCommunity,
+  narrowVehicleFitmentContext,
+} from "@/lib/build-recommendations-for-node-with-community";
 import { prisma } from "@/lib/prisma";
-import { buildRecommendationsForNodeWithCommunity } from "@/lib/build-recommendations-for-node-with-community";
+import { getVehicleInCurrentContext } from "@/app/api/_shared/vehicle-context";
+import { toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
+import { parseSearchParamText } from "@/lib/http/input-validation";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const vehicleId = searchParams.get("vehicleId")?.trim();
-    const nodeId = searchParams.get("nodeId")?.trim();
+    // MT-SEC-072: validate bounded length on search params before DB lookup.
+    const vehicleId = parseSearchParamText(searchParams.get("vehicleId"), { max: 64 });
+    const nodeId = parseSearchParamText(searchParams.get("nodeId"), { max: 64 });
 
     if (!vehicleId || !nodeId) {
       return NextResponse.json(
@@ -15,18 +22,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id: vehicleId },
-      select: {
-        id: true,
-        modelId: true,
-        modelVariantId: true,
-        modelVariant: { select: { year: true } },
-      },
+    // MT-SEC-073: previously unauthenticated → IDOR. Now requires auth and
+    // verifies the caller owns the vehicle through getVehicleInCurrentContext.
+    const vehicle = await getVehicleInCurrentContext(vehicleId, {
+      id: true,
+      motorcycleBrandId: true,
+      motorcycleModelFamilyId: true,
+      motorcycleVariantId: true,
+      motorcycleGenerationId: true,
     });
 
     if (!vehicle) {
       return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
+    }
+
+    const vctx = narrowVehicleFitmentContext(vehicle);
+    if (!vctx) {
+      return NextResponse.json(
+        { error: "У мотоцикла не задана модель — рекомендации недоступны." },
+        { status: 400 }
+      );
     }
 
     const node = await prisma.node.findUnique({
@@ -37,13 +52,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Узел не найден." }, { status: 404 });
     }
 
-    const recommendations = await buildRecommendationsForNodeWithCommunity(prisma, vehicle, nodeId, {
-      code: node.code,
-      serviceGroup: node.serviceGroup,
-    });
+    const recommendations = await buildRecommendationsForNodeWithCommunity(
+      prisma,
+      vctx,
+      nodeId,
+      {
+        code: node.code,
+        serviceGroup: node.serviceGroup,
+      }
+    );
 
     return NextResponse.json({ recommendations });
   } catch (error) {
+    const ctxErr = toCurrentUserContextErrorResponse(error);
+    if (ctxErr) return ctxErr;
     console.error("Failed to load recommended SKUs:", error);
     return NextResponse.json(
       { error: "Не удалось загрузить рекомендации по запчастям." },

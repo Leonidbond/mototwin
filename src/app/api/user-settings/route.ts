@@ -7,6 +7,7 @@ import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
 } from "../_shared/current-user-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
 const userSettingsPatchSchema = z
   .object({
@@ -65,7 +66,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const currentUser = await getCurrentUserContext();
-    const json = await request.json();
+    const json = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
     const parsed = userSettingsPatchSchema.safeParse(json);
 
     if (!parsed.success) {
@@ -96,6 +97,9 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ settings: normalizeUserSettings(updated) });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

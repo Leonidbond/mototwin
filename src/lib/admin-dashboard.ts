@@ -112,16 +112,23 @@ export async function loadWorkQueue(
       },
       orderBy: { createdAt: "desc" },
       take: safetyOnly || tab === "fitment" ? limit : Math.ceil(limit / 3),
-      select: {
-        id: true,
-        partMaster: { select: { brandName: true, sku: true } },
-        modelVariant: {
+      include: {
+        partMaster: { select: { id: true, brandName: true, sku: true, title: true } },
+        motorcycleGeneration: {
           select: {
             id: true,
-            model: { select: { name: true, brand: { select: { name: true } } } },
+            name: true,
+            variant: {
+              select: {
+                name: true,
+                family: {
+                  select: { name: true, brand: { select: { name: true } } },
+                },
+              },
+            },
           },
         },
-        node: { select: { name: true, serviceGroup: true } },
+        node: { select: { id: true, code: true, name: true, serviceGroup: true } },
       },
     });
     const reportIds = reports.map((r) => r.id);
@@ -141,8 +148,9 @@ export async function loadWorkQueue(
       const partLabel = report.partMaster
         ? `${report.partMaster.brandName} ${report.partMaster.sku}`
         : "—";
-      const modelLabel = report.modelVariant?.model
-        ? `${report.modelVariant.model.brand.name} ${report.modelVariant.model.name}`
+      const gen = report.motorcycleGeneration;
+      const modelLabel = gen
+        ? `${gen.variant.family.brand.name} ${gen.variant.family.name} ${gen.variant.name}`.trim()
         : "—";
       rows.push({
         id: `fr-${report.id}`,
@@ -165,18 +173,27 @@ export async function loadWorkQueue(
       where: { status: "MIXED_REPORTS" },
       orderBy: { lastRecalculatedAt: "desc" },
       take: tab === "conflicts" ? limit : Math.ceil(limit / 3),
-      select: {
-        id: true,
-        confidenceScore: true,
-        reportCount: true,
-        partMaster: { select: { brandName: true, sku: true } },
-        modelVariant: {
-          select: { model: { select: { name: true, brand: { select: { name: true } } } } },
+      include: {
+        partMaster: { select: { id: true, brandName: true, sku: true, title: true } },
+        motorcycleGeneration: {
+          select: {
+            id: true,
+            name: true,
+            variant: {
+              select: {
+                name: true,
+                family: {
+                  select: { name: true, brand: { select: { name: true } } },
+                },
+              },
+            },
+          },
         },
-        node: { select: { name: true } },
+        node: { select: { id: true, code: true, name: true } },
       },
     });
     for (const conflict of conflicts) {
+      const gen = conflict.motorcycleGeneration;
       rows.push({
         id: `cf-${conflict.id}`,
         kind: "conflict",
@@ -184,8 +201,8 @@ export async function loadWorkQueue(
         partLabel: conflict.partMaster
           ? `${conflict.partMaster.brandName} ${conflict.partMaster.sku}`
           : "—",
-        modelLabel: conflict.modelVariant?.model
-          ? `${conflict.modelVariant.model.brand.name} ${conflict.modelVariant.model.name}`
+        modelLabel: gen
+          ? `${gen.variant.family.brand.name} ${gen.variant.family.name} ${gen.variant.name}`.trim()
           : "—",
         nodeLabel: conflict.node?.name ?? "—",
         statusKey: "mixed-reports",
@@ -209,43 +226,45 @@ export async function loadFastestGrowingModels(
   periodKey: AdminPeriodKey = ADMIN_DEFAULT_PERIOD
 ): Promise<AdminFastestModelsResponse> {
   const period = resolvePeriod(periodKey);
-  const variants = await prisma.modelVariant.findMany({
+  const generations = await prisma.motorcycleGeneration.findMany({
     take: 200,
     include: {
-      model: { include: { brand: true } },
+      variant: { include: { family: { include: { brand: true } } } },
       vehicles: { select: { id: true, userId: true, createdAt: true } },
       fitmentReports: { select: { id: true, createdAt: true } },
       fitmentConfidences: { select: { status: true } },
     },
   });
 
-  const rows = variants
-    .map((variant) => {
-      const garageCount = variant.vehicles.length;
-      const garageDeltaCount = variant.vehicles.filter(
+  const rows = generations
+    .map((generation) => {
+      const garageCount = generation.vehicles.length;
+      const garageDeltaCount = generation.vehicles.filter(
         (v) => v.createdAt && v.createdAt >= period.fromDate
       ).length;
       const activeOwners = new Set(
-        variant.vehicles
+        generation.vehicles
           .filter((v) => v.createdAt && v.createdAt >= period.fromDate)
           .map((v) => v.userId)
       ).size;
-      const reports = variant.fitmentReports.length;
-      const reportsDelta = variant.fitmentReports.filter(
+      const reports = generation.fitmentReports.length;
+      const reportsDelta = generation.fitmentReports.filter(
         (r) => r.createdAt >= period.fromDate
       ).length;
       const supportLevel = inferSupportLevel({
         garageCount,
         reports,
-        verified: variant.fitmentConfidences.filter(
+        verified: generation.fitmentConfidences.filter(
           (fc) => fc.status === "VERIFIED_BY_MOTOTWIN"
         ).length,
-        mixed: variant.fitmentConfidences.filter((fc) => fc.status === "MIXED_REPORTS").length,
+        mixed: generation.fitmentConfidences.filter((fc) => fc.status === "MIXED_REPORTS").length,
       });
       return {
-        modelVariantId: variant.id,
-        brandLabel: variant.model.brand.name,
-        modelLabel: `${variant.model.name} ${variant.versionName}`,
+        motorcycleGenerationId: generation.id,
+        brandLabel: generation.variant.family.brand.name,
+        modelFamilyLabel: generation.variant.family.name,
+        variantLabel: generation.variant.name,
+        generationLabel: generation.name,
         garageCount,
         garageDelta: percentDelta(garageCount, garageDeltaCount),
         activeOwners,
@@ -261,9 +280,11 @@ export async function loadFastestGrowingModels(
     .slice(0, 5)
     .map<AdminFastestModelRowWire>((row, idx) => ({
       rank: idx + 1,
-      modelVariantId: row.modelVariantId,
+      motorcycleGenerationId: row.motorcycleGenerationId,
       brandLabel: row.brandLabel,
-      modelLabel: row.modelLabel,
+      modelFamilyLabel: row.modelFamilyLabel,
+      variantLabel: row.variantLabel,
+      generationLabel: row.generationLabel,
       garageCount: row.garageCount,
       garageDelta: row.garageDelta,
       activeOwners: row.activeOwners,
@@ -279,27 +300,27 @@ export async function loadFastestGrowingModels(
 export async function loadProblemAreas(): Promise<AdminProblemAreasResponse> {
   const cards: AdminProblemAreaCardWire[] = [];
 
-  const lowVerifiedCandidates = await prisma.modelVariant.findMany({
+  const lowVerifiedCandidates = await prisma.motorcycleGeneration.findMany({
     take: 50,
     include: {
-      model: { include: { brand: true } },
+      variant: { include: { family: { include: { brand: true } } } },
       vehicles: { select: { id: true } },
       fitmentConfidences: { select: { status: true } },
     },
   });
-  for (const variant of lowVerifiedCandidates) {
-    const verified = variant.fitmentConfidences.filter(
+  for (const generation of lowVerifiedCandidates) {
+    const verified = generation.fitmentConfidences.filter(
       (fc) => fc.status === "VERIFIED_BY_MOTOTWIN"
     ).length;
-    if (variant.vehicles.length >= 5 && verified <= 1) {
+    if (generation.vehicles.length >= 5 && verified <= 1) {
       cards.push({
-        id: `low-verified-${variant.id}`,
+        id: `low-verified-${generation.id}`,
         kind: "low-verified-coverage",
-        title: `${variant.model.brand.name} ${variant.model.name} ${variant.year}`,
-        description: `${variant.vehicles.length} пользователей в гаражах, подтверждено деталей: ${verified}`,
+        title: `${generation.variant.family.brand.name} ${generation.variant.family.name} ${generation.variant.name} ${generation.name}`,
+        description: `${generation.vehicles.length} пользователей в гаражах, подтверждено деталей: ${verified}`,
         recommendation: "Добавить базовые детали и проверить топ-категории",
         ctaLabel: "Добавить детали",
-        ctaHref: `/admin/models/${variant.id}`,
+        ctaHref: `/admin/models/${generation.id}`,
       });
       if (cards.length >= 2) break;
     }
@@ -310,15 +331,20 @@ export async function loadProblemAreas(): Promise<AdminProblemAreasResponse> {
     orderBy: { reportCount: "desc" },
     take: 5,
     include: {
-      modelVariant: { include: { model: { include: { brand: true } } } },
+      motorcycleGeneration: {
+        include: {
+          variant: { include: { family: { include: { brand: true } } } },
+        },
+      },
       node: true,
     },
   });
   for (const conflict of conflictAggregates) {
+    const gen = conflict.motorcycleGeneration;
     cards.push({
       id: `conflict-${conflict.id}`,
       kind: "conflicting-fitment",
-      title: `${conflict.modelVariant.model.brand.name} ${conflict.modelVariant.model.name} ${conflict.modelVariant.year}`,
+      title: `${gen.variant.family.brand.name} ${gen.variant.family.name} ${gen.variant.name} ${gen.name}`,
       description: `${conflict.reportCount} конфликтующих отчетов · ${conflict.node.name}`,
       recommendation: "Ручная модерация safety-critical категорий",
       ctaLabel: "Проверить конфликты",
@@ -328,23 +354,23 @@ export async function loadProblemAreas(): Promise<AdminProblemAreasResponse> {
   }
 
   if (cards.length < 3) {
-    const variantsWithoutRules = await prisma.modelVariant.findMany({
+    const generationsWithoutRules = await prisma.motorcycleGeneration.findMany({
       take: 6,
       include: {
-        model: { include: { brand: true } },
+        variant: { include: { family: { include: { brand: true } } } },
         vehicles: { select: { id: true } },
       },
     });
-    for (const variant of variantsWithoutRules) {
-      if (variant.vehicles.length >= 1) {
+    for (const generation of generationsWithoutRules) {
+      if (generation.vehicles.length >= 1) {
         cards.push({
-          id: `no-rules-${variant.id}`,
+          id: `no-rules-${generation.id}`,
           kind: "missing-service-rules",
-          title: `${variant.model.brand.name} ${variant.model.name} ${variant.year}`,
+          title: `${generation.variant.family.brand.name} ${generation.variant.family.name} ${generation.variant.name} ${generation.name}`,
           description: "Нет регламентов ТО для этой модели",
           recommendation: "Создать service rules",
           ctaLabel: "Создать правило",
-          ctaHref: `/admin/service-rules/new?modelVariantId=${variant.id}`,
+          ctaHref: `/admin/service-rules/new?motorcycleGenerationId=${generation.id}`,
         });
         if (cards.length >= 4) break;
       }
@@ -392,7 +418,7 @@ export async function loadCatalogCoverage(): Promise<AdminCatalogCoverageRespons
     { label: "Подвеска", serviceGroup: "FRONT_SUSPENSION" },
   ];
 
-  const brandRows = await prisma.brand.findMany({
+  const brandRows = await prisma.motorcycleBrand.findMany({
     orderBy: { name: "asc" },
     take: 4,
     select: { id: true, name: true, slug: true },
@@ -403,15 +429,15 @@ export async function loadCatalogCoverage(): Promise<AdminCatalogCoverageRespons
   for (const def of NODE_DEFS) {
     const cells = await Promise.all(
       brandRows.map(async (brand) => {
-        const variants = await prisma.modelVariant.findMany({
-          where: { model: { brandId: brand.id } },
+        const generations = await prisma.motorcycleGeneration.findMany({
+          where: { variant: { is: { family: { is: { brandId: brand.id } } } } },
           select: { id: true },
         });
-        if (variants.length === 0) return { brandKey: brand.slug, percent: 0 };
-        const variantIds = variants.map((v) => v.id);
+        if (generations.length === 0) return { brandKey: brand.slug, percent: 0 };
+        const generationIds = generations.map((g) => g.id);
         const verified = await prisma.fitmentConfidence.count({
           where: {
-            modelVariantId: { in: variantIds },
+            motorcycleGenerationId: { in: generationIds },
             status: { in: ["VERIFIED_BY_MOTOTWIN", "COMMUNITY_CONFIRMED"] },
             node: {
               OR: [
@@ -423,7 +449,7 @@ export async function loadCatalogCoverage(): Promise<AdminCatalogCoverageRespons
             },
           },
         });
-        const percent = Math.min(100, Math.round((verified / variants.length) * 100));
+        const percent = Math.min(100, Math.round((verified / generations.length) * 100));
         return { brandKey: brand.slug, percent };
       })
     );
@@ -730,9 +756,9 @@ function inferSupportLevel(stats: {
   verified: number;
   mixed: number;
 }): AdminSupportLevel {
-  if (stats.verified >= 5 && stats.mixed === 0 && stats.garageCount >= 100) return "FULL_SUPPORT";
+  if (stats.verified >= 5 && stats.mixed === 0 && stats.garageCount >= 100) return "MVP_CORE";
   if (stats.verified >= 1 || stats.reports >= 10) return "COMMUNITY_SUPPORT";
   if (stats.reports >= 1 || stats.garageCount >= 5) return "EARLY_BETA";
-  if (stats.garageCount === 0) return "NO_DATA";
+  if (stats.garageCount === 0) return "NO_FITMENT_DATA_YET";
   return "EARLY_BETA";
 }

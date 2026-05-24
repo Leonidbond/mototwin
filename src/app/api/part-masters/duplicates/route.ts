@@ -1,12 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildPartMasterIdentity } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "@/app/api/_shared/current-user-context";
+import { parseSearchParamText } from "@/lib/http/input-validation";
+import { rateLimit, rateLimit429 } from "@/lib/http/rate-limit";
 
 export async function GET(request: NextRequest) {
   try {
+    // MT-SEC-073: previously unauthenticated → DoS via heavy fuzzy DB queries.
+    const userCtx = await getCurrentUserContext();
+    const decision = rateLimit({
+      bucket: "part-master-duplicates",
+      request,
+      limit: 60,
+      windowMs: 60_000,
+      extraKey: userCtx.userId,
+    });
+    if (!decision.allowed) {
+      return rateLimit429(decision);
+    }
     const { searchParams } = new URL(request.url);
-    const brandName = searchParams.get("brandName")?.trim() ?? "";
-    const sku = searchParams.get("sku")?.trim() ?? "";
+    // MT-SEC-072: bound input lengths before LIKE/contains hits the DB.
+    const brandName = parseSearchParamText(searchParams.get("brandName"), { max: 120 }) ?? "";
+    const sku = parseSearchParamText(searchParams.get("sku"), { max: 100 }) ?? "";
     if (!brandName || !sku) {
       return NextResponse.json({ error: "Параметры brandName и sku обязательны." }, { status: 400 });
     }
@@ -62,6 +81,8 @@ export async function GET(request: NextRequest) {
       candidates,
     });
   } catch (error) {
+    const ctxErr = toCurrentUserContextErrorResponse(error);
+    if (ctxErr) return ctxErr;
     console.error("part-masters duplicates:", error);
     return NextResponse.json({ error: "Не удалось выполнить поиск дублей." }, { status: 500 });
   }

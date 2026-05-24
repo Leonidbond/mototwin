@@ -59,9 +59,9 @@
 
 ### 2.4. `PartFitment`
 
-- **Назначение:** **применимость к мотоциклу** в терминах гаража: бренд/модель/модификация (и при необходимости год/рынок).
-- **Типичные поля:** `partSkuId`, `vehicleTaxon` (brandId, modelId, modelVariantId или аналог), `yearFrom?`, `yearTo?`, `market?`, `fitmentKind` (EXACT_MODEL | FAMILY | VERIFY_REQUIRED), `sourceId?`, `evidence?` (JSON).
-- **Правило:** одна деталь может иметь **несколько** fitment-строк; противоречия разруливаются приоритетом источника и флагом verify.
+- **Назначение:** **применимость к мотоциклу** в терминах нового стандарта `MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`.
+- **Типичные поля:** `partSkuId`, `motorcycleBrandId?`, `motorcycleModelFamilyId?`, `motorcycleVariantId?`, `motorcycleGenerationId?` (чем больше заполнено, тем уже область применимости — `motorcycleGenerationId` = exact fit на год/рынок поколения), `market?` (свободная пометка вроде "EU" / "US"), `engineCode?`, `vinFrom?` / `vinTo?`, `fitmentType` (EXACT_GENERATION | EXACT_VARIANT | FAMILY | BRAND | GENERIC_NODE | VERIFY_REQUIRED), `confidence`, `note?`.
+- **Правило:** одна деталь может иметь **несколько** fitment-строк; противоречия разруливаются приоритетом источника и флагом verify. Подбор и UI-бакеты строятся `analyzeStructuredCatalogSignals` в `@mototwin/domain`, который смотрит, до какого уровня иерархии заполнен fitment.
 
 ### 2.5. `PartOffer`
 
@@ -157,18 +157,25 @@
 
 ```json
 {
-  "mode": "MODEL_VARIANT",
-  "brandCode": "YAM",
-  "modelCode": "MT-07",
-  "variantCode": "2021-EU",
-  "yearFrom": 2021,
-  "yearTo": 2024,
+  "mode": "GENERATION",
+  "brandSlug": "yamaha",
+  "modelFamilySlug": "mt-07",
+  "variantSlug": "mt-07",
+  "generationName": "MT-07 / 2021-2024",
   "verify": false
 }
 ```
 
 ```json
-{ "mode": "MODEL_VARIANT", "modelVariantId": "<cuid из существующего сида ТС>", "verify": true }
+{ "mode": "GENERATION", "motorcycleGenerationId": "<cuid из мото-сида>", "verify": true }
+```
+
+```json
+{ "mode": "VARIANT", "motorcycleVariantId": "<cuid>", "verify": false }
+```
+
+```json
+{ "mode": "FAMILY", "motorcycleModelFamilyId": "<cuid>", "verify": true }
 ```
 
 **`verify: true`** → в БД `fitmentKind = VERIFY_REQUIRED` (или эквивалент): продукт не должен утверждать «точно подходит» без ручной проверки.
@@ -220,9 +227,11 @@
 
 | Тип | Условие | Действие в UI |
 |-----|---------|----------------|
-| **Exact fit** | Есть `PartFitment` на **тот же** `modelVariantId`, что у ТС, и `verify: false` | Показать как «подходит к вашей модификации». |
-| **Model fit** | Fitment на семейство/модель без точной модификации или с перекрывающимися годами | Показать с пометкой «вероятно подходит; проверьте год/рынок». |
-| **Generic node match** | Есть `PartSkuNodeLink` на выбранный **листовой узел**, fitment универсальный или слабый | Показать как «типичный расходник для узла». |
+| **Exact generation fit** | Есть `PartFitment` на **тот же** `motorcycleGenerationId`, что у поколения ТС, и `verify: false` | Показать как «подходит к вашему поколению». |
+| **Variant fit** | Fitment на `motorcycleVariantId` без `motorcycleGenerationId` | Показать как «подходит к модификации; проверьте год/рынок». |
+| **Family fit** | Fitment на `motorcycleModelFamilyId` без `motorcycleVariantId` / `motorcycleGenerationId` | Показать как «подходит к семейству модели; уточните поколение». |
+| **Brand fit** | Fitment только на `motorcycleBrandId` | Показать с явным предупреждением «универсальный по бренду». |
+| **Generic node match** | `PartSkuNodeLink` на выбранный **листовой узел**, fitment пустой/универсальный | Показать как «типичный расходник для узла». |
 | **Related consumable** | `linkKind: RELATED` или правило «с маслом часто фильтр» (позже — граф правил) | Показать вторичным блоком. |
 | **Verify required** | `verify: true` или конфликтующие fitment из разных источников | Явный бейдж «нужна проверка», не автозамена номера в заказе. |
 

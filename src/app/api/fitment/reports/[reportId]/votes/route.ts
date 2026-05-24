@@ -3,19 +3,23 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
 import { recalculateFitmentConfidenceForKey } from "@/lib/fitment-confidence-prisma";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedTextOptional, strictObject } from "@/lib/http/input-validation";
 
 type RouteContext = { params: Promise<{ reportId: string }> };
 
-const voteSchema = z.object({
+// MT-SEC-068 + MT-SEC-070: strict + length-capped optional comment.
+const voteSchema = strictObject({
   voteType: z.enum(["CONFIRM", "REJECT", "SAME_EXPERIENCE", "DIFFERENT_EXPERIENCE", "HELPFUL"]),
-  comment: z.string().trim().optional().nullable(),
+  comment: boundedTextOptional({ max: 1_000 }),
 });
 
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { reportId } = await context.params;
     const userCtx = await getCurrentUserContext();
-    const body = voteSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
+    const body = voteSchema.parse(raw);
 
     const report = await prisma.fitmentReport.findUnique({
       where: { id: reportId },
@@ -23,7 +27,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         id: true,
         moderationStatus: true,
         partMasterId: true,
-        modelVariantId: true,
+        motorcycleGenerationId: true,
         nodeId: true,
       },
     });
@@ -52,12 +56,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     await recalculateFitmentConfidenceForKey(prisma, {
       partMasterId: report.partMasterId,
-      modelVariantId: report.modelVariantId,
+      motorcycleGenerationId: report.motorcycleGenerationId,
       nodeId: report.nodeId,
     });
 
     return NextResponse.json({ vote });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const ctxErr = toCurrentUserContextErrorResponse(error);
     if (ctxErr) return ctxErr;
     if (error instanceof z.ZodError) {

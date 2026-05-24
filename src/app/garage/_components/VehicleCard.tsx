@@ -67,12 +67,18 @@ export function VehicleCard({ vehicle, silhouettePriority }: Props) {
   const score = card.garageScore;
   const scoreColor = getScoreColor(score);
 
+  const generation = vehicle.motorcycleGeneration;
+  const yearLabel = generation.yearsLabel?.trim()
+    ? generation.yearsLabel.trim()
+    : generation.yearTo != null
+      ? `${generation.yearFrom}–${generation.yearTo}`
+      : `${generation.yearFrom}–`;
   const metaLine = [
-    vehicle.modelVariant?.year,
+    yearLabel,
     card.summary.odometerLine,
-    vehicle.modelVariant?.versionName,
+    vehicle.motorcycleVariant.name,
   ]
-    .filter((chunk): chunk is string | number => Boolean(chunk))
+    .filter((chunk): chunk is string => Boolean(chunk))
     .join(" · ");
 
   return (

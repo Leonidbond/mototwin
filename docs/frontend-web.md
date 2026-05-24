@@ -19,15 +19,17 @@
 - Main transitions: `/onboarding`, `/garage`
 
 ### 3.2 Add motorcycle (onboarding)
-- Cascading selections:
-  - `/api/brands`
-  - `/api/models?brandId=...`
-  - `/api/model-variants?modelId=...`
+- 4-уровневый каскадный пикер по новой иерархии моделей (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`, см. [data-model.md](./data-model.md)):
+  - `GET /api/motorcycle-brands`
+  - `GET /api/motorcycle-model-families?motorcycleBrandId=...`
+  - `GET /api/motorcycle-variants?motorcycleModelFamilyId=...`
+  - `GET /api/motorcycle-generations?motorcycleVariantId=...` — карточка поколения показывает `yearsLabel` (или `yearFrom`–`yearTo`) и preview техспек (`engine`, `displacementCc`, нормализованная `powerHpNormalized`, `gearbox`, `drive`)
+- Cascade reset: смена значения на любом уровне очищает выбор всех нижестоящих и связанные списки.
 - Form fields:
   - identity (`nickname`, `vin`)
   - state (`odometer`, `engineHours`)
   - ride profile fields
-- Submit to `/api/vehicles`
+- Submit to `POST /api/vehicles` — все 4 ID (`motorcycleBrandId/motorcycleModelFamilyId/motorcycleVariantId/motorcycleGenerationId`) обязательны; backend проверяет согласованность цепочки.
 
 ### 3.3 User profile (`/profile`)
 

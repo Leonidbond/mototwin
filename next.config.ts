@@ -17,7 +17,34 @@ function lanIpv4HostnamesForDev(): string[] {
   return [...out];
 }
 
-const allowedDevOrigins = lanIpv4HostnamesForDev();
+const isProduction = process.env.NODE_ENV === "production";
+
+/**
+ * In production we never need LAN HMR origins — keep the allowlist empty so we
+ * don't accidentally widen the dev-asset attack surface (MT-SEC-048).
+ */
+const allowedDevOrigins = isProduction ? [] : lanIpv4HostnamesForDev();
+
+/**
+ * Baseline security headers (MT-SEC-006). CSP is intentionally NOT enabled yet —
+ * inline scripts/styles need a pass first (see MT-SEC-047 in
+ * docs/security/findings.md). HSTS only kicks in once the upstream serves HTTPS,
+ * which is the deploy team's responsibility (MT-SEC-029).
+ */
+const securityHeaders = [
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=63072000; includeSubDomains; preload",
+  },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), payment=()",
+  },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+];
 
 const nextConfig: NextConfig = {
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
@@ -25,6 +52,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     // Keep module resolution scoped to this workspace.
     root: path.resolve(__dirname),
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
   },
 };
 

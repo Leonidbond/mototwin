@@ -7,6 +7,7 @@ import {
 } from "../_shared/current-user-context";
 import { notificationSettingsPatchSchema } from "../_shared/notifications-http";
 import { getOrCreateUserNotificationSettings } from "@/lib/notifications";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
 export async function GET() {
   try {
@@ -24,7 +25,8 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const currentUser = await getCurrentUserContext();
-    const parsed = notificationSettingsPatchSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
+    const parsed = notificationSettingsPatchSchema.parse(raw);
     await getOrCreateUserNotificationSettings(currentUser.userId);
     const settings = await prisma.userNotificationSettings.update({
       where: { userId: currentUser.userId },
@@ -32,6 +34,9 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ settings });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const userContextError = toCurrentUserContextErrorResponse(error);
     if (userContextError) return userContextError;
     if (error instanceof z.ZodError) {

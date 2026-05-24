@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import {
+  toVehicleDetailApiRecord,
+  vehicleWireInclude,
+} from "@/lib/vehicle-wire";
+import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
 } from "../../_shared/current-user-context";
 import { nextResponseFromUnexpectedRouteError } from "../../_shared/route-error-response";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
 type RouteContext = {
   params: Promise<{
@@ -17,12 +22,15 @@ const updateVehicleProfileSchema = z
   .object({
     nickname: z.string().trim().max(80).nullable(),
     vin: z.string().trim().max(32).nullable(),
-    rideProfile: z.object({
-      usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
-      ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
-      loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
-      usageIntensity: z.enum(["LOW", "MEDIUM", "HIGH"]),
-    }),
+    // MT-SEC-068: nested object made strict to block mass assignment.
+    rideProfile: z
+      .object({
+        usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
+        ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
+        loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
+        usageIntensity: z.enum(["LOW", "MEDIUM", "HIGH"]),
+      })
+      .strict(),
   })
   .strict();
 
@@ -43,19 +51,14 @@ export async function GET(_: Request, context: RouteContext) {
           ownerUserId: currentUser.userId,
         },
       },
-      include: {
-        brand: true,
-        model: true,
-        modelVariant: true,
-        rideProfile: true,
-      },
+      include: vehicleWireInclude,
     });
 
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ vehicle });
+    return NextResponse.json({ vehicle: toVehicleDetailApiRecord(vehicle) });
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
@@ -74,7 +77,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (!id?.trim()) {
       return NextResponse.json({ error: "Vehicle id is required" }, { status: 400 });
     }
-    const json = await request.json();
+    const json = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
     const parsed = updateVehicleProfileSchema.safeParse(json);
     if (!parsed.success) {
       return NextResponse.json(
@@ -125,16 +128,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           },
         },
       },
-      include: {
-        brand: true,
-        model: true,
-        modelVariant: true,
-        rideProfile: true,
-      },
+      include: vehicleWireInclude,
     });
 
-    return NextResponse.json({ vehicle: updatedVehicle });
+    return NextResponse.json({
+      vehicle: toVehicleDetailApiRecord(updatedVehicle),
+    });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

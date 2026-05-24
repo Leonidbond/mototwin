@@ -149,7 +149,7 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
     () =>
       sidebarVehicle
         ? sidebarVehicle.nickname?.trim() ||
-          `${sidebarVehicle.brandName} ${sidebarVehicle.modelName}`.trim()
+          `${sidebarVehicle.brandName} ${sidebarVehicle.modelFamilyName}`.trim()
         : "",
     [sidebarVehicle]
   );

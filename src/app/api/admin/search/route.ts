@@ -54,14 +54,19 @@ export async function GET(request: Request) {
         OR: [
           { vin: { contains: query, mode: "insensitive" } },
           { nickname: { contains: query, mode: "insensitive" } },
-          { model: { name: { contains: query, mode: "insensitive" } } },
+          { motorcycleModelFamily: { name: { contains: query, mode: "insensitive" } } },
+          { motorcycleVariant: { name: { contains: query, mode: "insensitive" } } },
+          { motorcycleGeneration: { name: { contains: query, mode: "insensitive" } } },
         ],
       },
       take: MAX_PER_GROUP,
       include: {
-        brand: { select: { name: true } },
-        model: { select: { name: true } },
-        modelVariant: { select: { year: true, versionName: true } },
+        motorcycleBrand: { select: { name: true } },
+        motorcycleModelFamily: { select: { name: true } },
+        motorcycleVariant: { select: { name: true } },
+        motorcycleGeneration: {
+          select: { name: true, yearsLabel: true, yearFrom: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -72,8 +77,10 @@ export async function GET(request: Request) {
         hits: vehicles.map<AdminSearchHitWire>((vehicle) => ({
           kind: "vehicle",
           id: vehicle.id,
-          title: vehicle.nickname || `${vehicle.brand.name} ${vehicle.model.name}`,
-          subtitle: `${vehicle.modelVariant.year} · ${vehicle.modelVariant.versionName}${
+          title:
+            vehicle.nickname ||
+            `${vehicle.motorcycleBrand.name} ${vehicle.motorcycleModelFamily.name}`,
+          subtitle: `${vehicle.motorcycleGeneration.yearsLabel} · ${vehicle.motorcycleVariant.name}${
             vehicle.vin ? ` · VIN ${vehicle.vin.slice(-6)}` : ""
           }`,
           href: `/admin/vehicles/${vehicle.id}`,
@@ -81,27 +88,45 @@ export async function GET(request: Request) {
       });
     }
 
-    const variants = await prisma.modelVariant.findMany({
+    const generations = await prisma.motorcycleGeneration.findMany({
       where: {
         OR: [
-          { versionName: { contains: query, mode: "insensitive" } },
-          { model: { name: { contains: query, mode: "insensitive" } } },
+          { name: { contains: query, mode: "insensitive" } },
+          { variant: { name: { contains: query, mode: "insensitive" } } },
+          {
+            variant: {
+              family: { name: { contains: query, mode: "insensitive" } },
+            },
+          },
         ],
       },
       take: MAX_PER_GROUP,
-      include: { model: { include: { brand: true } } },
+      include: {
+        variant: {
+          include: {
+            family: {
+              include: { brand: true },
+            },
+          },
+        },
+      },
     });
-    if (variants.length > 0) {
+    if (generations.length > 0) {
       groups.push({
         kind: "model",
         label: "Модели",
-        hits: variants.map<AdminSearchHitWire>((variant) => ({
-          kind: "model",
-          id: variant.id,
-          title: `${variant.model.brand.name} ${variant.model.name} ${variant.year}`,
-          subtitle: variant.versionName,
-          href: `/admin/models/${variant.id}`,
-        })),
+        hits: generations.map<AdminSearchHitWire>((generation) => {
+          const variant = generation.variant;
+          const family = variant.family;
+          const brand = family.brand;
+          return {
+            kind: "model",
+            id: generation.id,
+            title: `${brand.name} ${family.name} ${generation.yearsLabel}`,
+            subtitle: `${variant.name} · ${generation.name}`,
+            href: `/admin/models/${generation.id}`,
+          };
+        }),
       });
     }
 

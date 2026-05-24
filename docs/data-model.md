@@ -20,6 +20,11 @@
 - `ExpenseInstallStatus`: `BOUGHT_NOT_INSTALLED`, `INSTALLED`, `NOT_APPLICABLE`
 - `ExpensePurchaseStatus`: `PLANNED`, `PURCHASED`
 - `ExpenseInstallationStatus`: `NOT_INSTALLED`, `INSTALLED`
+- `MotoSupportLevel`: `MVP_CORE`, `MVP_CORE_LEGACY`, `COMMUNITY_SUPPORT`, `EARLY_BETA`, `NO_FITMENT_DATA_YET` — уровень поддержки для `MotorcycleBrand` / `MotorcycleModelFamily` / `MotorcycleVariant` / `MotorcycleGeneration` (агрегируется снизу вверх).
+- `MotoDriveType`: `CHAIN`, `BELT`, `SHAFT`, `OTHER` — тип привода у `MotorcycleTechnicalSpecs`.
+- `MotoPowerUnit`: `HP`, `KW`, `PS` — единица номинальной мощности; loader нормализует в `powerHpNormalized`.
+- `MotoMarketRegion`: `EU`, `US`, `JP`, `RU`, `IN`, `LATAM`, `WORLDWIDE` (и т.п. — см. `prisma/schema.prisma`) — регион рынка `MotorcycleGeneration`.
+- `MotoWeightType`: `DRY`, `WET`, `KERB` — какой именно показатель веса записан в `weightKg`.
 
 ## 3. Core entities and relationships
 
@@ -50,16 +55,20 @@
 - Local client storage is fallback/cache only; DB is primary source when API is available.
 - See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md) for TOP customization UX and API.
 
-### Brand / Model / ModelVariant
+### MotorcycleBrand / MotorcycleModelFamily / MotorcycleVariant / MotorcycleGeneration
 
-- `Brand` -> `Model` is 1:N.
-- `Model` -> `ModelVariant` is 1:N.
-- `Model` has unique constraint `@@unique([brandId, slug])`.
-- `ModelVariant` contains technical fields (`engineType`, `coolingType`, etc.).
+Канонический иерархический стандарт мотоциклов (см. `docs/models/mototwin_model_technical_master_standard_cursor.md`):
+
+- `MotorcycleBrand` → `MotorcycleModelFamily` (1:N), unique `@@unique([brandId, slug])`. Семейство — это «маркетинговая модель» в терминах вендора (`690 Enduro R`, `R 1300 GS`).
+- `MotorcycleModelFamily` → `MotorcycleVariant` (1:N), unique `@@unique([familyId, slug])`. Вариант — конфигурация семейства (`R 1300 GS Trophy`, `690 Enduro R`).
+- `MotorcycleVariant` → `MotorcycleGeneration` (1:N), unique `@@unique([variantId, name, yearFrom, yearTo])`. **Поколение** — каноничный якорь fitment-данных и техспек: `yearFrom`, `yearTo` (nullable), `yearsLabel` ("2019-current"), `marketRegion` (`MotoMarketRegion`), `segment`, `supportLevel` (`MVP_CORE` / `MVP_CORE_LEGACY` / `COMMUNITY_SUPPORT` / `EARLY_BETA` / `NO_FITMENT_DATA_YET`), `dataStatus`, `comment`, `sourceUrl`.
+- `MotorcycleTechnicalSpecs` — 1:1 sidecar к `MotorcycleGeneration` (`@unique generationId`); содержит `engine`, `displacementCc`, `powerValue`/`powerUnit`/`powerHpNormalized`, `torqueNm`, `gearbox`, `drive` (`MotoDriveType`), `frontWheelIn`/`rearWheelIn`, `frontTire`/`rearTire`, `fuelLiters`, `weightKg`/`weightType` (`MotoWeightType`), `seatMm`. Loader (`prisma/motorcycle-technical-master-loader.ts`) подставляет `powerHpNormalized` из `powerValue + powerUnit`, если не задано вручную.
+
+Сидинг — `prisma/seed-data/*-model-technical-master.csv` через `loadMotorcycleTechnicalMasterCsv` (zod-валидация по строкам). Бренды и поколения единообразны для всех вендоров (BMW, KTM и т. д.) — см. `docs/models/mototwin_*_model_technical_master_*.md`.
 
 ### Vehicle / RideProfile
 
-- `Vehicle` links to `User`, optional `Garage`, `Brand`, `Model`, `ModelVariant`.
+- `Vehicle` links to `User`, optional `Garage`, и FKs `motorcycleBrandId`/`motorcycleModelFamilyId`/`motorcycleVariantId`/`motorcycleGenerationId`. **Поколение — обязательный якорь** для подбора деталей и техспек.
 - `Vehicle` has soft-delete fields: `trashedAt`, `trashExpiresAt`.
 - `RideProfile` is effectively 1:1 with `Vehicle` via unique `vehicleId`.
 - `Vehicle` also links to `ServiceEvent`, `ExpenseItem`, `NodeState`, `TopNodeState`.

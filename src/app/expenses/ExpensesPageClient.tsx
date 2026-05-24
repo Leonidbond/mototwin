@@ -111,7 +111,10 @@ function getInstallationStatusLabel(expense: ExpenseItem): string {
 }
 
 function getVehicleLabel(vehicle: GarageVehicleItem): string {
-  return vehicle.nickname || `${vehicle.brand.name} ${vehicle.model.name}`;
+  return (
+    vehicle.nickname ||
+    `${vehicle.motorcycleBrand.name} ${vehicle.motorcycleModelFamily.name}`
+  );
 }
 
 function getExpenseVehicleLabel(expense: ExpenseItem): string {

@@ -20,9 +20,23 @@ export async function loadAdminVehicleList(params: {
   const skip = (page - 1) * pageSize;
 
   const where: Prisma.VehicleWhereInput = { trashedAt: null };
-  if (filters.brandId) where.brandId = filters.brandId;
-  if (filters.modelId) where.modelId = filters.modelId;
-  if (filters.year) where.modelVariant = { is: { year: filters.year } };
+  if (filters.motorcycleBrandId) where.motorcycleBrandId = filters.motorcycleBrandId;
+  if (filters.motorcycleModelFamilyId)
+    where.motorcycleModelFamilyId = filters.motorcycleModelFamilyId;
+  if (filters.motorcycleVariantId)
+    where.motorcycleVariantId = filters.motorcycleVariantId;
+  if (filters.motorcycleGenerationId)
+    where.motorcycleGenerationId = filters.motorcycleGenerationId;
+  if (filters.year) {
+    where.motorcycleGeneration = {
+      is: {
+        OR: [
+          { yearFrom: filters.year },
+          { AND: [{ yearFrom: { lte: filters.year } }, { yearTo: { gte: filters.year } }] },
+        ],
+      },
+    };
+  }
   if (filters.q) {
     where.OR = [
       { vin: { contains: filters.q, mode: "insensitive" } },
@@ -41,9 +55,12 @@ export async function loadAdminVehicleList(params: {
       skip,
       include: {
         user: { select: { id: true, displayName: true, email: true } },
-        brand: { select: { name: true } },
-        model: { select: { name: true } },
-        modelVariant: { select: { year: true, versionName: true } },
+        motorcycleBrand: { select: { name: true } },
+        motorcycleModelFamily: { select: { name: true } },
+        motorcycleVariant: { select: { name: true } },
+        motorcycleGeneration: {
+          select: { name: true, yearFrom: true },
+        },
         _count: { select: { serviceEvents: true } },
       },
     }),
@@ -65,10 +82,11 @@ export async function loadAdminVehicleList(params: {
     id: vehicle.id,
     ownerLabel: vehicle.user.displayName ?? vehicle.user.email ?? "—",
     ownerId: vehicle.user.id,
-    brandLabel: vehicle.brand.name,
-    modelLabel: vehicle.model.name,
-    year: vehicle.modelVariant.year,
-    versionName: vehicle.modelVariant.versionName,
+    brandLabel: vehicle.motorcycleBrand.name,
+    modelFamilyLabel: vehicle.motorcycleModelFamily.name,
+    variantLabel: vehicle.motorcycleVariant.name,
+    generationLabel: vehicle.motorcycleGeneration.name,
+    year: vehicle.motorcycleGeneration.yearFrom,
     nickname: vehicle.nickname,
     vinLast: vehicle.vin ? vehicle.vin.slice(-6) : null,
     odometer: vehicle.odometer,

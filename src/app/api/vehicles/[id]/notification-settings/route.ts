@@ -8,6 +8,7 @@ import {
   getOrCreateUserNotificationSettings,
 } from "@/lib/notifications";
 import { vehicleNotificationSettingsPatchSchema } from "../../../_shared/notifications-http";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -42,7 +43,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    const parsed = vehicleNotificationSettingsPatchSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
+    const parsed = vehicleNotificationSettingsPatchSchema.parse(raw);
     await getOrCreateVehicleNotificationSettings(vehicle.userId, vehicleId);
     const settings = await prisma.vehicleNotificationSettings.update({
       where: { vehicleId },
@@ -50,6 +52,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
     return NextResponse.json({ settings });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const userContextError = toCurrentUserContextErrorResponse(error);
     if (userContextError) return userContextError;
     if (error instanceof z.ZodError) {

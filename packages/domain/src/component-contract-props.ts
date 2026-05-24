@@ -18,6 +18,7 @@ import {
   buildVehicleStateViewModel,
   buildVehicleSummaryViewModel,
   buildRideProfileViewModel,
+  formatPowerLine,
 } from "./vehicle-view-models";
 import { buildGarageAttentionIndicatorViewModel } from "./garage-attention";
 import { calculateGarageScore } from "./garage-score";
@@ -25,12 +26,30 @@ import { calculateGarageScore } from "./garage-score";
 export function buildGarageCardProps(vehicle: GarageVehicleItem): GarageCardProps {
   const summary = buildVehicleSummaryViewModel(vehicle);
   const rideProfile = buildRideProfileViewModel(vehicle.rideProfile);
-  const brandModelCaption = `${vehicle.brand.name} | ${vehicle.model.name}`;
+  const brand = vehicle.motorcycleBrand.name;
+  const family = vehicle.motorcycleModelFamily.name;
+  const brandModelCaption = `${brand} | ${family}`;
+  const specs = vehicle.technicalSpecs;
+  const wheels =
+    specs?.frontWheelIn != null && specs?.rearWheelIn != null
+      ? `${specs.frontWheelIn}″ / ${specs.rearWheelIn}″`
+      : specs?.frontWheelIn != null
+        ? `${specs.frontWheelIn}″`
+        : specs?.rearWheelIn != null
+          ? `${specs.rearWheelIn}″`
+          : null;
+  const weight =
+    specs?.weightKg != null ? `${specs.weightKg} кг` : null;
+  const power = specs ? formatPowerLine(specs) : null;
   const specHighlights = [
-    { label: "Двигатель", value: vehicle.modelVariant?.engineType || "Не указан" },
-    { label: "Охлаждение", value: vehicle.modelVariant?.coolingType || "Не указано" },
-    { label: "Колеса", value: vehicle.modelVariant?.wheelSizes || "Не указаны" },
-    { label: "Тормоза", value: vehicle.modelVariant?.brakeSystem || "Не указаны" },
+    { label: "Двигатель", value: specs?.engine || "Не указан" },
+    {
+      label: "Кубатура",
+      value: specs?.displacementCc != null ? `${specs.displacementCc} см³` : "Не указана",
+    },
+    { label: "Мощность", value: power || "Не указана" },
+    { label: "Колеса", value: wheels || "Не указаны" },
+    { label: "Вес", value: weight || "Не указан" },
   ];
 
   return {

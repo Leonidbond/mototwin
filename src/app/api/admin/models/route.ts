@@ -4,11 +4,11 @@ import { requireAnyAdmin, toAdminErrorResponse } from "@/lib/admin-auth";
 import { loadAdminModelList } from "@/lib/admin-models";
 
 const SUPPORT_LEVELS: AdminSupportLevel[] = [
-  "FULL_SUPPORT",
+  "MVP_CORE",
+  "MVP_CORE_LEGACY",
   "COMMUNITY_SUPPORT",
   "EARLY_BETA",
-  "NO_DATA",
-  "UNSUPPORTED",
+  "NO_FITMENT_DATA_YET",
 ];
 
 export async function GET(request: Request) {
@@ -17,7 +17,10 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const filters = {
       q: url.searchParams.get("q") ?? undefined,
-      brandId: url.searchParams.get("brandId") ?? undefined,
+      motorcycleBrandId:
+        url.searchParams.get("motorcycleBrandId") ??
+        url.searchParams.get("brandId") ??
+        undefined,
       supportLevel: parseSupportLevel(url.searchParams.get("supportLevel")),
     };
     const page = Number(url.searchParams.get("page") ?? 1);

@@ -3,6 +3,10 @@
 
 ---
 
+> **Терминология (актуальный маппинг на схему):** в этом документе **`ModelVariant`** соответствует паре **`MotorcycleVariant + MotorcycleGeneration`** из текущего унифицированного стандарта моделей (см. [data-model.md](./data-model.md)). Поле `modelVariantId` в API/БД сейчас называется **`motorcycleGenerationId`**. Текущий API-роут — `GET /api/vehicles/[id]/part-compatibility-report?partMasterId=…&nodeId=…` (он сам резолвит `motorcycleGenerationId` из машины пользователя; внешний контракт `partId/modelVariantId/nodeId` ниже сохраняется как «исторический», см. [api-backend.md](./api-backend.md)). Иерархия каталога: `MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration` (+ sidecar `MotorcycleTechnicalSpecs`).
+
+---
+
 # 1. Назначение страницы
 
 Страница «Итоговый отчет по совместимости детали» показывает агрегированную информацию о том, насколько конкретная деталь подходит конкретной модели мотоцикла и конкретному узлу.

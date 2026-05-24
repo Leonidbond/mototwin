@@ -240,13 +240,21 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
     serviceEvents,
   });
   const silhouetteKey = resolveGarageVehicleSilhouette({
-    brand: { name: vehicle.brandName },
-    model: { name: vehicle.modelName },
-    modelVariant: {
-      year: vehicle.year,
-      versionName: vehicle.variantName,
-      engineType: vehicle.modelVariant?.engineType ?? null,
-      coolingType: vehicle.modelVariant?.coolingType ?? null,
+    motorcycleBrand: { id: vehicle.motorcycleBrandId, name: vehicle.brandName },
+    motorcycleModelFamily: {
+      id: vehicle.motorcycleModelFamilyId,
+      name: vehicle.modelFamilyName,
+    },
+    motorcycleVariant: {
+      id: vehicle.motorcycleVariantId,
+      name: vehicle.variantName,
+    },
+    motorcycleGeneration: {
+      id: vehicle.motorcycleGenerationId,
+      name: vehicle.generationName,
+      yearFrom: vehicle.year || 0,
+      yearTo: null,
+      yearsLabel: vehicle.yearsLabel ?? "",
     },
     rideProfile: vehicle.rideProfile,
   });
@@ -275,7 +283,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
     [wishlistPartsSummary]
   );
   const heroMetaLine = [
-    vehicle.modelVariant?.year ?? vehicle.year,
+    vehicle.year || null,
     vehicleStateViewModel?.odometerValue ?? `${vehicle.odometer} км`,
     vehicle.variantName || silhouetteClassLabel,
   ]
@@ -459,7 +467,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
                   letterSpacing: -0.8,
                 }}
               >
-                {detailViewModel?.displayName || `${vehicle.brandName} ${vehicle.modelName}`}
+                {detailViewModel?.displayName || `${vehicle.brandName} ${vehicle.modelFamilyName}`}
               </h1>
               <div style={{ marginTop: 8, color: productSemanticColors.textSecondary, fontSize: 13 }}>
                 {heroMetaLine}

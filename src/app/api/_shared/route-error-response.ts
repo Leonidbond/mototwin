@@ -63,8 +63,17 @@ export function nextResponseFromUnexpectedRouteError(
     );
   }
 
-  const isDev = process.env.NODE_ENV !== "production";
-  if (isDev && msg.length > 0) {
+  // Dev/staging-only: surface the underlying message to make debugging easier.
+  // Suppressed unless the operator explicitly opts in via
+  // MOTOTWIN_EXPOSE_DEV_ERROR_DETAILS=true (defaults to enabled in dev only,
+  // for backwards compatibility with the existing local UX). MT-SEC-013.
+  const isProd = process.env.NODE_ENV === "production";
+  const exposeDetails = isProd
+    ? false
+    : process.env.MOTOTWIN_EXPOSE_DEV_ERROR_DETAILS === "false"
+      ? false
+      : true;
+  if (exposeDetails && msg.length > 0) {
     const tail = msg.length > 220 ? `${msg.slice(0, 220)}…` : msg;
     return NextResponse.json({ error: `${args.fallbackMessage}: ${tail}` }, { status: 500 });
   }

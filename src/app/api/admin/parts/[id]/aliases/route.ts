@@ -4,13 +4,16 @@ import { normalizePartNumber } from "@mototwin/domain";
 import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { prisma } from "@/lib/prisma";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
-const CreateAliasSchema = z.object({
-  alias: z.string().min(1).max(80),
-  source: z.string().max(40).optional(),
-});
+const CreateAliasSchema = z
+  .object({
+    alias: z.string().min(1).max(80),
+    source: z.string().max(40).optional(),
+  })
+  .strict();
 
-const DeleteAliasSchema = z.object({ aliasId: z.string().min(1) });
+const DeleteAliasSchema = z.object({ aliasId: z.string().min(1).max(64) }).strict();
 
 export async function POST(
   request: Request,
@@ -19,7 +22,7 @@ export async function POST(
   try {
     const ctx = await requireAdminRole(["SUPER_ADMIN", "CATALOG_MANAGER", "MODERATOR"]);
     const { id } = await context.params;
-    const body = await request.json();
+    const body = await parseJsonBody<unknown>(request, { maxBytes: 2 * 1024 });
     const parsed = CreateAliasSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Неверные данные" }, { status: 400 });
@@ -47,6 +50,9 @@ export async function POST(
     });
     return NextResponse.json(created);
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const handled = toAdminErrorResponse(error);
     if (handled) return handled;
     console.error("admin/parts/[id]/aliases POST:", error);
@@ -61,7 +67,7 @@ export async function DELETE(
   try {
     const ctx = await requireAdminRole(["SUPER_ADMIN", "CATALOG_MANAGER", "MODERATOR"]);
     const { id } = await context.params;
-    const body = await request.json();
+    const body = await parseJsonBody<unknown>(request, { maxBytes: 2 * 1024 });
     const parsed = DeleteAliasSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Не указан aliasId" }, { status: 400 });
@@ -78,6 +84,9 @@ export async function DELETE(
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const handled = toAdminErrorResponse(error);
     if (handled) return handled;
     console.error("admin/parts/[id]/aliases DELETE:", error);

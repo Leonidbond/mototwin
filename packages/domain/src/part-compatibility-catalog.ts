@@ -1,62 +1,110 @@
-import type { FitmentReportResultWire } from "@mototwin/types";
-
 type FitmentRow = {
-  modelVariantId: string | null;
-  modelId: string | null;
-  yearFrom: number | null;
-  yearTo: number | null;
+  motorcycleGenerationId: string | null;
+  motorcycleVariantId: string | null;
+  motorcycleModelFamilyId: string | null;
+  motorcycleBrandId: string | null;
   fitmentType: string | null;
 };
 
 export type StructuredCatalogSignals = {
   catalogLineRu: string | null;
-  hasExactVariantFit: boolean;
-  hasModelYearFit: boolean;
+  hasExactGenerationFit: boolean;
+  hasVariantFit: boolean;
+  hasFamilyFit: boolean;
+  hasBrandFit: boolean;
   hasGenericNodeFit: boolean;
+  /**
+   * @deprecated Renamed to {@link hasExactGenerationFit} after the unified motorcycle
+   * model refactor (4-level hierarchy). Old callers can still consume this alias.
+   */
+  hasExactVariantFit: boolean;
+  /**
+   * @deprecated Renamed to {@link hasFamilyFit}; under the new hierarchy "model" =
+   * `MotorcycleModelFamily`. Year ranges are now derived from generations.
+   */
+  hasModelYearFit: boolean;
 };
 
 /**
- * Анализ строк каталога (PartFitment) для связки vehicle model / variant / год.
- * Логика совпадает с прежним fitment-report-sheet.
+ * Analyses catalog `PartFitment` rows for the unified motorcycle hierarchy
+ * (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`).
+ * Buckets a SKU into one of {generation, variant, family, brand, generic} signals
+ * based on which anchor IDs are filled and match the vehicle. Replaces the legacy
+ * `(brandId, modelId, modelVariantId, yearFrom..yearTo)` analysis used before the
+ * model standard refactor.
  */
 export function analyzeStructuredCatalogSignals(
   fitmentRows: FitmentRow[],
   vehicle: {
-    modelVariantId: string | null;
-    modelId: string;
-    modelYear: number | null;
+    motorcycleBrandId: string;
+    motorcycleModelFamilyId: string;
+    motorcycleVariantId: string;
+    motorcycleGenerationId: string;
   }
 ): StructuredCatalogSignals {
-  let hasExactVariantFit = false;
-  let hasModelYearFit = false;
+  let hasExactGenerationFit = false;
+  let hasVariantFit = false;
+  let hasFamilyFit = false;
+  let hasBrandFit = false;
   let hasGenericNodeFit = false;
-  const vy = vehicle.modelYear;
+
   for (const f of fitmentRows) {
-    if (vehicle.modelVariantId && f.modelVariantId === vehicle.modelVariantId) {
-      hasExactVariantFit = true;
+    if (
+      f.motorcycleGenerationId &&
+      f.motorcycleGenerationId === vehicle.motorcycleGenerationId
+    ) {
+      hasExactGenerationFit = true;
     }
-    if (f.modelId && f.modelId === vehicle.modelId) {
-      if (vy == null) {
-        hasModelYearFit = true;
-      } else {
-        const yf = f.yearFrom ?? Number.MIN_SAFE_INTEGER;
-        const yt = f.yearTo ?? Number.MAX_SAFE_INTEGER;
-        if (vy >= yf && vy <= yt) {
-          hasModelYearFit = true;
-        }
-      }
+    if (
+      !f.motorcycleGenerationId &&
+      f.motorcycleVariantId &&
+      f.motorcycleVariantId === vehicle.motorcycleVariantId
+    ) {
+      hasVariantFit = true;
+    }
+    if (
+      !f.motorcycleGenerationId &&
+      !f.motorcycleVariantId &&
+      f.motorcycleModelFamilyId &&
+      f.motorcycleModelFamilyId === vehicle.motorcycleModelFamilyId
+    ) {
+      hasFamilyFit = true;
+    }
+    if (
+      !f.motorcycleGenerationId &&
+      !f.motorcycleVariantId &&
+      !f.motorcycleModelFamilyId &&
+      f.motorcycleBrandId &&
+      f.motorcycleBrandId === vehicle.motorcycleBrandId
+    ) {
+      hasBrandFit = true;
     }
     if ((f.fitmentType || "").toUpperCase() === "GENERIC_NODE") {
       hasGenericNodeFit = true;
     }
   }
+
   let catalogLineRu: string | null = null;
-  if (hasExactVariantFit) {
-    catalogLineRu = "Каталог: зафиксирована применимость к вашей модификации.";
-  } else if (hasModelYearFit) {
-    catalogLineRu = "Каталог: применимость к модели (по годам и модификациям).";
+  if (hasExactGenerationFit) {
+    catalogLineRu = "Каталог: зафиксирована применимость к вашему поколению.";
+  } else if (hasVariantFit) {
+    catalogLineRu = "Каталог: применимость к вашей модификации.";
+  } else if (hasFamilyFit) {
+    catalogLineRu = "Каталог: применимость к семейству модели.";
+  } else if (hasBrandFit) {
+    catalogLineRu = "Каталог: применимость к марке.";
   } else if (hasGenericNodeFit) {
     catalogLineRu = "Каталог: универсальная применимость по типу узла.";
   }
-  return { catalogLineRu, hasExactVariantFit, hasModelYearFit, hasGenericNodeFit };
+
+  return {
+    catalogLineRu,
+    hasExactGenerationFit,
+    hasVariantFit,
+    hasFamilyFit,
+    hasBrandFit,
+    hasGenericNodeFit,
+    hasExactVariantFit: hasExactGenerationFit,
+    hasModelYearFit: hasFamilyFit,
+  };
 }

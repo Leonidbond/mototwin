@@ -5,11 +5,15 @@ import { loadAdminUserDetail } from "@/lib/admin-users";
 import { logAdminAction } from "@/lib/admin-audit";
 import { prisma } from "@/lib/prisma";
 import { revokeAllUserSessions } from "@/lib/auth/session-service";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
-const UpdateUserBlockSchema = z.object({
-  isBlocked: z.boolean(),
-  reason: z.string().trim().min(3).max(500),
-});
+// MT-SEC-068: .strict() prevents extra fields slipping into the audit log payload.
+const UpdateUserBlockSchema = z
+  .object({
+    isBlocked: z.boolean(),
+    reason: z.string().trim().min(3).max(500),
+  })
+  .strict();
 
 export async function GET(
   _request: Request,
@@ -38,7 +42,9 @@ export async function PATCH(
   try {
     const admin = await requireAnyAdmin();
     const { id } = await context.params;
-    const body = (await request.json().catch(() => null)) as unknown;
+    const body = (await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 }).catch(
+      () => null
+    )) as unknown;
     const parsed = UpdateUserBlockSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -98,6 +104,9 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const handled = toAdminErrorResponse(error);
     if (handled) return handled;
     console.error("admin/users/[id] PATCH:", error);

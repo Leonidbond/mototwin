@@ -88,18 +88,20 @@ Defined in `apps/app/app/_layout.tsx`:
   - `Недавно`
 
 ### 3.4 Add Motorcycle (`vehicles/new.tsx`)
-- Progressive single-screen flow
+- Progressive single-screen flow с 4-уровневым каскадом по новому стандарту иерархии (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`, см. [data-model.md](./data-model.md), [expo-add-motorcycle-flow.md](./expo-add-motorcycle-flow.md))
 - Cascading fetch:
-  - `getBrands()`
-  - `getModels(brandId)`
-  - `getModelVariants(modelId)`
+  - `getMotorcycleBrands()`
+  - `getMotorcycleModelFamilies({ motorcycleBrandId })`
+  - `getMotorcycleVariants({ motorcycleModelFamilyId })`
+  - `getMotorcycleGenerations({ motorcycleVariantId })` — карточка показывает `yearsLabel` (или `yearFrom`–`yearTo`) и preview техспек
+- Cascade reset: смена значения на любом уровне очищает выбор всех нижестоящих
 - Required fields:
-  - brand, model, modelVariant
+  - motorcycleBrandId, motorcycleModelFamilyId, motorcycleVariantId, motorcycleGenerationId
   - odometer >= 0
 - Optional:
   - nickname, vin, engineHours
 - Ride profile selection included
-- Create via `createVehicle()` -> `POST /api/vehicles`
+- Create via `createVehicle()` -> `POST /api/vehicles` (все 4 ID отправляются в payload)
 - Success: `router.replace("/garage")`
 
 ### 3.5 Vehicle Detail (`vehicles/[id]/index.tsx`)

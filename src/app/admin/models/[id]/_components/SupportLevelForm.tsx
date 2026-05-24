@@ -7,15 +7,15 @@ import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 import { ruAdmin } from "../../../_locales/ru";
 
 const OPTIONS: AdminSupportLevel[] = [
-  "FULL_SUPPORT",
+  "MVP_CORE",
+  "MVP_CORE_LEGACY",
   "COMMUNITY_SUPPORT",
   "EARLY_BETA",
-  "NO_DATA",
-  "UNSUPPORTED",
+  "NO_FITMENT_DATA_YET",
 ];
 
 interface SupportLevelFormProps {
-  modelVariantId: string;
+  motorcycleGenerationId: string;
   current: AdminSupportLevel;
   override: AdminSupportLevel | null;
   reasonHint: string | null;
@@ -24,7 +24,7 @@ interface SupportLevelFormProps {
 }
 
 export function SupportLevelForm({
-  modelVariantId,
+  motorcycleGenerationId,
   current,
   override,
   reasonHint,
@@ -47,7 +47,7 @@ export function SupportLevelForm({
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/admin/models/${modelVariantId}/support-level`, {
+        const res = await fetch(`/api/admin/models/${motorcycleGenerationId}/support-level`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({

@@ -5,6 +5,8 @@ import type { ExpenseItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedInt, boundedTextOptional, strictObject } from "@/lib/http/input-validation";
 
 type RouteContext = {
   params: Promise<{ expenseId: string }>;
@@ -22,11 +24,12 @@ type ExpenseRow = Omit<
   updatedAt: Date;
 };
 
-const markInstalledSchema = z.object({
+// MT-SEC-068 + MT-SEC-070: strict + bounded fields.
+const markInstalledSchema = strictObject({
   installedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))),
-  serviceEventId: z.string().trim().nullable().optional(),
-  odometer: z.number().int().min(0).nullable().optional(),
-  engineHours: z.number().int().min(0).nullable().optional(),
+  serviceEventId: boundedTextOptional({ max: 64 }),
+  odometer: boundedInt({ min: 0, max: 10_000_000 }).nullable().optional(),
+  engineHours: boundedInt({ min: 0, max: 1_000_000 }).nullable().optional(),
 });
 
 function toWire(row: ExpenseRow): ExpenseItem {
@@ -44,7 +47,8 @@ function toWire(row: ExpenseRow): ExpenseItem {
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { expenseId } = await context.params;
-    const data = markInstalledSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
+    const data = markInstalledSchema.parse(raw);
 
     const existing = await prisma.expenseItem.findUnique({
       where: { id: expenseId },
@@ -101,6 +105,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ expense: toWire(updated as ExpenseRow) });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

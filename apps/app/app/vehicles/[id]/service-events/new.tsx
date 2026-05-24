@@ -160,7 +160,7 @@ export default function NewServiceEventScreen() {
 
         const v = vehicleData.vehicle;
         setVehicleDisplayName(
-          v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelName}`.trim() : "") || "Мотоцикл"
+          v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelFamilyName}`.trim() : "") || "Мотоцикл"
         );
         const rawV = v as VehicleDetailApiRecord | null | undefined;
         setContextVehicleDetail(rawV ? vehicleDetailFromApiRecord(rawV) : null);

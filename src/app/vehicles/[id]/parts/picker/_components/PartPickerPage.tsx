@@ -521,7 +521,7 @@ export function PartPickerPage({
 
   const whyMatches = useMemo(() => {
     if (!vehicle) return [];
-    const modelLabel = `${vehicle.brandName} ${vehicle.modelName}`.trim();
+    const modelLabel = `${vehicle.brandName} ${vehicle.modelFamilyName}`.trim();
     return buildWhyMatchesReasons({
       vehicleModelLabel: modelLabel,
       draft,
@@ -666,7 +666,7 @@ export function PartPickerPage({
   }, [submitPreview, quantityResolutionByDraftId, draft, vehicleId, router]);
 
   const vehicleLabelForCrumbs = vehicle
-    ? vehicle.nickname || `${vehicle.brandName} ${vehicle.modelName}`
+    ? vehicle.nickname || `${vehicle.brandName} ${vehicle.modelFamilyName}`
     : "Мотоцикл";
 
   const pickerBreadcrumbs = useMemo(

@@ -4,19 +4,28 @@ import { prisma } from "@/lib/prisma";
 import { recalculateFitmentConfidenceForKey } from "@/lib/fitment-confidence-prisma";
 import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
 import { getVehicleInCurrentContext } from "@/app/api/_shared/vehicle-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import {
+  boundedInt,
+  boundedText,
+  boundedTextOptional,
+  parseSearchParamText,
+  strictObject,
+} from "@/lib/http/input-validation";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-const rideProfileBodySchema = z.object({
+const rideProfileBodySchema = strictObject({
   usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
   ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
   loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
   usageIntensity: z.enum(["LOW", "MEDIUM", "HIGH"]),
 });
 
-const createReportSchema = z.object({
-  partMasterId: z.string().trim().min(1),
-  nodeId: z.string().trim().min(1),
+// MT-SEC-068 + MT-SEC-070: strict + capped strings/numerics for user-submitted reports.
+const createReportSchema = strictObject({
+  partMasterId: boundedText({ max: 64 }),
+  nodeId: boundedText({ max: 64 }),
   fitmentResult: z.enum([
     "DIRECT_FIT",
     "FIT_WITH_MODIFICATION",
@@ -26,14 +35,12 @@ const createReportSchema = z.object({
   ]),
   installationStatus: z.enum(["INSTALLED", "PURCHASED_NOT_INSTALLED", "TESTED_NOT_INSTALLED"]),
   modificationRequired: z.boolean().optional(),
-  modificationDetails: z.string().trim().optional().nullable(),
-  comment: z.string().trim().optional().nullable(),
-  serviceEventId: z.string().trim().optional().nullable(),
-  installedAtMileage: z.number().int().optional().nullable(),
-  installedAtHours: z.number().int().optional().nullable(),
-  /** 1–5, опционально (§23 средняя оценка). */
+  modificationDetails: boundedTextOptional({ max: 2_000 }),
+  comment: boundedTextOptional({ max: 2_000 }),
+  serviceEventId: boundedTextOptional({ max: 64 }),
+  installedAtMileage: boundedInt({ min: 0, max: 10_000_000 }).optional().nullable(),
+  installedAtHours: boundedInt({ min: 0, max: 1_000_000 }).optional().nullable(),
   rating: z.number().int().min(1).max(5).optional().nullable(),
-  /** Профиль езды для снимка в отчёте (§19); иначе берётся из RideProfile мотоцикла. */
   rideProfile: rideProfileBodySchema.optional().nullable(),
 });
 
@@ -41,23 +48,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId } = await context.params;
     const { searchParams } = new URL(request.url);
-    const nodeId = searchParams.get("nodeId")?.trim();
-    const partMasterIdFilter = searchParams.get("partMasterId")?.trim();
+    // MT-SEC-071: validate search params.
+    const nodeId = parseSearchParamText(searchParams.get("nodeId"), { max: 64 });
+    const partMasterIdFilter = parseSearchParamText(searchParams.get("partMasterId"), { max: 64 });
     if (!nodeId) {
       return NextResponse.json({ error: "nodeId обязателен." }, { status: 400 });
     }
     const vehicle = await getVehicleInCurrentContext(vehicleId, {
       id: true,
-      modelVariantId: true,
+      motorcycleGenerationId: true,
     });
-    if (!vehicle?.modelVariantId) {
+    if (!vehicle?.motorcycleGenerationId) {
       return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
     }
     const reports = await prisma.fitmentReport.findMany({
       where: {
         vehicleId,
         nodeId,
-        modelVariantId: vehicle.modelVariantId,
+        motorcycleGenerationId: vehicle.motorcycleGenerationId,
         moderationStatus: "PUBLISHED",
         ...(partMasterIdFilter ? { partMasterId: partMasterIdFilter } : {}),
       },
@@ -81,13 +89,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const userCtx = await getCurrentUserContext();
     const { id: vehicleId } = await context.params;
-    const body = createReportSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 16 * 1024 });
+    const body = createReportSchema.parse(raw);
 
     const vehicle = await getVehicleInCurrentContext(vehicleId, {
       id: true,
-      modelVariantId: true,
+      motorcycleGenerationId: true,
     });
-    if (!vehicle?.modelVariantId) {
+    if (!vehicle?.motorcycleGenerationId) {
       return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
     }
 
@@ -149,7 +158,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       data: {
         partMasterId: body.partMasterId,
         vehicleId,
-        modelVariantId: vehicle.modelVariantId,
+        motorcycleGenerationId: vehicle.motorcycleGenerationId,
         nodeId: body.nodeId,
         fitmentResult: body.fitmentResult,
         installationStatus: body.installationStatus,
@@ -170,7 +179,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     try {
       await recalculateFitmentConfidenceForKey(prisma, {
         partMasterId: body.partMasterId,
-        modelVariantId: vehicle.modelVariantId,
+        motorcycleGenerationId: vehicle.motorcycleGenerationId,
         nodeId: body.nodeId,
       });
     } catch (recalcErr) {
@@ -179,6 +188,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ report }, { status: 201 });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const ctxErr = toCurrentUserContextErrorResponse(error);
     if (ctxErr) return ctxErr;
     if (error instanceof z.ZodError) {

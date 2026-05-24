@@ -7,38 +7,59 @@ import {
 import type { PrismaClient } from "@prisma/client";
 import type { FitmentConfidenceStatus, PartRecommendationViewModel } from "@mototwin/types";
 
+/**
+ * Vehicle anchor used to classify catalog rows for a node.
+ * The four optional FKs match the unified motorcycle hierarchy
+ * (Brand → ModelFamily → Variant → Generation).
+ */
 export type VehicleFitmentContext = {
   id: string;
-  modelId: string;
-  modelVariantId: string | null;
-  modelVariant: { year: number } | null;
+  motorcycleBrandId: string;
+  motorcycleModelFamilyId: string;
+  motorcycleVariantId: string;
+  motorcycleGenerationId: string;
 };
 
 /**
- * Prisma `Vehicle` rows may have nullable `modelId` / `year`; recommendations need a strict context.
+ * Narrow a Prisma `Vehicle` row to the strict context required by the recommender.
+ * All four motorcycle FKs are now non-null on the schema, so this only validates the shape.
  */
 export function narrowVehicleFitmentContext(vehicle: {
   id: string;
-  modelId: string | null;
-  modelVariantId: string | null;
-  modelVariant: { year: number | null } | null;
+  motorcycleBrandId: string | null;
+  motorcycleModelFamilyId: string | null;
+  motorcycleVariantId: string | null;
+  motorcycleGenerationId: string | null;
 }): VehicleFitmentContext | null {
-  if (!vehicle.modelId?.trim()) {
+  if (
+    !vehicle.motorcycleBrandId ||
+    !vehicle.motorcycleModelFamilyId ||
+    !vehicle.motorcycleVariantId ||
+    !vehicle.motorcycleGenerationId
+  ) {
     return null;
   }
   return {
     id: vehicle.id,
-    modelId: vehicle.modelId,
-    modelVariantId: vehicle.modelVariantId,
-    modelVariant:
-      vehicle.modelVariant?.year != null && Number.isFinite(vehicle.modelVariant.year)
-        ? { year: vehicle.modelVariant.year }
-        : null,
+    motorcycleBrandId: vehicle.motorcycleBrandId,
+    motorcycleModelFamilyId: vehicle.motorcycleModelFamilyId,
+    motorcycleVariantId: vehicle.motorcycleVariantId,
+    motorcycleGenerationId: vehicle.motorcycleGenerationId,
   };
 }
 
 /**
- * Loads SKU recommendations for a node and merges published {@link FitmentConfidence} for the vehicle variant.
+ * Loads SKU recommendations for a node and merges published {@link FitmentConfidence} for the vehicle generation.
+ *
+ * Catalog rows are classified into one of six progressive buckets based on the deepest non-null FK
+ * that matches the vehicle:
+ *   - EXACT     : `motorcycleGenerationId` matches the vehicle's generation.
+ *   - VARIANT   : `motorcycleVariantId` matches and generation FK is null on the row.
+ *   - FAMILY    : `motorcycleModelFamilyId` matches.
+ *   - BRAND     : `motorcycleBrandId` matches.
+ *   - GENERIC   : `fitmentType = GENERIC_NODE` (universal across all bikes).
+ *   - VERIFY    : the row is anchored to a different brand/family/variant/generation — show only as
+ *                 "verify required" merchandise, not as a confident match.
  */
 export async function buildRecommendationsForNodeWithCommunity(
   prisma: PrismaClient,
@@ -80,11 +101,11 @@ export async function buildRecommendationsForNodeWithCommunity(
     }
   >();
 
-  if (masterIds.length > 0 && vehicle.modelVariantId) {
+  if (masterIds.length > 0) {
     const [confRows, publishedGroups] = await Promise.all([
       prisma.fitmentConfidence.findMany({
         where: {
-          modelVariantId: vehicle.modelVariantId,
+          motorcycleGenerationId: vehicle.motorcycleGenerationId,
           nodeId,
           partMasterId: { in: masterIds },
         },
@@ -92,7 +113,7 @@ export async function buildRecommendationsForNodeWithCommunity(
       prisma.fitmentReport.groupBy({
         by: ["partMasterId"],
         where: {
-          modelVariantId: vehicle.modelVariantId,
+          motorcycleGenerationId: vehicle.motorcycleGenerationId,
           nodeId,
           partMasterId: { in: masterIds },
           moderationStatus: "PUBLISHED",
@@ -124,46 +145,94 @@ export async function buildRecommendationsForNodeWithCommunity(
       relation?.relationType?.trim() || (row.primaryNodeId === nodeId ? "PRIMARY" : "ALTERNATIVE");
     const relationConfidence = relation?.confidence ?? 60;
 
-    const hasExactFit = row.fitments.some(
-      (fitment) =>
-        fitment.modelVariantId &&
-        vehicle.modelVariantId &&
-        fitment.modelVariantId === vehicle.modelVariantId
-    );
-    const hasModelFit = row.fitments.some((fitment) => {
-      if (!fitment.modelId || fitment.modelId !== vehicle.modelId) {
-        return false;
+    // Bucket classification: walk the fitment rows and find the deepest level that
+    // matches the vehicle. Anchors at deeper levels override broader matches.
+    let hasExactFit = false;
+    let hasVariantFit = false;
+    let hasFamilyFit = false;
+    let hasBrandFit = false;
+    let hasGenericFitment = false;
+    let hasMismatchedAnchor = false;
+
+    for (const fitment of row.fitments) {
+      const isGeneric = (fitment.fitmentType || "").toUpperCase() === "GENERIC_NODE";
+      if (isGeneric) {
+        hasGenericFitment = true;
       }
-      const vehicleYear = vehicle.modelVariant?.year ?? null;
-      if (!vehicleYear) {
-        return true;
+
+      // Match levels: deepest non-null wins. We only count a level as "matched"
+      // if every level above it either matches or is null on the fitment row.
+      const brandOk =
+        fitment.motorcycleBrandId == null ||
+        fitment.motorcycleBrandId === vehicle.motorcycleBrandId;
+      const familyOk =
+        fitment.motorcycleModelFamilyId == null ||
+        fitment.motorcycleModelFamilyId === vehicle.motorcycleModelFamilyId;
+      const variantOk =
+        fitment.motorcycleVariantId == null ||
+        fitment.motorcycleVariantId === vehicle.motorcycleVariantId;
+      const generationOk =
+        fitment.motorcycleGenerationId == null ||
+        fitment.motorcycleGenerationId === vehicle.motorcycleGenerationId;
+
+      const allLevelsAlignWithVehicle = brandOk && familyOk && variantOk && generationOk;
+      if (!allLevelsAlignWithVehicle && !isGeneric) {
+        // Some FK on the row points to a different brand/family/variant/generation.
+        hasMismatchedAnchor = true;
+        continue;
       }
-      const yearFrom = fitment.yearFrom ?? Number.MIN_SAFE_INTEGER;
-      const yearTo = fitment.yearTo ?? Number.MAX_SAFE_INTEGER;
-      return vehicleYear >= yearFrom && vehicleYear <= yearTo;
-    });
-    const hasGenericFitment = row.fitments.some(
-      (fitment) => (fitment.fitmentType || "").toUpperCase() === "GENERIC_NODE"
-    );
+
+      if (fitment.motorcycleGenerationId === vehicle.motorcycleGenerationId) {
+        hasExactFit = true;
+      } else if (fitment.motorcycleVariantId === vehicle.motorcycleVariantId) {
+        hasVariantFit = true;
+      } else if (fitment.motorcycleModelFamilyId === vehicle.motorcycleModelFamilyId) {
+        hasFamilyFit = true;
+      } else if (fitment.motorcycleBrandId === vehicle.motorcycleBrandId) {
+        hasBrandFit = true;
+      }
+    }
+
+    // Pick a representative fitment row in priority order: deepest match → generic → first.
     const matchingFitment =
       row.fitments.find(
-        (fitment) =>
-          fitment.modelVariantId &&
-          vehicle.modelVariantId &&
-          fitment.modelVariantId === vehicle.modelVariantId
+        (f) => f.motorcycleGenerationId === vehicle.motorcycleGenerationId
       ) ??
-      row.fitments.find((fitment) => fitment.modelId && fitment.modelId === vehicle.modelId) ??
-      row.fitments.find((fitment) => (fitment.fitmentType || "").toUpperCase() === "GENERIC_NODE") ??
+      row.fitments.find(
+        (f) =>
+          f.motorcycleVariantId === vehicle.motorcycleVariantId &&
+          f.motorcycleGenerationId == null
+      ) ??
+      row.fitments.find(
+        (f) =>
+          f.motorcycleModelFamilyId === vehicle.motorcycleModelFamilyId &&
+          f.motorcycleVariantId == null
+      ) ??
+      row.fitments.find(
+        (f) =>
+          f.motorcycleBrandId === vehicle.motorcycleBrandId &&
+          f.motorcycleModelFamilyId == null
+      ) ??
+      row.fitments.find((f) => (f.fitmentType || "").toUpperCase() === "GENERIC_NODE") ??
       row.fitments[0] ??
       null;
-    const fitmentConfidence = row.fitments[0]?.confidence ?? 0;
+    const fitmentConfidence = matchingFitment?.confidence ?? row.fitments[0]?.confidence ?? 0;
     const confidence = Math.max(relationConfidence, fitmentConfidence);
+
+    // Map the buckets back to the legacy boolean inputs of the view-model builder.
+    // Until packages/domain exposes a 6-bucket primitive, anything below "exact"
+    // collapses to "model fit" — VARIANT / FAMILY / BRAND are all confident matches
+    // for the same family lineage. GENERIC stays separate. VERIFY (mismatched anchor
+    // with no other match) becomes a non-confident merch suggestion.
+    const hasModelFit = hasExactFit || hasVariantFit || hasFamilyFit || hasBrandFit;
+    const onlyMismatched =
+      !hasExactFit && !hasVariantFit && !hasFamilyFit && !hasBrandFit && !hasGenericFitment;
 
     const base = buildPartRecommendationViewModel({
       sku,
       nodeId,
       relationType,
-      confidence,
+      confidence: onlyMismatched && hasMismatchedAnchor ? Math.min(confidence, 30) : confidence,
       hasExactFit,
       hasModelFit,
       hasGenericFitment,

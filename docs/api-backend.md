@@ -12,48 +12,133 @@
 - Error shape: `{ error: string }`
 - Validation errors: `{ error: "Validation failed", issues }`
 
+## 2.1 Security / Input validation conventions
+
+Все write-ручки должны соблюдать защитный паттерн ниже (введён в итерации 2 security audit, см. [docs/security/findings.md](./security/findings.md#input-validation-audit-итерация-2--полный-обход-97-ручек--122-handler-ов) и [docs/security/api-findings.md](./security/api-findings.md)).
+
+### Helpers
+
+| Helper | Расположение | Назначение |
+|--------|--------------|------------|
+| `parseJsonBody<T>(request, { maxBytes })` | [src/lib/http/parse-json-body.ts](../src/lib/http/parse-json-body.ts) | Чтение тела с верхней границей; кидает `BodyParseError` → 413 |
+| `strictObject({ ... })` | [src/lib/http/input-validation.ts](../src/lib/http/input-validation.ts) | Alias `z.object({ ... }).strict()`; отвергает лишние поля |
+| `boundedText({ min, max })` / `boundedTextOptional({ max })` | то же | trimmed string с явными границами |
+| `boundedNumber({ min, max })` / `boundedInt({ min, max })` | то же | finite + range-checked |
+| `boundedArray(item, { max })` | то же | массивы с cap-ом длины |
+| `boundedJsonValue({ maxSerializedBytes, maxDepth })` | то же | open-structure JSON с serialized-size + depth cap |
+| `safeUrl({ max, requireHttps, allowedHosts })` | то же | scheme-allowlist `http(s):` only |
+| `safePagination({ maxLimit, defaultLimit })` | то же | `{ limit, offset }` с потолком |
+| `parseSearchParamText({ max })` / `parseSearchParamInt({ min, max, fallback })` | то же | length/range-capped разбор `URLSearchParams` без throw |
+| `safeRenderUrl(input)` | [src/lib/http/safe-render-url.ts](../src/lib/http/safe-render-url.ts) | Defense-in-depth-фильтр для URL из БД перед возвратом клиенту |
+| `rateLimit({ bucket, request, limit, windowMs, extraKey })` + `rateLimit429(decision)` | [src/lib/http/rate-limit.ts](../src/lib/http/rate-limit.ts) | In-memory sliding-window rate limiter, уже применён к auth + cost-sensitive ручкам |
+| `fetchWithTimeout(url, init, { timeoutMs })` | [src/lib/http/fetch-with-timeout.ts](../src/lib/http/fetch-with-timeout.ts) | `AbortController`-обёртка для outbound fetch (Yandex/OAuth) |
+
+### Шаблон write-handler-а
+
+```ts
+import { z } from "zod";
+import { NextResponse } from "next/server";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject, boundedText, boundedInt } from "@/lib/http/input-validation";
+import { getCurrentUserContext } from "@/app/api/_shared/current-user-context";
+
+const bodySchema = strictObject({
+  title: boundedText({ max: 300 }),
+  quantity: boundedInt({ min: 1, max: 10_000 }),
+});
+
+export async function POST(request: Request) {
+  try {
+    const userCtx = await getCurrentUserContext();
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 8 * 1024 });
+    const body = bodySchema.parse(raw);
+    // ... domain call ...
+    return NextResponse.json({ ok: true }, { status: 201 });
+  } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: error.issues },
+        { status: 400 }
+      );
+    }
+    // ... остальные ветви (AuthError, AdminAuthError, ...)
+    throw error;
+  }
+}
+```
+
+### Чек-лист на ревью
+
+- [ ] Тело читается через `parseJsonBody<T>(request, { maxBytes: ... })`, а не `await request.json()`.
+- [ ] Zod-схема — `strictObject({ ... })` (для вложенных object-полей — тоже `.strict()`).
+- [ ] Все user-controlled `string` поля имеют `.max(...)` через `boundedText`/`boundedTextOptional`.
+- [ ] Все `number`/`int` поля имеют `min`/`max` через `boundedNumber`/`boundedInt`.
+- [ ] Все массивы имеют `.max(...)` через `boundedArray`.
+- [ ] Поля произвольной формы (`z.unknown()` / `z.any()`) заменены на `boundedJsonValue({ maxSerializedBytes, maxDepth })`.
+- [ ] URL-поля валидируются `safeUrl({ max })` (а не `z.string().url()` — `safeUrl` отвергает `javascript:`/`data:`/`file:`).
+- [ ] Search-параметры читаются через `parseSearchParamText`/`parseSearchParamInt`, а не `searchParams.get(...)?.trim()` напрямую.
+- [ ] Любой URL из БД, возвращаемый клиенту и потенциально попадающий в `<a href>` / `<Image src>`, проходит через `safeRenderUrl(...)` на стороне сервера.
+- [ ] Любая ручка, дёргающая платный external API или дорогой DB-запрос без auth, защищена `rateLimit({ ... })` + `rateLimit429(decision)`.
+- [ ] Outbound `fetch` обёрнут `fetchWithTimeout` либо использует библиотеку с собственным таймаутом (`google-auth-library`, `jose.createRemoteJWKSet`).
+- [ ] Каждый user-scoped ресурс резолвится через `getCurrentUserContext()` / `getVehicleInCurrentContext(vehicleId)` — двойная привязка `garageId + ownerUserId`.
+
 ## 3. Implemented routes
 
 ## 3.1 Catalog
 
-### `GET /api/brands`
-- Response `200`: `{ brands: Array<{ id, name, slug }> }`
-- Response `500`: `{ error: "Failed to fetch brands" }`
+Каталог моделей унифицирован по 4-уровневой иерархии (см. [data-model.md §MotorcycleBrand / MotorcycleModelFamily / MotorcycleVariant / MotorcycleGeneration](./data-model.md)). Старые роуты `/api/brands`, `/api/models`, `/api/model-variants` удалены.
 
-### `GET /api/models?brandId=...`
-- Required query: `brandId`
-- Response `200`: `{ models: Array<{ id, name, slug, brandId }> }`
-- Response `400`: `{ error: "brandId is required" }`
-- Response `500`: `{ error: "Failed to fetch models" }`
+### `GET /api/motorcycle-brands`
+- Response `200`: `{ brands: Array<{ id, name, slug, supportLevel: MotoSupportLevel }> }`
+- `supportLevel` агрегирован как лучший среди дочерних поколений (`MVP_CORE > MVP_CORE_LEGACY > COMMUNITY_SUPPORT > EARLY_BETA > NO_FITMENT_DATA_YET`); `EARLY_BETA` если поколений ещё нет.
+- Sort: `name asc`.
+- Response `500`: `{ error: "Failed to fetch motorcycle brands" }`
 
-### `GET /api/model-variants?modelId=...`
-- Required query: `modelId`
-- Response `200`: `{ variants: Array<...model variant fields...> }`
-- Response `400`: `{ error: "modelId is required" }`
-- Response `500`: `{ error: "Failed to fetch model variants" }`
-- Sort: `year desc`, then `versionName asc`
+### `GET /api/motorcycle-model-families?motorcycleBrandId=...`
+- Required query: `motorcycleBrandId`
+- Response `200`: `{ families: Array<{ id, motorcycleBrandId, name, slug, supportLevel: MotoSupportLevel }> }`
+- Response `400`: `{ error: "motorcycleBrandId is required" }`
+- Response `500`: `{ error: "Failed to fetch motorcycle model families" }`
+- Sort: `name asc`.
+
+### `GET /api/motorcycle-variants?motorcycleModelFamilyId=...`
+- Required query: `motorcycleModelFamilyId`
+- Response `200`: `{ variants: Array<{ id, motorcycleModelFamilyId, name, slug, supportLevel: MotoSupportLevel }> }`
+- Response `400`: `{ error: "motorcycleModelFamilyId is required" }`
+- Response `500`: `{ error: "Failed to fetch motorcycle variants" }`
+- Sort: `name asc`.
+
+### `GET /api/motorcycle-generations?motorcycleVariantId=...`
+- Required query: `motorcycleVariantId`
+- Response `200`: `{ generations: Array<{ id, motorcycleVariantId, name, yearFrom, yearTo, yearsLabel, marketRegion, segment, supportLevel, technicalSpecs }> }`. `technicalSpecs` — это `VehicleTechnicalSpecsView` (`engine`, `displacementCc`, `powerValue`, `powerUnit`, `powerHpNormalized`, `torqueNm`, `gearbox`, `drive`, `frontWheelIn`/`rearWheelIn`, `frontTire`/`rearTire`, `fuelLiters`, `weightKg`, `weightType`, `seatMm`, `marketRegion`).
+- Response `400`: `{ error: "motorcycleVariantId is required" }`
+- Response `500`: `{ error: "Failed to fetch motorcycle generations" }`
+- Sort: `yearFrom asc`, потом `name asc`.
 
 ## 3.2 Garage and vehicle
 
 ### `GET /api/garage`
-- Returns garage vehicles for demo user
-- Response `200`: `{ vehicles }` with `brand`, `model`, `modelVariant`, `rideProfile`
-- Response `500`: demo user/garage load failure errors
+- Returns garage vehicles for current user
+- Response `200`: `{ vehicles: GarageVehicleItem[] }`. Каждый ТС включает `motorcycleBrand`, `motorcycleModelFamily`, `motorcycleVariant`, `motorcycleGeneration` (с `yearFrom/yearTo/yearsLabel`), `technicalSpecs: VehicleTechnicalSpecsView | null`, `rideProfile`, `attentionSummary?`.
+- Response `500`: загрузка гаража/пользователя.
 
 ### `POST /api/vehicles`
-- Creates vehicle + ride profile
+- Creates vehicle + ride profile.
 - Required body:
-  - `brandId`, `modelId`, `modelVariantId`
+  - `motorcycleBrandId`, `motorcycleModelFamilyId`, `motorcycleVariantId`, `motorcycleGenerationId` — все 4 уровня обязательны и должны быть согласованы (бэкенд валидирует цепочку через `prisma.motorcycleGeneration.findFirst`)
   - `odometer` (int >= 0)
   - `engineHours` (`int >= 0 | null`)
   - `rideProfile` with enum fields
 - Optional body: `nickname`, `vin`
-- Response `201`: `{ vehicle }`
-- Response `400`: validation failed
+- Response `201`: `{ vehicle: GarageVehicleItem }`
+- Response `400`: validation failed (включая разорванную цепочку 4-уровневой иерархии)
 - Response `500`: create failure
 
 ### `GET /api/vehicles/[id]`
-- Response `200`: `{ vehicle }` with related entities
+- Response `200`: `{ vehicle: VehicleDetailApiRecord }` — иерархия с вложенным `motorcycleGeneration: { yearFrom, yearTo, yearsLabel, marketRegion, technicalSpecs }`. Клиент уплощает в `VehicleDetail` через `vehicleDetailFromApiRecord` из `@mototwin/domain`.
 - Response `404`: `{ error: "Vehicle not found" }`
 - Response `500`: fetch failure
 

@@ -681,7 +681,7 @@ export function CommunityPartPageClient(props: {
   const sidebarPlaqueTitle = useMemo(
     () =>
       vehicle
-        ? vehicle.nickname?.trim() || `${vehicle.brandName} ${vehicle.modelName}`.trim()
+        ? vehicle.nickname?.trim() || `${vehicle.brandName} ${vehicle.modelFamilyName}`.trim()
         : "",
     [vehicle]
   );

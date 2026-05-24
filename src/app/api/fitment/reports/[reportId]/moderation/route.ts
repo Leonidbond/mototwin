@@ -1,30 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
+import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 import { recalculateFitmentConfidenceForKey } from "@/lib/fitment-confidence-prisma";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
 type RouteContext = { params: Promise<{ reportId: string }> };
 
-const patchSchema = z.object({
+const patchSchema = strictObject({
   moderationStatus: z.enum(["PENDING", "PUBLISHED", "NEEDS_REVIEW", "HIDDEN", "REJECTED"]),
 });
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { reportId } = await context.params;
-    const userCtx = await getCurrentUserContext();
-    if (!userCtx.isModerator) {
-      return NextResponse.json({ error: "Недостаточно прав." }, { status: 403 });
-    }
-    const body = patchSchema.parse(await request.json());
+    // MT-SEC-024: centralized RBAC instead of direct `userCtx.isModerator`.
+    await requireAdminRole(["MODERATOR", "CATALOG_MANAGER"]);
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 2 * 1024 });
+    const body = patchSchema.parse(raw);
 
     const report = await prisma.fitmentReport.findUnique({
       where: { id: reportId },
       select: {
         id: true,
         partMasterId: true,
-        modelVariantId: true,
+        motorcycleGenerationId: true,
         nodeId: true,
         moderationStatus: true,
       },
@@ -41,15 +42,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.moderationStatus === "PUBLISHED") {
       await recalculateFitmentConfidenceForKey(prisma, {
         partMasterId: report.partMasterId,
-        modelVariantId: report.modelVariantId,
+        motorcycleGenerationId: report.motorcycleGenerationId,
         nodeId: report.nodeId,
       });
     }
 
     return NextResponse.json({ report: updated });
   } catch (error) {
-    const ctxErr = toCurrentUserContextErrorResponse(error);
-    if (ctxErr) return ctxErr;
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
+    const adminErr = toAdminErrorResponse(error);
+    if (adminErr) return adminErr;
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation failed", issues: error.issues }, { status: 400 });
     }

@@ -28,6 +28,7 @@
 | [`mototwin_ui_refactor_playbook.md`](./mototwin_ui_refactor_playbook.md) | Playbook UI-рефакторинга |
 | [`top-node-icons.md`](./top-node-icons.md) | TOP-node иконки: хранение и именование |
 | [`node-tree-design-icons.md`](./node-tree-design-icons.md) | Иконки строк дерева узлов (design → `from-design` → `nodes`, скрипты) |
+| [`models/mototwin_model_technical_master_standard_cursor.md`](./models/mototwin_model_technical_master_standard_cursor.md) | **Standard:** unified motorcycle model technical master (4-уровневая иерархия `MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration` + `MotorcycleTechnicalSpecs`) — source of truth для CSV-импорта моделей и схемы. |
 
 ---
 
@@ -86,7 +87,13 @@
 
 ---
 
-## 8. Архив
+## 8. Security
+
+[`security/README.md`](./security/README.md) — аудит по OWASP Top 10 (web), OWASP API Top 10 (2023), OWASP Mobile Top 10 (2024). Включает: [threat-model](./security/threat-model.md), per-stream findings ([api](./security/api-findings.md) · [web](./security/web-findings.md) · [mobile](./security/mobile-findings.md)), сводный [реестр находок](./security/findings.md), [roadmap фиксов](./security/roadmap.md).
+
+---
+
+## 9. Архив
 
 Каталог **[`archive/`](./archive/)** — перенесённые «кандидаты в архив» из старого индекса: `project.md`, `node-status.md`, `documentation-gap-analysis.md`, планы `expo-bootstrap` / `expo-first-migration`, все **`expo-screen-*.md`**, черновик расходов `expenses-analytics-vision-draft.md`. См. [`archive/README.md`](./archive/README.md).
 

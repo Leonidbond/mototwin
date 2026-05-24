@@ -9,6 +9,8 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedInt, strictObject } from "@/lib/http/input-validation";
 
 type RouteContext = {
   params: Promise<{
@@ -16,15 +18,16 @@ type RouteContext = {
   }>;
 };
 
-const updateVehicleStateSchema = z.object({
-  odometer: z.number().int().min(0),
-  engineHours: z.number().int().min(0).nullable(),
+// MT-SEC-068 + MT-SEC-070: bound odometer/engineHours and forbid extra fields.
+const updateVehicleStateSchema = strictObject({
+  odometer: boundedInt({ min: 0, max: 10_000_000 }),
+  engineHours: boundedInt({ min: 0, max: 1_000_000 }).nullable(),
 });
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const json = await request.json();
+    const json = await parseJsonBody<unknown>(request, { maxBytes: 2 * 1024 });
     const data = updateVehicleStateSchema.parse(json);
 
     const vehicle = await getVehicleInCurrentContext(id, { id: true });
@@ -215,6 +218,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ vehicle: updatedVehicle });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

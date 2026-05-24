@@ -50,6 +50,15 @@ export type MobileOAuthInput = {
   provider: OAuthProvider;
   idToken?: string;
   accessToken?: string;
+  /**
+   * Raw (un-hashed) nonce for the Apple Sign-In flow. The client generates a
+   * cryptographically random string, computes SHA-256(rawNonce), and passes
+   * the digest as `nonce` to AppleAuthentication.signInAsync. The server then
+   * verifies that the JWT's `nonce` claim equals SHA-256(rawNonce).
+   *
+   * MT-SEC-003 in docs/security/findings.md.
+   */
+  rawNonce?: string;
 };
 
 export type ForgotPasswordInput = {

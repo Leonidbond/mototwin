@@ -749,7 +749,7 @@ export default function VehicleServiceLogPage() {
       const vehicle = detail.vehicle;
       const title =
         vehicle?.nickname ||
-        `${vehicle?.brandName || ""} ${vehicle?.modelName || ""}`.trim() ||
+        `${vehicle?.brandName || ""} ${vehicle?.modelFamilyName || ""}`.trim() ||
         "Мотоцикл";
       setVehicleTitle(title);
       setVehicleVin(vehicle?.vin ?? null);

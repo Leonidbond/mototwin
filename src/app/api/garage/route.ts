@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import type { GarageVehiclesResponse } from "@mototwin/types";
 import { computeGarageAttentionByVehicleId } from "@/lib/vehicle-node-tree-internal";
 import { prisma } from "@/lib/prisma";
+import { toGarageVehicleItem, vehicleWireInclude } from "@/lib/vehicle-wire";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
@@ -21,12 +23,7 @@ export async function GET() {
       orderBy: {
         createdAt: "desc",
       },
-      include: {
-        brand: true,
-        model: true,
-        modelVariant: true,
-        rideProfile: true,
-      },
+      include: vehicleWireInclude,
     });
 
     const attentionById = await computeGarageAttentionByVehicleId(
@@ -38,16 +35,18 @@ export async function GET() {
       }))
     );
 
-    const vehiclesPayload = vehicles.map((v) => ({
-      ...v,
-      attentionSummary: attentionById.get(v.id) ?? {
-        totalCount: 0,
-        overdueCount: 0,
-        soonCount: 0,
-      },
-    }));
+    const vehiclesPayload: GarageVehiclesResponse = {
+      vehicles: vehicles.map((row) => ({
+        ...toGarageVehicleItem(row),
+        attentionSummary: attentionById.get(row.id) ?? {
+          totalCount: 0,
+          overdueCount: 0,
+          soonCount: 0,
+        },
+      })),
+    };
 
-    return NextResponse.json({ vehicles: vehiclesPayload });
+    return NextResponse.json(vehiclesPayload);
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {

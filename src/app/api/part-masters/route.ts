@@ -3,15 +3,19 @@ import { z } from "zod";
 import { buildPartMasterIdentity, normalizePartNumber } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedText, boundedTextOptional, strictObject } from "@/lib/http/input-validation";
 
-const createSchema = z.object({
-  brandName: z.string().trim().min(1),
-  sku: z.string().trim().min(1),
-  title: z.string().trim().min(1),
-  category: z.string().trim().min(1),
-  description: z.string().trim().optional().nullable(),
-  vehicleId: z.string().trim().min(1),
-  nodeId: z.string().trim().min(1),
+// MT-SEC-068 + MT-SEC-070: strict + bounded — user-created catalog records
+// end up in shared moderation queue, so bound every field tightly.
+const createSchema = strictObject({
+  brandName: boundedText({ min: 1, max: 120 }),
+  sku: boundedText({ min: 1, max: 100 }),
+  title: boundedText({ min: 1, max: 300 }),
+  category: boundedText({ min: 1, max: 120 }),
+  description: boundedTextOptional({ max: 2_000 }),
+  vehicleId: boundedText({ max: 64 }),
+  nodeId: boundedText({ max: 64 }),
   /** When true, also creates catalog {@link PartSku} + node link so the part appears in recommendations. */
   attachSkuToNode: z.boolean().optional(),
 });
@@ -19,7 +23,8 @@ const createSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const userCtx = await getCurrentUserContext();
-    const body = createSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 8 * 1024 });
+    const body = createSchema.parse(raw);
     const { brandNormalized, normalizedSku, skuLabel } = buildPartMasterIdentity({
       brandName: body.brandName,
       skuLabel: body.sku,
@@ -43,7 +48,7 @@ export async function POST(request: NextRequest) {
         garage: { ownerUserId: userCtx.userId },
         trashedAt: null,
       },
-      select: { id: true, modelVariantId: true },
+      select: { id: true, motorcycleGenerationId: true },
     });
     if (!vehicle) {
       return NextResponse.json({ error: "Мотоцикл не найден." }, { status: 404 });
@@ -123,6 +128,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ partMaster: master, skuId }, { status: 201 });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const ctxErr = toCurrentUserContextErrorResponse(error);
     if (ctxErr) return ctxErr;
     if (error instanceof z.ZodError) {

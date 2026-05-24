@@ -24,11 +24,14 @@ They are updated only through **"Обновить состояние"** (`STATE_
 
 Profile edit does not change:
 
-- `brandId`
-- `modelId`
-- `modelVariantId`
+- `motorcycleBrandId`
+- `motorcycleModelFamilyId`
+- `motorcycleVariantId`
+- `motorcycleGenerationId`
 - ownership fields (`userId`, `garageId`)
 - trash fields (`trashedAt`, `trashExpiresAt`)
+
+Каталог моделей теперь 4-уровневый (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration` + sidecar `MotorcycleTechnicalSpecs`), см. [data-model.md](./data-model.md). Чтобы поменять привязку ТС к модели/поколению, нужно создать новый мотоцикл (а старый — в свалку): миграция между поколениями в profile-flow не предусмотрена.
 
 ## API
 

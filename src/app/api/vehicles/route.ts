@@ -1,20 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { CreateVehicleResponse } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
+import { toGarageVehicleItem, vehicleWireInclude } from "@/lib/vehicle-wire";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
 } from "../_shared/current-user-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedInt, boundedText, boundedTextOptional, strictObject } from "@/lib/http/input-validation";
 
-const createVehicleSchema = z.object({
-  brandId: z.string().min(1),
-  modelId: z.string().min(1),
-  modelVariantId: z.string().min(1),
-  nickname: z.string().trim().nullable().optional(),
-  vin: z.string().trim().nullable().optional(),
-  odometer: z.number().int().min(0),
-  engineHours: z.number().int().min(0).nullable(),
-  rideProfile: z.object({
+// MT-SEC-068 + MT-SEC-070: strictObject blocks mass assignment; nickname/vin
+// length-capped; nested rideProfile object is also strict.
+const createVehicleSchema = strictObject({
+  motorcycleBrandId: boundedText({ max: 64 }),
+  motorcycleModelFamilyId: boundedText({ max: 64 }),
+  motorcycleVariantId: boundedText({ max: 64 }),
+  motorcycleGenerationId: boundedText({ max: 64 }),
+  nickname: boundedTextOptional({ max: 120 }),
+  // VIN is 17 chars max per ISO 3779; allow some slack for legacy inputs.
+  vin: boundedTextOptional({ max: 32 }),
+  odometer: boundedInt({ min: 0, max: 10_000_000 }),
+  engineHours: boundedInt({ min: 0, max: 1_000_000 }).nullable(),
+  rideProfile: strictObject({
     usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
     ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
     loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
@@ -24,17 +32,37 @@ const createVehicleSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const json = await request.json();
+    const json = await parseJsonBody<unknown>(request, { maxBytes: 8 * 1024 });
     const data = createVehicleSchema.parse(json);
     const currentUser = await getCurrentUserContext();
+
+    /** Validate the 4-level FK chain belongs together before creating the vehicle. */
+    const generation = await prisma.motorcycleGeneration.findFirst({
+      where: {
+        id: data.motorcycleGenerationId,
+        variantId: data.motorcycleVariantId,
+        variant: {
+          familyId: data.motorcycleModelFamilyId,
+          family: { brandId: data.motorcycleBrandId },
+        },
+      },
+      select: { id: true },
+    });
+    if (!generation) {
+      return NextResponse.json(
+        { error: "Указанные бренд/семейство/модификация/поколение не согласованы." },
+        { status: 400 }
+      );
+    }
 
     const vehicle = await prisma.vehicle.create({
       data: {
         userId: currentUser.userId,
         garageId: currentUser.garageId,
-        brandId: data.brandId,
-        modelId: data.modelId,
-        modelVariantId: data.modelVariantId,
+        motorcycleBrandId: data.motorcycleBrandId,
+        motorcycleModelFamilyId: data.motorcycleModelFamilyId,
+        motorcycleVariantId: data.motorcycleVariantId,
+        motorcycleGenerationId: data.motorcycleGenerationId,
         nickname: data.nickname || null,
         vin: data.vin || null,
         odometer: data.odometer,
@@ -48,16 +76,17 @@ export async function POST(request: NextRequest) {
           },
         },
       },
-      include: {
-        brand: true,
-        model: true,
-        modelVariant: true,
-        rideProfile: true,
-      },
+      include: vehicleWireInclude,
     });
 
-    return NextResponse.json({ vehicle }, { status: 201 });
+    const payload: CreateVehicleResponse = {
+      vehicle: toGarageVehicleItem(vehicle),
+    };
+    return NextResponse.json(payload, { status: 201 });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

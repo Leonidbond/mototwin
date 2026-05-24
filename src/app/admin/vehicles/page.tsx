@@ -9,8 +9,10 @@ import { ruAdmin } from "../_locales/ru";
 
 interface AdminVehiclesPageProps {
   searchParams: Promise<{
-    brandId?: string;
-    modelId?: string;
+    motorcycleBrandId?: string;
+    motorcycleModelFamilyId?: string;
+    motorcycleVariantId?: string;
+    motorcycleGenerationId?: string;
     year?: string;
     q?: string;
     sort?: string;
@@ -21,22 +23,27 @@ interface AdminVehiclesPageProps {
 export default async function AdminVehiclesPage({ searchParams }: AdminVehiclesPageProps) {
   const params = await searchParams;
   const filters: AdminVehicleListFilters = {
-    brandId: params.brandId || undefined,
-    modelId: params.modelId || undefined,
+    motorcycleBrandId: params.motorcycleBrandId || undefined,
+    motorcycleModelFamilyId: params.motorcycleModelFamilyId || undefined,
+    motorcycleVariantId: params.motorcycleVariantId || undefined,
+    motorcycleGenerationId: params.motorcycleGenerationId || undefined,
     year: parseInt(params.year ?? "", 10) || undefined,
     q: params.q || undefined,
     sort: parseSort(params.sort),
   };
   const page = Number(params.page ?? 1);
 
-  const [self, list, brands, years] = await Promise.all([
+  const [self, list, brands, yearRows] = await Promise.all([
     loadAdminSelf(),
     loadAdminVehicleList({ filters, page }),
-    prisma.brand.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.modelVariant.findMany({
-      orderBy: { year: "desc" },
-      select: { year: true },
-      distinct: ["year"],
+    prisma.motorcycleBrand.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.motorcycleGeneration.findMany({
+      orderBy: { yearFrom: "desc" },
+      select: { yearFrom: true },
+      distinct: ["yearFrom"],
     }),
   ]);
 
@@ -46,14 +53,17 @@ export default async function AdminVehiclesPage({ searchParams }: AdminVehiclesP
         fields={[
           { key: "q", label: "Поиск", search: true, placeholder: "VIN, имя, никнейм" },
           {
-            key: "brandId",
+            key: "motorcycleBrandId",
             label: "Бренд",
             options: brands.map((b) => ({ value: b.id, label: b.name })),
           },
           {
             key: "year",
             label: "Год",
-            options: years.map((y) => ({ value: String(y.year), label: String(y.year) })),
+            options: yearRows.map((y) => ({
+              value: String(y.yearFrom),
+              label: String(y.yearFrom),
+            })),
           },
           {
             key: "sort",

@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import {
+  toVehicleDetailApiRecord,
+  vehicleWireInclude,
+} from "@/lib/vehicle-wire";
+import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
 } from "../../../_shared/current-user-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedTextOptional, strictObject } from "@/lib/http/input-validation";
 
 type RouteContext = {
   params: Promise<{
@@ -12,10 +18,11 @@ type RouteContext = {
   }>;
 };
 
-const updateVehicleProfileSchema = z.object({
-  nickname: z.string().trim().nullable(),
-  vin: z.string().trim().nullable(),
-  rideProfile: z.object({
+// MT-SEC-068 + MT-SEC-070: strict object + capped strings.
+const updateVehicleProfileSchema = strictObject({
+  nickname: boundedTextOptional({ max: 120 }),
+  vin: boundedTextOptional({ max: 32 }),
+  rideProfile: strictObject({
     usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
     ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
     loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
@@ -26,7 +33,7 @@ const updateVehicleProfileSchema = z.object({
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const json = await request.json();
+    const json = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
     const data = updateVehicleProfileSchema.parse(json);
     const currentUser = await getCurrentUserContext();
 
@@ -68,16 +75,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           },
         },
       },
-      include: {
-        brand: true,
-        model: true,
-        modelVariant: true,
-        rideProfile: true,
-      },
+      include: vehicleWireInclude,
     });
 
-    return NextResponse.json({ vehicle: updatedVehicle });
+    return NextResponse.json({
+      vehicle: toVehicleDetailApiRecord(updatedVehicle),
+    });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

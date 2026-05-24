@@ -33,9 +33,18 @@ export async function registerUser(input: {
     throw new AuthServiceError("INVALID_PASSWORD", 400, passwordError);
   }
 
+  // MT-SEC-004: returning a distinct EMAIL_TAKEN response lets attackers
+  // enumerate registered addresses. We keep the 409 status (the UX expects
+  // it) but emit a generic message that mirrors the password-recovery flow,
+  // so the response body alone does not confirm the e-mail exists. The hard
+  // defense — per-IP rate limiting — is wired separately (MT-SEC-002).
   const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (existing) {
-    throw new AuthServiceError("EMAIL_TAKEN", 409, "Пользователь с таким email уже зарегистрирован.");
+    throw new AuthServiceError(
+      "REGISTRATION_REJECTED",
+      409,
+      "Не удалось завершить регистрацию. Если у вас уже есть аккаунт — войдите или восстановите пароль."
+    );
   }
 
   const passwordHash = await hashPassword(input.password);
@@ -87,13 +96,17 @@ export async function verifyUserCredentials(
   if (!user?.passwordHash) {
     throw new AuthServiceError("INVALID_CREDENTIALS", 401, "Неверный email или пароль.");
   }
-  if (user.isBlocked) {
-    throw new AuthServiceError("ACCOUNT_BLOCKED", 403, "Аккаунт заблокирован. Обратитесь в поддержку.");
-  }
 
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) {
     throw new AuthServiceError("INVALID_CREDENTIALS", 401, "Неверный email или пароль.");
+  }
+
+  // The block check runs AFTER password verification (MT-SEC-016): otherwise
+  // an attacker could enumerate which addresses are registered + blocked just
+  // by submitting any password and observing the 403 vs 401 status flip.
+  if (user.isBlocked) {
+    throw new AuthServiceError("ACCOUNT_BLOCKED", 403, "Аккаунт заблокирован. Обратитесь в поддержку.");
   }
 
   return {
@@ -252,7 +265,7 @@ export async function resolveOrCreateOAuthUser(input: {
     };
   }
 
-  const user = await prisma.$transaction(async (tx) => {
+  const { user, linkedToExistingEmail } = await prisma.$transaction(async (tx) => {
     const byEmail =
       normalizedEmail != null
         ? await tx.user.findUnique({
@@ -293,8 +306,21 @@ export async function resolveOrCreateOAuthUser(input: {
       },
     });
 
-    return baseUser;
+    return { user: baseUser, linkedToExistingEmail: Boolean(byEmail) };
   });
+
+  if (linkedToExistingEmail) {
+    // Auto-linking an OAuth account to a pre-existing local user is a
+    // sensitive event (MT-SEC-050). For verified-email providers (Google,
+    // Apple) the risk is low — Yandex linking is disabled at the provider
+    // level. We still emit a forensic breadcrumb so we can detect anomalies
+    // in audit log analysis. A follow-up email-notification to the user is
+    // tracked in docs/security/findings.md as MT-SEC-050.
+    console.warn(
+      "[auth] oauth account linked to existing user",
+      JSON.stringify({ userId: user.id, provider, providerAccountId })
+    );
+  }
 
   await ensureUserBootstrap(user.id);
   return {

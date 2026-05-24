@@ -5,27 +5,31 @@ import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { ADMIN_CACHE_TAGS } from "@/lib/admin-cache";
 import { prisma } from "@/lib/prisma";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
-const PayloadSchema = z.object({
-  kind: z.enum(["PART_MASTER", "FITMENT_REPORT", "FITMENT_CONFIDENCE"]),
-  id: z.string().min(1),
-  action: z.enum([
-    "approve",
-    "reject",
-    "publish",
-    "needs_review",
-    "hide",
-    "verify",
-    "community_confirm",
-  ]),
-  reason: z.string().max(500).optional(),
-});
+// MT-SEC-068 + MT-SEC-070: strict + bounded id length.
+const PayloadSchema = z
+  .object({
+    kind: z.enum(["PART_MASTER", "FITMENT_REPORT", "FITMENT_CONFIDENCE"]),
+    id: z.string().min(1).max(64),
+    action: z.enum([
+      "approve",
+      "reject",
+      "publish",
+      "needs_review",
+      "hide",
+      "verify",
+      "community_confirm",
+    ]),
+    reason: z.string().max(500).optional(),
+  })
+  .strict();
 
 /** Apply a moderation action and write to the audit log. */
 export async function POST(request: Request) {
   try {
     const ctx = await requireAdminRole(["SUPER_ADMIN", "CATALOG_MANAGER", "MODERATOR"]);
-    const body = await request.json();
+    const body = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
     const parsed = PayloadSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -127,6 +131,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: "Неподдерживаемый тип" }, { status: 400 });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const handled = toAdminErrorResponse(error);
     if (handled) return handled;
     console.error("admin/moderation/action:", error);

@@ -9,9 +9,9 @@ const TOP_NODES = 14;
 
 export async function loadAdminFitmentMatrix(): Promise<AdminFitmentMatrixResponse> {
   const [topBrands, topNodes, confidences] = await Promise.all([
-    prisma.brand.findMany({
+    prisma.motorcycleBrand.findMany({
       take: TOP_BRANDS,
-      orderBy: { models: { _count: "desc" } },
+      orderBy: { families: { _count: "desc" } },
       select: { id: true, name: true },
     }),
     prisma.node.findMany({
@@ -23,7 +23,15 @@ export async function loadAdminFitmentMatrix(): Promise<AdminFitmentMatrixRespon
     prisma.fitmentConfidence.findMany({
       where: { partMaster: { status: "ACTIVE" } },
       include: {
-        modelVariant: { include: { model: { select: { brandId: true } } } },
+        motorcycleGeneration: {
+          select: {
+            variant: {
+              select: {
+                family: { select: { brandId: true } },
+              },
+            },
+          },
+        },
         node: { select: { id: true } },
       },
     }),
@@ -34,7 +42,7 @@ export async function loadAdminFitmentMatrix(): Promise<AdminFitmentMatrixRespon
   const nodeLookup = new Map(topNodes.map((n) => [n.id, n.name]));
 
   for (const fc of confidences) {
-    const brandId = fc.modelVariant.model.brandId;
+    const brandId = fc.motorcycleGeneration.variant.family.brandId;
     const nodeId = fc.node.id;
     if (!brandLookup.has(brandId) || !nodeLookup.has(nodeId)) continue;
     const key = `${brandId}::${nodeId}`;

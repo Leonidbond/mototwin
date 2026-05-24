@@ -222,11 +222,10 @@ export function buildPartSkuViewModel(row: {
   fitments: Array<{
     id: string;
     skuId: string;
-    brandId: string | null;
-    modelId: string | null;
-    modelVariantId: string | null;
-    yearFrom: number | null;
-    yearTo: number | null;
+    motorcycleBrandId: string | null;
+    motorcycleModelFamilyId: string | null;
+    motorcycleVariantId: string | null;
+    motorcycleGenerationId: string | null;
     market: string | null;
     engineCode: string | null;
     vinFrom: string | null;
@@ -302,11 +301,10 @@ export function buildPartSkuViewModel(row: {
   const fitments: PartFitment[] = row.fitments.map((f) => ({
     id: f.id,
     skuId: f.skuId,
-    brandId: f.brandId,
-    modelId: f.modelId,
-    modelVariantId: f.modelVariantId,
-    yearFrom: f.yearFrom,
-    yearTo: f.yearTo,
+    motorcycleBrandId: f.motorcycleBrandId,
+    motorcycleModelFamilyId: f.motorcycleModelFamilyId,
+    motorcycleVariantId: f.motorcycleVariantId,
+    motorcycleGenerationId: f.motorcycleGenerationId,
     market: f.market,
     engineCode: f.engineCode,
     vinFrom: f.vinFrom,

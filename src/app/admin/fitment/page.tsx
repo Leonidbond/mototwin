@@ -19,7 +19,11 @@ export default async function AdminFitmentPage() {
       take: TOP_PROBLEM,
       include: {
         partMaster: { select: { brandName: true, sku: true, id: true } },
-        modelVariant: { include: { model: { include: { brand: true } } } },
+        motorcycleGeneration: {
+          include: {
+            variant: { include: { family: { include: { brand: true } } } },
+          },
+        },
         node: { select: { name: true } },
       },
     }),
@@ -29,7 +33,11 @@ export default async function AdminFitmentPage() {
       take: TOP_PROBLEM,
       include: {
         partMaster: { select: { brandName: true, sku: true, id: true } },
-        modelVariant: { include: { model: { include: { brand: true } } } },
+        motorcycleGeneration: {
+          include: {
+            variant: { include: { family: { include: { brand: true } } } },
+          },
+        },
         node: { select: { name: true } },
       },
     }),
@@ -49,23 +57,29 @@ export default async function AdminFitmentPage() {
       <section style={twoColGrid}>
         <ProblemList
           title="Конфликтующие fitments"
-          items={mixed.map((row) => ({
-            id: row.id,
-            primary: `${row.partMaster.brandName} ${row.partMaster.sku}`,
-            secondary: `${row.modelVariant.model.brand.name} ${row.modelVariant.model.name} ${row.modelVariant.year} · ${row.node.name}`,
-            badge: `${row.reportCount} reports`,
-            href: `/admin/moderation?queue=mixedFitments`,
-          }))}
+          items={mixed.map((row) => {
+            const gen = row.motorcycleGeneration;
+            return {
+              id: row.id,
+              primary: `${row.partMaster.brandName} ${row.partMaster.sku}`,
+              secondary: `${gen.variant.family.brand.name} ${gen.variant.family.name} ${gen.variant.name} ${gen.name} · ${row.node.name}`,
+              badge: `${row.reportCount} reports`,
+              href: `/admin/moderation?queue=mixedFitments`,
+            };
+          })}
         />
         <ProblemList
           title="Низкая уверенность"
-          items={lowConfidence.map((row) => ({
-            id: row.id,
-            primary: `${row.partMaster.brandName} ${row.partMaster.sku}`,
-            secondary: `${row.modelVariant.model.brand.name} ${row.modelVariant.model.name} ${row.modelVariant.year} · ${row.node.name}`,
-            badge: `${row.confidenceScore}/100`,
-            href: `/admin/catalog/${row.partMaster.id}?tab=fitments`,
-          }))}
+          items={lowConfidence.map((row) => {
+            const gen = row.motorcycleGeneration;
+            return {
+              id: row.id,
+              primary: `${row.partMaster.brandName} ${row.partMaster.sku}`,
+              secondary: `${gen.variant.family.brand.name} ${gen.variant.family.name} ${gen.variant.name} ${gen.name} · ${row.node.name}`,
+              badge: `${row.confidenceScore}/100`,
+              href: `/admin/catalog/${row.partMaster.id}?tab=fitments`,
+            };
+          })}
         />
       </section>
     </AdminPageChrome>

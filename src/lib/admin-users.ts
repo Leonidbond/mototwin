@@ -150,9 +150,10 @@ export async function loadAdminUserDetail(userId: string): Promise<AdminUserDeta
         orderBy: { createdAt: "desc" },
         take: 5,
         include: {
-          brand: { select: { name: true } },
-          model: { select: { name: true } },
-          modelVariant: { select: { year: true } },
+          motorcycleBrand: { select: { name: true } },
+          motorcycleModelFamily: { select: { name: true } },
+          motorcycleVariant: { select: { name: true } },
+          motorcycleGeneration: { select: { yearFrom: true, name: true } },
         },
       },
       fitmentReportsCreated: {
@@ -212,9 +213,9 @@ export async function loadAdminUserDetail(userId: string): Promise<AdminUserDeta
     })),
     recentVehicles: user.vehicles.map((v) => ({
       id: v.id,
-      brandLabel: v.brand.name,
-      modelLabel: v.model.name,
-      year: v.modelVariant.year,
+      brandLabel: v.motorcycleBrand.name,
+      modelLabel: `${v.motorcycleModelFamily.name} ${v.motorcycleVariant.name}`.trim(),
+      year: v.motorcycleGeneration.yearFrom,
       nickname: v.nickname,
       odometer: v.odometer,
       createdAt: v.createdAt.toISOString(),

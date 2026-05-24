@@ -7,6 +7,7 @@ import {
 } from "@/app/api/_shared/current-user-context";
 import { notificationSnoozeSchema } from "@/app/api/_shared/notifications-http";
 import { serializeNotification, transitionNotificationStatus } from "@/lib/notifications";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
 type RouteContext = { params: Promise<{ notificationId: string }> };
 
@@ -14,7 +15,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const currentUser = await getCurrentUserContext();
     const { notificationId } = await context.params;
-    const parsed = notificationSnoozeSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 1 * 1024 });
+    const parsed = notificationSnoozeSchema.parse(raw);
     const notification = await transitionNotificationStatus({
       userId: currentUser.userId,
       notificationId,
@@ -26,6 +28,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
     return NextResponse.json({ notification: serializeNotification(notification) });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const userContextError = toCurrentUserContextErrorResponse(error);
     if (userContextError) return userContextError;
     if (error instanceof z.ZodError) {

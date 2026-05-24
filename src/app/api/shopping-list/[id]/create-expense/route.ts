@@ -5,6 +5,8 @@ import type { ExpenseItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedNumber, boundedText, boundedTextOptional, strictObject } from "@/lib/http/input-validation";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -22,12 +24,15 @@ type ExpenseRow = Omit<
   updatedAt: Date;
 };
 
-const createExpenseSchema = z.object({
-  amount: z.number().positive(),
-  currency: z.string().trim().min(1).max(12),
+// MT-SEC-068 + MT-SEC-070: strict + capped fields.
+const createExpenseSchema = strictObject({
+  amount: boundedNumber({ min: 0, max: 1_000_000_000 }).refine((value) => value > 0, {
+    message: "amount must be > 0",
+  }),
+  currency: boundedText({ min: 1, max: 12 }),
   purchasedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
-  vendor: z.string().trim().nullable().optional(),
-  comment: z.string().trim().nullable().optional(),
+  vendor: boundedTextOptional({ max: 200 }),
+  comment: boundedTextOptional({ max: 2_000 }),
 });
 
 function toWire(row: ExpenseRow): ExpenseItem {
@@ -45,7 +50,8 @@ function toWire(row: ExpenseRow): ExpenseItem {
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const data = createExpenseSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 8 * 1024 });
+    const data = createExpenseSchema.parse(raw);
 
     const item = await prisma.partWishlistItem.findUnique({
       where: { id },
@@ -117,6 +123,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ expense: toWire(expense as ExpenseRow) }, { status: 201 });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

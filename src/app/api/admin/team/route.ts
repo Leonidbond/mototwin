@@ -5,14 +5,18 @@ import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { loadAdminTeam } from "@/lib/admin-settings";
 import { prisma } from "@/lib/prisma";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
-const PayloadSchema = z.object({
-  userId: z.string().min(1),
-  adminRole: z
-    .enum(["SUPER_ADMIN", "CATALOG_MANAGER", "MODERATOR", "ANALYST"])
-    .nullable(),
-  reason: z.string().min(3).max(500),
-});
+// MT-SEC-068 + MT-SEC-070: strict + bounded userId length.
+const PayloadSchema = z
+  .object({
+    userId: z.string().min(1).max(64),
+    adminRole: z
+      .enum(["SUPER_ADMIN", "CATALOG_MANAGER", "MODERATOR", "ANALYST"])
+      .nullable(),
+    reason: z.string().min(3).max(500),
+  })
+  .strict();
 
 export async function GET() {
   try {
@@ -30,7 +34,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const ctx = await requireAdminRole(["SUPER_ADMIN"]);
-    const body = await request.json();
+    const body = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
     const parsed = PayloadSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -84,6 +88,9 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const handled = toAdminErrorResponse(error);
     if (handled) return handled;
     console.error("admin/team PATCH:", error);

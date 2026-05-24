@@ -103,9 +103,10 @@ export type VehicleProfileFormValues = EditVehicleProfileFormValues;
 export type EditVehicleProfilePayload = UpdateVehicleProfilePayload;
 
 export type AddMotorcycleFormValues = {
-  brandId: string;
-  modelId: string;
-  modelVariantId: string;
+  motorcycleBrandId: string;
+  motorcycleModelFamilyId: string;
+  motorcycleVariantId: string;
+  motorcycleGenerationId: string;
   nickname: string;
   vin: string;
   odometer: string;

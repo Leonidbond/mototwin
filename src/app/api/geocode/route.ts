@@ -6,6 +6,14 @@ import {
   yandexGeocodeForwardAll,
   yandexGeocodeReverse,
 } from "@/lib/yandex-geocoder";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "@/app/api/_shared/current-user-context";
+import { rateLimit, rateLimit429 } from "@/lib/http/rate-limit";
+import { parseSearchParamText } from "@/lib/http/input-validation";
+
+const GEOCODE_QUERY_MAX = 256;
 
 export async function GET(request: Request) {
   if (!getYandexGeocoderApiKey()) {
@@ -15,8 +23,32 @@ export async function GET(request: Request) {
     );
   }
 
+  let userId: string;
+  try {
+    // MT-SEC-074: was unauthenticated → arbitrary callers could exhaust the
+    // paid Yandex Geocoder budget. Require auth + per-user rate limit.
+    const userCtx = await getCurrentUserContext();
+    userId = userCtx.userId;
+  } catch (error) {
+    const ctxErr = toCurrentUserContextErrorResponse(error);
+    if (ctxErr) return ctxErr;
+    throw error;
+  }
+
+  const decision = rateLimit({
+    bucket: "geocode",
+    request,
+    limit: 60,
+    windowMs: 60_000,
+    extraKey: userId,
+  });
+  if (!decision.allowed) {
+    return rateLimit429(decision);
+  }
+
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get("query")?.trim();
+  // MT-SEC-072: cap query length (Yandex limit + DoS protection).
+  const query = parseSearchParamText(searchParams.get("query"), { max: GEOCODE_QUERY_MAX });
   const latRaw = searchParams.get("lat");
   const lngRaw = searchParams.get("lng");
 

@@ -1613,9 +1613,10 @@ export function createInitialAddMotorcycleFormValues(
   overrides?: Partial<AddMotorcycleFormValues>
 ): AddMotorcycleFormValues {
   return {
-    brandId: "",
-    modelId: "",
-    modelVariantId: "",
+    motorcycleBrandId: "",
+    motorcycleModelFamilyId: "",
+    motorcycleVariantId: "",
+    motorcycleGenerationId: "",
     nickname: "",
     vin: "",
     odometer: "",
@@ -1639,9 +1640,10 @@ export function normalizeAddMotorcyclePayload(
   }
 
   return {
-    brandId: values.brandId.trim(),
-    modelId: values.modelId.trim(),
-    modelVariantId: values.modelVariantId.trim(),
+    motorcycleBrandId: values.motorcycleBrandId.trim(),
+    motorcycleModelFamilyId: values.motorcycleModelFamilyId.trim(),
+    motorcycleVariantId: values.motorcycleVariantId.trim(),
+    motorcycleGenerationId: values.motorcycleGenerationId.trim(),
     nickname: values.nickname.trim() || null,
     vin: values.vin.trim() || null,
     odometer,
@@ -1655,8 +1657,20 @@ export function normalizeAddMotorcyclePayload(
   };
 }
 
+/**
+ * Per-step error keys for the 4-level motorcycle picker (Brand → Model family → Variant → Generation).
+ * Mirrors {@link AddMotorcycleFormValues}.
+ */
 export type AddMotorcycleFieldErrors = Partial<
-  Record<"brandId" | "modelId" | "modelVariantId" | "odometer" | "engineHours", string>
+  Record<
+    | "motorcycleBrandId"
+    | "motorcycleModelFamilyId"
+    | "motorcycleVariantId"
+    | "motorcycleGenerationId"
+    | "odometer"
+    | "engineHours",
+    string
+  >
 >;
 
 export function validateAddMotorcycleFormValues(
@@ -1667,20 +1681,26 @@ export function validateAddMotorcycleFormValues(
   const fieldErrors: AddMotorcycleFieldErrors = {};
 
   const missingTree =
-    !values.brandId.trim() || !values.modelId.trim() || !values.modelVariantId.trim();
+    !values.motorcycleBrandId.trim() ||
+    !values.motorcycleModelFamilyId.trim() ||
+    !values.motorcycleVariantId.trim() ||
+    !values.motorcycleGenerationId.trim();
 
   if (missingTree) {
     if (style === "web") {
-      errors.push("Выберите бренд, модель и модификацию.");
+      errors.push("Выберите бренд, семейство, модификацию и поколение.");
     } else {
-      if (!values.brandId.trim()) {
-        fieldErrors.brandId = "Выберите марку.";
+      if (!values.motorcycleBrandId.trim()) {
+        fieldErrors.motorcycleBrandId = "Выберите марку.";
       }
-      if (!values.modelId.trim()) {
-        fieldErrors.modelId = "Выберите модель.";
+      if (!values.motorcycleModelFamilyId.trim()) {
+        fieldErrors.motorcycleModelFamilyId = "Выберите семейство.";
       }
-      if (!values.modelVariantId.trim()) {
-        fieldErrors.modelVariantId = "Выберите модификацию.";
+      if (!values.motorcycleVariantId.trim()) {
+        fieldErrors.motorcycleVariantId = "Выберите модификацию.";
+      }
+      if (!values.motorcycleGenerationId.trim()) {
+        fieldErrors.motorcycleGenerationId = "Выберите поколение.";
       }
       errors.push("Проверьте обязательные поля формы.");
     }

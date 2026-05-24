@@ -35,10 +35,12 @@ export function VehicleCard(props: {
   const overdueCount = props.vehicle.attentionSummary?.overdueCount ?? 0;
   const okCount = Math.max(0, 10 - attentionTotal);
   const recentlyCount = 0;
+  const generation = props.vehicle.motorcycleGeneration;
+  const generationYear = generation.yearsLabel?.trim() || generation.yearFrom || null;
   const metaLine = [
-    props.vehicle.modelVariant?.year,
+    generationYear,
     card.summary.odometerLine,
-    props.vehicle.modelVariant?.versionName,
+    props.vehicle.motorcycleVariant.name,
   ]
     .filter((chunk): chunk is string | number => Boolean(chunk))
     .join(" · ");

@@ -1,4 +1,11 @@
+import { fetchWithTimeout } from "@/lib/http/fetch-with-timeout";
+
 const GEOCODE_BASE = "https://geocode-maps.yandex.ru/v1";
+/**
+ * 6s is enough headroom for a slow Yandex response without letting one stalled
+ * upstream pin a request thread indefinitely (MT-SEC-015).
+ */
+const GEOCODE_TIMEOUT_MS = 6_000;
 
 export type YandexGeocodedPlace = {
   address: string;
@@ -73,7 +80,7 @@ async function fetchGeocode(params: URLSearchParams): Promise<YandexGeocodedPlac
   params.set("results", params.get("results") ?? "10");
 
   const url = `${GEOCODE_BASE}/?${params.toString()}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetchWithTimeout(url, { cache: "no-store", timeoutMs: GEOCODE_TIMEOUT_MS });
   const data = (await res.json()) as YandexGeocodeJson;
 
   if (!res.ok) {
@@ -105,7 +112,7 @@ export async function yandexGeocodeForwardAll(query: string): Promise<YandexGeoc
     results: "10",
   });
   const url = `${GEOCODE_BASE}/?${params.toString()}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetchWithTimeout(url, { cache: "no-store", timeoutMs: GEOCODE_TIMEOUT_MS });
   const data = (await res.json()) as YandexGeocodeJson;
 
   if (!res.ok) {

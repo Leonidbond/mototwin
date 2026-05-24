@@ -16,13 +16,32 @@ export function buildPasswordResetUrl(rawToken: string): string {
   return `${getBaseUrl()}/reset-password?${q.toString()}`;
 }
 
+function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  if (at <= 0) return "***";
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const head = local.slice(0, 1);
+  const tail = local.length > 2 ? local.slice(-1) : "";
+  return `${head}***${tail}@${domain}`;
+}
+
 export async function sendPasswordResetEmail(input: { to: string; rawToken: string }): Promise<void> {
   const resetUrl = buildPasswordResetUrl(input.rawToken);
   const resendApiKey = process.env.RESEND_API_KEY?.trim();
   const fromAddress = process.env.AUTH_EMAIL_FROM?.trim() || "MotoTwin <no-reply@mototwin.local>";
 
   if (!resendApiKey) {
-    console.info(`[auth] Password reset for ${input.to}: ${resetUrl}`);
+    if (process.env.NODE_ENV === "production") {
+      // Hard-fail in production: silently dropping reset emails is a
+      // worse outcome than a 500 — and we MUST NOT log the email + working
+      // reset URL to console logs (MT-SEC-022). Operators see the error
+      // and add RESEND_API_KEY.
+      throw new Error(
+        "Password reset email transport is not configured: RESEND_API_KEY is required in production"
+      );
+    }
+    console.info(`[auth] Password reset (dev only) for ${maskEmail(input.to)}: ${resetUrl}`);
     return;
   }
 

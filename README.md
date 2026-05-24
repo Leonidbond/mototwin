@@ -67,3 +67,8 @@ git pull origin main
 
 cd /Users/lbondarenko/Mototwin/mototwin/apps/app
 npx expo start --tunnel -c
+
+пользователь локально
+URL:      /login
+Email:    demo@mototwin.local
+Пароль:   demo12345

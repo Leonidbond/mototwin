@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { toGarageVehicleItem, vehicleWireInclude } from "@/lib/vehicle-wire";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
@@ -17,14 +18,11 @@ export async function GET() {
         },
       },
       orderBy: [{ trashedAt: "desc" }],
-      include: {
-        brand: true,
-        model: true,
-        modelVariant: true,
-        rideProfile: true,
-      },
+      include: vehicleWireInclude,
     });
-    return NextResponse.json({ vehicles });
+    return NextResponse.json({
+      vehicles: vehicles.map((row) => toGarageVehicleItem(row)),
+    });
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {

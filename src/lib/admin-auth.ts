@@ -93,6 +93,22 @@ export async function requireAnyAdmin(): Promise<AdminContext> {
   return getAdminContext();
 }
 
+/**
+ * Non-throwing version of `getAdminContext` — returns null when the current
+ * user has no admin role (e.g. for hybrid "owner OR moderator" checks). Used
+ * by routes that want to fall back to an ownership check without surfacing a
+ * 403 to legitimate non-admin users (MT-SEC-024).
+ */
+export async function tryGetAdminContext(): Promise<AdminContext | null> {
+  try {
+    return await getAdminContext();
+  } catch (error) {
+    if (error instanceof AdminAccessError) return null;
+    if (error instanceof CurrentUserContextError) return null;
+    throw error;
+  }
+}
+
 /** Convert thrown errors from admin auth/context into NextResponses. */
 export function toAdminErrorResponse(error: unknown): NextResponse | null {
   if (error instanceof AdminAccessError) {

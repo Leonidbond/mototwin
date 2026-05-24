@@ -33,14 +33,22 @@ export type PartSkuNodeLink = {
   node: PartSkuNodeSummary;
 };
 
+/**
+ * Wire shape of a part-fitment rule, anchored on the unified motorcycle hierarchy
+ * (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`).
+ *
+ * - All four anchor IDs are nullable: rules that match an entire brand have only
+ *   `motorcycleBrandId`, rules that match an entire family have brand + family, etc.
+ * - When all four are null, the rule is treated as `GENERIC` by the recommendation
+ *   engine and surfaced as VERIFY.
+ */
 export type PartFitment = {
   id: string;
   skuId: string;
-  brandId: string | null;
-  modelId: string | null;
-  modelVariantId: string | null;
-  yearFrom: number | null;
-  yearTo: number | null;
+  motorcycleBrandId: string | null;
+  motorcycleModelFamilyId: string | null;
+  motorcycleVariantId: string | null;
+  motorcycleGenerationId: string | null;
   market: string | null;
   engineCode: string | null;
   vinFrom: string | null;

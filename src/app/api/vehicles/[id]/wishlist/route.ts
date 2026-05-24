@@ -11,6 +11,8 @@ import { prisma } from "@/lib/prisma";
 import type { PartWishlistItem } from "@mototwin/types";
 import { isVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedInt, boundedNumber, boundedTextOptional } from "@/lib/http/input-validation";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 
@@ -37,10 +39,13 @@ const wishlistSkuSelect = {
   },
 } as const;
 
+// MT-SEC-070: bound all user-controlled text/numeric fields. Top-level object
+// stays non-strict because superRefine attaches custom validation; the field
+// allowlist below has the same effect.
 const createWishlistSchema = z
   .object({
     skuId: z
-      .union([z.string(), z.null(), z.undefined()])
+      .union([z.string().max(64), z.null(), z.undefined()])
       .transform((v) => {
         if (v == null) {
           return null;
@@ -49,11 +54,11 @@ const createWishlistSchema = z
         return t.length > 0 ? t : null;
       }),
     title: z
-      .union([z.string(), z.null(), z.undefined()])
+      .union([z.string().max(300), z.null(), z.undefined()])
       .transform((v) => (v == null ? "" : String(v).trim())),
-    quantity: z.number().int().min(1, "Количество должно быть не меньше 1").optional(),
+    quantity: boundedInt({ min: 1, max: 10_000 }).optional(),
     nodeId: z
-      .union([z.string(), z.null(), z.undefined()])
+      .union([z.string().max(64), z.null(), z.undefined()])
       .transform((v) => {
         if (v == null) {
           return null;
@@ -61,10 +66,10 @@ const createWishlistSchema = z
         const t = String(v).trim();
         return t.length > 0 ? t : null;
       }),
-    comment: z.string().trim().nullable().optional(),
+    comment: boundedTextOptional({ max: 2_000 }),
     status: statusEnum.optional(),
-    costAmount: z.union([z.number().min(0), z.null()]).optional(),
-    currency: z.union([z.string(), z.null()]).optional(),
+    costAmount: z.union([boundedNumber({ min: 0, max: 1_000_000_000 }), z.null()]).optional(),
+    currency: z.union([z.string().trim().max(12), z.null()]).optional(),
     source: z.enum(["RECOMMENDATION", "USER_ADDED"]).optional(),
   })
   .superRefine((data, ctx) => {
@@ -165,7 +170,7 @@ export async function GET(_: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId } = await context.params;
-    const json = await request.json();
+    const json = await parseJsonBody<unknown>(request, { maxBytes: 8 * 1024 });
     const data = createWishlistSchema.parse(json);
 
     const allowed = await isVehicleInCurrentContext(vehicleId);
@@ -259,6 +264,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ item: toWire(created) });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

@@ -101,15 +101,13 @@ async function loadQueueItems(queue: AdminModerationQueueKey): Promise<AdminMode
         where,
         orderBy: { createdAt: "desc" },
         take: QUEUE_TAKE,
-        select: {
-          id: true,
-          fitmentResult: true,
-          moderationStatus: true,
-          createdAt: true,
+        include: {
           partMaster: { select: { brandName: true, sku: true, title: true } },
           node: { select: { name: true, serviceGroup: true } },
-          modelVariant: {
-            include: { model: { include: { brand: true } } },
+          motorcycleGeneration: {
+            include: {
+              variant: { include: { family: { include: { brand: true } } } },
+            },
           },
         },
       });
@@ -119,11 +117,12 @@ async function loadQueueItems(queue: AdminModerationQueueKey): Promise<AdminMode
           : "—";
         const safety =
           row.node && (SAFETY_GROUPS as readonly string[]).includes(row.node.serviceGroup ?? "");
+        const gen = row.motorcycleGeneration;
         return {
           id: row.id,
           kind: "FITMENT_REPORT",
           title: part,
-          subtitle: `${row.modelVariant.model.brand.name} ${row.modelVariant.model.name} ${row.modelVariant.year} · ${row.node?.name ?? "—"} · ${row.fitmentResult}`,
+          subtitle: `${gen.variant.family.brand.name} ${gen.variant.family.name} ${gen.variant.name} ${gen.name} · ${row.node?.name ?? "—"} · ${row.fitmentResult}`,
           status: row.moderationStatus,
           badges: safety ? ["Safety"] : [],
           createdAt: row.createdAt.toISOString(),
@@ -137,19 +136,26 @@ async function loadQueueItems(queue: AdminModerationQueueKey): Promise<AdminMode
         take: QUEUE_TAKE,
         include: {
           partMaster: { select: { brandName: true, sku: true, title: true } },
-          modelVariant: { include: { model: { include: { brand: true } } } },
+          motorcycleGeneration: {
+            include: {
+              variant: { include: { family: { include: { brand: true } } } },
+            },
+          },
           node: { select: { name: true } },
         },
       });
-      return rows.map((row) => ({
-        id: row.id,
-        kind: "FITMENT_CONFIDENCE",
-        title: `${row.partMaster.brandName} ${row.partMaster.sku}`,
-        subtitle: `${row.modelVariant.model.brand.name} ${row.modelVariant.model.name} ${row.modelVariant.year} · ${row.node.name}`,
-        status: row.status,
-        badges: [`${row.reportCount} reports`],
-        createdAt: row.lastRecalculatedAt.toISOString(),
-      }));
+      return rows.map((row) => {
+        const gen = row.motorcycleGeneration;
+        return {
+          id: row.id,
+          kind: "FITMENT_CONFIDENCE",
+          title: `${row.partMaster.brandName} ${row.partMaster.sku}`,
+          subtitle: `${gen.variant.family.brand.name} ${gen.variant.family.name} ${gen.variant.name} ${gen.name} · ${row.node.name}`,
+          status: row.status,
+          badges: [`${row.reportCount} reports`],
+          createdAt: row.lastRecalculatedAt.toISOString(),
+        };
+      });
     }
     default:
       return [];
@@ -196,7 +202,11 @@ export async function loadModerationInspector(
       include: {
         partMaster: true,
         node: true,
-        modelVariant: { include: { model: { include: { brand: true } } } },
+        motorcycleGeneration: {
+          include: {
+            variant: { include: { family: { include: { brand: true } } } },
+          },
+        },
         createdBy: { select: { id: true, displayName: true, email: true } },
       },
     });
@@ -218,11 +228,12 @@ export async function loadModerationInspector(
       actions.push({ id: "reject", label: "Отклонить", tone: "danger" });
     }
 
+    const gen = report.motorcycleGeneration;
     return {
       id: report.id,
       kind: "FITMENT_REPORT",
       heading: partLabel,
-      subheading: `${report.modelVariant.model.brand.name} ${report.modelVariant.model.name} ${report.modelVariant.year}`,
+      subheading: `${gen.variant.family.brand.name} ${gen.variant.family.name} ${gen.variant.name} ${gen.name}`,
       status: report.moderationStatus,
       fields: [
         { label: "Узел", value: report.node?.name ?? "—" },
@@ -238,7 +249,7 @@ export async function loadModerationInspector(
       actions,
       links: [
         { label: "Деталь", href: `/admin/catalog/${report.partMasterId}` },
-        { label: "Модель", href: `/admin/models/${report.modelVariantId}` },
+        { label: "Модель", href: `/admin/models/${report.motorcycleGenerationId}` },
         ...(report.createdBy
           ? [{ label: "Пользователь", href: `/admin/users/${report.createdBy.id}` }]
           : []),
@@ -250,16 +261,21 @@ export async function loadModerationInspector(
       where: { id },
       include: {
         partMaster: true,
-        modelVariant: { include: { model: { include: { brand: true } } } },
+        motorcycleGeneration: {
+          include: {
+            variant: { include: { family: { include: { brand: true } } } },
+          },
+        },
         node: true,
       },
     });
     if (!fc) return null;
+    const gen = fc.motorcycleGeneration;
     return {
       id: fc.id,
       kind: "FITMENT_CONFIDENCE",
       heading: `${fc.partMaster.brandName} ${fc.partMaster.sku}`,
-      subheading: `${fc.modelVariant.model.brand.name} ${fc.modelVariant.model.name} ${fc.modelVariant.year} · ${fc.node.name}`,
+      subheading: `${gen.variant.family.brand.name} ${gen.variant.family.name} ${gen.variant.name} ${gen.name} · ${fc.node.name}`,
       status: fc.status,
       fields: [
         { label: "Reports", value: String(fc.reportCount) },
@@ -274,7 +290,7 @@ export async function loadModerationInspector(
       ],
       links: [
         { label: "Деталь", href: `/admin/catalog/${fc.partMasterId}` },
-        { label: "Модель", href: `/admin/models/${fc.modelVariantId}` },
+        { label: "Модель", href: `/admin/models/${fc.motorcycleGenerationId}` },
       ],
     };
   }

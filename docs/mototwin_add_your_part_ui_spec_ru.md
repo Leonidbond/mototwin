@@ -3,6 +3,10 @@
 
 ---
 
+> **Терминология (актуальный маппинг на схему):** упоминания `modelVariantId` в этом документе соответствуют **`motorcycleGenerationId`** из текущего унифицированного стандарта моделей (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`, см. [data-model.md](./data-model.md)). Совместимость и `FitmentReport` привязываются к конкретному `MotorcycleGeneration`.
+
+---
+
 # 1. Главный принцип
 
 Не использовать wizard на 4 отдельных экрана.

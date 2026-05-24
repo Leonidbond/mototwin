@@ -261,11 +261,41 @@ enum AdminRole {
 }
 
 enum ModelSupportLevel {
-  FULL_SUPPORT
+  MVP_CORE
+  MVP_CORE_LEGACY
   COMMUNITY_SUPPORT
   EARLY_BETA
-  NO_DATA
-  UNSUPPORTED
+  NO_FITMENT_DATA_YET
+}
+
+enum MotoDriveType {
+  CHAIN
+  SHAFT
+  BELT
+  UNKNOWN
+}
+
+enum MotoPowerUnit {
+  hp
+  PS
+  kW
+}
+
+enum MotoMarketRegion {
+  GLOBAL
+  EU
+  US
+  RU
+  OTHER
+}
+
+enum MotoWeightType {
+  dry
+  wet
+  curb
+  fully_fueled
+  without_fuel
+  unknown
 }
 
 enum ImportBatchType {
@@ -484,92 +514,171 @@ model Subscription {
   @@map("subscriptions")
 }
 
-model Brand {
+/**
+ * Top-level motorcycle brand (manufacturer). Replaces legacy `Brand`.
+ * See docs/models/mototwin_model_technical_master_standard_cursor.md.
+ */
+model MotorcycleBrand {
   id        String   @id @default(cuid())
   name      String   @unique
   slug      String   @unique
   createdAt DateTime @default(now())
 
-  models   Model[]
+  families MotorcycleModelFamily[]
   vehicles Vehicle[]
+  fitments PartFitment[]
 
-  @@map("brands")
+  @@map("motorcycle_brands")
 }
 
-model Model {
+/**
+ * Family of related models (e.g. "R 1300 GS", "390 Adventure"). Replaces legacy `Model`.
+ */
+model MotorcycleModelFamily {
   id        String   @id @default(cuid())
   brandId   String
   name      String
   slug      String
   createdAt DateTime @default(now())
 
-  brand    Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  variants ModelVariant[]
+  brand    MotorcycleBrand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  variants MotorcycleVariant[]
   vehicles Vehicle[]
+  fitments PartFitment[]
 
   @@unique([brandId, slug])
-  @@map("models")
+  @@map("motorcycle_model_families")
 }
 
-model ModelVariant {
-  id             String   @id @default(cuid())
-  modelId        String
-  year           Int
-  generation     String?
-  versionName    String
-  market         String?
-  engineType     String?
-  coolingType    String?
-  wheelSizes     String?
-  brakeSystem    String?
-  chainPitch     String?
-  stockSprockets String?
-  /** Admin override; when null, support level is inferred from data. */
-  supportLevel   ModelSupportLevel?
+/**
+ * Configuration/trim of a family (e.g. "R 1300 GS Adventure", "390 Adventure R").
+ * NEW level introduced by the unified standard — does not exist in legacy schema.
+ */
+model MotorcycleVariant {
+  id        String   @id @default(cuid())
+  familyId  String
+  name      String
+  slug      String
+  createdAt DateTime @default(now())
+
+  family      MotorcycleModelFamily  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  generations MotorcycleGeneration[]
+  vehicles    Vehicle[]
+  fitments    PartFitment[]
+
+  @@unique([familyId, slug])
+  @@map("motorcycle_variants")
+}
+
+/**
+ * Year-range generation of a variant — the canonical anchor for fitment and tech specs.
+ * Replaces legacy `ModelVariant` (which stored a single year + tech fields inline).
+ */
+model MotorcycleGeneration {
+  id           String           @id @default(cuid())
+  variantId    String
+  name         String
+  yearFrom     Int
+  yearTo       Int?
+  yearsLabel   String
+  marketRegion MotoMarketRegion
+  segment      String
+  /** Admin override / curated value; defaults to EARLY_BETA for new entries. */
+  supportLevel ModelSupportLevel @default(EARLY_BETA)
   /** Last reason captured when support level was changed by an admin. */
   supportLevelReason String?
-  createdAt      DateTime @default(now())
+  /** Free-form data quality status, e.g. official_current_us_converted, manual_seed_needs_official_verification. */
+  dataStatus String
+  comment    String?
+  sourceUrl  String?
+  createdAt  DateTime @default(now())
 
-  model    Model     @relation(fields: [modelId], references: [id], onDelete: Cascade)
-  vehicles Vehicle[]
-  fitmentConfidences FitmentConfidence[]
+  variant            MotorcycleVariant         @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  technicalSpecs     MotorcycleTechnicalSpecs?
+  vehicles           Vehicle[]
+  fitments           PartFitment[]
   fitmentReports     FitmentReport[]
+  fitmentConfidences FitmentConfidence[]
 
-  @@index([modelId, year])
-  @@map("model_variants")
+  @@unique([variantId, name, yearFrom, yearTo])
+  @@index([yearFrom, yearTo])
+  @@index([supportLevel])
+  @@map("motorcycle_generations")
+}
+
+/**
+ * 1:1 sidecar of technical parameters for {@link MotorcycleGeneration}.
+ * Power is stored as native (powerValue + powerUnit); powerHpNormalized is derived for filters.
+ */
+model MotorcycleTechnicalSpecs {
+  id                   String         @id @default(cuid())
+  generationId         String         @unique
+  engine               String
+  displacementCc       Float?
+  displacementIsApprox Boolean        @default(false)
+  powerValue           Float?
+  powerUnit            MotoPowerUnit?
+  /** Derived hp value for filtering/sorting; loader fills from powerValue+powerUnit when missing. */
+  powerHpNormalized    Float?
+  powerIsApprox        Boolean        @default(false)
+  torqueNm             Float?
+  torqueIsApprox       Boolean        @default(false)
+  gearbox              String?
+  drive                MotoDriveType
+  frontWheelIn         Float?
+  rearWheelIn          Float?
+  frontTire            String?
+  rearTire             String?
+  fuelLiters           Float?
+  fuelIsApprox         Boolean        @default(false)
+  weightKg             Float?
+  weightType           MotoWeightType?
+  /** Range allowed as string, e.g. "849/869". */
+  seatMm               String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  generation MotorcycleGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@index([drive])
+  @@index([frontWheelIn, rearWheelIn])
+  @@index([displacementCc])
+  @@map("motorcycle_technical_specs")
 }
 
 model Vehicle {
-  id             String    @id @default(cuid())
-  userId         String
-  garageId       String?
-  trashedAt      DateTime?
-  trashExpiresAt DateTime?
-  brandId        String
-  modelId        String
-  modelVariantId String
-  nickname       String?
-  vin            String?
-  odometer       Int       @default(0)
-  engineHours    Int?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                       String    @id @default(cuid())
+  userId                   String
+  garageId                 String?
+  trashedAt                DateTime?
+  trashExpiresAt           DateTime?
+  motorcycleBrandId        String
+  motorcycleModelFamilyId  String
+  motorcycleVariantId      String
+  motorcycleGenerationId   String
+  nickname                 String?
+  vin                      String?
+  odometer                 Int       @default(0)
+  engineHours              Int?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  garage            Garage?            @relation(fields: [garageId], references: [id], onDelete: SetNull)
-  brand             Brand              @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  model             Model              @relation(fields: [modelId], references: [id], onDelete: Restrict)
-  modelVariant      ModelVariant       @relation(fields: [modelVariantId], references: [id], onDelete: Restrict)
-  rideProfile       RideProfile?
-  serviceEvents     ServiceEvent[]
-  topNodeStates     TopNodeState[]
-  nodeStates        NodeState[]
-  notifications     Notification[]
-  notificationSettings VehicleNotificationSettings?
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  garage                 Garage?               @relation(fields: [garageId], references: [id], onDelete: SetNull)
+  motorcycleBrand        MotorcycleBrand       @relation(fields: [motorcycleBrandId], references: [id], onDelete: Restrict)
+  motorcycleModelFamily  MotorcycleModelFamily @relation(fields: [motorcycleModelFamilyId], references: [id], onDelete: Restrict)
+  motorcycleVariant      MotorcycleVariant     @relation(fields: [motorcycleVariantId], references: [id], onDelete: Restrict)
+  motorcycleGeneration   MotorcycleGeneration  @relation(fields: [motorcycleGenerationId], references: [id], onDelete: Restrict)
+  rideProfile            RideProfile?
+  serviceEvents          ServiceEvent[]
+  topNodeStates          TopNodeState[]
+  nodeStates             NodeState[]
+  notifications          Notification[]
+  notificationSettings   VehicleNotificationSettings?
   mileageHoursUpdateLogs MileageHoursUpdateLog[]
-  partWishlistItems PartWishlistItem[]
-  expenseItems      ExpenseItem[]
-  fitmentReports    FitmentReport[]
+  partWishlistItems      PartWishlistItem[]
+  expenseItems           ExpenseItem[]
+  fitmentReports         FitmentReport[]
 
   @@index([userId])
   @@index([garageId])
@@ -577,7 +686,7 @@ model Vehicle {
   @@index([trashExpiresAt])
   @@index([garageId, trashedAt])
   @@index([garageId, userId])
-  @@index([brandId, modelId, modelVariantId])
+  @@index([motorcycleBrandId, motorcycleModelFamilyId, motorcycleVariantId, motorcycleGenerationId])
   @@map("vehicles")
 }
 
@@ -863,12 +972,19 @@ model PartFitment {
   skuId String
   sku   PartSku @relation(fields: [skuId], references: [id], onDelete: Cascade)
 
-  brandId        String?
-  modelId        String?
-  modelVariantId String?
+  /**
+   * Progressive granularity. The deepest non-null FK wins when classifying a vehicle match
+   * (generation > variant > family > brand). All four are optional to support generic catalog rows.
+   */
+  motorcycleBrandId       String?
+  motorcycleModelFamilyId String?
+  motorcycleVariantId     String?
+  motorcycleGenerationId  String?
 
-  yearFrom Int?
-  yearTo   Int?
+  motorcycleBrand       MotorcycleBrand?       @relation(fields: [motorcycleBrandId], references: [id], onDelete: Cascade)
+  motorcycleModelFamily MotorcycleModelFamily? @relation(fields: [motorcycleModelFamilyId], references: [id], onDelete: Cascade)
+  motorcycleVariant     MotorcycleVariant?     @relation(fields: [motorcycleVariantId], references: [id], onDelete: Cascade)
+  motorcycleGeneration  MotorcycleGeneration?  @relation(fields: [motorcycleGenerationId], references: [id], onDelete: Cascade)
 
   market     String?
   engineCode String?
@@ -882,9 +998,10 @@ model PartFitment {
   createdAt DateTime @default(now())
 
   @@index([skuId])
-  @@index([brandId])
-  @@index([modelId])
-  @@index([modelVariantId])
+  @@index([motorcycleBrandId])
+  @@index([motorcycleModelFamilyId])
+  @@index([motorcycleVariantId])
+  @@index([motorcycleGenerationId])
   @@map("part_fitments")
 }
 
@@ -948,36 +1065,36 @@ model PartWishlistItem {
 }
 
 model FitmentReport {
-  id                    String                       @id @default(cuid())
-  partMasterId          String
-  partMaster            PartMaster                   @relation(fields: [partMasterId], references: [id], onDelete: Cascade)
-  vehicleId             String
-  vehicle               Vehicle                      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  modelVariantId        String
-  modelVariant          ModelVariant                 @relation(fields: [modelVariantId], references: [id], onDelete: Cascade)
-  nodeId                String
-  node                  Node                         @relation(fields: [nodeId], references: [id], onDelete: Restrict)
-  fitmentResult         FitmentReportResult
-  installationStatus    FitmentInstallationStatus
-  modificationRequired  Boolean                      @default(false)
-  modificationDetails   String?
-  comment               String?
-  installedAtMileage    Int?
-  installedAtHours      Int?
-  rideProfileSnapshot   Json?
-  rating                Int?
-  serviceEventId        String?
-  serviceEvent          ServiceEvent?                @relation(fields: [serviceEventId], references: [id], onDelete: SetNull)
-  moderationStatus      FitmentReportModerationStatus @default(PENDING)
-  createdByUserId       String
-  createdBy             User                         @relation("FitmentReportCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
-  createdAt             DateTime                     @default(now())
-  updatedAt             DateTime                     @updatedAt
+  id                     String                        @id @default(cuid())
+  partMasterId           String
+  partMaster             PartMaster                    @relation(fields: [partMasterId], references: [id], onDelete: Cascade)
+  vehicleId              String
+  vehicle                Vehicle                       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  motorcycleGenerationId String
+  motorcycleGeneration   MotorcycleGeneration          @relation(fields: [motorcycleGenerationId], references: [id], onDelete: Cascade)
+  nodeId                 String
+  node                   Node                          @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  fitmentResult          FitmentReportResult
+  installationStatus     FitmentInstallationStatus
+  modificationRequired   Boolean                       @default(false)
+  modificationDetails    String?
+  comment                String?
+  installedAtMileage     Int?
+  installedAtHours       Int?
+  rideProfileSnapshot    Json?
+  rating                 Int?
+  serviceEventId         String?
+  serviceEvent           ServiceEvent?                 @relation(fields: [serviceEventId], references: [id], onDelete: SetNull)
+  moderationStatus       FitmentReportModerationStatus @default(PENDING)
+  createdByUserId        String
+  createdBy              User                          @relation("FitmentReportCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
 
   evidence FitmentEvidence[]
   votes    FitmentVote[]
 
-  @@index([partMasterId, modelVariantId, nodeId])
+  @@index([partMasterId, motorcycleGenerationId, nodeId])
   @@index([vehicleId])
   @@index([moderationStatus])
   @@index([createdByUserId])
@@ -1014,25 +1131,25 @@ model FitmentVote {
 }
 
 model FitmentConfidence {
-  id                 String                  @id @default(cuid())
-  partMasterId       String
-  partMaster         PartMaster              @relation(fields: [partMasterId], references: [id], onDelete: Cascade)
-  modelVariantId     String
-  modelVariant       ModelVariant            @relation(fields: [modelVariantId], references: [id], onDelete: Cascade)
-  nodeId             String
-  node               Node                    @relation(fields: [nodeId], references: [id], onDelete: Restrict)
-  confidenceScore    Int                     @default(0)
-  reportCount        Int                     @default(0)
-  confirmationCount  Int                     @default(0)
-  rejectionCount     Int                     @default(0)
-  modificationCount  Int                     @default(0)
-  status             FitmentConfidenceStatus @default(LOW_CONFIDENCE)
+  id                     String                  @id @default(cuid())
+  partMasterId           String
+  partMaster             PartMaster              @relation(fields: [partMasterId], references: [id], onDelete: Cascade)
+  motorcycleGenerationId String
+  motorcycleGeneration   MotorcycleGeneration    @relation(fields: [motorcycleGenerationId], references: [id], onDelete: Cascade)
+  nodeId                 String
+  node                   Node                    @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  confidenceScore        Int                     @default(0)
+  reportCount            Int                     @default(0)
+  confirmationCount      Int                     @default(0)
+  rejectionCount         Int                     @default(0)
+  modificationCount      Int                     @default(0)
+  status                 FitmentConfidenceStatus @default(LOW_CONFIDENCE)
   /** When true, auto-recalc does not downgrade {@link status} (staff verified). */
-  isStaffVerified    Boolean                 @default(false)
-  lastRecalculatedAt DateTime               @default(now())
+  isStaffVerified        Boolean                 @default(false)
+  lastRecalculatedAt     DateTime                @default(now())
 
-  @@unique([partMasterId, modelVariantId, nodeId])
-  @@index([modelVariantId, nodeId])
+  @@unique([partMasterId, motorcycleGenerationId, nodeId])
+  @@index([motorcycleGenerationId, nodeId])
   @@map("fitment_confidence")
 }
 

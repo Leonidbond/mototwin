@@ -114,8 +114,12 @@ function buildProviders(): Provider[] {
 
   if (process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET) {
     providers.push(
+      // Yandex /info does not return an `email_verified` claim. Treating it as
+      // verified would let any Yandex user hijack a local account that shares
+      // the same `default_email` — see MT-SEC-005 in docs/security/findings.md.
+      // Linking is therefore explicit and goes through the dedicated UX.
       YandexProvider({
-        allowDangerousEmailAccountLinking: true,
+        allowDangerousEmailAccountLinking: false,
         clientId: process.env.YANDEX_CLIENT_ID,
         clientSecret: process.env.YANDEX_CLIENT_SECRET,
       })

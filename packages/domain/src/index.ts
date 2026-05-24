@@ -471,3 +471,4 @@ export {
   getOrderedTopNodeIdsPresentInNodeTree,
   filterLeafOptionsUnderTopNodeAncestors,
 } from "./picker-top-nodes";
+export { normalizePowerToHp } from "./motorcycle-power";

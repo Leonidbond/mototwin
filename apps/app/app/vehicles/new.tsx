@@ -21,9 +21,10 @@ import {
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
   AddMotorcycleFormValues,
-  BrandItem,
-  ModelItem,
-  ModelVariantItem,
+  MotorcycleBrandPickerItem,
+  MotorcycleGenerationPickerItem,
+  MotorcycleModelFamilyPickerItem,
+  MotorcycleVariantPickerItem,
   RideLoadType,
   RideStyle,
   RideUsageIntensity,
@@ -40,9 +41,10 @@ type RideOption<T extends string> = {
 };
 
 type FormErrors = {
-  brandId?: string;
-  modelId?: string;
-  modelVariantId?: string;
+  motorcycleBrandId?: string;
+  motorcycleModelFamilyId?: string;
+  motorcycleVariantId?: string;
+  motorcycleGenerationId?: string;
   odometer?: string;
   engineHours?: string;
 };
@@ -52,10 +54,47 @@ const RIDING_STYLE_OPTIONS = RIDE_RIDING_STYLE_OPTIONS as RideOption<RideStyle>[
 const LOAD_TYPE_OPTIONS = RIDE_LOAD_TYPE_OPTIONS as RideOption<RideLoadType>[];
 const USAGE_INTENSITY_OPTIONS = RIDE_USAGE_INTENSITY_OPTIONS as RideOption<RideUsageIntensity>[];
 
-function getVariantLabel(variant: ModelVariantItem): string {
-  const yearPart = String(variant.year);
-  const versionPart = variant.versionName?.trim() || "Без версии";
-  return `${yearPart} · ${versionPart}`;
+function formatGenerationYear(item: MotorcycleGenerationPickerItem): string {
+  const label = item.yearsLabel?.trim();
+  if (label) {
+    return label;
+  }
+  if (item.yearFrom && item.yearTo) {
+    return `${item.yearFrom}–${item.yearTo}`;
+  }
+  if (item.yearFrom) {
+    return `${item.yearFrom}–`;
+  }
+  return "—";
+}
+
+function getGenerationLabel(item: MotorcycleGenerationPickerItem): string {
+  const year = formatGenerationYear(item);
+  const trimmedName = item.name?.trim();
+  return trimmedName ? `${year} · ${trimmedName}` : year;
+}
+
+function getGenerationSpecsHint(item: MotorcycleGenerationPickerItem): string | null {
+  const specs = item.technicalSpecs;
+  if (!specs) {
+    return null;
+  }
+  const parts: string[] = [];
+  if (specs.engine?.trim()) {
+    parts.push(specs.engine.trim());
+  }
+  if (specs.displacementCc != null) {
+    parts.push(`${specs.displacementCc} см³`);
+  }
+  if (specs.powerHpNormalized != null) {
+    parts.push(`${specs.powerHpNormalized} л.с.`);
+  } else if (specs.powerValue != null && specs.powerUnit) {
+    parts.push(`${specs.powerValue} ${specs.powerUnit}`);
+  }
+  if (specs.gearbox?.trim()) {
+    parts.push(specs.gearbox.trim());
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 function SelectChips<T extends string>({
@@ -92,21 +131,24 @@ const defaultNewMotorcycleForm = createInitialAddMotorcycleFormValues();
 export default function NewVehicleScreen() {
   const router = useRouter();
 
-  const [brands, setBrands] = useState<BrandItem[]>([]);
-  const [models, setModels] = useState<ModelItem[]>([]);
-  const [variants, setVariants] = useState<ModelVariantItem[]>([]);
+  const [brands, setBrands] = useState<MotorcycleBrandPickerItem[]>([]);
+  const [modelFamilies, setModelFamilies] = useState<MotorcycleModelFamilyPickerItem[]>([]);
+  const [variants, setVariants] = useState<MotorcycleVariantPickerItem[]>([]);
+  const [generations, setGenerations] = useState<MotorcycleGenerationPickerItem[]>([]);
 
   const [isLoadingBrands, setIsLoadingBrands] = useState(true);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isLoadingModelFamilies, setIsLoadingModelFamilies] = useState(false);
   const [isLoadingVariants, setIsLoadingVariants] = useState(false);
+  const [isLoadingGenerations, setIsLoadingGenerations] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const [screenError, setScreenError] = useState("");
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
-  const [brandId, setBrandId] = useState("");
-  const [modelId, setModelId] = useState("");
-  const [modelVariantId, setModelVariantId] = useState("");
+  const [motorcycleBrandId, setMotorcycleBrandId] = useState("");
+  const [motorcycleModelFamilyId, setMotorcycleModelFamilyId] = useState("");
+  const [motorcycleVariantId, setMotorcycleVariantId] = useState("");
+  const [motorcycleGenerationId, setMotorcycleGenerationId] = useState("");
 
   const [nickname, setNickname] = useState("");
   const [vin, setVin] = useState("");
@@ -127,7 +169,7 @@ export default function NewVehicleScreen() {
         setScreenError("");
         const endpoints = createMobileApiClient();
         const response = await withAuthGuard(
-          () => endpoints.getBrands(),
+          () => endpoints.getMotorcycleBrands(),
           () => router.replace("/login")
         );
         if (!response) {
@@ -145,44 +187,50 @@ export default function NewVehicleScreen() {
   }, [router]);
 
   useEffect(() => {
-    if (!brandId) {
-      setModels([]);
-      setModelId("");
+    if (!motorcycleBrandId) {
+      setModelFamilies([]);
+      setMotorcycleModelFamilyId("");
       setVariants([]);
-      setModelVariantId("");
+      setMotorcycleVariantId("");
+      setGenerations([]);
+      setMotorcycleGenerationId("");
       return;
     }
 
-    const loadModels = async () => {
+    const loadModelFamilies = async () => {
       try {
-        setIsLoadingModels(true);
+        setIsLoadingModelFamilies(true);
         setScreenError("");
         const endpoints = createMobileApiClient();
         const response = await withAuthGuard(
-          () => endpoints.getModels(brandId),
+          () => endpoints.getMotorcycleModelFamilies(motorcycleBrandId),
           () => router.replace("/login")
         );
         if (!response) {
           return;
         }
-        setModels(response.models || []);
+        setModelFamilies(response.families || []);
       } catch (error) {
-        setScreenError("Не удалось загрузить модели выбранной марки.");
+        setScreenError("Не удалось загрузить семейства выбранной марки.");
       } finally {
-        setIsLoadingModels(false);
+        setIsLoadingModelFamilies(false);
       }
     };
 
-    setModelId("");
+    setMotorcycleModelFamilyId("");
     setVariants([]);
-    setModelVariantId("");
-    void loadModels();
-  }, [brandId, router]);
+    setMotorcycleVariantId("");
+    setGenerations([]);
+    setMotorcycleGenerationId("");
+    void loadModelFamilies();
+  }, [motorcycleBrandId, router]);
 
   useEffect(() => {
-    if (!modelId) {
+    if (!motorcycleModelFamilyId) {
       setVariants([]);
-      setModelVariantId("");
+      setMotorcycleVariantId("");
+      setGenerations([]);
+      setMotorcycleGenerationId("");
       return;
     }
 
@@ -192,7 +240,7 @@ export default function NewVehicleScreen() {
         setScreenError("");
         const endpoints = createMobileApiClient();
         const response = await withAuthGuard(
-          () => endpoints.getModelVariants(modelId),
+          () => endpoints.getMotorcycleVariants(motorcycleModelFamilyId),
           () => router.replace("/login")
         );
         if (!response) {
@@ -200,21 +248,55 @@ export default function NewVehicleScreen() {
         }
         setVariants(response.variants || []);
       } catch (error) {
-        setScreenError("Не удалось загрузить модификации выбранной модели.");
+        setScreenError("Не удалось загрузить модификации выбранного семейства.");
       } finally {
         setIsLoadingVariants(false);
       }
     };
 
-    setModelVariantId("");
+    setMotorcycleVariantId("");
+    setGenerations([]);
+    setMotorcycleGenerationId("");
     void loadVariants();
-  }, [modelId, router]);
+  }, [motorcycleModelFamilyId, router]);
+
+  useEffect(() => {
+    if (!motorcycleVariantId) {
+      setGenerations([]);
+      setMotorcycleGenerationId("");
+      return;
+    }
+
+    const loadGenerations = async () => {
+      try {
+        setIsLoadingGenerations(true);
+        setScreenError("");
+        const endpoints = createMobileApiClient();
+        const response = await withAuthGuard(
+          () => endpoints.getMotorcycleGenerations(motorcycleVariantId),
+          () => router.replace("/login")
+        );
+        if (!response) {
+          return;
+        }
+        setGenerations(response.generations || []);
+      } catch (error) {
+        setScreenError("Не удалось загрузить поколения выбранной модификации.");
+      } finally {
+        setIsLoadingGenerations(false);
+      }
+    };
+
+    setMotorcycleGenerationId("");
+    void loadGenerations();
+  }, [motorcycleVariantId, router]);
 
   const submitCreateVehicle = async () => {
     const motorcycleForm: AddMotorcycleFormValues = {
-      brandId,
-      modelId,
-      modelVariantId,
+      motorcycleBrandId,
+      motorcycleModelFamilyId,
+      motorcycleVariantId,
+      motorcycleGenerationId,
       nickname,
       vin,
       odometer,
@@ -259,7 +341,7 @@ export default function NewVehicleScreen() {
       <ScreenHeader title="Добавить мотоцикл" />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <Text style={styles.description}>
-          Заполните базовые данные. Сначала выберите марку, затем модель и модификацию.
+          Заполните базовые данные. Сначала выберите марку, семейство, модификацию и поколение.
         </Text>
 
         {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
@@ -274,13 +356,13 @@ export default function NewVehicleScreen() {
           ) : (
             <View style={styles.chipsWrap}>
               {brands.map((brand) => {
-                const isSelected = brand.id === brandId;
+                const isSelected = brand.id === motorcycleBrandId;
                 return (
                   <Pressable
                     key={brand.id}
                     onPress={() => {
-                      setBrandId(brand.id);
-                      setFormErrors((prev) => ({ ...prev, brandId: undefined }));
+                      setMotorcycleBrandId(brand.id);
+                      setFormErrors((prev) => ({ ...prev, motorcycleBrandId: undefined }));
                     }}
                     style={[styles.chip, isSelected && styles.chipActive]}
                   >
@@ -292,74 +374,147 @@ export default function NewVehicleScreen() {
               })}
             </View>
           )}
-          {formErrors.brandId ? <Text style={styles.inlineErrorText}>{formErrors.brandId}</Text> : null}
+          {formErrors.motorcycleBrandId ? (
+            <Text style={styles.inlineErrorText}>{formErrors.motorcycleBrandId}</Text>
+          ) : null}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Модель *</Text>
-          {!brandId ? <Text style={styles.hintText}>Сначала выберите марку.</Text> : null}
-          {brandId && isLoadingModels ? (
+          <Text style={styles.sectionTitle}>Семейство *</Text>
+          {!motorcycleBrandId ? (
+            <Text style={styles.hintText}>Сначала выберите марку.</Text>
+          ) : null}
+          {motorcycleBrandId && isLoadingModelFamilies ? (
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color={c.textPrimary} />
-              <Text style={styles.loadingText}>Загрузка моделей...</Text>
+              <Text style={styles.loadingText}>Загрузка семейств...</Text>
             </View>
           ) : null}
-          {brandId && !isLoadingModels ? (
+          {motorcycleBrandId && !isLoadingModelFamilies ? (
             <View style={styles.chipsWrap}>
-              {models.map((model) => {
-                const isSelected = model.id === modelId;
+              {modelFamilies.map((family) => {
+                const isSelected = family.id === motorcycleModelFamilyId;
                 return (
                   <Pressable
-                    key={model.id}
+                    key={family.id}
                     onPress={() => {
-                      setModelId(model.id);
-                      setFormErrors((prev) => ({ ...prev, modelId: undefined }));
+                      setMotorcycleModelFamilyId(family.id);
+                      setFormErrors((prev) => ({
+                        ...prev,
+                        motorcycleModelFamilyId: undefined,
+                      }));
                     }}
                     style={[styles.chip, isSelected && styles.chipActive]}
                   >
                     <Text style={[styles.chipLabel, isSelected && styles.chipLabelActive]}>
-                      {model.name}
+                      {family.name}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
           ) : null}
-          {formErrors.modelId ? <Text style={styles.inlineErrorText}>{formErrors.modelId}</Text> : null}
+          {formErrors.motorcycleModelFamilyId ? (
+            <Text style={styles.inlineErrorText}>{formErrors.motorcycleModelFamilyId}</Text>
+          ) : null}
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Модификация *</Text>
-          {!modelId ? <Text style={styles.hintText}>Сначала выберите модель.</Text> : null}
-          {modelId && isLoadingVariants ? (
+          {!motorcycleModelFamilyId ? (
+            <Text style={styles.hintText}>Сначала выберите семейство.</Text>
+          ) : null}
+          {motorcycleModelFamilyId && isLoadingVariants ? (
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color={c.textPrimary} />
               <Text style={styles.loadingText}>Загрузка модификаций...</Text>
             </View>
           ) : null}
-          {modelId && !isLoadingVariants ? (
+          {motorcycleModelFamilyId && !isLoadingVariants ? (
             <View style={styles.chipsWrap}>
               {variants.map((variant) => {
-                const isSelected = variant.id === modelVariantId;
+                const isSelected = variant.id === motorcycleVariantId;
                 return (
                   <Pressable
                     key={variant.id}
                     onPress={() => {
-                      setModelVariantId(variant.id);
-                      setFormErrors((prev) => ({ ...prev, modelVariantId: undefined }));
+                      setMotorcycleVariantId(variant.id);
+                      setFormErrors((prev) => ({
+                        ...prev,
+                        motorcycleVariantId: undefined,
+                      }));
                     }}
                     style={[styles.chip, isSelected && styles.chipActive]}
                   >
                     <Text style={[styles.chipLabel, isSelected && styles.chipLabelActive]}>
-                      {getVariantLabel(variant)}
+                      {variant.name}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
           ) : null}
-          {formErrors.modelVariantId ? (
-            <Text style={styles.inlineErrorText}>{formErrors.modelVariantId}</Text>
+          {formErrors.motorcycleVariantId ? (
+            <Text style={styles.inlineErrorText}>{formErrors.motorcycleVariantId}</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Поколение *</Text>
+          {!motorcycleVariantId ? (
+            <Text style={styles.hintText}>Сначала выберите модификацию.</Text>
+          ) : null}
+          {motorcycleVariantId && isLoadingGenerations ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color={c.textPrimary} />
+              <Text style={styles.loadingText}>Загрузка поколений...</Text>
+            </View>
+          ) : null}
+          {motorcycleVariantId && !isLoadingGenerations ? (
+            <View style={styles.generationList}>
+              {generations.map((generation) => {
+                const isSelected = generation.id === motorcycleGenerationId;
+                const specsHint = getGenerationSpecsHint(generation);
+                return (
+                  <Pressable
+                    key={generation.id}
+                    onPress={() => {
+                      setMotorcycleGenerationId(generation.id);
+                      setFormErrors((prev) => ({
+                        ...prev,
+                        motorcycleGenerationId: undefined,
+                      }));
+                    }}
+                    style={[
+                      styles.generationCard,
+                      isSelected && styles.generationCardActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.generationTitle,
+                        isSelected && styles.generationTitleActive,
+                      ]}
+                    >
+                      {getGenerationLabel(generation)}
+                    </Text>
+                    {specsHint ? (
+                      <Text
+                        style={[
+                          styles.generationSubtitle,
+                          isSelected && styles.generationSubtitleActive,
+                        ]}
+                      >
+                        {specsHint}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+          {formErrors.motorcycleGenerationId ? (
+            <Text style={styles.inlineErrorText}>{formErrors.motorcycleGenerationId}</Text>
           ) : null}
         </View>
 
@@ -514,6 +669,39 @@ const styles = StyleSheet.create({
   },
   chipLabelActive: {
     color: c.onPrimaryAction,
+  },
+  generationList: {
+    marginTop: 10,
+    gap: 8,
+  },
+  generationCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.card,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  generationCardActive: {
+    backgroundColor: c.primaryAction,
+    borderColor: c.primaryAction,
+  },
+  generationTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: c.textPrimary,
+  },
+  generationTitleActive: {
+    color: c.onPrimaryAction,
+  },
+  generationSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: c.textMeta,
+  },
+  generationSubtitleActive: {
+    color: c.onPrimaryAction,
+    opacity: 0.85,
   },
   input: {
     marginTop: 10,

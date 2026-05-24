@@ -18,7 +18,7 @@ export default async function AdminModelDetailPage({ params }: AdminModelDetailP
   const [self, detail] = await Promise.all([loadAdminSelf(), loadAdminModelDetail(id)]);
   if (!detail) notFound();
 
-  const title = `${detail.brandLabel} ${detail.modelLabel} ${detail.year}`;
+  const title = `${detail.brandLabel} ${detail.modelFamilyLabel} ${detail.variantLabel} ${detail.generationLabel}`;
   const allowMutate = canMutate(self.role);
 
   return (
@@ -42,13 +42,17 @@ export default async function AdminModelDetailPage({ params }: AdminModelDetailP
                 color: productSemanticColors.textPrimary,
               }}
             >
-              {detail.versionName}
+              {detail.variantLabel} · {detail.generationLabel}
             </h2>
             <SupportLevelChip level={detail.supportLevel} />
           </div>
           <dl style={specGrid}>
-            <Spec term="Поколение" value={detail.generation} />
-            <Spec term="Рынок" value={detail.market} />
+            <Spec term="Поколение" value={detail.generationLabel} />
+            <Spec
+              term="Годы выпуска"
+              value={formatYears(detail.productionYearFrom, detail.productionYearTo)}
+            />
+            <Spec term="Рынок" value={detail.marketRegion} />
             <Spec term="Двигатель" value={detail.engineType} />
             <Spec term="Охлаждение" value={detail.coolingType} />
             <Spec term="Колеса" value={detail.wheelSizes} />
@@ -115,7 +119,7 @@ export default async function AdminModelDetailPage({ params }: AdminModelDetailP
           )}
         </div>
         <SupportLevelForm
-          modelVariantId={detail.modelVariantId}
+          motorcycleGenerationId={detail.motorcycleGenerationId}
           current={detail.supportLevel}
           override={detail.supportLevelOverride}
           reasonHint={detail.supportLevelReason}
@@ -124,6 +128,12 @@ export default async function AdminModelDetailPage({ params }: AdminModelDetailP
       </section>
     </AdminPageChrome>
   );
+}
+
+function formatYears(from: number | null, to: number | null): string | null {
+  if (from == null && to == null) return null;
+  if (from != null && to != null) return from === to ? String(from) : `${from}–${to}`;
+  return from != null ? `${from}+` : `…${to}`;
 }
 
 function Spec({ term, value }: { term: string; value: string | null | undefined }) {

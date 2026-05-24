@@ -14,10 +14,11 @@ import type {
   UpdateExpenseItemResponse,
 } from "./expense-item";
 import type {
-  BrandItem,
   GarageVehicleItem,
-  ModelItem,
-  ModelVariantItem,
+  MotorcycleBrandPickerItem,
+  MotorcycleGenerationPickerItem,
+  MotorcycleModelFamilyPickerItem,
+  MotorcycleVariantPickerItem,
   UpdateVehicleProfileResult,
   VehicleTrashInfo,
   VehicleDetail,
@@ -160,9 +161,15 @@ export type UpdateVehicleStateResponse = {
 
 export type UpdateVehicleProfileResponse = UpdateVehicleProfileResult;
 
-export type BrandsResponse = {
-  brands: BrandItem[];
+export type MotorcycleBrandsResponse = {
+  brands: MotorcycleBrandPickerItem[];
 };
+
+/**
+ * @deprecated Renamed to {@link MotorcycleBrandsResponse}; kept as an alias while UI
+ * surfaces are migrated. The wire shape is identical.
+ */
+export type BrandsResponse = MotorcycleBrandsResponse;
 
 export type ServiceBundleTemplatesResponse = {
   templates: ServiceBundleTemplateWire[];
@@ -195,13 +202,23 @@ export type CreateUserServiceEventFormTemplateResponse = {
   template: UserServiceEventFormTemplateWire;
 };
 
-export type ModelsResponse = {
-  models: ModelItem[];
+export type MotorcycleModelFamiliesResponse = {
+  families: MotorcycleModelFamilyPickerItem[];
 };
 
-export type ModelVariantsResponse = {
-  variants: ModelVariantItem[];
+export type MotorcycleVariantsResponse = {
+  variants: MotorcycleVariantPickerItem[];
 };
+
+export type MotorcycleGenerationsResponse = {
+  generations: MotorcycleGenerationPickerItem[];
+};
+
+/** @deprecated Renamed to {@link MotorcycleModelFamiliesResponse}. */
+export type ModelsResponse = MotorcycleModelFamiliesResponse;
+
+/** @deprecated Renamed to {@link MotorcycleVariantsResponse}. */
+export type ModelVariantsResponse = MotorcycleVariantsResponse;
 
 export type CreateVehicleResponse = {
   vehicle: GarageVehicleItem;

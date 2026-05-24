@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
+import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 
 export async function GET() {
   try {
-    const userCtx = await getCurrentUserContext();
-    if (!userCtx.isModerator) {
-      return NextResponse.json({ error: "Недостаточно прав." }, { status: 403 });
-    }
+    // MT-SEC-024: any moderator may read the queue; SUPER_ADMIN is implicit.
+    await requireAdminRole(["MODERATOR", "CATALOG_MANAGER"]);
 
     const [pendingMasters, pendingReports, safetyPending] = await Promise.all([
       prisma.partMaster.findMany({
@@ -62,8 +60,8 @@ export async function GET() {
       safetyCriticalPending: safetyPending,
     });
   } catch (error) {
-    const ctxErr = toCurrentUserContextErrorResponse(error);
-    if (ctxErr) return ctxErr;
+    const adminErr = toAdminErrorResponse(error);
+    if (adminErr) return adminErr;
     console.error("moderation fitment GET:", error);
     return NextResponse.json({ error: "Не удалось загрузить очередь." }, { status: 500 });
   }

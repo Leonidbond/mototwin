@@ -5,6 +5,8 @@ import type {
   VehicleTrashRetentionDays,
 } from "@mototwin/types";
 
+import { pickGenerationYearLabel } from "./vehicle-view-models";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function calculateTrashExpiresAt(
@@ -37,16 +39,19 @@ export function buildTrashedVehicleViewModel(
   vehicle: GarageVehicleItem & VehicleTrashInfo,
   now = new Date()
 ): TrashedVehicleViewModel {
-  const title = vehicle.nickname?.trim() || `${vehicle.brand.name} ${vehicle.model.name}`;
-  const year = vehicle.modelVariant?.year ?? "—";
-  const variant = vehicle.modelVariant?.versionName ?? "Модификация не указана";
+  const brand = vehicle.motorcycleBrand.name;
+  const family = vehicle.motorcycleModelFamily.name;
+  const variant = vehicle.motorcycleVariant.name;
+  const generation = vehicle.motorcycleGeneration.name;
+  const title = vehicle.nickname?.trim() || `${brand} ${family}`;
+  const yearLabel = pickGenerationYearLabel(vehicle.motorcycleGeneration);
   const trashedAtDate = new Date(vehicle.trashedAt);
   const expiresAtDate = new Date(vehicle.trashExpiresAt);
   const daysRemaining = getTrashDaysRemaining(expiresAtDate, now);
   return {
     id: vehicle.id,
     title,
-    subtitle: `${vehicle.brand.name} · ${vehicle.model.name} · ${year} · ${variant}`,
+    subtitle: `${brand} · ${family} · ${yearLabel} · ${variant} (${generation})`,
     trashedAtLabel: trashedAtDate.toLocaleDateString("ru-RU"),
     expiresAtLabel: expiresAtDate.toLocaleDateString("ru-RU"),
     daysRemaining,

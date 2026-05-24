@@ -212,19 +212,19 @@ function FitmentsPanel({
         <tbody>
           {detail.fitments.map((row) => (
             <tr
-              key={row.modelVariantId}
+              key={row.motorcycleGenerationId}
               style={{ borderTop: `1px solid ${productSemanticColors.border}` }}
             >
               <td style={tdStyle}>
                 <Link
-                  href={`/admin/models/${row.modelVariantId}`}
+                  href={`/admin/models/${row.motorcycleGenerationId}`}
                   prefetch={false}
                   style={{ color: productSemanticColors.textPrimary, textDecoration: "none" }}
                 >
-                  {row.brandLabel} {row.modelLabel}
+                  {row.brandLabel} {row.modelFamilyLabel} {row.variantLabel} {row.generationLabel}
                 </Link>
               </td>
-              <td style={tdStyle}>{row.year}</td>
+              <td style={tdStyle}>{row.modelYear ?? "—"}</td>
               <td style={tdStyle}>{row.status}</td>
               <td style={tdStyleNumeric}>{formatNumberRu(row.reportCount)}</td>
               <td style={tdStyleNumeric}>{row.confidenceScore}/100</td>
@@ -262,7 +262,7 @@ function ReportsPanel({
               key={report.id}
               style={{ borderTop: `1px solid ${productSemanticColors.border}` }}
             >
-              <td style={tdStyle}>{report.modelLabel}</td>
+              <td style={tdStyle}>{report.generationLabel}</td>
               <td style={tdStyle}>{report.nodeLabel}</td>
               <td style={tdStyle}>{report.fitmentResult}</td>
               <td style={tdStyle}>{report.moderationStatus}</td>

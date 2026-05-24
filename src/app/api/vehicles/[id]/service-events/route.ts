@@ -15,6 +15,7 @@ import {
 } from "@/lib/service-event-serialize";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
+import { boundedJsonValue } from "@/lib/http/input-validation";
 
 type RouteContext = {
   params: Promise<{
@@ -38,21 +39,22 @@ const nextReminderDateInputSchema = z
   ])
   .optional();
 
+// MT-SEC-070: bound text + numeric fields on the per-item schema.
 const createServiceBundleItemSchema = z.object({
-  nodeId: z.string().trim().min(1),
+  nodeId: z.string().trim().min(1).max(64),
   actionType: z.enum(ACTION_TYPE_VALUES),
-  partName: z.string().trim().nullable().optional(),
-  sku: z.string().trim().nullable().optional(),
-  quantity: z.number().int().positive().nullable().optional(),
-  partCost: z.number().nonnegative().nullable().optional(),
-  laborCost: z.number().nonnegative().nullable().optional(),
-  comment: z.string().trim().nullable().optional(),
+  partName: z.string().trim().max(300).nullable().optional(),
+  sku: z.string().trim().max(200).nullable().optional(),
+  quantity: z.number().int().positive().max(10_000).nullable().optional(),
+  partCost: z.number().nonnegative().max(1_000_000_000).nullable().optional(),
+  laborCost: z.number().nonnegative().max(1_000_000_000).nullable().optional(),
+  comment: z.string().trim().max(2_000).nullable().optional(),
 });
 
 const createServiceEventSchema = z
   .object({
-    nodeId: z.string().trim().min(1).optional(),
-    title: z.string().trim().min(1),
+    nodeId: z.string().trim().max(64).optional(),
+    title: z.string().trim().min(1).max(300),
     mode: z.enum(["BASIC", "ADVANCED"]),
     performedBy: z.enum(["SELF", "SERVICE", "OTHER"]).optional(),
     serviceProviderNote: z.string().trim().max(500).nullable().optional(),
@@ -63,8 +65,8 @@ const createServiceEventSchema = z
     attachFileRequested: z.boolean().optional(),
     nextReminderEnabled: z.boolean().optional(),
     nextReminderDate: nextReminderDateInputSchema,
-    nextReminderOdometer: z.number().int().min(0).nullable().optional(),
-    nextReminderEngineHours: z.number().int().min(0).nullable().optional(),
+    nextReminderOdometer: z.number().int().min(0).max(10_000_000).nullable().optional(),
+    nextReminderEngineHours: z.number().int().min(0).max(1_000_000).nullable().optional(),
     eventDate: z
       .string()
       .trim()
@@ -72,16 +74,20 @@ const createServiceEventSchema = z
       .refine((value) => !Number.isNaN(Date.parse(value)), {
         message: "eventDate must be a valid ISO date string",
       }),
-    odometer: z.number().int().min(0),
-    engineHours: z.number().int().min(0).nullable().optional(),
-    installedPartsJson: z.any().nullable().optional(),
-    partsCost: z.number().nonnegative().nullable().optional(),
-    laborCost: z.number().nonnegative().nullable().optional(),
-    totalCost: z.number().nonnegative().nullable().optional(),
-    currency: z.string().trim().nullable().optional(),
-    comment: z.string().trim().nullable().optional(),
-    installedExpenseItemIds: z.array(z.string().trim().min(1)).optional(),
-    items: z.array(createServiceBundleItemSchema).min(1),
+    odometer: z.number().int().min(0).max(10_000_000),
+    engineHours: z.number().int().min(0).max(1_000_000).nullable().optional(),
+    // MT-SEC-066: `z.any()` previously accepted arbitrarily deep / huge JSON.
+    // Cap at 64 KB serialized and 24 levels of nesting (generous for real
+    // service-event payloads but stops abuse).
+    installedPartsJson: boundedJsonValue({ maxSerializedBytes: 64 * 1024, maxDepth: 24 }).nullable().optional(),
+    partsCost: z.number().nonnegative().max(1_000_000_000).nullable().optional(),
+    laborCost: z.number().nonnegative().max(1_000_000_000).nullable().optional(),
+    totalCost: z.number().nonnegative().max(1_000_000_000).nullable().optional(),
+    currency: z.string().trim().max(12).nullable().optional(),
+    comment: z.string().trim().max(2_000).nullable().optional(),
+    // MT-SEC-070: cap array lengths to prevent DoS via huge service-event payloads.
+    installedExpenseItemIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
+    items: z.array(createServiceBundleItemSchema).min(1).max(200),
   })
   .superRefine((value, ctx) => {
     if (value.mode === "BASIC") {

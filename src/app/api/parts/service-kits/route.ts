@@ -143,9 +143,10 @@ export async function GET(request: NextRequest) {
       where: { id: vehicleId },
       select: {
         id: true,
-        modelId: true,
-        modelVariantId: true,
-        modelVariant: { select: { year: true } },
+        motorcycleBrandId: true,
+        motorcycleModelFamilyId: true,
+        motorcycleVariantId: true,
+        motorcycleGenerationId: true,
       },
     });
     if (!vehicle) {

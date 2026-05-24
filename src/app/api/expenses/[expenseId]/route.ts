@@ -5,6 +5,8 @@ import type { ExpenseItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import { toCurrentUserContextErrorResponse } from "../../_shared/current-user-context";
 import { getVehicleInCurrentContext } from "../../_shared/vehicle-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedInt, boundedNumber, boundedText, boundedTextOptional, strictObject } from "@/lib/http/input-validation";
 
 type RouteContext = {
   params: Promise<{ expenseId: string }>;
@@ -31,28 +33,27 @@ type ExpenseModel = {
 
 const expenseModel = () => (prisma as unknown as { expenseItem: ExpenseModel }).expenseItem;
 
-const patchExpenseSchema = z
-  .object({
-    nodeId: z.string().trim().nullable().optional(),
-    category: z.enum(["PART", "CONSUMABLE", "SERVICE_WORK", "REPAIR", "DIAGNOSTICS", "OTHER"]).optional(),
-    installStatus: z.enum(["BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"]).optional(),
-    purchaseStatus: z.enum(["PLANNED", "PURCHASED"]).optional(),
-    installationStatus: z.enum(["NOT_INSTALLED", "INSTALLED"]).optional(),
-    expenseDate: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).optional(),
-    title: z.string().trim().min(1).max(300).optional(),
-    amount: z.number().positive().optional(),
-    currency: z.string().trim().min(1).max(12).optional(),
-    quantity: z.number().int().min(1).optional(),
-    comment: z.string().trim().nullable().optional(),
-    partSku: z.string().trim().nullable().optional(),
-    partName: z.string().trim().nullable().optional(),
-    vendor: z.string().trim().nullable().optional(),
-    purchasedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
-    installedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
-    odometer: z.number().int().min(0).nullable().optional(),
-    engineHours: z.number().int().min(0).nullable().optional(),
-  })
-  .strict();
+// MT-SEC-068 + MT-SEC-070: mirror the create schema with bounded text/numerics.
+const patchExpenseSchema = strictObject({
+  nodeId: boundedTextOptional({ max: 64 }),
+  category: z.enum(["PART", "CONSUMABLE", "SERVICE_WORK", "REPAIR", "DIAGNOSTICS", "OTHER"]).optional(),
+  installStatus: z.enum(["BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"]).optional(),
+  purchaseStatus: z.enum(["PLANNED", "PURCHASED"]).optional(),
+  installationStatus: z.enum(["NOT_INSTALLED", "INSTALLED"]).optional(),
+  expenseDate: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).optional(),
+  title: boundedText({ min: 1, max: 300 }).optional(),
+  amount: boundedNumber({ min: 0, max: 1_000_000_000 }).refine((v) => v > 0).optional(),
+  currency: boundedText({ min: 1, max: 12 }).optional(),
+  quantity: boundedInt({ min: 1, max: 10_000 }).optional(),
+  comment: boundedTextOptional({ max: 2_000 }),
+  partSku: boundedTextOptional({ max: 200 }),
+  partName: boundedTextOptional({ max: 300 }),
+  vendor: boundedTextOptional({ max: 200 }),
+  purchasedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
+  installedAt: z.string().trim().refine((value) => !Number.isNaN(Date.parse(value))).nullable().optional(),
+  odometer: boundedInt({ min: 0, max: 10_000_000 }).nullable().optional(),
+  engineHours: boundedInt({ min: 0, max: 1_000_000 }).nullable().optional(),
+});
 
 function toWire(row: ExpenseRow): ExpenseItem {
   return {
@@ -98,7 +99,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return existing;
     }
 
-    const data = patchExpenseSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 32 * 1024 });
+    const data = patchExpenseSchema.parse(raw);
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
@@ -131,6 +133,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const analytics = buildExpenseAnalyticsFromItems(expenses, new Date(updated.expenseDate).getFullYear());
     return NextResponse.json({ expense: toWire(updated), analytics });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

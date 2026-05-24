@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { AdminBrandRefRow } from "@mototwin/types";
 import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 import { AdminPageChrome } from "../_components/AdminPageChrome";
 import { loadAdminSelf } from "@/lib/admin-self";
@@ -17,11 +18,11 @@ export default async function AdminDictionariesPage({
   const tab = params.tab === "nodes" ? "nodes" : "brands";
 
   const self = await loadAdminSelf();
-  const [brands, nodes] = await Promise.all([
+  const [brandRows, nodes] = await Promise.all([
     tab === "brands"
-      ? prisma.brand.findMany({
+      ? prisma.motorcycleBrand.findMany({
           orderBy: { name: "asc" },
-          include: { _count: { select: { models: true } } },
+          include: { _count: { select: { families: true } } },
         })
       : Promise.resolve([]),
     tab === "nodes"
@@ -40,6 +41,13 @@ export default async function AdminDictionariesPage({
         })
       : Promise.resolve([]),
   ]);
+
+  const brands: AdminBrandRefRow[] = brandRows.map((b) => ({
+    id: b.id,
+    name: b.name,
+    slug: b.slug,
+    modelFamilyCount: b._count.families,
+  }));
 
   return (
     <AdminPageChrome title={ruAdmin.nav.dictionaries} self={self}>
@@ -79,7 +87,7 @@ export default async function AdminDictionariesPage({
                     <td style={tdStyle}>
                       <code style={codeStyle}>{brand.slug}</code>
                     </td>
-                    <td style={tdStyleNumeric}>{formatNumberRu(brand._count.models)}</td>
+                    <td style={tdStyleNumeric}>{formatNumberRu(brand.modelFamilyCount)}</td>
                   </tr>
                 ))
               )}

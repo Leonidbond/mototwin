@@ -41,13 +41,21 @@ const KEYWORDS: Array<{ key: VehicleSilhouetteKey; patterns: RegExp[] }> = [
 ];
 
 export function resolveGarageVehicleSilhouette(
-  vehicle: Pick<GarageVehicleItem, "brand" | "model" | "modelVariant" | "rideProfile">,
+  vehicle: Pick<
+    GarageVehicleItem,
+    | "motorcycleBrand"
+    | "motorcycleModelFamily"
+    | "motorcycleVariant"
+    | "motorcycleGeneration"
+    | "rideProfile"
+  >,
   fallback: VehicleSilhouetteKey = "naked_roadster"
 ): VehicleSilhouetteKey {
   const haystack = [
-    vehicle.brand?.name ?? "",
-    vehicle.model?.name ?? "",
-    vehicle.modelVariant?.versionName ?? "",
+    vehicle.motorcycleBrand?.name ?? "",
+    vehicle.motorcycleModelFamily?.name ?? "",
+    vehicle.motorcycleVariant?.name ?? "",
+    vehicle.motorcycleGeneration?.name ?? "",
     vehicle.rideProfile?.usageType ?? "",
     vehicle.rideProfile?.ridingStyle ?? "",
   ]

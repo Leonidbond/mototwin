@@ -3,6 +3,7 @@ import type {
   AdminModelDetailWire,
   AdminModelListItemWire,
   AdminModelListResponse,
+  AdminModelSupportSummaryWire,
   AdminSupportLevel,
 } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
@@ -11,8 +12,36 @@ const DEFAULT_PAGE_SIZE = 25;
 
 interface ModelListFilters {
   q?: string;
-  brandId?: string;
+  motorcycleBrandId?: string;
   supportLevel?: AdminSupportLevel;
+}
+
+const EMPTY_SUMMARY: AdminModelSupportSummaryWire = {
+  mvpCore: 0,
+  mvpCoreLegacy: 0,
+  community: 0,
+  earlyBeta: 0,
+  noFitmentDataYet: 0,
+};
+
+function bumpSummary(
+  summary: AdminModelSupportSummaryWire,
+  level: AdminSupportLevel
+): AdminModelSupportSummaryWire {
+  switch (level) {
+    case "MVP_CORE":
+      return { ...summary, mvpCore: summary.mvpCore + 1 };
+    case "MVP_CORE_LEGACY":
+      return { ...summary, mvpCoreLegacy: summary.mvpCoreLegacy + 1 };
+    case "COMMUNITY_SUPPORT":
+      return { ...summary, community: summary.community + 1 };
+    case "EARLY_BETA":
+      return { ...summary, earlyBeta: summary.earlyBeta + 1 };
+    case "NO_FITMENT_DATA_YET":
+      return { ...summary, noFitmentDataYet: summary.noFitmentDataYet + 1 };
+    default:
+      return summary;
+  }
 }
 
 export async function loadAdminModelList(params: {
@@ -25,28 +54,47 @@ export async function loadAdminModelList(params: {
   const page = Math.max(1, params.page ?? 1);
   const skip = (page - 1) * pageSize;
 
-  const where: Prisma.ModelVariantWhereInput = {};
-  if (filters.brandId) where.model = { is: { brandId: filters.brandId } };
+  const where: Prisma.MotorcycleGenerationWhereInput = {};
+  if (filters.motorcycleBrandId) {
+    where.variant = {
+      family: { brandId: filters.motorcycleBrandId },
+    };
+  }
   if (filters.q) {
     where.OR = [
-      { versionName: { contains: filters.q, mode: "insensitive" } },
-      { model: { name: { contains: filters.q, mode: "insensitive" } } },
-      { model: { brand: { name: { contains: filters.q, mode: "insensitive" } } } },
+      { name: { contains: filters.q, mode: "insensitive" } },
+      { variant: { name: { contains: filters.q, mode: "insensitive" } } },
+      {
+        variant: {
+          family: { name: { contains: filters.q, mode: "insensitive" } },
+        },
+      },
+      {
+        variant: {
+          family: {
+            brand: { name: { contains: filters.q, mode: "insensitive" } },
+          },
+        },
+      },
     ];
   }
   if (filters.supportLevel) {
     where.supportLevel = filters.supportLevel as ModelSupportLevel;
   }
 
-  const [total, variants] = await Promise.all([
-    prisma.modelVariant.count({ where }),
-    prisma.modelVariant.findMany({
+  const [total, generations] = await Promise.all([
+    prisma.motorcycleGeneration.count({ where }),
+    prisma.motorcycleGeneration.findMany({
       where,
-      orderBy: [{ year: "desc" }, { versionName: "asc" }],
+      orderBy: [{ yearFrom: "desc" }, { name: "asc" }],
       take: pageSize,
       skip,
       include: {
-        model: { include: { brand: true } },
+        variant: {
+          include: {
+            family: { include: { brand: true } },
+          },
+        },
         _count: {
           select: {
             vehicles: true,
@@ -59,46 +107,43 @@ export async function loadAdminModelList(params: {
     }),
   ]);
 
-  const items: AdminModelListItemWire[] = variants.map((variant) => {
-    const verified = variant.fitmentConfidences.filter(
-      (fc) => fc.status === "VERIFIED_BY_MOTOTWIN" || fc.status === "COMMUNITY_CONFIRMED"
+  const items: AdminModelListItemWire[] = generations.map((generation) => {
+    const variant = generation.variant;
+    const family = variant.family;
+    const brand = family.brand;
+    const verified = generation.fitmentConfidences.filter(
+      (fc) =>
+        fc.status === "VERIFIED_BY_MOTOTWIN" ||
+        fc.status === "COMMUNITY_CONFIRMED"
     ).length;
-    const conflicts = variant.fitmentConfidences.filter((fc) => fc.status === "MIXED_REPORTS").length;
-    const overrideLevel = (variant.supportLevel as AdminSupportLevel | null) ?? null;
-    const supportLevel: AdminSupportLevel =
-      overrideLevel ??
-      inferSupportLevel({
-        garageCount: variant._count.vehicles,
-        reports: variant._count.fitmentReports,
-        verified,
-        mixed: conflicts,
-      });
+    const conflicts = generation.fitmentConfidences.filter(
+      (fc) => fc.status === "MIXED_REPORTS"
+    ).length;
+    const overrideLevel = generation.supportLevel as AdminSupportLevel | null;
     return {
-      modelVariantId: variant.id,
-      brandLabel: variant.model.brand.name,
-      brandId: variant.model.brand.id,
-      modelLabel: variant.model.name,
-      modelId: variant.model.id,
-      year: variant.year,
-      versionName: variant.versionName,
-      garageCount: variant._count.vehicles,
-      reportsCount: variant._count.fitmentReports,
+      motorcycleGenerationId: generation.id,
+      motorcycleBrandId: brand.id,
+      motorcycleModelFamilyId: family.id,
+      motorcycleVariantId: variant.id,
+      brandLabel: brand.name,
+      modelFamilyLabel: family.name,
+      variantLabel: variant.name,
+      generationLabel: generation.name,
+      modelYear: null,
+      productionYearFrom: generation.yearFrom,
+      productionYearTo: generation.yearTo ?? null,
+      garageCount: generation._count.vehicles,
+      reportsCount: generation._count.fitmentReports,
       verifiedCount: verified,
       conflictsCount: conflicts,
-      supportLevel,
+      supportLevel: (generation.supportLevel as AdminSupportLevel) ?? "EARLY_BETA",
       supportLevelOverride: overrideLevel,
     };
   });
 
-  const summary = items.reduce(
-    (acc, item) => {
-      if (item.supportLevel === "FULL_SUPPORT") acc.full += 1;
-      else if (item.supportLevel === "COMMUNITY_SUPPORT") acc.community += 1;
-      else if (item.supportLevel === "EARLY_BETA") acc.earlyBeta += 1;
-      else acc.noData += 1;
-      return acc;
-    },
-    { full: 0, community: 0, earlyBeta: 0, noData: 0 }
+  const summary = items.reduce<AdminModelSupportSummaryWire>(
+    (acc, item) => bumpSummary(acc, item.supportLevel),
+    { ...EMPTY_SUMMARY }
   );
 
   return {
@@ -111,11 +156,18 @@ export async function loadAdminModelList(params: {
   };
 }
 
-export async function loadAdminModelDetail(modelVariantId: string): Promise<AdminModelDetailWire | null> {
-  const variant = await prisma.modelVariant.findUnique({
-    where: { id: modelVariantId },
+export async function loadAdminModelDetail(
+  motorcycleGenerationId: string
+): Promise<AdminModelDetailWire | null> {
+  const generation = await prisma.motorcycleGeneration.findUnique({
+    where: { id: motorcycleGenerationId },
     include: {
-      model: { include: { brand: true } },
+      variant: {
+        include: {
+          family: { include: { brand: true } },
+        },
+      },
+      technicalSpecs: true,
       _count: {
         select: { vehicles: true, fitmentReports: true },
       },
@@ -124,18 +176,21 @@ export async function loadAdminModelDetail(modelVariantId: string): Promise<Admi
       },
     },
   });
-  if (!variant) return null;
+  if (!generation) return null;
 
-  const verified = variant.fitmentConfidences.filter(
-    (fc) => fc.status === "VERIFIED_BY_MOTOTWIN" || fc.status === "COMMUNITY_CONFIRMED"
+  const verified = generation.fitmentConfidences.filter(
+    (fc) =>
+      fc.status === "VERIFIED_BY_MOTOTWIN" || fc.status === "COMMUNITY_CONFIRMED"
   ).length;
-  const conflicts = variant.fitmentConfidences.filter((fc) => fc.status === "MIXED_REPORTS").length;
+  const conflicts = generation.fitmentConfidences.filter(
+    (fc) => fc.status === "MIXED_REPORTS"
+  ).length;
 
   const nodeBuckets = new Map<
     string,
     { nodeLabel: string; verified: number; reports: number; conflicts: number }
   >();
-  for (const fc of variant.fitmentConfidences) {
+  for (const fc of generation.fitmentConfidences) {
     const node = fc.node;
     const bucket = nodeBuckets.get(node.id) ?? {
       nodeLabel: node.name,
@@ -144,42 +199,48 @@ export async function loadAdminModelDetail(modelVariantId: string): Promise<Admi
       conflicts: 0,
     };
     bucket.reports += fc.reportCount;
-    if (fc.status === "VERIFIED_BY_MOTOTWIN" || fc.status === "COMMUNITY_CONFIRMED") {
+    if (
+      fc.status === "VERIFIED_BY_MOTOTWIN" ||
+      fc.status === "COMMUNITY_CONFIRMED"
+    ) {
       bucket.verified += 1;
     }
     if (fc.status === "MIXED_REPORTS") bucket.conflicts += 1;
     nodeBuckets.set(node.id, bucket);
   }
 
-  const overrideLevel = (variant.supportLevel as AdminSupportLevel | null) ?? null;
-  const supportLevel: AdminSupportLevel =
-    overrideLevel ??
-    inferSupportLevel({
-      garageCount: variant._count.vehicles,
-      reports: variant._count.fitmentReports,
-      verified,
-      mixed: conflicts,
-    });
+  const overrideLevel = generation.supportLevel as AdminSupportLevel | null;
+  const variant = generation.variant;
+  const family = variant.family;
+  const brand = family.brand;
+  const specs = generation.technicalSpecs;
 
   return {
-    modelVariantId: variant.id,
-    brandLabel: variant.model.brand.name,
-    modelLabel: variant.model.name,
-    year: variant.year,
-    versionName: variant.versionName,
-    generation: variant.generation,
-    market: variant.market,
-    engineType: variant.engineType,
-    coolingType: variant.coolingType,
-    wheelSizes: variant.wheelSizes,
-    brakeSystem: variant.brakeSystem,
-    chainPitch: variant.chainPitch,
-    stockSprockets: variant.stockSprockets,
-    supportLevel,
+    motorcycleGenerationId: generation.id,
+    motorcycleBrandId: brand.id,
+    motorcycleModelFamilyId: family.id,
+    motorcycleVariantId: variant.id,
+    brandLabel: brand.name,
+    modelFamilyLabel: family.name,
+    variantLabel: variant.name,
+    generationLabel: generation.name,
+    modelYear: null,
+    productionYearFrom: generation.yearFrom,
+    productionYearTo: generation.yearTo ?? null,
+    marketRegion: generation.marketRegion ? String(generation.marketRegion) : null,
+    /** Closest schema field for the curated «engine type» plaque cell. */
+    engineType: specs?.engine?.trim() || null,
+    /** Not surfaced on the unified technical-master schema yet. */
+    coolingType: null,
+    wheelSizes: null,
+    brakeSystem: null,
+    chainPitch: null,
+    stockSprockets: null,
+    supportLevel: (generation.supportLevel as AdminSupportLevel) ?? "EARLY_BETA",
     supportLevelOverride: overrideLevel,
-    supportLevelReason: variant.supportLevelReason ?? null,
-    garageCount: variant._count.vehicles,
-    reportsCount: variant._count.fitmentReports,
+    supportLevelReason: generation.supportLevelReason ?? null,
+    garageCount: generation._count.vehicles,
+    reportsCount: generation._count.fitmentReports,
     verifiedCount: verified,
     conflictsCount: conflicts,
     nodeCoverage: Array.from(nodeBuckets.entries())
@@ -193,17 +254,4 @@ export async function loadAdminModelDetail(modelVariantId: string): Promise<Admi
       .sort((a, b) => b.reports - a.reports)
       .slice(0, 12),
   };
-}
-
-export function inferSupportLevel(stats: {
-  garageCount: number;
-  reports: number;
-  verified: number;
-  mixed: number;
-}): AdminSupportLevel {
-  if (stats.verified >= 5 && stats.mixed === 0 && stats.garageCount >= 100) return "FULL_SUPPORT";
-  if (stats.verified >= 1 || stats.reports >= 10) return "COMMUNITY_SUPPORT";
-  if (stats.reports >= 1 || stats.garageCount >= 5) return "EARLY_BETA";
-  if (stats.garageCount === 0) return "NO_DATA";
-  return "EARLY_BETA";
 }

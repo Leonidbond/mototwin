@@ -7,6 +7,7 @@ import {
 } from "../../../_shared/current-user-context";
 import { usageUpdateSchema } from "../../../_shared/notifications-http";
 import { applyVehicleUsageUpdate } from "@/lib/notifications";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -19,7 +20,8 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    const parsed = usageUpdateSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 2 * 1024 });
+    const parsed = usageUpdateSchema.parse(raw);
     const result = await applyVehicleUsageUpdate({
       userId: currentUser.userId,
       vehicleId,
@@ -40,6 +42,9 @@ export async function POST(request: Request, context: RouteContext) {
       resolvedNotifications: result.resolvedNotifications,
     });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const userContextError = toCurrentUserContextErrorResponse(error);
     if (userContextError) return userContextError;
     if (error instanceof z.ZodError) {

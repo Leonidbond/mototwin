@@ -1,7 +1,6 @@
 import type {
   AddServiceKitToWishlistPayload,
   AddServiceKitToWishlistResponse,
-  BrandsResponse,
   CreateExpenseFromShoppingListInput,
   CreateExpenseFromShoppingListResponse,
   CreateExpenseItemInput,
@@ -15,8 +14,10 @@ import type {
   CreateWishlistItemResponse,
   DeleteExpenseItemResponse,
   GarageVehiclesResponse,
-  ModelVariantsResponse,
-  ModelsResponse,
+  MotorcycleBrandsResponse,
+  MotorcycleGenerationsResponse,
+  MotorcycleModelFamiliesResponse,
+  MotorcycleVariantsResponse,
   PartRecommendationsResponse,
   PartSkuDetailResponse,
   PartSkusResponse,
@@ -557,8 +558,8 @@ export function createMotoTwinEndpoints(client: ApiClient) {
       );
     },
 
-    getBrands() {
-      return client.request<BrandsResponse>("/api/brands");
+    getMotorcycleBrands() {
+      return client.request<MotorcycleBrandsResponse>("/api/motorcycle-brands");
     },
 
     getServiceBundleTemplates() {
@@ -579,15 +580,24 @@ export function createMotoTwinEndpoints(client: ApiClient) {
       );
     },
 
-    getModels(brandId: string) {
-      const search = new URLSearchParams({ brandId });
-      return client.request<ModelsResponse>(`/api/models?${search.toString()}`);
+    getMotorcycleModelFamilies(motorcycleBrandId: string) {
+      const search = new URLSearchParams({ motorcycleBrandId });
+      return client.request<MotorcycleModelFamiliesResponse>(
+        `/api/motorcycle-model-families?${search.toString()}`
+      );
     },
 
-    getModelVariants(modelId: string) {
-      const search = new URLSearchParams({ modelId });
-      return client.request<ModelVariantsResponse>(
-        `/api/model-variants?${search.toString()}`
+    getMotorcycleVariants(motorcycleModelFamilyId: string) {
+      const search = new URLSearchParams({ motorcycleModelFamilyId });
+      return client.request<MotorcycleVariantsResponse>(
+        `/api/motorcycle-variants?${search.toString()}`
+      );
+    },
+
+    getMotorcycleGenerations(motorcycleVariantId: string) {
+      const search = new URLSearchParams({ motorcycleVariantId });
+      return client.request<MotorcycleGenerationsResponse>(
+        `/api/motorcycle-generations?${search.toString()}`
       );
     },
 

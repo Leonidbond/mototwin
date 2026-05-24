@@ -171,11 +171,11 @@ export const ruAdmin = {
     low: "Low confidence",
   },
   support: {
-    FULL_SUPPORT: "Full support",
+    MVP_CORE: "Полная поддержка (MVP-core)",
+    MVP_CORE_LEGACY: "Поддержка (legacy MVP-core)",
     COMMUNITY_SUPPORT: "Community support",
     EARLY_BETA: "Early beta",
-    NO_DATA: "No fitment data yet",
-    UNSUPPORTED: "Unsupported",
+    NO_FITMENT_DATA_YET: "Нет данных по совместимости",
   },
   access: {
     forbidden: "Этот раздел доступен только администраторам.",

@@ -1,15 +1,21 @@
 import type { PrismaClient } from "@prisma/client";
 import { computeFitmentConfidenceState } from "@mototwin/domain";
 
+export type FitmentConfidenceKey = {
+  partMasterId: string;
+  motorcycleGenerationId: string;
+  nodeId: string;
+};
+
 export async function recalculateFitmentConfidenceForKey(
   prisma: PrismaClient,
-  key: { partMasterId: string; modelVariantId: string; nodeId: string }
+  key: FitmentConfidenceKey
 ): Promise<void> {
   const existing = await prisma.fitmentConfidence.findUnique({
     where: {
-      partMasterId_modelVariantId_nodeId: {
+      partMasterId_motorcycleGenerationId_nodeId: {
         partMasterId: key.partMasterId,
-        modelVariantId: key.modelVariantId,
+        motorcycleGenerationId: key.motorcycleGenerationId,
         nodeId: key.nodeId,
       },
     },
@@ -19,7 +25,7 @@ export async function recalculateFitmentConfidenceForKey(
   const publishedReports = await prisma.fitmentReport.findMany({
     where: {
       partMasterId: key.partMasterId,
-      modelVariantId: key.modelVariantId,
+      motorcycleGenerationId: key.motorcycleGenerationId,
       nodeId: key.nodeId,
       moderationStatus: "PUBLISHED",
     },
@@ -86,15 +92,15 @@ export async function recalculateFitmentConfidenceForKey(
 
   await prisma.fitmentConfidence.upsert({
     where: {
-      partMasterId_modelVariantId_nodeId: {
+      partMasterId_motorcycleGenerationId_nodeId: {
         partMasterId: key.partMasterId,
-        modelVariantId: key.modelVariantId,
+        motorcycleGenerationId: key.motorcycleGenerationId,
         nodeId: key.nodeId,
       },
     },
     create: {
       partMasterId: key.partMasterId,
-      modelVariantId: key.modelVariantId,
+      motorcycleGenerationId: key.motorcycleGenerationId,
       nodeId: key.nodeId,
       confidenceScore: computed.confidenceScore,
       reportCount: computed.reportCount,

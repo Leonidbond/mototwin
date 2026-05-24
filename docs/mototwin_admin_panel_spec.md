@@ -603,11 +603,13 @@ KPI-карточки:
 
 ### 11.1. Матрица совместимости
 
-Формат:
+Формат (по новой 4-уровневой иерархии каталога моделей, см. [data-model.md](./data-model.md)):
 
 ```text
-Part → ModelVariant → Node → Fitment Status → Confidence → Source
+Part → MotorcycleGeneration → Node → Fitment Status → Confidence → Source
 ```
+
+`PartFitment` может закрепляться на одном из уровней `MotorcycleBrand`, `MotorcycleModelFamily`, `MotorcycleVariant`, `MotorcycleGeneration` (`fitmentType ∈ { GENERATION | VARIANT | FAMILY | BRAND | GENERIC_NODE }`); матрица в админке показывает «эффективный» уровень и поколение, к которому правило сейчас применяется.
 
 Пример таблицы:
 
@@ -657,27 +659,31 @@ Part → ModelVariant → Node → Fitment Status → Confidence → Source
 
 ### 12.1. Каталог моделей
 
-Иерархия:
+Иерархия (унифицированный 4-уровневый стандарт, см. [data-model.md](./data-model.md)):
 
 ```text
-Brand
-  Model family
-    Model
-      Generation
-        ModelVariant
-          Year / Market / Configuration
+MotorcycleBrand
+  MotorcycleModelFamily
+    MotorcycleVariant
+      MotorcycleGeneration
+        + MotorcycleTechnicalSpecs (sidecar 1:1)
 ```
+
+Каждый уровень имеет собственный `supportLevel: MotoSupportLevel` (`MVP_CORE | MVP_CORE_LEGACY | COMMUNITY_SUPPORT | EARLY_BETA | NO_FITMENT_DATA_YET`); более высокие уровни агрегируют «лучший» статус потомков.
 
 Пример:
 
 ```text
-BMW
-  GS
-    R 1250 GS
-      K50 / 2019–2024
-        R 1250 GS EU 2021
-        R 1250 GS Adventure EU 2021
+MotorcycleBrand: BMW
+  MotorcycleModelFamily: GS
+    MotorcycleVariant: R 1250 GS
+      MotorcycleGeneration: K50 (2019–2024, EU)
+        MotorcycleTechnicalSpecs: 1254cc, 100kW, 6-speed, ...
+    MotorcycleVariant: R 1250 GS Adventure
+      MotorcycleGeneration: K51 (2019–2024, EU)
 ```
+
+«Год / рынок / конфигурация» теперь живут на уровне `MotorcycleGeneration` (`yearFrom`, `yearTo`, `yearsLabel`, `marketRegion`, `segment`); технические параметры — в sidecar `MotorcycleTechnicalSpecs`.
 
 ---
 
@@ -1153,10 +1159,10 @@ BMW
 
 Для MotoTwin админку нужно проектировать вокруг 4 центральных сущностей:
 
-1. **ModelVariant** — какая модель и насколько она поддержана.
+1. **MotorcycleGeneration** (с sidecar `MotorcycleTechnicalSpecs`) — конкретное поколение модификации; именно к нему привязываются `Vehicle.motorcycleGenerationId` и `FitmentConfidence`. Уровни поддержки также живут здесь и агрегируются вверх по `MotorcycleVariant → MotorcycleModelFamily → MotorcycleBrand`.
 2. **PartMaster** — нормализованная деталь.
 3. **FitmentReport** — пользовательский опыт установки.
-4. **FitmentRule / FitmentConfidence** — агрегированная совместимость и уровень доверия.
+4. **FitmentRule / FitmentConfidence** — агрегированная совместимость и уровень доверия (уникальный ключ — `partMasterId × motorcycleGenerationId × nodeId`).
 
 Все остальное — пользователи, отчеты, модерация, загрузки, справочники — должно обслуживать именно эти 4 сущности.
 
@@ -1254,7 +1260,7 @@ model AdminAuditLog {
   actorId       String
   actor         User     @relation(fields: [actorId], references: [id])
   action        String   // напр. "fitment.publish", "support.change", "part.merge"
-  entityType    String   // "PartMaster" | "FitmentReport" | "ModelVariant" | ...
+  entityType    String   // "PartMaster" | "FitmentReport" | "MotorcycleGeneration" | "MotorcycleVariant" | ...
   entityId      String
   before        Json?
   after         Json?

@@ -1313,7 +1313,7 @@ export default function ServiceLogScreen() {
         setTopServiceNodes(topRes.nodes ?? []);
         const v = vehicleRes.vehicle;
         setVehicleDisplayName(
-          v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelName}`.trim() : "") || "Мотоцикл"
+          v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelFamilyName}`.trim() : "") || "Мотоцикл"
         );
         const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
         setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);

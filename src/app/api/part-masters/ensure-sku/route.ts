@@ -3,18 +3,22 @@ import { z } from "zod";
 import { normalizePartNumber } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { boundedText, strictObject } from "@/lib/http/input-validation";
 
-const bodySchema = z.object({
-  partMasterId: z.string().trim().min(1),
-  nodeId: z.string().trim().min(1),
-  vehicleId: z.string().trim().min(1),
-  partType: z.string().trim().min(1),
+// MT-SEC-068 + MT-SEC-070: strict + bounded ids/partType.
+const bodySchema = strictObject({
+  partMasterId: boundedText({ max: 64 }),
+  nodeId: boundedText({ max: 64 }),
+  vehicleId: boundedText({ max: 64 }),
+  partType: boundedText({ min: 1, max: 120 }),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const userCtx = await getCurrentUserContext();
-    const body = bodySchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 2 * 1024 });
+    const body = bodySchema.parse(raw);
 
     const vehicle = await prisma.vehicle.findFirst({
       where: {
@@ -104,6 +108,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ skuId: created.id, created: true }, { status: 201 });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const ctxErr = toCurrentUserContextErrorResponse(error);
     if (ctxErr) return ctxErr;
     if (error instanceof z.ZodError) {

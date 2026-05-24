@@ -9,11 +9,11 @@ import { prisma } from "@/lib/prisma";
 import { ruAdmin, formatNumber } from "../_locales/ru";
 
 const SUPPORT_LEVELS: AdminSupportLevel[] = [
-  "FULL_SUPPORT",
+  "MVP_CORE",
+  "MVP_CORE_LEGACY",
   "COMMUNITY_SUPPORT",
   "EARLY_BETA",
-  "NO_DATA",
-  "UNSUPPORTED",
+  "NO_FITMENT_DATA_YET",
 ];
 
 interface AdminModelsPageProps {
@@ -39,7 +39,10 @@ export default async function AdminModelsPage({ searchParams }: AdminModelsPageP
   const [self, list, brands] = await Promise.all([
     loadAdminSelf(),
     loadAdminModelList({ filters, page }),
-    prisma.brand.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.motorcycleBrand.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
 
   return (
@@ -47,22 +50,31 @@ export default async function AdminModelsPage({ searchParams }: AdminModelsPageP
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
           gap: 14,
         }}
       >
-        <SummaryStat label={ruAdmin.support.FULL_SUPPORT} value={list.summary.full} tone="#22C55E" />
+        <SummaryStat label={ruAdmin.support.MVP_CORE} value={list.summary.mvpCore} tone="#22C55E" />
+        <SummaryStat
+          label={ruAdmin.support.MVP_CORE_LEGACY}
+          value={list.summary.mvpCoreLegacy}
+          tone="#10B981"
+        />
         <SummaryStat
           label={ruAdmin.support.COMMUNITY_SUPPORT}
           value={list.summary.community}
           tone="#60A5FA"
         />
         <SummaryStat label={ruAdmin.support.EARLY_BETA} value={list.summary.earlyBeta} tone="#FBBF24" />
-        <SummaryStat label={ruAdmin.support.NO_DATA} value={list.summary.noData} tone="#94A3B8" />
+        <SummaryStat
+          label={ruAdmin.support.NO_FITMENT_DATA_YET}
+          value={list.summary.noFitmentDataYet}
+          tone="#94A3B8"
+        />
       </section>
       <AdminFilterBar
         fields={[
-          { key: "q", label: "Поиск", search: true, placeholder: "Бренд или модель" },
+          { key: "q", label: "Поиск", search: true, placeholder: "Бренд, модель или поколение" },
           {
             key: "brandId",
             label: "Бренд",

@@ -39,18 +39,21 @@ const DEFAULT_CHEVRON = "#6B7280";
 
 function silhouetteSourceForVehicleDetail(vehicle: VehicleDetail): ImageSourcePropType {
   const key = resolveGarageVehicleSilhouette({
-    brand: { name: vehicle.brandName },
-    model: { name: vehicle.modelName },
-    modelVariant: {
-      year: vehicle.year,
-      versionName: vehicle.variantName,
-      market: vehicle.modelVariant?.market ?? null,
-      engineType: vehicle.modelVariant?.engineType ?? null,
-      coolingType: vehicle.modelVariant?.coolingType ?? null,
-      wheelSizes: vehicle.modelVariant?.wheelSizes ?? null,
-      brakeSystem: vehicle.modelVariant?.brakeSystem ?? null,
-      chainPitch: vehicle.modelVariant?.chainPitch ?? null,
-      stockSprockets: vehicle.modelVariant?.stockSprockets ?? null,
+    motorcycleBrand: { id: vehicle.motorcycleBrandId, name: vehicle.brandName },
+    motorcycleModelFamily: {
+      id: vehicle.motorcycleModelFamilyId,
+      name: vehicle.modelFamilyName,
+    },
+    motorcycleVariant: {
+      id: vehicle.motorcycleVariantId,
+      name: vehicle.variantName,
+    },
+    motorcycleGeneration: {
+      id: vehicle.motorcycleGenerationId,
+      name: vehicle.generationName,
+      yearFrom: vehicle.year,
+      yearTo: null,
+      yearsLabel: vehicle.yearsLabel,
     },
     rideProfile: vehicle.rideProfile,
   });

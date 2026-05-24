@@ -14,11 +14,40 @@ import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import * as AppleAuthentication from "expo-apple-authentication";
+import * as Crypto from "expo-crypto";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { createMobileApiClient } from "../src/create-mobile-api-client";
 import { writeAuthTokens } from "../src/auth-storage";
 
 WebBrowser.maybeCompleteAuthSession();
+
+/**
+ * Generates a random rawNonce, passes SHA-256(rawNonce) to Apple, and returns
+ * both the raw and the resulting identityToken so the backend can verify the
+ * `nonce` claim (MT-SEC-003). The rawNonce must be ≥ 32 chars after hex-encoding
+ * to satisfy the server-side guard.
+ */
+async function startAppleSignIn(): Promise<{ rawNonce: string; identityToken: string }> {
+  const randomBytes = await Crypto.getRandomBytesAsync(32);
+  const rawNonce = Array.from(randomBytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const hashedNonce = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    rawNonce
+  );
+  const credential = await AppleAuthentication.signInAsync({
+    requestedScopes: [
+      AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+      AppleAuthentication.AppleAuthenticationScope.EMAIL,
+    ],
+    nonce: hashedNonce,
+  });
+  if (!credential.identityToken) {
+    throw new Error("Apple не вернул identityToken.");
+  }
+  return { rawNonce, identityToken: credential.identityToken };
+}
 
 const yandexDiscovery: AuthSession.DiscoveryDocument = {
   authorizationEndpoint: "https://oauth.yandex.ru/authorize",
@@ -55,7 +84,12 @@ export default function LoginScreen() {
     yandexDiscovery
   );
 
-  async function onOAuthSuccess(input: { provider: "google" | "apple" | "yandex"; idToken?: string; accessToken?: string }) {
+  async function onOAuthSuccess(input: {
+    provider: "google" | "apple" | "yandex";
+    idToken?: string;
+    accessToken?: string;
+    rawNonce?: string;
+  }) {
     const api = createMobileApiClient();
     const result = await api.loginWithMobileOAuth(input);
     if (!result.accessToken || !result.refreshToken || !result.expiresAt) {
@@ -208,21 +242,10 @@ export default function LoginScreen() {
           onPress={() => {
             setError("");
             setOauthLoading("apple");
-            void AppleAuthentication.signInAsync({
-              requestedScopes: [
-                AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-                AppleAuthentication.AppleAuthenticationScope.EMAIL,
-              ],
-            })
-              .then((credential) => {
-                if (!credential.identityToken) {
-                  throw new Error("Apple не вернул identityToken.");
-                }
-                return onOAuthSuccess({
-                  provider: "apple",
-                  idToken: credential.identityToken,
-                });
-              })
+            void startAppleSignIn()
+              .then(({ rawNonce, identityToken }) =>
+                onOAuthSuccess({ provider: "apple", idToken: identityToken, rawNonce })
+              )
               .catch((err) => {
                 if (
                   err instanceof Error &&

@@ -48,18 +48,20 @@ Core:
 - `mototwin-endpoints.ts` — route-level methods
 
 Current endpoint methods:
-- `getGarage`
+- `getGarageVehicles`
 - `getVehicleDetail`
 - `getNodeTree`
 - `getServiceEvents`
 - `createServiceEvent`
-- `getGarageVehicles`
 - `updateVehicleState`
 - `updateVehicleProfile`
-- `getBrands`
-- `getModels`
-- `getModelVariants`
+- `getMotorcycleBrands` (`GET /api/motorcycle-brands`)
+- `getMotorcycleModelFamilies({ motorcycleBrandId })` (`GET /api/motorcycle-model-families`)
+- `getMotorcycleVariants({ motorcycleModelFamilyId })` (`GET /api/motorcycle-variants`)
+- `getMotorcycleGenerations({ motorcycleVariantId })` (`GET /api/motorcycle-generations`)
 - `createVehicle`
+
+Каталог моделей — 4 уровня (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`); legacy-методы `getBrands` / `getModels` / `getModelVariants` удалены вместе с роутами `/api/brands`, `/api/models`, `/api/model-variants` (см. [data-model.md](./data-model.md), [shared-api-client.md](./shared-api-client.md)).
 
 Usage:
 - actively used in Expo client

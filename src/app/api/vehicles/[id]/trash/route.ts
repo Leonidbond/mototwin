@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { calculateTrashExpiresAt } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
+import { toGarageVehicleItem, vehicleWireInclude } from "@/lib/vehicle-wire";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
@@ -34,18 +35,13 @@ export async function POST(_: Request, context: RouteContext) {
           ownerUserId: currentUser.userId,
         },
       },
-      include: {
-        brand: true,
-        model: true,
-        modelVariant: true,
-        rideProfile: true,
-      },
+      include: vehicleWireInclude,
     });
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
     if (vehicle.trashedAt && vehicle.trashExpiresAt) {
-      return NextResponse.json({ vehicle });
+      return NextResponse.json({ vehicle: toGarageVehicleItem(vehicle) });
     }
 
     const settings = await prisma.userSettings.findUnique({
@@ -58,14 +54,9 @@ export async function POST(_: Request, context: RouteContext) {
     const updated = await prisma.vehicle.update({
       where: { id: vehicle.id },
       data: { trashedAt, trashExpiresAt },
-      include: {
-        brand: true,
-        model: true,
-        modelVariant: true,
-        rideProfile: true,
-      },
+      include: vehicleWireInclude,
     });
-    return NextResponse.json({ vehicle: updated });
+    return NextResponse.json({ vehicle: toGarageVehicleItem(updated) });
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {

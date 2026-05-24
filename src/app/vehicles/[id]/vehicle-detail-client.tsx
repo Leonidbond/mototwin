@@ -2569,7 +2569,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     return [
       { label: "Гараж", href: "/garage" },
       {
-        label: vehicle.nickname || `${vehicle.brandName} ${vehicle.modelName}`,
+        label: vehicle.nickname || `${vehicle.brandName} ${vehicle.modelFamilyName}`,
         href: `/vehicles/${vehicleId}`,
       },
       { label: "Дерево узлов" },
@@ -4116,7 +4116,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
 
   const title =
     vehicle?.nickname ||
-    `${vehicle?.brandName || ""} ${vehicle?.modelName || ""}`.trim() ||
+    `${vehicle?.brandName || ""} ${vehicle?.modelFamilyName || ""}`.trim() ||
     "Карточка мотоцикла";
   const vehicleHeader = vehicle ? buildVehicleHeaderProps(vehicle) : null;
   const detailViewModel = vehicleHeader?.detail ?? null;
@@ -4130,7 +4130,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     ? buildRideProfileViewModel(vehicle.rideProfile)
     : null;
   const technicalInfoViewModel = vehicle
-    ? buildVehicleTechnicalInfoViewModel({ modelVariant: vehicle.modelVariant })
+    ? buildVehicleTechnicalInfoViewModel({ technicalSpecs: vehicle.technicalSpecs })
     : { items: [] };
 
   const showFullNodeTree = pageView === "nodeTree" || isFullNodeTreeOpen;
@@ -5382,7 +5382,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                       <div className="space-y-7">
             <section className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm">
               <div className="text-sm text-gray-500">
-                {vehicle?.brandName ?? "—"} | {vehicle?.modelName ?? "—"}
+                {vehicle?.brandName ?? "—"} | {vehicle?.modelFamilyName ?? "—"}
               </div>
 
               <div className="mt-3 flex flex-wrap items-start justify-between gap-3">

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
+import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
-const patchMasterSchema = z.object({
+const patchMasterSchema = strictObject({
   status: z.enum(["DRAFT", "PENDING_REVIEW", "ACTIVE", "MERGED", "REJECTED"]),
 });
 
@@ -11,12 +13,12 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const userCtx = await getCurrentUserContext();
-    if (!userCtx.isModerator) {
-      return NextResponse.json({ error: "Недостаточно прав." }, { status: 403 });
-    }
+    // MT-SEC-024: use the centralized RBAC helper so any role-model change
+    // (split MODERATOR, add CATALOG_MANAGER scopes, etc.) propagates here.
+    await requireAdminRole(["MODERATOR", "CATALOG_MANAGER"]);
     const { id } = await context.params;
-    const body = patchMasterSchema.parse(await request.json());
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 2 * 1024 });
+    const body = patchMasterSchema.parse(raw);
 
     const updated = await prisma.partMaster.update({
       where: { id },
@@ -33,8 +35,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ partMaster: updated });
   } catch (error) {
-    const ctxErr = toCurrentUserContextErrorResponse(error);
-    if (ctxErr) return ctxErr;
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
+    const adminErr = toAdminErrorResponse(error);
+    if (adminErr) return adminErr;
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Validation failed", issues: error.issues }, { status: 400 });
     }

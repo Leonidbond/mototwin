@@ -70,10 +70,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Неизвестный тип импорта" }, { status: 400 });
     }
 
+    // MT-SEC-075: sanitize client-controlled file.name before persisting it
+    // to the import batch + audit log. Strip path separators (preventing path
+    // traversal in any downstream filesystem usage), trim, and cap length.
+    const rawName = typeof file.name === "string" ? file.name : "upload";
+    const sanitizedFileName = rawName
+      .replace(/[\u0000-\u001f]/g, "") // control chars
+      .replace(/[/\\]/g, "_")
+      .trim()
+      .slice(0, 200) || "upload";
+
     const buffer = Buffer.from(await file.arrayBuffer());
     let parsed;
     try {
-      parsed = parseImportFile(buffer, file.name);
+      parsed = parseImportFile(buffer, sanitizedFileName);
     } catch (err) {
       return NextResponse.json(
         { error: err instanceof Error ? err.message : "Не удалось разобрать файл" },
@@ -84,7 +94,7 @@ export async function POST(request: Request) {
     const created = await createImportBatch({
       actorId: ctx.userId,
       type: type as AdminImportBatchTypeWire,
-      fileName: file.name,
+      fileName: sanitizedFileName,
       rows: parsed.rows,
     });
 
@@ -93,7 +103,7 @@ export async function POST(request: Request) {
       action: "import.create",
       entityType: "ImportBatch",
       entityId: created.id,
-      after: { type, fileName: file.name, rowCount: parsed.rows.length },
+      after: { type, fileName: sanitizedFileName, rowCount: parsed.rows.length },
       importBatchId: created.id,
     });
 

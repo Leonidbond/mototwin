@@ -38,7 +38,10 @@ export type SidebarVehiclePlaqueProps = {
 };
 
 function labelForGarageVehicle(v: GarageVehicleItem): string {
-  return v.nickname?.trim() || `${v.brand.name} ${v.model.name}`.trim();
+  return (
+    v.nickname?.trim() ||
+    `${v.motorcycleBrand.name} ${v.motorcycleModelFamily.name}`.trim()
+  );
 }
 
 /**

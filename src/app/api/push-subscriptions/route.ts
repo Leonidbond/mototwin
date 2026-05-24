@@ -6,11 +6,14 @@ import {
   toCurrentUserContextErrorResponse,
 } from "../_shared/current-user-context";
 import { pushSubscriptionSchema } from "../_shared/notifications-http";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUserContext();
-    const parsed = pushSubscriptionSchema.parse(await request.json());
+    // MT-SEC-069: push subscription has 4KB tokens + multiple fields.
+    const raw = await parseJsonBody<unknown>(request, { maxBytes: 32 * 1024 });
+    const parsed = pushSubscriptionSchema.parse(raw);
     const subscription = await prisma.pushSubscription.upsert({
       where: {
         userId_token: {
@@ -65,6 +68,9 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const userContextError = toCurrentUserContextErrorResponse(error);
     if (userContextError) return userContextError;
     if (error instanceof z.ZodError) {

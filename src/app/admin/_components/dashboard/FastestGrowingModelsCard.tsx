@@ -28,7 +28,10 @@ export function FastestGrowingModelsCard({ data }: FastestGrowingModelsCardProps
         </thead>
         <tbody>
           {data.rows.map((row) => (
-            <tr key={row.modelVariantId} style={{ borderBottom: `1px solid ${productSemanticColors.border}` }}>
+            <tr
+              key={row.motorcycleGenerationId}
+              style={{ borderBottom: `1px solid ${productSemanticColors.border}` }}
+            >
               <td style={tdStyle}>
                 <span
                   style={{
@@ -53,7 +56,7 @@ export function FastestGrowingModelsCard({ data }: FastestGrowingModelsCardProps
                         color: productSemanticColors.textPrimary,
                       }}
                     >
-                      {row.modelLabel}
+                      {row.modelFamilyLabel} {row.variantLabel}
                     </div>
                     <div
                       style={{
@@ -61,7 +64,7 @@ export function FastestGrowingModelsCard({ data }: FastestGrowingModelsCardProps
                         color: productSemanticColors.textMuted,
                       }}
                     >
-                      {row.brandLabel}
+                      {row.brandLabel} · {row.generationLabel}
                     </div>
                   </div>
                 </div>

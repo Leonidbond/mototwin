@@ -13,11 +13,14 @@ import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
 } from "../_shared/current-user-context";
+import { boundedJsonValue } from "@/lib/http/input-validation";
 
 const postBodySchema = z
   .object({
     baseTitle: z.string().max(200).optional().nullable(),
-    formSnapshot: z.unknown(),
+    // MT-SEC-067: form snapshots are opaque, but we still cap them at 128 KB
+    // serialized and 20 levels deep to prevent DB bloat / parser DoS.
+    formSnapshot: boundedJsonValue({ maxSerializedBytes: 128 * 1024, maxDepth: 20 }),
     includeInPartPicker: z.boolean().optional(),
   })
   .strict();

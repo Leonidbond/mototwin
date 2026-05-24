@@ -42,18 +42,21 @@ const CARD_BORDER = "#1F2937";
 
 function silhouetteSourceForVehicle(vehicle: VehicleDetail): ImageSourcePropType {
   const key = resolveGarageVehicleSilhouette({
-    brand: { name: vehicle.brandName },
-    model: { name: vehicle.modelName },
-    modelVariant: {
-      year: vehicle.year,
-      versionName: vehicle.variantName,
-      market: vehicle.modelVariant?.market ?? null,
-      engineType: vehicle.modelVariant?.engineType ?? null,
-      coolingType: vehicle.modelVariant?.coolingType ?? null,
-      wheelSizes: vehicle.modelVariant?.wheelSizes ?? null,
-      brakeSystem: vehicle.modelVariant?.brakeSystem ?? null,
-      chainPitch: vehicle.modelVariant?.chainPitch ?? null,
-      stockSprockets: vehicle.modelVariant?.stockSprockets ?? null,
+    motorcycleBrand: { id: vehicle.motorcycleBrandId, name: vehicle.brandName },
+    motorcycleModelFamily: {
+      id: vehicle.motorcycleModelFamilyId,
+      name: vehicle.modelFamilyName,
+    },
+    motorcycleVariant: {
+      id: vehicle.motorcycleVariantId,
+      name: vehicle.variantName,
+    },
+    motorcycleGeneration: {
+      id: vehicle.motorcycleGenerationId,
+      name: vehicle.generationName,
+      yearFrom: vehicle.year,
+      yearTo: null,
+      yearsLabel: vehicle.yearsLabel,
     },
     rideProfile: vehicle.rideProfile,
   });
@@ -61,7 +64,7 @@ function silhouetteSourceForVehicle(vehicle: VehicleDetail): ImageSourcePropType
 }
 
 function formatPlaqueSubtitle(vehicle: VehicleDetail): string {
-  const year = vehicle.modelVariant?.year ?? vehicle.year;
+  const year = vehicle.year;
   const odometerLabel = vehicle.odometer.toLocaleString("ru-RU");
   const ride = formatRideStyleChipRu(vehicle.rideProfile);
   const base = `${year || "—"} · ${odometerLabel} км`;
@@ -69,7 +72,10 @@ function formatPlaqueSubtitle(vehicle: VehicleDetail): string {
 }
 
 function labelForGarageVehicle(v: GarageVehicleItem): string {
-  return v.nickname?.trim() || `${v.brand.name} ${v.model.name}`.trim();
+  return (
+    v.nickname?.trim() ||
+    `${v.motorcycleBrand.name} ${v.motorcycleModelFamily.name}`.trim()
+  );
 }
 
 /** Собираем query без `id` — id мотоцикла уже в pathname (`/vehicles/[id]/…`). */
