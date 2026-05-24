@@ -1,6 +1,9 @@
 export {
   buildTopNodeOverviewCards,
+  buildTopNodeProfileGroups,
+  resolveEditableFavoriteNodeCodes,
 } from "./top-node-overview";
+export type { TopNodeProfileGroup, TopNodeProfileGroupNode } from "./top-node-overview";
 export {
   buildNodeContextPathLabel,
   buildNodeContextViewModel,

@@ -1587,6 +1587,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     if (restoredTopOnly !== null) {
       setNodeTreeTopOnly(restoredTopOnly);
+    } else {
+      try {
+        const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
+        if (raw) {
+          const settings = normalizeUserLocalSettings(JSON.parse(raw));
+          setNodeTreeTopOnly(settings.defaultNodeView === "top");
+        }
+      } catch {
+        // Use default false.
+      }
     }
 
     if (!restoredNodeId) {

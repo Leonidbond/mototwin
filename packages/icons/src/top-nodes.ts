@@ -13,6 +13,7 @@ export const TOP_NODE_ICON_KEYS = [
   "tires",
   "chain",
   "suspension",
+  "other",
 ] as const;
 
 export type TopNodeIconKey = (typeof TOP_NODE_ICON_KEYS)[number];
@@ -116,6 +117,12 @@ export const TOP_NODE_SVG_BODIES: Record<TopNodeIconKey, string> = {
     <line x1="12" y1="20.8" x2="12" y2="22"/>
     <circle cx="12" cy="22.4" r="1.2"/>
   `,
+  other: `
+    <rect x="3" y="3" width="8" height="8" rx="1.5"/>
+    <rect x="13" y="3" width="8" height="8" rx="1.5"/>
+    <rect x="3" y="13" width="8" height="8" rx="1.5"/>
+    <rect x="13" y="13" width="8" height="8" rx="1.5"/>
+  `,
 };
 
 export const TOP_NODE_ICON_LABELS_RU: Record<TopNodeIconKey, string> = {
@@ -125,6 +132,7 @@ export const TOP_NODE_ICON_LABELS_RU: Record<TopNodeIconKey, string> = {
   tires: "Шины",
   chain: "Цепь / звёзды",
   suspension: "Подвеска",
+  other: "Прочее",
 };
 
 /**
@@ -143,4 +151,5 @@ export const TOP_NODE_MATERIAL_COMMUNITY_ICONS: Record<
   tires: "tire",
   chain: "cog-outline",
   suspension: "shock-absorber",
+  other: "dots-grid",
 };

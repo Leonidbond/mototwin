@@ -11,7 +11,7 @@ export type TopServiceNodeItem = {
   topNodeOrder: number | null;
 };
 
-const TOP_SERVICE_NODE_CODES = [
+export const DEFAULT_TOP_SERVICE_NODE_CODES = [
   "ENGINE.LUBE.OIL",
   "ENGINE.LUBE.FILTER",
   "INTAKE.FILTER",
@@ -29,16 +29,29 @@ const TOP_SERVICE_NODE_CODES = [
   "SUSPENSION.FRONT.OIL",
 ] as const;
 
-const orderByCode = new Map<string, number>(TOP_SERVICE_NODE_CODES.map((code, index) => [code, (index + 1) * 10]));
+const defaultOrderByCode = new Map<string, number>(
+  DEFAULT_TOP_SERVICE_NODE_CODES.map((code, index) => [code, (index + 1) * 10])
+);
 
-export async function getTopServiceNodes(prisma: PrismaClient): Promise<TopServiceNodeItem[]> {
+export async function getTopServiceNodes(
+  prisma: PrismaClient,
+  customCodes?: string[] | null
+): Promise<TopServiceNodeItem[]> {
+  const codes =
+    customCodes && customCodes.length > 0
+      ? customCodes
+      : [...DEFAULT_TOP_SERVICE_NODE_CODES];
+
+  const orderByCode =
+    customCodes && customCodes.length > 0
+      ? new Map<string, number>(customCodes.map((code, index) => [code, (index + 1) * 10]))
+      : defaultOrderByCode;
+
   const nodes = await prisma.node.findMany({
     where: {
       isActive: true,
       isServiceRelevant: true,
-      code: {
-        in: [...TOP_SERVICE_NODE_CODES],
-      },
+      code: { in: codes },
     },
     select: {
       id: true,

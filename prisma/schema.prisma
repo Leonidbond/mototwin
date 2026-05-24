@@ -382,6 +382,8 @@ model UserSettings {
   dateFormat                String   @default("DD.MM.YYYY")
   defaultSnoozeDays         Int      @default(7)
   vehicleTrashRetentionDays Int      @default(30)
+  favoriteNodeCodes         String[] @default([])
+  defaultNodeView           String   @default("top")
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 

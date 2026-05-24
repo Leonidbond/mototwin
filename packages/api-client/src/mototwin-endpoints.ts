@@ -66,6 +66,7 @@ import type {
   VehicleDetailResponse,
   TopServiceNodesResponse,
   VehicleNodeTreeResponse,
+  ServiceNodesResponse,
   VehicleWishlistResponse,
   PartMasterDuplicatesResponse,
   CreatePartMasterInput,
@@ -284,6 +285,10 @@ export function createMotoTwinEndpoints(client: ApiClient) {
 
     getTopServiceNodes() {
       return client.request<TopServiceNodesResponse>("/api/nodes/top");
+    },
+
+    getServiceNodes() {
+      return client.request<ServiceNodesResponse>("/api/nodes/service");
     },
 
     getPartSkus(filters: PartSkuSearchFilters = {}) {

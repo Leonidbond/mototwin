@@ -62,6 +62,19 @@ export type TopServiceNodesResponse = {
   nodes: TopServiceNodeItem[];
 };
 
+export type ServiceNodeItem = {
+  id: string;
+  code: string;
+  name: string;
+  parentId: string | null;
+  level: number;
+  displayOrder: number;
+};
+
+export type ServiceNodesResponse = {
+  nodes: ServiceNodeItem[];
+};
+
 export type ServiceEventsResponse = {
   serviceEvents: ServiceEventItem[];
 };

@@ -98,6 +98,7 @@ import {
   consumeNodeTreeReturnState,
   writeNodeTreeReturnState,
 } from "../../../src/ui-node-tree-return-state";
+import { readUserLocalSettings } from "../../../src/ui-user-local-settings";
 import { getNodeTreeIconAsset } from "../../../../../src/node-tree-icons";
 import { buildVehicleServiceLogHref } from "./service-log";
 import {
@@ -1452,18 +1453,23 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     }
     appliedNodeTreeReturnStateRef.current = true;
     let isCancelled = false;
-    void consumeNodeTreeReturnState(vehicleId).then((state) => {
-      if (isCancelled || !state?.selectedNodeId) {
-        return;
+    void Promise.all([
+      consumeNodeTreeReturnState(vehicleId),
+      readUserLocalSettings(),
+    ]).then(([state, localSettings]) => {
+      if (isCancelled) return;
+      if (state?.selectedNodeId) {
+        if (isNodeStatusFilter(state.nodeStatusFilter)) {
+          setNodeStatusFilter(state.nodeStatusFilter);
+        }
+        setNodeTreeTopOnly(Boolean(state.nodeTreeTopOnly));
+        setExpandedIds(new Set(Array.isArray(state.expandedIds) ? state.expandedIds : []));
+        requestAnimationFrame(() => {
+          focusNodeInTree(state.selectedNodeId, { resetFilters: false });
+        });
+      } else {
+        setNodeTreeTopOnly(localSettings.defaultNodeView === "top");
       }
-      if (isNodeStatusFilter(state.nodeStatusFilter)) {
-        setNodeStatusFilter(state.nodeStatusFilter);
-      }
-      setNodeTreeTopOnly(Boolean(state.nodeTreeTopOnly));
-      setExpandedIds(new Set(Array.isArray(state.expandedIds) ? state.expandedIds : []));
-      requestAnimationFrame(() => {
-        focusNodeInTree(state.selectedNodeId, { resetFilters: false });
-      });
     });
     return () => {
       isCancelled = true;
@@ -3633,6 +3639,7 @@ const TOP_NODE_GROUP_ICON_SRC: Record<TopNodeOverviewCard["key"], ImageSourcePro
   tires: tiresIcon,
   chain: chainSprocketsIcon,
   suspension: suspensionIcon,
+  other: engineCoolingIcon,
 };
 
 const TOP_NODE_LEAF_ICON_SRC: Record<string, ImageSourcePropType> = {

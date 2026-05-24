@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { normalizeUserSettings } from "@mototwin/domain";
+import { MAX_FAVORITE_NODE_CODES } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import {
   getCurrentUserContext,
@@ -17,22 +18,31 @@ const userSettingsPatchSchema = z
     vehicleTrashRetentionDays: z
       .union([z.literal(7), z.literal(14), z.literal(30), z.literal(60), z.literal(90)])
       .optional(),
+    favoriteNodeCodes: z
+      .array(z.string().min(1).max(64))
+      .max(MAX_FAVORITE_NODE_CODES)
+      .optional(),
+    defaultNodeView: z.enum(["top", "all"]).optional(),
   })
   .strict();
+
+const userSettingsSelect = {
+  defaultCurrency: true,
+  distanceUnit: true,
+  engineHoursUnit: true,
+  dateFormat: true,
+  defaultSnoozeDays: true,
+  vehicleTrashRetentionDays: true,
+  favoriteNodeCodes: true,
+  defaultNodeView: true,
+} as const;
 
 export async function GET() {
   try {
     const currentUser = await getCurrentUserContext();
     const settings = await prisma.userSettings.findUnique({
       where: { userId: currentUser.userId },
-      select: {
-        defaultCurrency: true,
-        distanceUnit: true,
-        engineHoursUnit: true,
-        dateFormat: true,
-        defaultSnoozeDays: true,
-        vehicleTrashRetentionDays: true,
-      },
+      select: userSettingsSelect,
     });
     if (!settings) {
       return NextResponse.json(
@@ -67,14 +77,7 @@ export async function PATCH(request: Request) {
 
     const existing = await prisma.userSettings.findUnique({
       where: { userId: currentUser.userId },
-      select: {
-        defaultCurrency: true,
-        distanceUnit: true,
-        engineHoursUnit: true,
-        dateFormat: true,
-        defaultSnoozeDays: true,
-        vehicleTrashRetentionDays: true,
-      },
+      select: userSettingsSelect,
     });
     if (!existing) {
       return NextResponse.json(
@@ -88,14 +91,7 @@ export async function PATCH(request: Request) {
     const updated = await prisma.userSettings.update({
       where: { userId: currentUser.userId },
       data: merged,
-      select: {
-        defaultCurrency: true,
-        distanceUnit: true,
-        engineHoursUnit: true,
-        dateFormat: true,
-        defaultSnoozeDays: true,
-        vehicleTrashRetentionDays: true,
-      },
+      select: userSettingsSelect,
     });
 
     return NextResponse.json({ settings: normalizeUserSettings(updated) });

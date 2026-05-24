@@ -4,8 +4,10 @@ import type {
   UserLocalSettingsCurrency,
   UserLocalSettingsDateFormat,
   UserLocalSettingsDistanceUnit,
+  UserLocalSettingsNodeView,
   VehicleTrashRetentionDays,
 } from "@mototwin/types";
+import { MAX_FAVORITE_NODE_CODES } from "@mototwin/types";
 
 export const USER_LOCAL_SETTINGS_STORAGE_KEY = "mototwin.userLocalSettings";
 
@@ -24,6 +26,8 @@ export const DEFAULT_USER_LOCAL_SETTINGS: UserLocalSettings = {
   dateFormat: "DD.MM.YYYY",
   defaultSnoozeDays: 7,
   vehicleTrashRetentionDays: 30,
+  favoriteNodeCodes: [],
+  defaultNodeView: "top",
 };
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -50,6 +54,18 @@ function isVehicleTrashRetentionDays(value: unknown): value is VehicleTrashReten
   return value === 7 || value === 14 || value === 30 || value === 60 || value === 90;
 }
 
+function isNodeView(value: unknown): value is UserLocalSettingsNodeView {
+  return value === "top" || value === "all";
+}
+
+function normalizeFavoriteNodeCodes(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const codes = value
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim().toUpperCase());
+  return codes.slice(0, MAX_FAVORITE_NODE_CODES);
+}
+
 export function normalizeUserLocalSettings(value: unknown): UserLocalSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { ...DEFAULT_USER_LOCAL_SETTINGS };
@@ -70,6 +86,10 @@ export function normalizeUserLocalSettings(value: unknown): UserLocalSettings {
     vehicleTrashRetentionDays: isVehicleTrashRetentionDays(raw.vehicleTrashRetentionDays)
       ? raw.vehicleTrashRetentionDays
       : DEFAULT_USER_LOCAL_SETTINGS.vehicleTrashRetentionDays,
+    favoriteNodeCodes: normalizeFavoriteNodeCodes(raw.favoriteNodeCodes),
+    defaultNodeView: isNodeView(raw.defaultNodeView)
+      ? raw.defaultNodeView
+      : DEFAULT_USER_LOCAL_SETTINGS.defaultNodeView,
   };
 }
 
@@ -129,6 +149,9 @@ export function validateUserSettings(value: unknown): {
       !isVehicleTrashRetentionDays(raw.vehicleTrashRetentionDays)
     ) {
       return { ok: false, error: "Недопустимое значение срока хранения на Свалке." };
+    }
+    if ("defaultNodeView" in raw && !isNodeView(raw.defaultNodeView)) {
+      return { ok: false, error: "Недопустимое значение вида узлов." };
     }
   }
   return { ok: true, settings };

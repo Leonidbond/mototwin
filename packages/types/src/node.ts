@@ -209,7 +209,8 @@ export type TopNodeOverviewGroupKey =
   | "brakes"
   | "tires"
   | "chain"
-  | "suspension";
+  | "suspension"
+  | "other";
 
 export type TopNodeOverviewCard = {
   key: TopNodeOverviewGroupKey;

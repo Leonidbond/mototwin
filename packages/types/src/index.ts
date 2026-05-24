@@ -176,6 +176,8 @@ export type {
   VehicleDetailResponse,
   VehicleNodeTreeResponse,
   TopServiceNodesResponse,
+  ServiceNodesResponse,
+  ServiceNodeItem,
   ServiceEventsResponse,
   CreateServiceEventResponse,
   UpdateServiceEventResponse,
@@ -328,7 +330,9 @@ export type {
   UserLocalSettingsCurrency,
   UserLocalSettingsDistanceUnit,
   UserLocalSettingsDateFormat,
+  UserLocalSettingsNodeView,
 } from "./user-settings";
+export { MAX_FAVORITE_NODE_CODES } from "./user-settings";
 export type {
   AdminRoleWire,
   AdminSectionKey,

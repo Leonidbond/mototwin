@@ -52,6 +52,7 @@ Important: do not run `npx expo` from monorepo root without workspace context, o
 - `docs/frontend-web.md` — web client structure and behavior.
 - `docs/garage-dashboard-mvp.md` — garage semantics and parity notes.
 
+ssh root@195.24.71.143  
 
 для обновления кода на сервере
 sudo -iu deploy

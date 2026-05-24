@@ -83,6 +83,7 @@ const TOP_NODE_CARD_ICON_SRC = {
   lubrication: lubricationIcon,
   suspension: suspensionIcon,
   tires: tiresIcon,
+  other: engineCoolingIcon,
 } as const satisfies Record<TopNodeOverviewCard["key"], StaticImageData>;
 
 /** С `max-width: 1120px` в `.midGrid` одна колонка — здесь порог двух колонок. */
