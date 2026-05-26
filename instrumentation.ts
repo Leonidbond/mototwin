@@ -24,7 +24,9 @@ export async function register(): Promise<void> {
     } else {
       console.error("[mototwin] Unknown env validation failure", error);
     }
-    // Hard-stop. We must never serve traffic with insecure env in prod.
-    process.exit(1);
+    // Hard-stop (throw — process.exit is not allowed in Edge-analyzed bundles).
+    throw error instanceof Error
+      ? error
+      : new Error("[mototwin] Refusing to start — invalid environment");
   }
 }

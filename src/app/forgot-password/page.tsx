@@ -70,7 +70,7 @@ export default function ForgotPasswordPage() {
             </p>
           ) : null}
           {message ? (
-            <p className="text-sm" style={{ color: productSemanticColors.success }}>
+            <p className="text-sm" style={{ color: productSemanticColors.successStrong }}>
               {message}
             </p>
           ) : null}
