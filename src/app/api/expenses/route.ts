@@ -3,6 +3,7 @@ import { z } from "zod";
 import { buildExpenseAnalyticsFromItems, getCurrentExpenseYear } from "@mototwin/domain";
 import type { ExpenseItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
+import { expenseVehicleInclude, toExpenseItemVehicleSummary } from "@/lib/vehicle-wire";
 import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "../_shared/current-user-context";
 import { getVehicleInCurrentContext } from "../_shared/vehicle-context";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
@@ -99,35 +100,16 @@ async function loadExpenses(vehicleId?: string | null): Promise<ExpenseItem[]> {
     orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
     include: {
       node: { select: { id: true, name: true } },
-      vehicle: {
-        select: {
-          id: true,
-          nickname: true,
-          brand: { select: { name: true } },
-          model: { select: { name: true } },
-        },
-      },
+      vehicle: { include: expenseVehicleInclude },
     },
   });
 
   return rows.map((row) => {
     const wire = toWire(row);
-    const rawVehicle = row.vehicle as unknown as {
-      id: string;
-      nickname: string | null;
-      brand?: { name: string };
-      model?: { name: string };
-    } | null;
+    const rawVehicle = row.vehicle as unknown as Parameters<typeof toExpenseItemVehicleSummary>[0];
     return {
       ...wire,
-      vehicle: rawVehicle
-        ? {
-            id: rawVehicle.id,
-            nickname: rawVehicle.nickname,
-            brandName: rawVehicle.brand?.name ?? "",
-            modelName: rawVehicle.model?.name ?? "",
-          }
-        : null,
+      vehicle: toExpenseItemVehicleSummary(rawVehicle),
     };
   });
 }
@@ -218,14 +200,7 @@ export async function POST(request: NextRequest) {
       },
       include: {
         node: { select: { id: true, name: true } },
-        vehicle: {
-          select: {
-            id: true,
-            nickname: true,
-            brand: { select: { name: true } },
-            model: { select: { name: true } },
-          },
-        },
+        vehicle: { include: expenseVehicleInclude },
       },
     });
 

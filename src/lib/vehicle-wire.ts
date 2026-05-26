@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type {
+  ExpenseItemVehicleSummary,
   GarageVehicleItem,
   VehicleDetailApiRecord,
   VehicleRideProfile,
@@ -178,5 +179,31 @@ export function toVehicleDetailApiRecord(
       technicalSpecs: buildTechnicalSpecsView(row.motorcycleGeneration),
     },
     rideProfile: toRideProfileWire(row.rideProfile),
+  };
+}
+
+/** Minimal vehicle include for expense list/create responses. */
+export const expenseVehicleInclude = {
+  id: true,
+  nickname: true,
+  motorcycleBrand: { select: { name: true } },
+  motorcycleModelFamily: { select: { name: true } },
+} satisfies Prisma.VehicleInclude;
+
+type ExpenseVehicleWithIncludes = Prisma.VehicleGetPayload<{
+  include: typeof expenseVehicleInclude;
+}>;
+
+export function toExpenseItemVehicleSummary(
+  vehicle: ExpenseVehicleWithIncludes | null | undefined
+): ExpenseItemVehicleSummary | null {
+  if (!vehicle) {
+    return null;
+  }
+  return {
+    id: vehicle.id,
+    nickname: vehicle.nickname,
+    brandName: vehicle.motorcycleBrand.name,
+    modelName: vehicle.motorcycleModelFamily.name,
   };
 }
