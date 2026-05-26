@@ -68,6 +68,7 @@ export default function ProfilePage() {
   const [serviceNodes, setServiceNodes] = useState<ServiceNodeItem[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [topNodesExpanded, setTopNodesExpanded] = useState(false);
   const [pickerMode, setPickerMode] = useState<"add" | "replace">("add");
   const [replaceTargetCode, setReplaceTargetCode] = useState<string | null>(null);
   const [nodeSearch, setNodeSearch] = useState("");
@@ -265,6 +266,7 @@ export default function ProfilePage() {
   };
 
   const openAddNodePicker = async () => {
+    setTopNodesExpanded(true);
     setPickerMode("add");
     setReplaceTargetCode(null);
     await ensureServiceNodesLoaded();
@@ -273,6 +275,7 @@ export default function ProfilePage() {
   };
 
   const openReplaceNodePicker = async (code: string) => {
+    setTopNodesExpanded(true);
     setPickerMode("replace");
     setReplaceTargetCode(code);
     await ensureServiceNodesLoaded();
@@ -522,25 +525,41 @@ export default function ProfilePage() {
             backgroundColor: productSemanticColors.card,
           }}
         >
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-950">Мой ТОП узлов</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {`${effectiveTopNodeCodes.length} / ${MAX_FAVORITE_NODE_CODES} узлов`}
-                {isUsingCustomNodes ? " · персональный" : " · стандартный"}
-              </p>
-            </div>
+          <div className="mb-3 flex items-start justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setTopNodesExpanded((value) => !value)}
+              aria-expanded={topNodesExpanded}
+              className="flex min-w-0 flex-1 items-start gap-2 text-left"
+            >
+              <span
+                className="mt-1 inline-flex shrink-0 text-gray-500 transition-transform"
+                style={{ transform: topNodesExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
+                aria-hidden
+              >
+                ▶
+              </span>
+              <span className="min-w-0">
+                <h2 className="text-lg font-semibold text-gray-950">Мой ТОП узлов</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {`${effectiveTopNodeCodes.length} / ${MAX_FAVORITE_NODE_CODES} узлов`}
+                  {isUsingCustomNodes ? " · персональный" : " · стандартный"}
+                </p>
+              </span>
+            </button>
             {isUsingCustomNodes ? (
               <button
                 type="button"
                 onClick={resetFavoriteNodes}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
               >
                 Сбросить до стандартного
               </button>
             ) : null}
           </div>
 
+          {topNodesExpanded ? (
+          <>
           <p className="text-sm text-gray-500 mb-3">
             {isUsingCustomNodes
               ? "Ваш набор ТОП-узлов. Группы совпадают с дашбордом мотоцикла."
@@ -693,6 +712,8 @@ export default function ProfilePage() {
                 })}
               </ul>
             </div>
+          ) : null}
+          </>
           ) : null}
         </section>
 

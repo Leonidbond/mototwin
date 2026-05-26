@@ -61,6 +61,7 @@ export default function ProfileScreen() {
   const [serviceNodes, setServiceNodes] = useState<ServiceNodeItem[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isPickerVisible, setIsPickerVisible] = useState(false);
+  const [topNodesExpanded, setTopNodesExpanded] = useState(false);
   const [pickerMode, setPickerMode] = useState<"add" | "replace">("add");
   const [replaceTargetCode, setReplaceTargetCode] = useState<string | null>(null);
 
@@ -188,6 +189,7 @@ export default function ProfileScreen() {
   };
 
   const openAddNodePicker = async () => {
+    setTopNodesExpanded(true);
     setPickerMode("add");
     setReplaceTargetCode(null);
     await ensureServiceNodesLoaded();
@@ -195,6 +197,7 @@ export default function ProfileScreen() {
   };
 
   const openReplaceNodePicker = async (code: string) => {
+    setTopNodesExpanded(true);
     setPickerMode("replace");
     setReplaceTargetCode(code);
     await ensureServiceNodesLoaded();
@@ -342,13 +345,21 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <View style={styles.topNodesHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Мой ТОП узлов</Text>
-              <Text style={styles.topNodesSubtitle}>
-                {`${effectiveTopNodeCodes.length} / ${MAX_FAVORITE_NODE_CODES} узлов`}
-                {isUsingCustomNodes ? " · персональный" : " · стандартный"}
-              </Text>
-            </View>
+            <Pressable
+              style={({ pressed }) => [styles.topNodesHeaderToggle, pressed && styles.topNodesHeaderTogglePressed]}
+              onPress={() => setTopNodesExpanded((value) => !value)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: topNodesExpanded }}
+            >
+              <Text style={styles.topNodesChevron}>{topNodesExpanded ? "▼" : "▶"}</Text>
+              <View style={styles.topNodesHeaderText}>
+                <Text style={styles.sectionTitle}>Мой ТОП узлов</Text>
+                <Text style={styles.topNodesSubtitle}>
+                  {`${effectiveTopNodeCodes.length} / ${MAX_FAVORITE_NODE_CODES} узлов`}
+                  {isUsingCustomNodes ? " · персональный" : " · стандартный"}
+                </Text>
+              </View>
+            </Pressable>
             {isUsingCustomNodes ? (
               <Pressable
                 style={({ pressed }) => [styles.resetButton, pressed && styles.resetButtonPressed]}
@@ -359,6 +370,8 @@ export default function ProfileScreen() {
             ) : null}
           </View>
 
+          {topNodesExpanded ? (
+          <>
           <Text style={styles.topNodesHint}>
             {isUsingCustomNodes
               ? "Ваш набор ТОП-узлов. Группы совпадают с дашбордом мотоцикла."
@@ -430,6 +443,8 @@ export default function ProfileScreen() {
                 : "+ Добавить узел"}
             </Text>
           </Pressable>
+          </>
+          ) : null}
         </View>
 
         {devLoginEnabled ? (
@@ -711,6 +726,10 @@ const styles = StyleSheet.create({
   settingOptionTextActive: { color: c.textInverse },
   // Top nodes section
   topNodesHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  topNodesHeaderToggle: { flex: 1, flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  topNodesHeaderTogglePressed: { opacity: 0.85 },
+  topNodesHeaderText: { flex: 1, minWidth: 0 },
+  topNodesChevron: { fontSize: 12, color: c.textMuted, marginTop: 4, width: 14 },
   topNodesSubtitle: { fontSize: 11, color: c.textMuted, marginTop: 2 },
   topNodesHint: { fontSize: 12, color: c.textSecondary, lineHeight: 18 },
   topNodesEmptyText: { fontSize: 12, color: c.textMuted },
