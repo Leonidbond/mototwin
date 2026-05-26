@@ -9,7 +9,7 @@
  * `docs/models/mototwin_model_technical_master_standard_cursor.md` for rules.
  */
 
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import Papa from "papaparse";
 import { z } from "zod";
@@ -181,18 +181,28 @@ export type MotoTechnicalMasterSeedStats = {
   techSpecsUpserted: number;
 };
 
-const DEFAULT_FILES = [
-  "bmw-model-technical-master.csv",
-  "ktm-model-technical-master.csv",
-];
+const MASTER_CSV_SUFFIX = "-model-technical-master.csv";
+const MASTER_CSV_SKIP = new Set(["all-remaining-brands-model-technical-master.csv"]);
+
+export async function listMotorcycleTechnicalMasterCsvFiles(
+  baseDir = path.join(process.cwd(), "prisma", "seed-data")
+): Promise<string[]> {
+  const entries = await readdir(baseDir, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(MASTER_CSV_SUFFIX))
+    .map((entry) => entry.name)
+    .filter((name) => !MASTER_CSV_SKIP.has(name))
+    .sort((a, b) => a.localeCompare(b));
+}
 
 export async function loadMotorcycleTechnicalMaster(
   prisma: PrismaClient,
   options: { fileNames?: string[]; baseDir?: string } = {}
 ): Promise<MotoTechnicalMasterSeedStats> {
-  const fileNames = options.fileNames ?? DEFAULT_FILES;
   const baseDir =
     options.baseDir ?? path.join(process.cwd(), "prisma", "seed-data");
+  const fileNames =
+    options.fileNames ?? (await listMotorcycleTechnicalMasterCsvFiles(baseDir));
 
   const stats: MotoTechnicalMasterSeedStats = {
     files: 0,

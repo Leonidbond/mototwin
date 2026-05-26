@@ -9,6 +9,8 @@ echo "==> prisma migrate deploy"
 npx prisma migrate deploy
 echo "==> prisma generate"
 npx prisma generate
+echo "==> motorcycle catalog seed (upsert)"
+npm run db:seed:motorcycle
 echo "==> build"
 npm run build
 echo "==> restart mototwin"

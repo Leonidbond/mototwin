@@ -13,6 +13,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:motorcycle": "tsx scripts/seed-motorcycle-master.ts",
     "qa:service-bundle-advanced-smoke": "tsx scripts/qa-service-bundle-advanced-smoke.ts",
     "qa:service-event-full-smoke": "tsx scripts/qa-service-event-full-smoke.ts",
     "qa:service-log-web-routes-smoke": "tsx scripts/qa-service-log-web-routes-smoke.ts",

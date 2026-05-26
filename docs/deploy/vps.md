@@ -76,9 +76,17 @@ sudo certbot --nginx -d beta.mototwin.ru
 ## 6. Обновления
 
 ```bash
-cd /opt/mototwin/app
-git pull
+cd /opt/mototwin/app/mototwin
+git pull origin main
 bash deploy/scripts/deploy-app.sh
+```
+
+Скрипт `deploy-app.sh` после миграций запускает **`npm run db:seed:motorcycle`** — безопасный upsert каталога моделей из `prisma/seed-data/*-model-technical-master.csv` (все бренды). Полный `npm run db:seed` на проде не нужен, если БД уже с данными пользователей.
+
+Только каталог моделей вручную:
+
+```bash
+npm run db:seed:motorcycle
 ```
 
 ## 7. Бэкапы
