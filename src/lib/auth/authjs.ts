@@ -4,8 +4,9 @@ import type { DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import Apple from "next-auth/providers/apple";
-import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers";
-import type { Provider } from "next-auth/providers";
+import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers/oauth";
+
+type Provider = NonNullable<NextAuthOptions["providers"]>[number];
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { ensureUserBootstrap } from "./user-bootstrap";
