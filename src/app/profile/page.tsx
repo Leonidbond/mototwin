@@ -71,12 +71,14 @@ export default function ProfilePage() {
   const [pickerMode, setPickerMode] = useState<"add" | "replace">("add");
   const [replaceTargetCode, setReplaceTargetCode] = useState<string | null>(null);
   const [nodeSearch, setNodeSearch] = useState("");
+  const devLoginEnabled = isDevLoginEnabled();
+  const devUserOptions = getDevUserOptions();
 
   const getResolvedProfileEmail = (fromApi?: ProfileViewModel | null): string | null => {
     if (fromApi?.email) {
       return fromApi.email.trim().toLowerCase();
     }
-    if (selectedDevUserEmail) {
+    if (devLoginEnabled && selectedDevUserEmail) {
       return selectedDevUserEmail.trim().toLowerCase();
     }
     return null;
@@ -107,12 +109,20 @@ export default function ProfilePage() {
     localStorage.setItem(USER_LOCAL_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
   };
 
-  const devLoginEnabled = isDevLoginEnabled();
-  const devUserOptions = getDevUserOptions();
-  const profile = useMemo(
-    () => buildProfileViewModel(selectedDevUserEmail, apiProfile ?? undefined),
-    [apiProfile, selectedDevUserEmail]
-  );
+  const profile = useMemo((): ProfileViewModel => {
+    if (apiProfile) {
+      return apiProfile;
+    }
+    if (devLoginEnabled) {
+      return buildProfileViewModel(selectedDevUserEmail);
+    }
+    return {
+      displayName: "—",
+      email: "—",
+      registeredAtLabel: "—",
+      garageTitle: "—",
+    };
+  }, [apiProfile, devLoginEnabled, selectedDevUserEmail]);
 
   const loadSettings = async () => {
     try {

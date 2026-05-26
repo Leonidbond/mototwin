@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
+import { createWebApiClient } from "@/lib/create-web-api-client";
 import { productSemanticColors } from "@mototwin/design-tokens";
+
+const api = createWebApiClient();
 
 function LoginForm() {
   const router = useRouter();
@@ -21,14 +24,9 @@ function LoginForm() {
     setError("");
     setLoading(true);
     try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
-      if (!result || result.error) {
-        throw new Error("Неверный email или пароль.");
-      }
+      // Email/password uses mototwin_session (see POST /api/auth/login).
+      // NextAuth credentials + database sessions are not supported together.
+      await api.login({ email, password });
       router.replace(nextPath.startsWith("/") ? nextPath : "/garage");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось войти.");
