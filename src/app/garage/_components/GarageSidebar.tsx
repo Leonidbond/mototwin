@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
+import { createMotoTwinEndpoints } from "@mototwin/api-client";
+import { createWebApiClient } from "@/lib/create-web-api-client";
 import { formatRideStyleChipRu, vehicleDetailFromApiRecord } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type { GarageVehicleItem, VehicleDetail, VehicleDetailApiRecord } from "@mototwin/types";
@@ -29,7 +30,31 @@ const LAST_VIEWED_VEHICLE_ID_STORAGE_KEY = "mototwin.lastViewedVehicleId";
 /** Если мотоцикл ещё не выбран — ведём в гараж (страниц `/vehicles`, `/service-log`, `/details` нет). */
 const NAV_FALLBACK_HREF = "/garage";
 
-const sidebarVehicleApi = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
+const sidebarVehicleApi = createWebApiClient();
+
+function formatSidebarUserLabel(displayName: string | null | undefined, email: string): string {
+  const trimmed = displayName?.trim();
+  if (trimmed) {
+    const parts = trimmed.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const lastInitial = parts[parts.length - 1]!.charAt(0).toUpperCase();
+      return `${parts[0]} ${lastInitial}.`;
+    }
+    return trimmed;
+  }
+  const local = email.split("@")[0]?.trim();
+  return local || "Пользователь";
+}
+
+function formatPlanLabelRu(planType: "FREE" | "PRO"): string {
+  return planType === "PRO" ? "Pro тариф" : "Free тариф";
+}
+
+function userAvatarInitial(displayName: string | null | undefined, email: string): string {
+  const source = displayName?.trim() || email.trim();
+  const letter = source.charAt(0).toUpperCase();
+  return letter || "?";
+}
 
 function formatKmRu(n: number): string {
   return new Intl.NumberFormat("ru-RU").format(n);
@@ -84,6 +109,37 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
 
   const vehicleBaseHref = contextVehicleId ? `/vehicles/${encodeURIComponent(contextVehicleId)}` : null;
   const pathBaseHref = pathVehicleId ? `/vehicles/${encodeURIComponent(pathVehicleId)}` : null;
+
+  const [sessionUser, setSessionUser] = useState<{
+    label: string;
+    planLabel: string;
+    avatarInitial: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void sidebarVehicleApi
+      .getAuthMe()
+      .then((me) => {
+        if (cancelled) {
+          return;
+        }
+        const email = me.user.email;
+        setSessionUser({
+          label: formatSidebarUserLabel(me.user.displayName, email),
+          planLabel: formatPlanLabelRu(me.planType),
+          avatarInitial: userAvatarInitial(me.user.displayName, email),
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSessionUser(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [garageVehicles, setGarageVehicles] = useState<GarageVehicleItem[]>([]);
   useEffect(() => {
@@ -291,13 +347,17 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
             justifyContent: collapsed ? "center" : "flex-start",
             padding: collapsed ? 6 : 10,
           }}
-          title={collapsed ? "Алексей К. · Free тариф" : undefined}
+          title={
+            collapsed && sessionUser
+              ? `${sessionUser.label} · ${sessionUser.planLabel}`
+              : undefined
+          }
         >
-          <span style={avatarStyle}>А</span>
+          <span style={avatarStyle}>{sessionUser?.avatarInitial ?? "…"}</span>
           {!collapsed ? (
             <div style={{ minWidth: 0 }}>
-              <div style={userNameStyle}>Алексей К.</div>
-              <div style={userPlanStyle}>Free тариф</div>
+              <div style={userNameStyle}>{sessionUser?.label ?? "…"}</div>
+              <div style={userPlanStyle}>{sessionUser?.planLabel ?? "…"}</div>
             </div>
           ) : null}
         </Link>

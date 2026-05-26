@@ -11,6 +11,7 @@ export type AuthMeResponse = {
   user: AuthUser;
   garageId: string;
   garageTitle: string;
+  planType: "FREE" | "PRO";
 };
 
 export type AuthLoginResponse = {

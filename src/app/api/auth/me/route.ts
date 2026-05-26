@@ -8,7 +8,7 @@ import {
 export async function GET() {
   try {
     const currentUser = await getCurrentUserContext();
-    const [user, garage] = await Promise.all([
+    const [user, garage, subscription] = await Promise.all([
       prisma.user.findUnique({
         where: { id: currentUser.userId },
         select: { id: true, email: true, displayName: true },
@@ -16,6 +16,10 @@ export async function GET() {
       prisma.garage.findUnique({
         where: { id: currentUser.garageId },
         select: { id: true, title: true },
+      }),
+      prisma.subscription.findUnique({
+        where: { userId: currentUser.userId },
+        select: { planType: true },
       }),
     ]);
 
@@ -31,6 +35,7 @@ export async function GET() {
       },
       garageId: garage.id,
       garageTitle: garage.title,
+      planType: subscription?.planType === "PRO" ? "PRO" : "FREE",
     });
   } catch (error) {
     const ctxError = toCurrentUserContextErrorResponse(error);
