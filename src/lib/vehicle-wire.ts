@@ -184,8 +184,6 @@ export function toVehicleDetailApiRecord(
 
 /** Minimal vehicle include for expense list/create responses. */
 export const expenseVehicleInclude = {
-  id: true,
-  nickname: true,
   motorcycleBrand: { select: { name: true } },
   motorcycleModelFamily: { select: { name: true } },
 } satisfies Prisma.VehicleInclude;
