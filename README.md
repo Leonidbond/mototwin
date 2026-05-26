@@ -56,12 +56,17 @@ Important: do not run `npx expo` from monorepo root without workspace context, o
 - [`docs/garage-dashboard-mvp.md`](docs/garage-dashboard-mvp.md) — garage semantics and parity notes
 
 ssh root@195.24.71.143  
+ssh mototwin-vps
 
 для обновления кода на сервере
 sudo -iu deploy
 cd /opt/mototwin/app/mototwin
 git status
 git pull origin main
+
+Напиши в чате, например: «деплой», «обнови прод», «задеплой на VPS» — агент должен подхватить skill по описанию и выполнить SSH-скрипт из SKILL.md.
+
+Если skill не подключается сам: @mototwin-deploy или явно «используй skill mototwin-deploy».
 
 для запуска мобилного в режиме туннеля
 

@@ -1,5 +1,7 @@
 # Деплой MotoTwin на VPS (закрытая бета)
 
+Для агента Cursor: skill **mototwin-deploy** в `.cursor/skills/mototwin-deploy/` (SSH, пути, команды, чеклист).
+
 ## Требования
 
 - Ubuntu 22.04/24.04, 2+ vCPU, **4 GB RAM минимум** (сборка Next.js с TypeScript нужна ~3–4 GB heap; `npm run build` задаёт `NODE_OPTIONS=--max-old-space-size=4096`)

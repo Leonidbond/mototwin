@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run on VPS as deploy from /opt/mototwin/app after git pull.
+# Run on VPS as deploy from /opt/mototwin/app/mototwin after git pull.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
