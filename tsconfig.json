@@ -55,7 +55,12 @@
     "**/*.mts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "apps",
+    "prisma",
+    "scripts",
+    "docs",
+    "deploy"
   ],
   "extends": "expo/tsconfig.base"
 }

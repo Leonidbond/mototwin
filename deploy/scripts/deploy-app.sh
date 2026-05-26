@@ -12,6 +12,7 @@ npx prisma generate
 echo "==> motorcycle catalog seed (upsert)"
 npm run db:seed:motorcycle
 echo "==> build"
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
 npm run build
 echo "==> restart mototwin"
 sudo systemctl restart mototwin
