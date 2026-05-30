@@ -31,6 +31,7 @@ import {
   isWishlistTransitionToInstalled,
   wishlistLineTotalAmount,
   partWishlistStatusLabelsRu,
+  vehicleDetailFromApiRecord,
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
 } from "@mototwin/domain";
 import type {
@@ -38,6 +39,7 @@ import type {
   PartWishlistItemStatus,
   PartWishlistItemViewModel,
   VehicleDetail,
+  VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
@@ -304,7 +306,11 @@ export default function VehicleWishlistScreen() {
         return null;
       }
       const [wishlistData, vehicleData, serviceData, nodeTreeData] = payload;
-      setVehicle(vehicleData.vehicle ?? null);
+      setVehicle(
+        vehicleData.vehicle
+          ? vehicleDetailFromApiRecord(vehicleData.vehicle as unknown as VehicleDetailApiRecord)
+          : null
+      );
       setNodeTree(nodeTreeData.nodeTree ?? []);
       const mappedItems = (wishlistData.items ?? []).map(buildPartWishlistItemViewModel);
       setItems(mappedItems);

@@ -57,7 +57,11 @@ apps/app/
     vehicle-wishlist/
   src/
     api-base-url.ts         # backend base URL resolution for Expo
+  android/                  # native project (expo prebuild); release APK via Gradle
+  eas.json                  # EAS build profiles
 ```
+
+Сборка и запуск: [`mobile-build.md`](./mobile-build.md).
 
 ## 5. Shared packages
 

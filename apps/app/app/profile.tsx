@@ -76,8 +76,17 @@ export default function ProfileScreen() {
   const devLoginEnabled = isDevLoginEnabled();
   const devUserOptions = getDevUserOptions();
   const profile = useMemo(
-    () => apiProfile ?? buildProfileData(selectedDevUserEmail),
-    [apiProfile, selectedDevUserEmail]
+    () =>
+      apiProfile ??
+      (devLoginEnabled
+        ? buildProfileData(selectedDevUserEmail)
+        : {
+            displayName: "—",
+            email: "—",
+            createdAtLabel: "—",
+            garageTitle: "Мой гараж",
+          }),
+    [apiProfile, devLoginEnabled, selectedDevUserEmail]
   );
   const resolvedProfileIdentity = useMemo(() => {
     const identity = apiProfile?.email ?? selectedDevUserEmail;
@@ -89,10 +98,9 @@ export default function ProfileScreen() {
   const loadProfileAndSettings = useCallback(async () => {
     const endpoints = createMobileApiClient();
     try {
-      const [settingsResponse, profileResponse, subscriptionResponse] = await Promise.all([
+      const [settingsResponse, profileResponse] = await Promise.all([
         endpoints.getUserSettings(),
         endpoints.getProfile(),
-        endpoints.getSubscriptionCurrent(),
       ]);
       const resolvedSettings = mergeUserLocalSettings(
         DEFAULT_USER_LOCAL_SETTINGS,
@@ -108,22 +116,29 @@ export default function ProfileScreen() {
         garageTitle: profileResponse.profile.garageTitle,
       });
       await writeUserLocalSettingsForIdentity(resolvedSettings, profileResponse.profile.email);
-      try {
-        const topResponse = await endpoints.getTopServiceNodes();
-        setTopServiceNodes(topResponse.nodes);
-      } catch {
-        setTopServiceNodes([]);
-      }
-      setSubscription(subscriptionResponse);
-      setSubscriptionError("");
       setSettingsError("");
     } catch {
       const fallback = await readUserLocalSettingsForIdentity(resolvedProfileIdentity);
       setUserSettings(fallback);
-      setSubscription(null);
       setSettingsError("Не удалось загрузить настройки с сервера, использован локальный кэш.");
     }
-  }, [apiBaseUrl, resolvedProfileIdentity]);
+
+    try {
+      const topResponse = await createMobileApiClient().getTopServiceNodes();
+      setTopServiceNodes(topResponse.nodes);
+    } catch {
+      setTopServiceNodes([]);
+    }
+
+    try {
+      const subscriptionResponse = await createMobileApiClient().getSubscriptionCurrent();
+      setSubscription(subscriptionResponse);
+      setSubscriptionError("");
+    } catch {
+      setSubscription(null);
+      setSubscriptionError("Не удалось загрузить подписку.");
+    }
+  }, [resolvedProfileIdentity]);
 
   useEffect(() => {
     void (async () => {

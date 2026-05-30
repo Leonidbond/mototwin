@@ -6467,6 +6467,82 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           </div>
         </div>
       ) : null}
+
+      {isEditingVehicleState ? (
+        <div className="fixed inset-0 z-[80] flex items-start justify-center bg-black/50 px-4 py-6 sm:items-center">
+          <div className="garage-dark-surface-text w-full max-w-lg rounded-3xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                Обновить пробег
+              </h2>
+              <button
+                type="button"
+                onClick={cancelVehicleStateEditor}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 px-3.5 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                disabled={isSavingVehicleState}
+              >
+                Закрыть
+              </button>
+            </div>
+
+            <div className="px-6 py-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <InputField label="Пробег, км">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={vehicleStateOdometer}
+                    onChange={(event) => setVehicleStateOdometer(event.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                    placeholder="Например, 15000"
+                    disabled={isSavingVehicleState}
+                  />
+                </InputField>
+
+                <InputField label="Моточасы">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={vehicleStateEngineHours}
+                    onChange={(event) => setVehicleStateEngineHours(event.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                    placeholder="Пусто = не указаны"
+                    disabled={isSavingVehicleState}
+                  />
+                </InputField>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => void saveVehicleState()}
+                  disabled={isSavingVehicleState}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingVehicleState ? "Сохраняем..." : "Сохранить"}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelVehicleStateEditor}
+                  disabled={isSavingVehicleState}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-900 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Отмена
+                </button>
+              </div>
+
+              {vehicleStateError ? (
+                <p className="mt-3 text-sm" style={{ color: productSemanticColors.error }}>
+                  {vehicleStateError}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {serviceLogActionNotice ? (
         <div
           className="fixed bottom-5 right-5 z-[70] flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow"

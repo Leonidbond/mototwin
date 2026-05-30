@@ -148,8 +148,32 @@
 
 ---
 
-## 7) Связанные документы
+## 7) Доступ по тарифу (FREE / RIDER / PRO)
 
+См. [subscription-access-mvp.md](./subscription-access-mvp.md).
+
+### API
+
+`GET /api/vehicles/[id]/node-tree` отдаёт **полное** дерево. На FREE и RIDER у листьев вне пользовательского топ-набора: `locked: true`, `selectable: false`; на PRO все узлы selectable.
+
+### UI (web + Expo)
+
+- Переключатель **«ТОП-узлы»** (отдельно от пользовательского `defaultNodeView` в настройках):
+  - **выкл.** — видно всё дерево; не-топовые листья нельзя выбрать (затемнение строк, без текста «нужен Pro» на каждой строке);
+  - **вкл.** — только ветки к топ-узлам (до 15 из блока «Состояния узлов»).
+- На FREE/RIDER по умолчанию при наличии locked-листьев включается режим «ТОП-узлы».
+- Родительские узлы **не** затемняются, если в поддереве есть хотя бы один активный (не locked) лист.
+- Баннер: «Для работы со всеми узлами нужен тариф Pro» — `SubscriptionLock` / `SubscriptionLockBanner`, `variant="surface"`.
+
+### Модальные пикеры
+
+Тот же принцип (`buildRestrictedPlanVehicleLeafPickerSets`): полный список листьев, toggle «ТОП-узлы», `planLocked` на строках.
+
+---
+
+## 8) Связанные документы
+
+- `docs/subscription-access-mvp.md`
 - `docs/node-tree.md`
 - `docs/archive/expo-screen-node-tree.md`
 - `docs/archive/expo-screen-node-tree-ux-improvements.md`

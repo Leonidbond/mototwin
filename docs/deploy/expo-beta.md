@@ -1,17 +1,21 @@
 # Expo — закрытая бета
 
-## Подготовка (на Mac)
+Краткий чеклист раздачи. **Полная инструкция по сборке:** [`../mobile-build.md`](../mobile-build.md).
+
+## Подготовка (один раз)
 
 ```bash
 npm install -g eas-cli
 cd apps/app
 eas login
-eas init   # привязать проект Expo
+eas init   # projectId → app.json extra.eas.projectId
 ```
 
-В `eas.json` уже задан `EXPO_PUBLIC_API_BASE_URL` для профиля `preview` — замените домен на ваш beta URL перед сборкой.
+В `eas.json` задайте `EXPO_PUBLIC_API_BASE_URL` для профилей `preview` / `production` (сейчас placeholder — замените на beta/prod домен).
 
-## Сборки
+Локальный release APK без EAS — см. [`mobile-build.md` §6](../mobile-build.md#6-release-apk-локально-android).
+
+## Сборки (EAS)
 
 ```bash
 cd apps/app
@@ -19,13 +23,15 @@ eas build -p android --profile preview
 eas build -p ios --profile preview
 ```
 
-Раздача: internal distribution / APK link (Android), TestFlight (iOS, нужен Apple Developer).
+Раздача: internal APK link (Android), TestFlight (iOS, Apple Developer).
 
-**Expo Go не подходит** для production API — только standalone-сборка с HTTPS URL.
+**Expo Go не подходит** для production API — только standalone с HTTPS URL.
 
 ## Проверка
 
-1. Регистрация / логин на экране Login
+1. Регистрация / логин
 2. Гараж загружается
 3. Logout → API 401
 4. Второй аккаунт не видит мото первого
+
+См. также [`beta-checklist.md`](./beta-checklist.md).

@@ -32,13 +32,11 @@ Or from `apps/app`:
 npx expo start
 ```
 
-For unstable local network/tunnel, clear cache:
-
-```bash
-npx expo start --tunnel -c
-```
-
 Important: do not run `npx expo` from monorepo root without workspace context, otherwise Expo may fail with `Unable to resolve module ../../App`.
+
+In a second terminal, start the web API for local data: `npm run dev` (port 3000).
+
+**Build release APK, EAS, env vars, adb:** [`docs/mobile-build.md`](docs/mobile-build.md).
 
 ## Mobile navigation (current)
 
@@ -49,7 +47,9 @@ Important: do not run `npx expo` from monorepo root without workspace context, o
 ## Docs
 
 - [`docs/README.md`](docs/README.md) — индекс документации
+- [`docs/subscription-access-mvp.md`](docs/subscription-access-mvp.md) — тарифы FREE / RIDER / PRO (реализовано)
 - [`docs/frontend-expo.md`](docs/frontend-expo.md) — Expo routes, architecture, platform notes
+- [`docs/mobile-build.md`](docs/mobile-build.md) — сборка и запуск мобильного приложения (Metro, APK, EAS)
 - [`docs/frontend-web.md`](docs/frontend-web.md) — web client structure and behavior
 - [`docs/user-settings-mvp.md`](docs/user-settings-mvp.md) — настройки профиля
 - [`docs/custom-top-nodes-mvp.md`](docs/custom-top-nodes-mvp.md) — персональный ТОП узлов и вид дерева

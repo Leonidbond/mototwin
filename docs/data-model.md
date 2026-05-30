@@ -6,7 +6,8 @@
 
 ## 2. Enums
 
-- `PlanType`: `FREE`, `PRO`
+- `PlanType`: `FREE`, `RIDER`, `PRO`
+- `ServiceEventEntryMode`: `QUICK`, `DETAILED` — доступ по тарифу (`allowedEntryModes`); см. [subscription-access-mvp.md](./subscription-access-mvp.md)
 - `SubscriptionStatus`: `ACTIVE`, `INACTIVE`, `CANCELED`, `TRIAL`
 - `UsageType`: `CITY`, `HIGHWAY`, `MIXED`, `OFFROAD`
 - `RidingStyle`: `CALM`, `ACTIVE`, `AGGRESSIVE`
@@ -35,8 +36,9 @@
 - `User` has optional 1:1 `UserSettings` (`userId` unique).
 - `User.email` is nullable unique (transitional pre-auth ownership mode).
 - `User.displayName` is optional.
-- `Subscription` is optional 1:1 to `User` (`userId` unique).
-- Runtime MVP currently uses demo user approach for vehicle flows.
+- `Subscription` is optional 1:1 to `User` (`userId` unique): `planType` (`PlanType`), `status` (`SubscriptionStatus`), `startedAt`, `endsAt`, `trialEndsAt`.
+- При регистрации создаётся строка подписки (bootstrap); смена плана в MVP — `PATCH /api/subscription/plan` без биллинга.
+- См. [subscription-access-mvp.md](./subscription-access-mvp.md).
 
 ### Garage
 
@@ -92,6 +94,8 @@
 - `eventKind` distinguishes:
   - `SERVICE`
   - `STATE_UPDATE`
+- `mode`: `BASIC` | `ADVANCED` (форма быстрый / подробный бандл).
+- `entryMode`: `QUICK` | `DETAILED` (ограничение тарифа; подробный UI ⇒ `DETAILED`).
 - Stores operation facts: `eventDate`, `odometer`, `engineHours`, `serviceType`, optional cost/comment/parts json.
 - Optional **place of service / installation** (web form «Место установки»): `installLocationAddress` (`String?`), `installLocationLat` / `installLocationLng` (`Float?`); координаты сохраняются только вместе с непустым адресом.
 - Form extras (also on `ServiceEvent`): `performedBy`, `serviceProviderNote`, attachment intent flags, next-service reminder fields — see [web-service-event-form.md](./web-service-event-form.md).

@@ -20,7 +20,8 @@
 | [`data-model.md`](./data-model.md) | Prisma: сущности, enum, связи |
 | [`api-backend.md`](./api-backend.md) | HTTP API, правила, формы ответов |
 | [`frontend-web.md`](./frontend-web.md) | Next.js клиент |
-| [`frontend-expo.md`](./frontend-expo.md) | Expo Router, экраны, потоки |
+| [`frontend-expo.md`](./frontend-expo.md) | Expo Router, экраны, потокы |
+| [`mobile-build.md`](./mobile-build.md) | Сборка и запуск Expo: Metro, release APK, EAS, troubleshooting |
 | [`shared-packages.md`](./shared-packages.md) | `types`, `domain`, `api-client`, границы reuse |
 | [`functional-logic.md`](./functional-logic.md) | События, статусы узлов, агрегация |
 | [`parity/cross-platform-parity.md`](./parity/cross-platform-parity.md) | Матрица parity и намеренные отличия |
@@ -71,13 +72,15 @@
 
 **Журналы фиксов:** [`parity/web-expo-parity-fixes.md`](./parity/web-expo-parity-fixes.md) · [`parity/web-expo-data-parity-fixes.md`](./parity/web-expo-data-parity-fixes.md) · [`parity/web-expo-node-tree-parity-fixes.md`](./parity/web-expo-node-tree-parity-fixes.md) · [`parity/web-expo-visual-parity-fixes.md`](./parity/web-expo-visual-parity-fixes.md) · [`parity/web-expo-service-log-parity-fixes.md`](./parity/web-expo-service-log-parity-fixes.md) (в конце — приложение с ранними заметками по Expo journal; отдельные файлы `expo-service-log-*-parity.md` удалены как дубли).
 
-**QA:** [`service-event-qa-smoke.md`](./service-event-qa-smoke.md) · [`status-cache-frontend-qa.md`](./status-cache-frontend-qa.md) · [`parts-catalog-regression-qa.md`](./parts-catalog-regression-qa.md) · [`parts-compatibility-qa.md`](./parts-compatibility-qa.md) · [`parts-catalog-qa-seed.md`](./parts-catalog-qa-seed.md)
+**QA:** [`service-event-qa-smoke.md`](./service-event-qa-smoke.md) · [`status-cache-frontend-qa.md`](./status-cache-frontend-qa.md) · [`parts-catalog-regression-qa.md`](./parts-catalog-regression-qa.md) · [`parts-compatibility-qa.md`](./parts-compatibility-qa.md) · [`parts-catalog-qa-seed.md`](./parts-catalog-qa-seed.md) · `npm run qa:subscription-smoke` → [subscription-access-mvp.md](./subscription-access-mvp.md#qa)
 
 ---
 
-## 6. Auth и доступ
+## 6. Auth, подписка и доступ
 
 [`auth-roadmap.md`](./auth-roadmap.md) · [`auth-data-ownership-architecture.md`](./auth-data-ownership-architecture.md) · [`auth-implementation-plan.md`](./auth-implementation-plan.md)
+
+**Тарифы (реализовано):** [`subscription-access-mvp.md`](./subscription-access-mvp.md) — MVP FREE / RIDER / PRO, API, UI, QA. Полная спека: [`mototwin_subscription_access_spec.md`](./mototwin_subscription_access_spec.md).
 
 ---
 

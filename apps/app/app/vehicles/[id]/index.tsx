@@ -66,6 +66,7 @@ import {
   NODE_TREE_PLAN_LOCKED_HINT_RU,
   nodeTreeHasPlanLockedNodes,
   resolveGarageVehicleSilhouette,
+  vehicleDetailFromApiRecord,
   type PartsCartSummary,
 } from "@mototwin/domain";
 import type {
@@ -88,6 +89,7 @@ import type {
   TopNodeOverviewCard,
   TopServiceNodeItem,
   VehicleDetail,
+  VehicleDetailApiRecord,
 } from "@mototwin/types";
 import {
   productSemanticColors as c,
@@ -787,7 +789,11 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       if (!detailData) {
         return;
       }
-      setVehicle(detailData.vehicle ?? null);
+      setVehicle(
+        detailData.vehicle
+          ? vehicleDetailFromApiRecord(detailData.vehicle as unknown as VehicleDetailApiRecord)
+          : null
+      );
     } catch (err) {
       setError("Не удалось загрузить данные мотоцикла.");
       setVehicle(null);

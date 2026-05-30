@@ -12,6 +12,8 @@
 - Из **`apps/app`**: `npx expo start`.
 - **`npx expo` из корня** без workspace приводит к стандартному `expo/AppEntry.js` и ошибке «Unable to resolve module ../../App» — так запускать не нужно.
 
+**Сборка release APK, EAS, adb, переменные окружения и troubleshooting:** [`mobile-build.md`](./mobile-build.md).
+
 ## 2. Route map (Expo Router)
 
 Defined in `apps/app/app/_layout.tsx`:
@@ -28,7 +30,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - `vehicles/[id]/wishlist/*` — полный список покупок, picker, редактирование позиции
 
 Переиспользуемые экранные блоки вынесены из `app/**` в **`apps/app/components/`**:
-- `expo-shell/` — `ScreenHeader`, **`InternalScreenChrome`** (крошки + заголовок + опциональные действия), `KeyboardAwareScrollScreen`, `ActionIconButton`, контекст ТС и т.п.
+- `expo-shell/` — `ScreenHeader`, **`InternalScreenChrome`** (горизонтальная хлебная строка + заголовок + опциональные действия; при `declutterMobile` заголовок сжимается при прокрутке), `KeyboardAwareScrollScreen`, `ActionIconButton`, контекст ТС и т.п.
 - `garage/` — **`GarageVehicleContextPlaque`**: компактная плашка мотоцикла под крошками (слот `belowNavRow` у `InternalScreenChrome`), переход на дашборд ТС по тапу, смена мотоцикла из гаража с сохранением хвоста маршрута (паритет с web `SidebarVehiclePlaque` / `GarageSidebar`). Хелпер пути: `apps/app/src/garage-vehicle-route.ts` (`replaceVehicleIdInPath`). Для query при смене ТС используется **`useGlobalSearchParams`** (в этой версии Expo Router **`useSearchParams` из пакета не экспортируется**).
 - `vehicle-detail/` — bundle-форма сервисного события, `MobileNodePickerModal`, модалки статуса
 - `vehicle-wishlist/` — блоки picker/корзины, редактор позиции, href-хелперы
@@ -197,6 +199,7 @@ Detailed parity matrix: `parity/cross-platform-parity.md`.
 
 ## 6. Related docs
 
+- `mobile-build.md` — dev-сервер, release APK, EAS, `.env`, типичные ошибки сборки
 - `node-picker-reuse.md` — **`MobileNodePickerModal`** (`apps/app/components/vehicle-detail/mobile-node-picker-modal.tsx`) и паритет с web
 - `frontend-web.md`
 - `shared-packages.md`

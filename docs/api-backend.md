@@ -135,6 +135,7 @@ export async function POST(request: Request) {
 - Optional body: `nickname`, `vin`
 - Response `201`: `{ vehicle: GarageVehicleItem }`
 - Response `400`: validation failed (включая разорванную цепочку 4-уровневой иерархии)
+- Response `403`: лимит `maxVehicles` по тарифу (`subscription` error shape)
 - Response `500`: create failure
 
 ### `GET /api/vehicles/[id]`
@@ -167,7 +168,8 @@ export async function POST(request: Request) {
 ### `GET /api/vehicles/[id]/service-events`
 - Returns vehicle service history with node metadata
 - Sort: `eventDate desc`, then `createdAt desc`
-- Response `200`: `{ serviceEvents }`
+- На **FREE** в ответе `meta`: `plan`, `visibleLimit` (10), `hiddenCount` — в БД событий больше, клиент показывает paywall в журнале
+- Response `200`: `{ serviceEvents, meta? }`
 - Response `404`: vehicle not found
 - Response `500`: fetch failure
 
@@ -179,6 +181,8 @@ export async function POST(request: Request) {
   - event date cannot be in future
   - event odometer cannot exceed current vehicle odometer
   - top node state must exist for vehicle (compatibility requirement)
+  - **`entryMode` / `mode`**: `DETAILED` или `ADVANCED` требуют `allowedEntryModes` на плане; иначе `403`
+  - выбор узлов: на FREE/RIDER — только узлы из топ-набора (см. subscription guards)
 - Request notes:
   - **`nextReminderDate`**: допускается **`null`** при выключенном напоминании или при включённом напоминании без даты (только пробег/моточасы); см. Zod-схему в `service-events/route.ts`
   - **`installLocationAddress`**, **`installLocationLat`**, **`installLocationLng`**: опционально; адрес до 500 символов; широта −90…90, долгота −180…180 (Zod в `service-events/route.ts` и `…/[eventId]/route.ts`). UI и ключ Яндекс.Карт — [web-service-event-form.md](./web-service-event-form.md), §5.1.
@@ -203,10 +207,11 @@ export async function POST(request: Request) {
   - `effectiveStatus`
   - `statusExplanation`
   - `children`
+  - на FREE/RIDER: `locked`, `selectable` (листья вне топ-набора — `locked: true`; PRO — все selectable)
 - Uses vehicle state + rules + latest leaf service events + node states
 - Aggregates status upward using fixed priority:
   `OVERDUE > SOON > RECENTLY_REPLACED > OK`
-- Response `200`: `{ nodeTree }`
+- Response `200`: `{ nodeTree }` — полное дерево, не плоский список топ-узлов
 - Response `404`: vehicle not found
 - Response `500`: fetch failure
 
@@ -241,20 +246,35 @@ export async function POST(request: Request) {
 
 ### `PATCH /api/user-settings`
 - Partial update; zod-validated fields including:
-  - `favoriteNodeCodes`: `string[]`, max 15 items
+  - `favoriteNodeCodes`: `string[]`, max 15 items — только **листья** каталога; на **FREE** → `403`
   - `defaultNodeView`: `"top"` | `"all"`
 - Response `200`: `{ settings }` (merged + normalized)
 - Response `400`: validation error
+- Response `403`: ограничение тарифа (ТОП-узлы на FREE)
 
 See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md).
 
-## 3.8 Admin users
+## 3.8 Subscription (mock billing)
+
+### `GET /api/subscription/current`
+- Текущий план, `trialEndsAt`, `capabilities` (матрица из `src/lib/subscription/capabilities.ts`)
+- Response `200`: `SubscriptionCurrentResponse`
+- Требует сессию / dev-user
+
+### `PATCH /api/subscription/plan`
+- Body: `{ plan: "FREE" | "RIDER" | "PRO" }`
+- Response `200`: обновлённая подписка
+- Response `400` / `403`: validation / blocked
+
+См. [subscription-access-mvp.md](./subscription-access-mvp.md).
+
+## 3.9 Admin users
 
 ### `GET /api/admin/users`
 - Requires admin access (`requireAnyAdmin`).
 - Filters:
   - `q` (email/displayName search),
-  - `plan` (`FREE|PRO|all`),
+  - `plan` (`FREE|RIDER|PRO|all`),
   - `hasVehicles` (`yes|no`),
   - `role` (`SUPER_ADMIN|CATALOG_MANAGER|MODERATOR|ANALYST|all`),
   - `status` (`active|blocked|all`).
