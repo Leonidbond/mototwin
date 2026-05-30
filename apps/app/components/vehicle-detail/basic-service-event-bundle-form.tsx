@@ -21,10 +21,7 @@ import {
   buildAddServiceEventCostBreakdownLines,
   createEmptyBundleItemFormValues,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
-  filterLeafOptionsUnderTopNodeAncestors,
-  flattenNodeTreeToSelectOptions,
-  getOrderedTopNodeIdsPresentInNodeTree,
-  nodeAncestorPathLabelRu,
+  buildRestrictedPlanVehicleLeafPickerSets,
   formatExpenseAmountRu,
   partSkuListPriceToBundlePartCostInput,
   getServiceActionTypeLabelRu,
@@ -37,6 +34,7 @@ import {
   SERVICE_ACTION_TYPE_OPTIONS,
   stripAddServiceEventFormValuesForUserTemplate,
   validateAddServiceEventFormValuesMobile,
+  canUseServiceEventEntryMode,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -49,9 +47,12 @@ import type {
   PartWishlistItemStatus,
   ServiceBundleTemplateWire,
   ServicePerformedBy,
+  SubscriptionCapabilities,
+  ServiceNodeItem,
   TopServiceNodeItem,
   UserServiceEventFormTemplateWire,
 } from "@mototwin/types";
+import { SubscriptionLockBanner } from "../subscription/subscription-lock-banner";
 import { MobileNodePickerModal } from "./mobile-node-picker-modal";
 
 /** Палитра панели узлов — как `SERVICE_EVENT_PARTS_UI` на web (`service-event-form/styles.ts`). */
@@ -321,6 +322,8 @@ export type BasicServiceEventBundleFormProps = {
   contextHint?: string;
   /** Блок «Что будет после сохранения» как на web `PostSaveExplainer`. По умолчанию включён. */
   showPostSaveExplainer?: boolean;
+  /** Omit while subscription is loading to avoid Free defaults on Pro/Rider. */
+  subscriptionCapabilities?: SubscriptionCapabilities | null;
 };
 
 export function BasicServiceEventBundleForm({
@@ -338,6 +341,7 @@ export function BasicServiceEventBundleForm({
   isEditMode,
   contextHint,
   showPostSaveExplainer = true,
+  subscriptionCapabilities,
 }: BasicServiceEventBundleFormProps) {
   const [form, setForm] = useState(() => cloneForm(initialForm));
   const [localError, setLocalError] = useState("");
@@ -350,6 +354,7 @@ export function BasicServiceEventBundleForm({
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [customCurrencyDraft, setCustomCurrencyDraft] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [detailedModePaywallVisible, setDetailedModePaywallVisible] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     eventDate?: string;
     odometer?: string;
@@ -365,6 +370,7 @@ export function BasicServiceEventBundleForm({
 
   const [bundleTemplates, setBundleTemplates] = useState<ServiceBundleTemplateWire[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
   const [bundleTemplatesErr, setBundleTemplatesErr] = useState("");
   const [userTemplates, setUserTemplates] = useState<UserServiceEventFormTemplateWire[]>([]);
   const [userTemplatesErr, setUserTemplatesErr] = useState("");
@@ -393,38 +399,37 @@ export function BasicServiceEventBundleForm({
   const [vehicleStateSaving, setVehicleStateSaving] = useState(false);
   const [vehicleStateError, setVehicleStateError] = useState("");
 
-  const leafOptions = useMemo(
-    () => flattenNodeTreeToSelectOptions(nodeTree).filter((o) => !o.hasChildren),
-    [nodeTree]
-  );
-  const leafPickerRows = useMemo(
+  const vehicleLeafPickerSets = useMemo(
     () =>
-      leafOptions.map((o) => ({
-        id: o.id,
-        code: o.code,
-        name: o.name,
-        level: o.level,
-        pathLabel: nodeAncestorPathLabelRu(nodeTree, o.id),
-      })),
-    [leafOptions, nodeTree]
+      buildRestrictedPlanVehicleLeafPickerSets({
+        nodeTree,
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscriptionCapabilities?.canSelectChildNode ?? true,
+      }),
+    [nodeTree, serviceCatalogNodes, subscriptionCapabilities?.canSelectChildNode, topServiceNodes]
   );
-  const topNodeIds = useMemo(
-    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
-    [nodeTree, topServiceNodes]
+  const leafPickerRows = vehicleLeafPickerSets.allLeaves;
+  const topLeafPickerRows = vehicleLeafPickerSets.topLeaves;
+  const selectableLeafPickerRows = vehicleLeafPickerSets.selectableLeaves;
+  const pickerShowTopToggle = vehicleLeafPickerSets.showTopToggle;
+  const allowChildNodes =
+    subscriptionCapabilities == null || subscriptionCapabilities.canSelectChildNode;
+  const detailedEntryAllowed =
+    subscriptionCapabilities == null ||
+    canUseServiceEventEntryMode(subscriptionCapabilities, "DETAILED");
+  const leafIds = useMemo(
+    () => new Set(selectableLeafPickerRows.map((o) => o.id)),
+    [selectableLeafPickerRows]
   );
-  const topLeafPickerRows = useMemo(
-    () => filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafPickerRows, topNodeIds),
-    [leafPickerRows, nodeTree, topNodeIds]
-  );
-  const leafIds = useMemo(() => new Set(leafOptions.map((o) => o.id)), [leafOptions]);
 
   const selectedUnitsCount = useMemo(
     () => form.items.filter((it) => it.nodeId.trim()).length,
     [form.items]
   );
   const hasFreeNodesForBundle = useMemo(
-    () => leafOptions.some((o) => !form.items.some((it) => it.nodeId.trim() === o.id)),
-    [leafOptions, form.items]
+    () => selectableLeafPickerRows.some((o) => !form.items.some((it) => it.nodeId.trim() === o.id)),
+    [selectableLeafPickerRows, form.items]
   );
 
   useEffect(() => {
@@ -527,6 +532,20 @@ export function BasicServiceEventBundleForm({
   );
 
   useEffect(() => {
+    if (detailedEntryAllowed) {
+      setDetailedModePaywallVisible(false);
+    }
+  }, [detailedEntryAllowed]);
+
+  useEffect(() => {
+    if (detailedEntryAllowed || form.mode !== "ADVANCED") {
+      return;
+    }
+    setSkuSearchRowIndex(0);
+    updateForm((prev) => switchFormToBasic(prev));
+  }, [detailedEntryAllowed, form.mode, updateForm]);
+
+  useEffect(() => {
     let cancelled = false;
     setBundleTemplatesErr("");
     const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
@@ -569,13 +588,20 @@ export function BasicServiceEventBundleForm({
   useEffect(() => {
     let cancelled = false;
     const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
-    void endpoints
-      .getTopServiceNodes()
-      .then((res) => {
-        if (!cancelled) setTopServiceNodes(res.nodes ?? []);
+    void Promise.all([
+      endpoints.getTopServiceNodes(),
+      endpoints.getServiceNodes(),
+    ])
+      .then(([topRes, catalogRes]) => {
+        if (cancelled) return;
+        setTopServiceNodes(topRes.nodes ?? []);
+        setServiceCatalogNodes(catalogRes.nodes ?? []);
       })
       .catch(() => {
-        if (!cancelled) setTopServiceNodes([]);
+        if (!cancelled) {
+          setTopServiceNodes([]);
+          setServiceCatalogNodes([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -939,40 +965,60 @@ export function BasicServiceEventBundleForm({
 
   const combinedError = localError || submitError;
 
+  const filterPickerRowsForRow = (rows: typeof leafPickerRows, rowIndex: number) =>
+    rows.filter(
+      (o) =>
+        o.id === form.items[rowIndex]?.nodeId.trim() ||
+        !form.items.some((it, i) => i !== rowIndex && it.nodeId.trim() === o.id)
+    );
+
   const nodePickerOptions =
-    nodePicker != null
-      ? leafPickerRows.filter(
-          (o) =>
-            o.id === form.items[nodePicker.rowIndex]?.nodeId.trim() ||
-            !form.items.some((it, i) => i !== nodePicker.rowIndex && it.nodeId.trim() === o.id)
-        )
-      : [];
+    nodePicker != null ? filterPickerRowsForRow(leafPickerRows, nodePicker.rowIndex) : [];
   const nodePickerTopOptions =
-    nodePicker != null
-      ? topLeafPickerRows.filter(
-          (o) =>
-            o.id === form.items[nodePicker.rowIndex]?.nodeId.trim() ||
-            !form.items.some((it, i) => i !== nodePicker.rowIndex && it.nodeId.trim() === o.id)
-        )
-      : [];
+    nodePicker != null && pickerShowTopToggle
+      ? filterPickerRowsForRow(topLeafPickerRows, nodePicker.rowIndex)
+      : undefined;
   const freeNodePickerRows = leafPickerRows.filter(
     (o) => !form.items.some((it) => it.nodeId.trim() === o.id)
   );
-  const freeTopNodePickerRows = topLeafPickerRows.filter(
-    (o) => !form.items.some((it) => it.nodeId.trim() === o.id)
-  );
+  const freeTopNodePickerRows = pickerShowTopToggle
+    ? topLeafPickerRows.filter((o) => !form.items.some((it) => it.nodeId.trim() === o.id))
+    : undefined;
 
   return (
     <View>
       <ServiceEventModeSegment
         mode={form.mode}
+        detailedAllowed={detailedEntryAllowed}
+        onBlockedDetailed={() => setDetailedModePaywallVisible(true)}
         onChange={(nextMode) => {
+          if (nextMode === "BASIC") {
+            setDetailedModePaywallVisible(false);
+          }
           setSkuSearchRowIndex(0);
           updateForm((prev) =>
             nextMode === "BASIC" ? switchFormToBasic(prev) : switchFormToAdvanced(prev)
           );
         }}
       />
+      {detailedModePaywallVisible && !detailedEntryAllowed ? (
+        <View style={{ marginBottom: 10 }}>
+          <SubscriptionLockBanner
+            title="Подробное ТО доступно в Rider"
+            description="В Free доступна быстрая запись обслуживания. Rider и Pro открывают подробное ТО с выбором узла, деталями работ и расходами."
+            requiredPlan="RIDER"
+          />
+        </View>
+      ) : null}
+      {!subscriptionCapabilities?.canSelectChildNode && subscriptionCapabilities ? (
+        <View style={{ marginBottom: 10 }}>
+          <SubscriptionLockBanner
+            title="Выбор подузлов — Pro"
+            description="На вашем тарифе в форме доступны только ТОП-узлы. Полное дерево — на тарифе Pro."
+            requiredPlan="PRO"
+          />
+        </View>
+      ) : null}
 
       {contextHint ? (
         <View style={styles.contextHintBox}>
@@ -1169,7 +1215,9 @@ export function BasicServiceEventBundleForm({
             const nodeIdTrim = row.nodeId.trim();
             const nodeOpt = leafOptions.find((o) => o.id === nodeIdTrim);
             const nodeTitle = nodeOpt?.name ?? `Узел ${rowIndex + 1}`;
-            const crumb = nodeIdTrim ? nodeAncestorPathLabelRu(nodeTree, row.nodeId) : "";
+            const crumb = nodeIdTrim
+              ? leafPickerRows.find((o) => o.id === row.nodeId)?.pathLabel ?? ""
+              : "";
             const hasNode = Boolean(nodeIdTrim);
             const canRemoveRow = form.items.length > 1;
             const rowActionLabelBasic = getServiceActionTypeLabelRu(form.commonActionType);

@@ -18,7 +18,9 @@ export default async function AdminSubscriptionsPage() {
   for (const row of subs) {
     subsByPlan.set(row.planType, (subsByPlan.get(row.planType) ?? 0) + row._count._all);
   }
-  const free = totalUsers - (subsByPlan.get("PRO") ?? 0);
+  const free = subsByPlan.get("FREE") ?? 0;
+  const rider = subsByPlan.get("RIDER") ?? 0;
+  const pro = subsByPlan.get("PRO") ?? 0;
 
   return (
     <AdminPageChrome title={ruAdmin.nav.subscriptions} self={self}>
@@ -29,21 +31,14 @@ export default async function AdminSubscriptionsPage() {
       <section
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
           gap: 14,
         }}
       >
         <Stat label="Всего пользователей" value={formatNumberRu(totalUsers)} />
-        <Stat
-          label="PRO активные"
-          value={formatNumberRu(
-            subs
-              .filter((row) => row.planType === "PRO" && row.status === "ACTIVE")
-              .reduce((acc, row) => acc + row._count._all, 0)
-          )}
-          tone="ok"
-        />
         <Stat label="FREE" value={formatNumberRu(Math.max(0, free))} tone="muted" />
+        <Stat label="RIDER" value={formatNumberRu(Math.max(0, rider))} />
+        <Stat label="PRO" value={formatNumberRu(Math.max(0, pro))} tone="ok" />
       </section>
 
       <section

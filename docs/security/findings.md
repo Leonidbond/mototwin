@@ -49,6 +49,8 @@
 | `MT-SEC-073` | **P0** (IDOR) | **resolved** | `parts/recommended-skus` — добавлен `getVehicleInCurrentContext` (был полностью без auth); `part-masters/duplicates` — добавлен `getCurrentUserContext` + rate-limit |
 | `MT-SEC-074` | P1 | **resolved** | `geocode` — добавлен `getCurrentUserContext` + rate-limit 60/min per-user (был полностью без auth, paid Yandex API → cost abuse) |
 | `MT-SEC-075` | P2 | **resolved** | `admin/imports` POST — sanitize `file.name` (strip path separators + control chars + length cap 200) перед записью в БД и audit log |
+| `MT-SEC-027` | P0 (scope:infra) | **partial** | `mototwin.dump` untracked + в `.gitignore`. **Открыто:** rewrite git history (commit `85860f1`) + ротация `AUTH_SECRET`/DB-пароля/`RESEND_API_KEY`/`YANDEX_GEOCODER_API_KEY` — см. [docs/deploy/vps.md §11](../deploy/vps.md#11-инцидент-mototwindump-в-git-history-mt-sec-027) |
+| `MT-SEC-029` | P0 (scope:infra) | **resolved** | `deploy/nginx/mototwin.conf` переписан: HTTPS-only, TLS Mozilla intermediate, HSTS preload, X-Frame-Options/X-Content-Type-Options/Referrer-Policy/Permissions-Policy/COOP, OCSP stapling, `client_max_body_size 16m`, proxy timeouts, HTTP→HTTPS 301 redirect с открытым `/.well-known/acme-challenge/` |
 
 Открытые приоритеты:
 
@@ -752,8 +754,8 @@ export async function fetchWithTimeout(url: string, opts: RequestInit & { timeou
 | ID | Название | Описание | Где |
 |----|----------|----------|-----|
 | `MT-SEC-026` | README с production SSH и demo credentials | `ssh root@195.24.71.143`, `sudo -iu deploy`, `demo@mototwin.local / demo12345` | [README.md:58-74](../../README.md) |
-| `MT-SEC-027` | `mototwin.dump` (≈119 KB) в репо | `-rw-------` файл в корне; проверить, не реальный ли это дамп Postgres с PII | корень репо |
+| `MT-SEC-027` | `mototwin.dump` (≈119 KB) в репо | **partial:** файл untracked + `.gitignore`. Open: rewrite history + ротация секретов — [docs/deploy/vps.md §11](../deploy/vps.md#11-инцидент-mototwindump-в-git-history-mt-sec-027) | корень репо |
 | `MT-SEC-028` | (Дубль `MT-SEC-026`, оставлено для трассировки в плане) | — | — |
-| `MT-SEC-029` | `deploy/nginx/mototwin.conf` без TLS / HSTS / security headers | Только `listen 80;`, комментарий «потом certbot» | [deploy/nginx/mototwin.conf](../../deploy/nginx/mototwin.conf) |
+| `MT-SEC-029` | `deploy/nginx/mototwin.conf` без TLS / HSTS / security headers | **resolved:** HTTPS-only + Mozilla intermediate + HSTS preload + 5 security headers + 301 redirect + OCSP stapling + body/timeout caps | [deploy/nginx/mototwin.conf](../../deploy/nginx/mototwin.conf) |
 | `MT-SEC-030` | `docker-compose.yml` (dev) — postgres/postgres на `0.0.0.0:5432` | Для разработки на ноутбуке в открытой сети — риск | [docker-compose.yml](../../docker-compose.yml) |
 | `MT-SEC-031` | Крупные файлы в репо: `eng.traineddata`, `rus.traineddata` (по ~5 МБ) | Не критично для безопасности, но gitignore-гигиена | корень репо |

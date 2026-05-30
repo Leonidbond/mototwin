@@ -12,10 +12,37 @@ import { getNodeStatusLabel, getTopNodeStatusBadgeLabel } from "./status";
  * (API must not send a placeholder OK). UI omits the status badge and must not
  * offer “open service log from status” for that row.
  */
+export const NODE_TREE_PLAN_LOCKED_HINT_RU =
+  "Для работы со всеми узлами перейдите на тариф Pro.";
+
+export function nodeTreeHasPlanLockedNodes(nodes: NodeTreeItem[]): boolean {
+  const stack = [...nodes];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    if (current.locked) return true;
+    stack.push(...current.children);
+  }
+  return false;
+}
+
+/** Leaf not restricted by plan, or any descendant leaf that is active. */
+function subtreeHasActiveLeaf(node: NodeTreeItem, children: NodeTreeItemViewModel[]): boolean {
+  if (children.length === 0) {
+    return node.locked !== true;
+  }
+  return children.some((child) => child.hasActiveLeafInSubtree);
+}
+
 export function buildNodeTreeItemViewModel(node: NodeTreeItem): NodeTreeItemViewModel {
-  const hasChildren = node.children.length > 0;
+  const children = node.children.map(buildNodeTreeItemViewModel);
+  const hasChildren = children.length > 0;
   const effective = node.effectiveStatus;
   const leaf = !hasChildren;
+  const hasActiveLeafInSubtree = subtreeHasActiveLeaf(node, children);
+  /** Dim only when API locked and no active leaf below (ancestors on path to top stay normal). */
+  const planLocked = node.locked === true && !hasActiveLeafInSubtree;
+  const canAddServiceEvent = leaf && node.locked !== true;
 
   return {
     id: node.id,
@@ -31,10 +58,12 @@ export function buildNodeTreeItemViewModel(node: NodeTreeItem): NodeTreeItemView
     statusBadgeLabel: effective ? getTopNodeStatusBadgeLabel(effective) : null,
     shortExplanationLabel: getNodeTreeItemReasonShortLine(node),
     hasChildren,
-    canAddServiceEvent: leaf,
-    children: node.children.map(buildNodeTreeItemViewModel),
+    hasActiveLeafInSubtree,
+    canAddServiceEvent,
+    planLocked: planLocked || undefined,
+    children,
     statusExplanation: node.statusExplanation,
-    actions: { addServiceEventAvailable: leaf },
+    actions: { addServiceEventAvailable: canAddServiceEvent },
   };
 }
 

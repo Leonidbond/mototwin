@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ServiceEventMode, ServicePerformedBy } from "@prisma/client";
+import { PlanType, ServiceEventEntryMode, ServiceEventMode, ServicePerformedBy } from "@prisma/client";
 import { z } from "zod";
 import {
   recomputeTopNodeStates,
@@ -14,8 +14,15 @@ import {
   type RawServiceEventRow,
 } from "@/lib/service-event-serialize";
 import { getVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
-import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "../../../../_shared/current-user-context";
 import { boundedJsonValue } from "@/lib/http/input-validation";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { subscriptionErrorResponse } from "@/lib/subscription/errors";
+import { getOrCreateUserSubscription } from "@/lib/subscription/resolve-plan";
+import { canUseEntryMode, loadNodesForSelection, validateNodesForPlan } from "@/lib/subscription/service-events";
 
 type RouteContext = {
   params: Promise<{
@@ -57,6 +64,7 @@ const updateServiceEventSchema = z
     nodeId: z.string().trim().max(64).optional(),
     title: z.string().trim().min(1).max(300),
     mode: z.enum(["BASIC", "ADVANCED"]),
+    entryMode: z.enum(["QUICK", "DETAILED"]).optional(),
     performedBy: z.enum(["SELF", "SERVICE", "OTHER"]).optional(),
     serviceProviderNote: z.string().trim().max(500).nullable().optional(),
     installLocationAddress: z.string().trim().max(500).nullable().optional(),
@@ -141,7 +149,20 @@ const updateServiceEventSchema = z
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId, eventId } = await context.params;
-    const payload = updateServiceEventSchema.parse(await request.json());
+    const currentUser = await getCurrentUserContext();
+    const payload = updateServiceEventSchema.parse(await parseJsonBody<unknown>(request, { maxBytes: 256 * 1024 }));
+    const entryMode =
+      payload.entryMode === "DETAILED" || payload.mode === "ADVANCED"
+        ? "DETAILED"
+        : "QUICK";
+    const subscription = await getOrCreateUserSubscription(currentUser.userId);
+    if (!canUseEntryMode(subscription.plan, entryMode)) {
+      return subscriptionErrorResponse({
+        code: "SERVICE_EVENT_MODE_NOT_ALLOWED",
+        requiredPlan: "RIDER",
+        message: "Подробный режим ТО доступен в Rider и Pro.",
+      });
+    }
 
     const vehicle = await getVehicleInCurrentContext(vehicleId, { id: true, odometer: true });
     if (!vehicle) {
@@ -190,6 +211,25 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (!anchorNodeId) {
       return NextResponse.json({ error: "Anchor nodeId required" }, { status: 400 });
     }
+    const selectedNodeIds = Array.from(new Set([anchorNodeId, ...payload.items.map((item) => item.nodeId)]));
+    const nodeMap = await loadNodesForSelection(prisma, selectedNodeIds);
+    const selectedNodes = selectedNodeIds
+      .map((nodeId) => nodeMap.get(nodeId) ?? null)
+      .filter((row): row is NonNullable<typeof row> => row != null);
+    if (selectedNodes.length !== selectedNodeIds.length) {
+      return NextResponse.json({ error: "Node not found" }, { status: 404 });
+    }
+    const nodeValidation = validateNodesForPlan(subscription.plan, selectedNodes);
+    if (!nodeValidation.ok) {
+      if (nodeValidation.reason === "missing") {
+        return NextResponse.json({ error: "Node not found" }, { status: 404 });
+      }
+      return subscriptionErrorResponse({
+        code: "CHILD_NODE_REQUIRES_PRO",
+        requiredPlan: "PRO",
+        message: "Выбор дочерних узлов доступен только в Pro.",
+      });
+    }
 
     const partsCost = payload.partsCost ?? null;
     const laborCost = payload.laborCost ?? null;
@@ -210,6 +250,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         anchorNodeId,
         title: payload.title,
         mode: payload.mode === "ADVANCED" ? ServiceEventMode.ADVANCED : ServiceEventMode.BASIC,
+        entryMode: entryMode === "DETAILED" ? ServiceEventEntryMode.DETAILED : ServiceEventEntryMode.QUICK,
+        createdUnderPlan:
+          subscription.plan === "PRO"
+            ? PlanType.PRO
+            : subscription.plan === "RIDER"
+              ? PlanType.RIDER
+              : PlanType.FREE,
         eventDate,
         odometer: nextOdometer,
         engineHours: payload.engineHours ?? null,
@@ -288,6 +335,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       serviceEvent: serializeServiceEventRow(updatedServiceEvent as unknown as RawServiceEventRow),
     });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

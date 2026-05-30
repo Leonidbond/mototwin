@@ -3,12 +3,16 @@ import { DEMO_GARAGE_TITLE } from "@/app/api/_shared/current-user-context";
 import { getOrCreateUserNotificationSettings } from "@/lib/notifications";
 
 export async function ensureUserBootstrap(userId: string): Promise<void> {
-  const [garage, settings] = await Promise.all([
+  const [garage, settings, subscription] = await Promise.all([
     prisma.garage.findFirst({
       where: { ownerUserId: userId },
       select: { id: true },
     }),
     prisma.userSettings.findUnique({
+      where: { userId },
+      select: { id: true },
+    }),
+    prisma.subscription.findUnique({
       where: { userId },
       select: { id: true },
     }),
@@ -26,6 +30,18 @@ export async function ensureUserBootstrap(userId: string): Promise<void> {
   if (!settings) {
     await prisma.userSettings.create({
       data: { userId },
+    });
+  }
+
+  if (!subscription) {
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await prisma.subscription.create({
+      data: {
+        userId,
+        planType: "FREE",
+        status: "ACTIVE",
+        trialEndsAt,
+      },
     });
   }
 

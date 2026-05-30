@@ -19,6 +19,7 @@
     "qa:service-log-web-routes-smoke": "tsx scripts/qa-service-log-web-routes-smoke.ts",
     "qa:notifications-smoke": "tsx scripts/qa-notifications-smoke.ts",
     "qa:auth-smoke": "tsx scripts/qa-auth-smoke.ts",
+    "qa:subscription-smoke": "tsx scripts/qa-subscription-smoke.ts",
     "cron:notifications": "tsx scripts/cron-recalculate-all-users.ts",
     "mobile:dev": "npm run dev --workspace @mototwin/app",
     "mobile:dev:lan": "npm run dev:lan --workspace @mototwin/app",

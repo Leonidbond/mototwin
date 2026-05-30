@@ -8,6 +8,7 @@ export type ServiceEventKind = "SERVICE" | "STATE_UPDATE";
  * - `ADVANCED` — каждый item имеет собственные partName/sku/quantity/partCost/laborCost.
  */
 export type ServiceEventMode = "BASIC" | "ADVANCED";
+export type ServiceEventEntryMode = "QUICK" | "DETAILED";
 
 /** Кто выполнил обслуживание (форма «Исполнитель»). */
 export type ServicePerformedBy = "SELF" | "SERVICE" | "OTHER";
@@ -64,6 +65,11 @@ export type ServiceEventItem = {
   title: string | null;
   /** Bundle mode (BASIC / ADVANCED). */
   mode: ServiceEventMode;
+  /** Plan-gated entry mode (QUICK / DETAILED). */
+  entryMode?: ServiceEventEntryMode;
+  createdUnderPlan?: "FREE" | "RIDER" | "PRO";
+  rotatedOutAt?: string | null;
+  rotatedOutReason?: "FREE_LIMIT" | null;
   odometer: number;
   engineHours: number | null;
   installedPartsJson?: unknown | null;
@@ -131,6 +137,7 @@ export type CreateServiceEventInput = {
   nodeId?: string;
   title: string;
   mode: ServiceEventMode;
+  entryMode?: ServiceEventEntryMode;
   eventDate: string;
   odometer: number;
   engineHours?: number | null;

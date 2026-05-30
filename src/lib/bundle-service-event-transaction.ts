@@ -1,7 +1,10 @@
 import {
   Prisma,
+  PlanType,
   ServiceActionType,
+  ServiceEventEntryMode,
   ServiceEventMode,
+  ServiceEventRotationReason,
   ServicePerformedBy,
   TopNodeStatus,
 } from "@prisma/client";
@@ -28,6 +31,10 @@ export type CreateBundleServiceEventInTxInput = {
   anchorNodeId: string;
   title: string;
   mode: ServiceEventMode;
+  entryMode?: ServiceEventEntryMode;
+  createdUnderPlan?: PlanType;
+  rotatedOutAt?: Date | null;
+  rotatedOutReason?: ServiceEventRotationReason | null;
   eventDate: Date;
   odometer: number;
   engineHours: number | null;
@@ -57,6 +64,8 @@ export type ServiceEventInclude = {
   nodeId: string;
   eventKind: string;
   mode: ServiceEventMode | string;
+  entryMode?: ServiceEventEntryMode | string | null;
+  createdUnderPlan?: PlanType | string | null;
   title: string | null;
   eventDate: Date;
   odometer: number;
@@ -77,6 +86,8 @@ export type ServiceEventInclude = {
   nextReminderDate?: Date | null;
   nextReminderOdometer?: number | null;
   nextReminderEngineHours?: number | null;
+  rotatedOutAt?: Date | null;
+  rotatedOutReason?: ServiceEventRotationReason | string | null;
   createdAt: Date;
   installedPartsJson?: Prisma.JsonValue | null;
   node?: {
@@ -416,6 +427,8 @@ export async function createBundleServiceEventInTransaction(
       vehicleId: input.vehicleId,
       nodeId: input.anchorNodeId,
       mode: input.mode,
+      entryMode: input.entryMode ?? ServiceEventEntryMode.QUICK,
+      createdUnderPlan: input.createdUnderPlan ?? PlanType.FREE,
       title: input.title,
       eventDate: input.eventDate,
       odometer: input.odometer,
@@ -440,6 +453,8 @@ export async function createBundleServiceEventInTransaction(
       nextReminderDate: input.nextReminderDate ?? null,
       nextReminderOdometer: input.nextReminderOdometer ?? null,
       nextReminderEngineHours: input.nextReminderEngineHours ?? null,
+      rotatedOutAt: input.rotatedOutAt ?? null,
+      rotatedOutReason: input.rotatedOutReason ?? null,
       items: {
         create: input.items.map((item, index) => ({
           nodeId: item.nodeId,
@@ -504,6 +519,8 @@ export async function updateBundleServiceEventInTransaction(
     data: {
       nodeId: input.anchorNodeId,
       mode: input.mode,
+      entryMode: input.entryMode ?? ServiceEventEntryMode.QUICK,
+      createdUnderPlan: input.createdUnderPlan ?? PlanType.FREE,
       title: input.title,
       eventDate: input.eventDate,
       odometer: input.odometer,
@@ -528,6 +545,8 @@ export async function updateBundleServiceEventInTransaction(
       nextReminderDate: input.nextReminderDate ?? null,
       nextReminderOdometer: input.nextReminderOdometer ?? null,
       nextReminderEngineHours: input.nextReminderEngineHours ?? null,
+      rotatedOutAt: input.rotatedOutAt ?? null,
+      rotatedOutReason: input.rotatedOutReason ?? null,
       items: {
         create: input.items.map((item, index) => ({
           nodeId: item.nodeId,

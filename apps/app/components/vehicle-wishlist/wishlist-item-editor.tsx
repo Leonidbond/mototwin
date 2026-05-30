@@ -18,8 +18,7 @@ import {
   applyPartSkuViewModelToPartWishlistFormValues,
   clearPartWishlistFormSkuSelection,
   createInitialPartWishlistFormValues,
-  flattenNodeTreeToSelectOptions,
-  nodeAncestorPathLabelRu,
+  buildRestrictedPlanVehicleLeafPickerSets,
   buildPartRecommendationGroupsForDisplay,
   formatExpenseAmountRu,
   formatPartSkuSearchResultMetaLineRu,
@@ -38,7 +37,10 @@ import {
 } from "@mototwin/domain";
 import type {
   FlattenedNodeSelectOption,
+  NodeTreeItem,
   PartRecommendationGroup,
+  ServiceNodeItem,
+  TopServiceNodeItem,
   PartRecommendationViewModel,
   PartSkuViewModel,
   PartWishlistFormValues,
@@ -54,6 +56,7 @@ import { InternalScreenChrome } from "../expo-shell/internal-screen-chrome";
 import { GarageVehicleContextPlaque } from "../garage/GarageVehicleContextPlaque";
 import { buildServiceEventNewFromWishlistHref } from "./hrefs";
 import { MobileNodePickerModal } from "../vehicle-detail/mobile-node-picker-modal";
+import { useMobileSubscription } from "../../src/use-mobile-subscription";
 
 type WishlistItemEditorProps = {
   vehicleId: string;
@@ -74,7 +77,10 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
-  const [nodeTreeOptions, setNodeTreeOptions] = useState<FlattenedNodeSelectOption[]>([]);
+  const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
+  const { capabilities: subscriptionCapabilities } = useMobileSubscription();
   const [form, setForm] = useState<PartWishlistFormValues>(() => createInitialPartWishlistFormValues());
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const statusWhenLoadedRef = useRef<PartWishlistItemStatus | null>(null);
@@ -108,6 +114,21 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
     const cur = form.currency.trim().toUpperCase() || "RUB";
     return `${formatExpenseAmountRu(unit * qty)} ${cur}`;
   }, [form.quantity, form.costAmount, form.currency]);
+
+  const vehicleLeafPickerSets = useMemo(
+    () =>
+      buildRestrictedPlanVehicleLeafPickerSets({
+        nodeTree,
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscriptionCapabilities?.canSelectChildNode ?? true,
+      }),
+    [nodeTree, serviceCatalogNodes, subscriptionCapabilities?.canSelectChildNode, topServiceNodes]
+  );
+  const nodeTreeOptions = vehicleLeafPickerSets.allLeaves;
+  const nodeTreeTopOptions = vehicleLeafPickerSets.showTopToggle
+    ? vehicleLeafPickerSets.topLeaves
+    : undefined;
 
   const selectedNodeLabel = useMemo(() => {
     const raw = form.nodeId.trim();
@@ -150,6 +171,8 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
         () =>
           Promise.all([
             endpoints.getNodeTree(vehicleId),
+            endpoints.getTopServiceNodes(),
+            endpoints.getServiceNodes(),
             endpoints.getVehicleWishlist(vehicleId),
             endpoints.getVehicleDetail(vehicleId),
           ]),
@@ -158,16 +181,13 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
       if (!payload) {
         return;
       }
-      const [tree, wishlist, vehicleRes] = payload;
+      const [tree, topRes, catalogRes, wishlist, vehicleRes] = payload;
       const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
       setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
       const nodes = tree.nodeTree ?? [];
-      setNodeTreeOptions(
-        flattenNodeTreeToSelectOptions(nodes).map((option) => ({
-          ...option,
-          pathLabel: nodeAncestorPathLabelRu(nodes, option.id),
-        }))
-      );
+      setNodeTree(nodes);
+      setTopServiceNodes(topRes.nodes ?? []);
+      setServiceCatalogNodes(catalogRes.nodes ?? []);
       const row = wishlist.items.find((i) => i.id === itemIdSafe);
       if (!row) {
         setLoadError("Позиция не найдена.");
@@ -685,6 +705,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
       <MobileNodePickerModal
         visible={nodePickerOpen}
         options={nodeTreeOptions}
+        topOptions={nodeTreeTopOptions}
         selectedId={form.nodeId}
         onClose={() => setNodePickerOpen(false)}
         onSelect={(nodeId) => {

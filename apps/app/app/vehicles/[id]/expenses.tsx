@@ -18,10 +18,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   buildExpenseAnalyticsFromItems,
-  filterLeafOptionsUnderTopNodeAncestors,
-  getLeafNodeOptions,
-  getOrderedTopNodeIdsPresentInNodeTree,
-  nodeAncestorPathLabelRu,
+  buildRestrictedPlanVehicleLeafPickerSets,
   vehicleDetailFromApiRecord,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
@@ -35,6 +32,7 @@ import type {
   ExpenseInstallStatus,
   ExpenseItem,
   NodeTreeItem,
+  ServiceNodeItem,
   TopServiceNodeItem,
   PartWishlistItemStatus,
   VehicleDetail,
@@ -45,7 +43,8 @@ import { withAuthGuard } from "../../../src/mobile-auth-guard";
 import { InternalScreenChrome } from "../../../components/expo-shell/internal-screen-chrome";
 import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import { GarageVehicleContextPlaque } from "../../../components/garage/GarageVehicleContextPlaque";
-import { MobileNodePickerModal, type MobileNodePickerOption } from "../../../components/vehicle-detail/mobile-node-picker-modal";
+import { MobileNodePickerModal } from "../../../components/vehicle-detail/mobile-node-picker-modal";
+import { useMobileSubscription } from "../../../src/use-mobile-subscription";
 
 const categoryOptions: ExpenseCategory[] = [
   "PART",
@@ -196,6 +195,8 @@ export default function VehicleExpensesScreen() {
   const [years, setYears] = useState<number[]>([]);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
+  const { capabilities: subscriptionCapabilities } = useMobileSubscription();
   const [installStatusFilter, setInstallStatusFilter] = useState<ExpenseInstallStatus | "ALL">("ALL");
   const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | "ALL">("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("");
@@ -236,6 +237,7 @@ export default function VehicleExpensesScreen() {
             endpoints.getExpenses({ vehicleId, year: selectedYear }),
             endpoints.getNodeTree(vehicleId),
             endpoints.getTopServiceNodes(),
+            endpoints.getServiceNodes(),
             endpoints.getVehicleDetail(vehicleId),
             endpoints.getVehicleWishlist(vehicleId),
           ]),
@@ -244,9 +246,10 @@ export default function VehicleExpensesScreen() {
       if (!payload) {
         return;
       }
-      const [result, treeData, topNodesData, vehicleRes, wishlistRes] = payload;
+      const [result, treeData, topNodesData, catalogData, vehicleRes, wishlistRes] = payload;
       setNodeTree(treeData.nodeTree ?? []);
       setTopServiceNodes(topNodesData.nodes ?? []);
+      setServiceCatalogNodes(catalogData.nodes ?? []);
       const v = vehicleRes.vehicle;
       setVehicleDisplayName(
         v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelFamilyName}`.trim() : "") || "Мотоцикл"
@@ -298,24 +301,20 @@ export default function VehicleExpensesScreen() {
     return Array.from(months.entries()).map(([key, label]) => ({ key, label })).sort((a, b) => b.key.localeCompare(a.key));
   }, [expenses]);
 
-  const leafRowsForNodePicker = useMemo<MobileNodePickerOption[]>(
+  const vehicleLeafPickerSets = useMemo(
     () =>
-      getLeafNodeOptions(nodeTree).map((leaf) => ({
-        ...leaf,
-        pathLabel: nodeAncestorPathLabelRu(nodeTree, leaf.id),
-      })),
-    [nodeTree]
+      buildRestrictedPlanVehicleLeafPickerSets({
+        nodeTree,
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscriptionCapabilities?.canSelectChildNode ?? true,
+      }),
+    [nodeTree, serviceCatalogNodes, subscriptionCapabilities?.canSelectChildNode, topServiceNodes]
   );
-
-  const orderedTopNodeIdsForPicker = useMemo(
-    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
-    [nodeTree, topServiceNodes]
-  );
-
-  const topLeafRowsForNodePicker = useMemo<MobileNodePickerOption[]>(
-    () => filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafRowsForNodePicker, orderedTopNodeIdsForPicker),
-    [leafRowsForNodePicker, nodeTree, orderedTopNodeIdsForPicker]
-  );
+  const leafRowsForNodePicker = vehicleLeafPickerSets.allLeaves;
+  const topLeafRowsForNodePicker = vehicleLeafPickerSets.showTopToggle
+    ? vehicleLeafPickerSets.topLeaves
+    : undefined;
 
   const expensesHrefWithoutHighlightExpense = useMemo(() => {
     const q = new URLSearchParams();
@@ -879,7 +878,7 @@ export default function VehicleExpensesScreen() {
         visible={nodePickerOpen}
         title="Фильтр по узлам"
         options={leafRowsForNodePicker}
-        topOptions={topLeafRowsForNodePicker.length > 0 ? topLeafRowsForNodePicker : undefined}
+        topOptions={topLeafRowsForNodePicker}
         selectedIds={selectedNodeIds}
         onClose={() => setNodePickerOpen(false)}
         onSelect={() => undefined}

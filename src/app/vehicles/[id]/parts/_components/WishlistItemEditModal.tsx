@@ -24,6 +24,7 @@ export type WishlistNodeSelectOption = {
   name: string;
   level: number;
   pathLabel?: string;
+  planLocked?: boolean;
 };
 
 export type WishlistItemEditModalProps = {
@@ -64,6 +65,7 @@ export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
     wishlistForm,
     setWishlistForm,
     wishlistNodeOptions,
+    wishlistNodeTopOptions,
     wishlistNodeRequiredError,
     wishlistEditingSourceItem,
     wishlistSkuQuery,
@@ -498,6 +500,7 @@ export function WishlistItemEditModal(props: WishlistItemEditModalProps) {
       <NodePickerModal
         open={nodePickerOpen}
         options={wishlistNodeOptions}
+        topOptions={wishlistNodeTopOptions}
         selectedIds={wishlistForm.nodeId ? new Set([wishlistForm.nodeId]) : undefined}
         searchPlaceholder="Поиск по названию узла"
         onClose={() => setNodePickerOpen(false)}

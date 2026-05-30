@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
@@ -15,6 +16,8 @@ import {
   normalizeDevUserEmail,
   normalizeUserLocalSettings,
   resolveEditableFavoriteNodeCodes,
+  catalogNodeAncestorPathLabelRu,
+  filterServiceCatalogLeafNodes,
   USER_LOCAL_SETTINGS_STORAGE_KEY,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
@@ -24,11 +27,17 @@ import {
   DEV_USER_STORAGE_KEY,
   MAX_FAVORITE_NODE_CODES,
   type ServiceNodeItem,
+  type SubscriptionCurrentResponse,
+  type SubscriptionPlan,
   type TopServiceNodeItem,
   type UserLocalSettings,
   type UserLocalSettingsNodeView,
 } from "@mototwin/types";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import {
+  NodePickerModal,
+  type SharedNodePickerOption,
+} from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
 type ProfileViewModel = {
@@ -62,6 +71,9 @@ export default function ProfilePage() {
   }));
   const [settingsSavedNotice, setSettingsSavedNotice] = useState("");
   const [settingsError, setSettingsError] = useState("");
+  const [subscription, setSubscription] = useState<SubscriptionCurrentResponse | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState("");
+  const [subscriptionSavedNotice, setSubscriptionSavedNotice] = useState("");
   const [selectedDevUserEmail, setSelectedDevUserEmail] = useState(DEFAULT_DEV_USER_EMAIL);
   const [apiProfile, setApiProfile] = useState<ProfileViewModel | null>(null);
 
@@ -71,7 +83,6 @@ export default function ProfilePage() {
   const [topNodesExpanded, setTopNodesExpanded] = useState(false);
   const [pickerMode, setPickerMode] = useState<"add" | "replace">("add");
   const [replaceTargetCode, setReplaceTargetCode] = useState<string | null>(null);
-  const [nodeSearch, setNodeSearch] = useState("");
   const devLoginEnabled = isDevLoginEnabled();
   const devUserOptions = getDevUserOptions();
 
@@ -127,9 +138,10 @@ export default function ProfilePage() {
 
   const loadSettings = async () => {
     try {
-      const [settingsResponse, profileResponse] = await Promise.all([
+      const [settingsResponse, profileResponse, subscriptionResponse] = await Promise.all([
         profileApi.getUserSettings(),
         profileApi.getProfile(),
+        profileApi.getSubscriptionCurrent(),
       ]);
       const resolved = normalizeUserLocalSettings(settingsResponse.settings);
       setUserSettings(resolved);
@@ -148,6 +160,8 @@ export default function ProfilePage() {
       } catch {
         setTopServiceNodes([]);
       }
+      setSubscription(subscriptionResponse);
+      setSubscriptionError("");
       setSettingsError("");
     } catch {
       const cached = readCachedSettingsForIdentity(getResolvedProfileEmail(apiProfile));
@@ -156,6 +170,7 @@ export default function ProfilePage() {
       } else {
         setUserSettings({ ...DEFAULT_USER_LOCAL_SETTINGS });
       }
+      setSubscription(null);
       setSettingsError("Не удалось загрузить настройки из сервера, использован локальный кэш.");
     }
   };
@@ -197,6 +212,19 @@ export default function ProfilePage() {
       window.setTimeout(() => setSettingsSavedNotice(""), 1800);
     } catch {
       setSettingsError("Не удалось сохранить настройки на сервере.");
+    }
+  };
+
+  const saveSubscriptionPlan = async (plan: SubscriptionPlan) => {
+    try {
+      const updated = await profileApi.updateSubscriptionPlan({ plan });
+      setSubscription(updated);
+      setSubscriptionError("");
+      setSubscriptionSavedNotice("Тариф обновлен");
+      window.setTimeout(() => setSubscriptionSavedNotice(""), 1800);
+      await loadSettings();
+    } catch {
+      setSubscriptionError("Не удалось обновить тариф.");
     }
   };
 
@@ -248,6 +276,8 @@ export default function ProfilePage() {
     () => buildTopNodeProfileGroups(topServiceNodes),
     [topServiceNodes]
   );
+  const canCustomizeTopNodes = subscription?.capabilities?.canCustomizeFavoriteNodes ?? true;
+  const canUseAllNodeView = subscription?.capabilities?.defaultNodeViewAll ?? true;
 
   const ensureServiceNodesLoaded = async () => {
     if (serviceNodes.length > 0) {
@@ -266,37 +296,36 @@ export default function ProfilePage() {
   };
 
   const openAddNodePicker = async () => {
+    if (!canCustomizeTopNodes) {
+      return;
+    }
     setTopNodesExpanded(true);
     setPickerMode("add");
     setReplaceTargetCode(null);
     await ensureServiceNodesLoaded();
     setIsPickerOpen(true);
-    setNodeSearch("");
   };
 
   const openReplaceNodePicker = async (code: string) => {
+    if (!canCustomizeTopNodes) {
+      return;
+    }
     setTopNodesExpanded(true);
     setPickerMode("replace");
     setReplaceTargetCode(code);
     await ensureServiceNodesLoaded();
     setIsPickerOpen(true);
-    setNodeSearch("");
   };
 
-  const toggleFavoriteNode = (code: string) => {
-    const base = resolveEditableFavoriteNodeCodes(
-      userSettings.favoriteNodeCodes,
-      effectiveTopNodeCodes
-    );
-    const next = base.includes(code)
-      ? base.filter((item) => item !== code)
-      : base.length < MAX_FAVORITE_NODE_CODES
-        ? [...base, code]
-        : base;
-    applyFavoriteNodeCodes(next);
+  const closeNodePicker = () => {
+    setIsPickerOpen(false);
+    setReplaceTargetCode(null);
   };
 
   const removeFavoriteNode = (code: string) => {
+    if (!canCustomizeTopNodes) {
+      return;
+    }
     const base = resolveEditableFavoriteNodeCodes(
       userSettings.favoriteNodeCodes,
       effectiveTopNodeCodes
@@ -305,6 +334,9 @@ export default function ProfilePage() {
   };
 
   const replaceFavoriteNode = (oldCode: string, newCode: string) => {
+    if (!canCustomizeTopNodes) {
+      return;
+    }
     if (oldCode === newCode) {
       return;
     }
@@ -316,33 +348,104 @@ export default function ProfilePage() {
       return;
     }
     applyFavoriteNodeCodes(base.map((item) => (item === oldCode ? newCode : item)));
-    setIsPickerOpen(false);
-    setReplaceTargetCode(null);
+    closeNodePicker();
   };
 
   const resetFavoriteNodes = () => {
+    if (!canCustomizeTopNodes) {
+      return;
+    }
     void saveUserSettings({ favoriteNodeCodes: [] });
   };
 
   const isUsingCustomNodes = userSettings.favoriteNodeCodes.length > 0;
   const isAtMax = editableFavoriteCodes.length >= MAX_FAVORITE_NODE_CODES;
 
-  const filteredServiceNodes = useMemo(() => {
-    const q = nodeSearch.trim().toLowerCase();
-    const selectedSet = new Set(editableFavoriteCodes);
-    let list = serviceNodes;
-    if (pickerMode === "replace" && replaceTargetCode) {
-      list = list.filter(
-        (node) => node.code === replaceTargetCode || !selectedSet.has(node.code)
-      );
-    }
-    if (!q) {
-      return list;
-    }
-    return list.filter(
-      (node) => node.name.toLowerCase().includes(q) || node.code.toLowerCase().includes(q)
+  const leafServiceNodes = useMemo(
+    () => filterServiceCatalogLeafNodes(serviceNodes),
+    [serviceNodes]
+  );
+
+  const serviceNodePickerOptions = useMemo(
+    (): SharedNodePickerOption[] =>
+      leafServiceNodes.map((node) => ({
+        id: node.id,
+        code: node.code,
+        name: node.name,
+        level: node.level,
+        pathLabel: catalogNodeAncestorPathLabelRu(serviceNodes, node.id),
+      })),
+    [leafServiceNodes, serviceNodes]
+  );
+
+  const topNodePickerOptions = useMemo(
+    (): SharedNodePickerOption[] =>
+      topServiceNodes
+        .map((node) => {
+          const catalogNode =
+            leafServiceNodes.find((item) => item.id === node.id) ??
+            leafServiceNodes.find((item) => item.code === node.code);
+          if (!catalogNode) {
+            return null;
+          }
+          return {
+            id: catalogNode.id,
+            code: node.code,
+            name: node.name,
+            level: catalogNode.level,
+            pathLabel: catalogNodeAncestorPathLabelRu(serviceNodes, catalogNode.id),
+          };
+        })
+        .filter((option): option is SharedNodePickerOption => option !== null),
+    [leafServiceNodes, serviceNodes, topServiceNodes]
+  );
+
+  const favoriteNodeIds = useMemo(() => {
+    const codeSet = new Set(editableFavoriteCodes);
+    return new Set(
+      leafServiceNodes.filter((node) => codeSet.has(node.code)).map((node) => node.id)
     );
-  }, [editableFavoriteCodes, nodeSearch, pickerMode, replaceTargetCode, serviceNodes]);
+  }, [editableFavoriteCodes, leafServiceNodes]);
+
+  const addDisabledIds = useMemo(() => {
+    if (!isAtMax || pickerMode !== "add") {
+      return undefined;
+    }
+    return new Set(
+      leafServiceNodes.filter((node) => !favoriteNodeIds.has(node.id)).map((node) => node.id)
+    );
+  }, [favoriteNodeIds, isAtMax, leafServiceNodes, pickerMode]);
+
+  const replaceDisabledIds = useMemo(() => {
+    if (pickerMode !== "replace" || !replaceTargetCode) {
+      return undefined;
+    }
+    const selectedCodes = new Set(editableFavoriteCodes);
+    return new Set(
+      leafServiceNodes
+        .filter((node) => selectedCodes.has(node.code) && node.code !== replaceTargetCode)
+        .map((node) => node.id)
+    );
+  }, [editableFavoriteCodes, leafServiceNodes, pickerMode, replaceTargetCode]);
+
+  const handleAddNodesConfirm = (nodeIds: string[]) => {
+    const idToCode = new Map(leafServiceNodes.map((node) => [node.id, node.code]));
+    const codes = nodeIds
+      .map((id) => idToCode.get(id))
+      .filter((code): code is string => Boolean(code));
+    applyFavoriteNodeCodes(codes);
+    closeNodePicker();
+  };
+
+  const handleReplaceNodeSelect = (nodeId: string) => {
+    if (!replaceTargetCode) {
+      return;
+    }
+    const newCode = serviceNodes.find((node) => node.id === nodeId)?.code;
+    if (newCode) {
+      replaceFavoriteNode(replaceTargetCode, newCode);
+    }
+  };
 
   const replaceTargetName = useMemo(() => {
     if (!replaceTargetCode) {
@@ -391,6 +494,47 @@ export default function ProfilePage() {
           <p className="mt-3 text-xs text-gray-500">
             В профиле можно управлять персональными настройками аккаунта и гаража.
           </p>
+        </section>
+
+        <section
+          className="rounded-2xl border p-5"
+          style={{
+            borderColor: productSemanticColors.border,
+            backgroundColor: productSemanticColors.card,
+          }}
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-950">Подписка</h2>
+            {subscriptionSavedNotice ? (
+              <span className="text-xs font-medium text-gray-500">{subscriptionSavedNotice}</span>
+            ) : null}
+          </div>
+          {subscriptionError ? (
+            <p className="mb-3 text-xs text-rose-600">{subscriptionError}</p>
+          ) : null}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm text-gray-700">
+              Текущий тариф
+              <select
+                value={subscription?.plan ?? "FREE"}
+                onChange={(e) => void saveSubscriptionPlan(e.target.value as SubscriptionPlan)}
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="FREE">Free</option>
+                <option value="RIDER">Rider</option>
+                <option value="PRO">Pro</option>
+              </select>
+            </label>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              <p>Пробный доступ: {subscription?.isTrialActive ? "активен" : "не активен"}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                До: {subscription?.trialEndsAt ? new Date(subscription.trialEndsAt).toLocaleDateString("ru-RU") : "—"}
+              </p>
+              <Link href="/subscription" className="mt-2 inline-block text-xs font-medium text-orange-600 hover:text-orange-700">
+                Сравнить тарифы
+              </Link>
+            </div>
+          </div>
         </section>
 
         <section
@@ -512,7 +656,9 @@ export default function ProfilePage() {
                 className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
               >
                 <option value="top">ТОП-узлы</option>
-                <option value="all">Все узлы</option>
+                <option value="all" disabled={!canUseAllNodeView}>
+                  Все узлы{canUseAllNodeView ? "" : " (только Pro)"}
+                </option>
               </select>
             </label>
           </div>
@@ -547,7 +693,7 @@ export default function ProfilePage() {
                 </p>
               </span>
             </button>
-            {isUsingCustomNodes ? (
+            {isUsingCustomNodes && canCustomizeTopNodes ? (
               <button
                 type="button"
                 onClick={resetFavoriteNodes}
@@ -560,6 +706,11 @@ export default function ProfilePage() {
 
           {topNodesExpanded ? (
           <>
+          {!canCustomizeTopNodes ? (
+            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Настройка списка ТОП-узлов доступна на тарифах Rider и Pro.
+            </div>
+          ) : null}
           <p className="text-sm text-gray-500 mb-3">
             {isUsingCustomNodes
               ? "Ваш набор ТОП-узлов. Группы совпадают с дашбордом мотоцикла."
@@ -591,6 +742,7 @@ export default function ProfilePage() {
                             <button
                               type="button"
                               onClick={() => void openReplaceNodePicker(node.code)}
+                              disabled={!canCustomizeTopNodes}
                               className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
                             >
                               Заменить
@@ -598,6 +750,7 @@ export default function ProfilePage() {
                             <button
                               type="button"
                               onClick={() => removeFavoriteNode(node.code)}
+                              disabled={!canCustomizeTopNodes}
                               className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
                             >
                               Удалить
@@ -615,104 +768,41 @@ export default function ProfilePage() {
           <button
             type="button"
             onClick={() => void openAddNodePicker()}
-            disabled={isAtMax}
+            disabled={isAtMax || !canCustomizeTopNodes}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isAtMax ? `Максимум ${MAX_FAVORITE_NODE_CODES} узлов` : "+ Добавить узел"}
           </button>
 
-          {isPickerOpen ? (
-            <div className="mt-4 rounded-xl border border-gray-200 bg-white overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <div>
-                  <p className="font-semibold text-sm text-gray-900">
-                    {pickerMode === "replace" ? "Замена узла" : "Добавить узел"}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {pickerMode === "replace"
-                      ? replaceTargetName
-                      : `${editableFavoriteCodes.length} / ${MAX_FAVORITE_NODE_CODES}`}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPickerOpen(false);
-                    setReplaceTargetCode(null);
-                  }}
-                  className="text-sm font-semibold text-gray-700 hover:text-gray-900"
-                >
-                  {pickerMode === "replace" ? "Отмена" : "Закрыть"}
-                </button>
-              </div>
-              <div className="px-4 py-2 border-b border-gray-100">
-                <input
-                  type="search"
-                  placeholder="Поиск узла..."
-                  value={nodeSearch}
-                  onChange={(e) => setNodeSearch(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400"
-                />
-              </div>
-              {pickerMode === "add" && isAtMax ? (
-                <div className="px-4 py-2 text-xs text-amber-700 bg-amber-50 border-b border-amber-100">
-                  Достигнут максимум ({MAX_FAVORITE_NODE_CODES}). Удалите узел, чтобы добавить другой.
-                </div>
-              ) : null}
-              <ul className="max-h-72 overflow-y-auto divide-y divide-gray-100">
-                {filteredServiceNodes.length === 0 ? (
-                  <li className="px-4 py-3 text-sm text-gray-400">Ничего не найдено</li>
-                ) : null}
-                {filteredServiceNodes.map((node) => {
-                  const isSelected = editableFavoriteCodes.includes(node.code);
-                  const isReplaceTarget =
-                    pickerMode === "replace" && node.code === replaceTargetCode;
-                  const isDisabled = pickerMode === "add" && isAtMax && !isSelected;
-                  return (
-                    <li key={node.code}>
-                      <button
-                        type="button"
-                        disabled={isDisabled || isReplaceTarget}
-                        onClick={() => {
-                          if (pickerMode === "replace" && replaceTargetCode) {
-                            replaceFavoriteNode(replaceTargetCode, node.code);
-                            return;
-                          }
-                          toggleFavoriteNode(node.code);
-                        }}
-                        className={[
-                          "w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors",
-                          isDisabled || isReplaceTarget ? "opacity-50 cursor-not-allowed" : "",
-                        ].join(" ")}
-                      >
-                        {pickerMode === "add" ? (
-                          <span
-                            className={[
-                              "w-4 h-4 rounded border flex items-center justify-center text-xs font-bold flex-shrink-0",
-                              isSelected
-                                ? "border-gray-800 bg-gray-800 text-white"
-                                : "border-gray-300",
-                            ].join(" ")}
-                          >
-                            {isSelected ? "✓" : ""}
-                          </span>
-                        ) : null}
-                        <span className="flex-1 min-w-0">
-                          <span className="block text-sm font-medium text-gray-900 truncate">
-                            {node.name}
-                          </span>
-                          <span className="block text-xs text-gray-400">{node.code}</span>
-                        </span>
-                        {pickerMode === "replace" && !isReplaceTarget ? (
-                          <span className="text-xs font-semibold text-gray-700">Выбрать</span>
-                        ) : null}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : null}
+          <NodePickerModal
+            key={
+              isPickerOpen && pickerMode === "add"
+                ? `add:${[...favoriteNodeIds].sort().join("|")}`
+                : "add-shut"
+            }
+            open={isPickerOpen && pickerMode === "add"}
+            title="Добавить узел"
+            mode="multi"
+            options={serviceNodePickerOptions}
+            topOptions={topNodePickerOptions.length > 0 ? topNodePickerOptions : undefined}
+            selectedIds={favoriteNodeIds}
+            disabledIds={addDisabledIds}
+            confirmLabel="Сохранить"
+            searchPlaceholder="Поиск узла…"
+            onClose={closeNodePicker}
+            onConfirm={handleAddNodesConfirm}
+          />
+          <NodePickerModal
+            open={isPickerOpen && pickerMode === "replace"}
+            title={replaceTargetName ? `Замена: ${replaceTargetName}` : "Замена узла"}
+            mode="single"
+            options={serviceNodePickerOptions}
+            topOptions={topNodePickerOptions.length > 0 ? topNodePickerOptions : undefined}
+            disabledIds={replaceDisabledIds}
+            searchPlaceholder="Поиск узла…"
+            onClose={closeNodePicker}
+            onSelect={handleReplaceNodeSelect}
+          />
           </>
           ) : null}
         </section>

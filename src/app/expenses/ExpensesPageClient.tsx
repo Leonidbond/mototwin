@@ -11,13 +11,10 @@ import {
   buildExpenseAnalyticsFromItems,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
-  filterLeafOptionsUnderTopNodeAncestors,
+  buildRestrictedPlanVehicleLeafPickerSets,
   findNodeTreeItemById,
   formatExpenseAmountRu,
-  getLeafNodeOptions,
   getExpenseMonthKeyFromIso,
-  getOrderedTopNodeIdsPresentInNodeTree,
-  nodeAncestorPathLabelRu,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -27,9 +24,11 @@ import type {
   ExpenseItem,
   GarageVehicleItem,
   NodeTreeItem,
+  ServiceNodeItem,
   TopServiceNodeItem,
 } from "@mototwin/types";
-import { NodePickerModal, type SharedNodePickerOption } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
+import { NodePickerModal } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
+import { useSubscription } from "@/lib/use-subscription";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 const SIDEBAR_COLLAPSED_KEY = "expenses.sidebar.collapsed";
@@ -201,6 +200,8 @@ export function ExpensesPageClient(props: {
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
+  const { subscription } = useSubscription();
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(() => (nodeIdFromQuery ? [nodeIdFromQuery] : []));
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -340,31 +341,34 @@ export function ExpensesPageClient(props: {
     [expenses]
   );
 
-  const nodePickerOptions = useMemo((): SharedNodePickerOption[] => {
-    if (nodeTree.length > 0) {
-      return getLeafNodeOptions(nodeTree).map((option) => ({
-        id: option.id,
-        code: option.code,
-        name: option.name,
-        level: option.level,
-        pathLabel: nodeAncestorPathLabelRu(nodeTree, option.id),
-      }));
+  const vehicleLeafPickerSets = useMemo(
+    () =>
+      nodeTree.length > 0
+        ? buildRestrictedPlanVehicleLeafPickerSets({
+            nodeTree,
+            catalogNodes: serviceCatalogNodes,
+            topServiceNodes,
+            canSelectChildNode: subscription?.capabilities?.canSelectChildNode ?? true,
+          })
+        : null,
+    [
+      nodeTree,
+      serviceCatalogNodes,
+      subscription?.capabilities?.canSelectChildNode,
+      topServiceNodes,
+    ]
+  );
+
+  const nodePickerOptions = useMemo(() => {
+    if (vehicleLeafPickerSets) {
+      return vehicleLeafPickerSets.allLeaves;
     }
     return nodeOptions.map(([id, name]) => ({ id, name }));
-  }, [nodeOptions, nodeTree]);
+  }, [nodeOptions, vehicleLeafPickerSets]);
 
-  const nodePickerTopOptions = useMemo((): SharedNodePickerOption[] => {
-    if (nodeTree.length === 0) return [];
-    const leafRows = getLeafNodeOptions(nodeTree).map((option) => ({
-      id: option.id,
-      code: option.code,
-      name: option.name,
-      level: option.level,
-      pathLabel: nodeAncestorPathLabelRu(nodeTree, option.id),
-    }));
-    const topIds = getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes);
-    return filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafRows, topIds);
-  }, [nodeTree, topServiceNodes]);
+  const nodePickerTopOptions = vehicleLeafPickerSets?.showTopToggle
+    ? vehicleLeafPickerSets.topLeaves
+    : undefined;
 
   const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 
@@ -476,16 +480,19 @@ export function ExpensesPageClient(props: {
       setIsLoading(true);
       setError("");
       const shouldLoadNodeData = Boolean(effectiveVehicleId);
-      const [expensesResult, vehiclesResult, nodeTreeResult, topServiceNodesResult] = await Promise.all([
-        api.getExpenses({ year, vehicleId: effectiveVehicleId || undefined }),
-        effectiveVehicleId ? Promise.resolve(null) : api.getGarageVehicles(),
-        shouldLoadNodeData ? api.getNodeTree(effectiveVehicleId) : Promise.resolve(null),
-        shouldLoadNodeData ? api.getTopServiceNodes() : Promise.resolve(null),
-      ]);
+      const [expensesResult, vehiclesResult, nodeTreeResult, topServiceNodesResult, catalogResult] =
+        await Promise.all([
+          api.getExpenses({ year, vehicleId: effectiveVehicleId || undefined }),
+          effectiveVehicleId ? Promise.resolve(null) : api.getGarageVehicles(),
+          shouldLoadNodeData ? api.getNodeTree(effectiveVehicleId) : Promise.resolve(null),
+          shouldLoadNodeData ? api.getTopServiceNodes() : Promise.resolve(null),
+          shouldLoadNodeData ? api.getServiceNodes() : Promise.resolve(null),
+        ]);
       setExpenses(expensesResult.expenses);
       setYears(expensesResult.years);
       setNodeTree(nodeTreeResult?.nodeTree ?? []);
       setTopServiceNodes(topServiceNodesResult?.nodes ?? []);
+      setServiceCatalogNodes(catalogResult?.nodes ?? []);
       if (vehiclesResult) {
         setVehicles(vehiclesResult.vehicles ?? []);
         setForm((prev) => ({ ...prev, vehicleId: prev.vehicleId || vehiclesResult.vehicles?.[0]?.id || "" }));
@@ -915,7 +922,7 @@ export function ExpensesPageClient(props: {
         open={nodePickerOpen}
         title="Фильтр по узлам"
         options={nodePickerOptions}
-        topOptions={nodePickerTopOptions.length > 0 ? nodePickerTopOptions : undefined}
+        topOptions={nodePickerTopOptions}
         mode="multi"
         selectedIds={selectedNodeIdSet}
         confirmLabel="Применить"

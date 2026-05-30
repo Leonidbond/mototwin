@@ -12,6 +12,9 @@ export type ServiceEventModeControlProps = {
   isBasic: boolean;
   onSelectBasic: () => void;
   onSelectDetailed: () => void;
+  /** False on Free — «Подробно» (ADVANCED) недоступен. */
+  detailedAllowed?: boolean;
+  onBlockedDetailed?: () => void;
   /**
    * `tiles` — крупные плитки (модалки / плотный десктоп).
    * `segmented` — одна строка, компактный переключатель под заголовком страницы.
@@ -51,8 +54,22 @@ export function ServiceEventModeControl({
   isBasic,
   onSelectBasic,
   onSelectDetailed,
+  detailedAllowed = true,
+  onBlockedDetailed,
   variant = "tiles",
 }: ServiceEventModeControlProps) {
+  const selectDetailed = () => {
+    if (!detailedAllowed) {
+      onBlockedDetailed?.();
+      return;
+    }
+    onSelectDetailed();
+  };
+
+  const detailedDisabledStyle: CSSProperties | undefined = detailedAllowed
+    ? undefined
+    : { opacity: 0.45, cursor: "not-allowed" };
+
   if (variant === "segmented") {
     return (
       <div
@@ -115,10 +132,11 @@ export function ServiceEventModeControl({
         </button>
         <button
           type="button"
-          onClick={onSelectDetailed}
+          onClick={selectDetailed}
           className="flex min-h-[58px] min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left tracking-tight transition hover:opacity-95 sm:min-h-[60px] sm:gap-2.5 sm:px-3"
-          style={segmentStyle(!isBasic)}
+          style={{ ...segmentStyle(!isBasic), ...detailedDisabledStyle }}
           aria-pressed={!isBasic}
+          aria-disabled={!detailedAllowed}
           title={DETAILED_MODE_SUBTITLE}
         >
           <span
@@ -213,10 +231,11 @@ export function ServiceEventModeControl({
       </button>
       <button
         type="button"
-        onClick={onSelectDetailed}
+        onClick={selectDetailed}
         className="flex min-h-[4.5rem] items-start gap-2.5 rounded-2xl border-2 p-3 text-left transition hover:opacity-95 sm:min-h-[4.75rem] sm:gap-3 sm:p-3.5"
-        style={tileStyle(!isBasic)}
+        style={{ ...tileStyle(!isBasic), ...detailedDisabledStyle }}
         aria-pressed={!isBasic}
+        aria-disabled={!detailedAllowed}
       >
         <span
           className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"

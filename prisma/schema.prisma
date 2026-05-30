@@ -8,6 +8,7 @@ datasource db {
 
 enum PlanType {
   FREE
+  RIDER
   PRO
 }
 
@@ -72,6 +73,15 @@ enum ServiceEventKind {
 enum ServiceEventMode {
   BASIC
   ADVANCED
+}
+
+enum ServiceEventEntryMode {
+  QUICK
+  DETAILED
+}
+
+enum ServiceEventRotationReason {
+  FREE_LIMIT
 }
 
 /** Кто выполнил сервисное событие (форма «Исполнитель»). */
@@ -508,6 +518,7 @@ model Subscription {
   status    SubscriptionStatus @default(ACTIVE)
   startedAt DateTime           @default(now())
   endsAt    DateTime?
+  trialEndsAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -702,6 +713,8 @@ model ServiceEvent {
    * Bundle mode: BASIC = single common action across multiple nodes; ADVANCED = per-item details.
    */
   mode               ServiceEventMode @default(BASIC)
+  entryMode          ServiceEventEntryMode @default(QUICK)
+  createdUnderPlan   PlanType @default(FREE)
   /**
    * Bundle title (free-form), e.g. «ТО 10 000 км».
    */
@@ -735,6 +748,8 @@ model ServiceEvent {
   nextReminderDate          DateTime?
   nextReminderOdometer      Int?
   nextReminderEngineHours   Int?
+  rotatedOutAt              DateTime?
+  rotatedOutReason          ServiceEventRotationReason?
   createdAt          DateTime         @default(now())
 
   vehicle      Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
@@ -745,6 +760,7 @@ model ServiceEvent {
 
   @@index([vehicleId])
   @@index([nodeId])
+  @@index([vehicleId, rotatedOutAt, eventDate])
   @@map("service_events")
 }
 

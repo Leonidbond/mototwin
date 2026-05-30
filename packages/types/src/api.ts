@@ -40,6 +40,12 @@ import type {
   VehicleNotificationSettingsPatch,
   VehicleNotificationSettingsWire,
 } from "./notification";
+import type {
+  SubscriptionCurrentResponse,
+  SubscriptionPlan,
+  UpdateSubscriptionPlanInput,
+  UpdateSubscriptionPlanResponse,
+} from "./subscription";
 
 /** Backend often returns `{ error: string }` on 4xx/5xx. */
 export type MotoTwinApiErrorBody = {
@@ -78,6 +84,11 @@ export type ServiceNodesResponse = {
 
 export type ServiceEventsResponse = {
   serviceEvents: ServiceEventItem[];
+  meta?: {
+    visibleLimit: number | null;
+    hiddenCount: number;
+    plan: SubscriptionPlan;
+  };
 };
 
 export type CreateServiceEventResponse = {
@@ -334,4 +345,10 @@ export type UsageUpdateResponse = {
     updatedAt: string;
   };
   resolvedNotifications: number;
+};
+
+export type {
+  SubscriptionCurrentResponse,
+  UpdateSubscriptionPlanInput,
+  UpdateSubscriptionPlanResponse,
 };

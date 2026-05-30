@@ -67,11 +67,12 @@ export function getRecentServiceEventsForNode(
 
 export function getNodeContextActions(options: {
   isLeaf: boolean;
+  planLocked?: boolean;
   hasServiceKits: boolean;
   hasStatusExplanation: boolean;
 }): NodeContextActionViewModel[] {
   const actions: NodeContextActionViewModel[] = [{ key: "journal", label: "Журнал" }];
-  if (options.isLeaf) {
+  if (options.isLeaf && !options.planLocked) {
     actions.push({ key: "add_service_event", label: "Добавить сервисное событие" });
     actions.push({ key: "add_wishlist", label: "Добавить в список покупок" });
   }
@@ -130,6 +131,7 @@ export function buildNodeContextViewModel(input: {
     serviceKits: toServiceKitSummary(input.serviceKits),
     actions: getNodeContextActions({
       isLeaf,
+      planLocked: input.node.planLocked,
       hasServiceKits: input.serviceKits.length > 0,
       hasStatusExplanation: Boolean(input.node.statusExplanation),
     }),

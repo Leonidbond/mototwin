@@ -1,6 +1,7 @@
 import type {
   CreateServiceEventInput,
   ServiceActionType,
+  ServiceEventEntryMode,
   ServiceEventMode,
   ServicePerformedBy,
 } from "./service-event";
@@ -37,6 +38,8 @@ export type AddServiceEventFormValues = {
   title: string;
   /** Текущий режим формы. */
   mode: ServiceEventMode;
+  /** Плановый режим ввода для paywall-логики (QUICK / DETAILED). */
+  entryMode?: ServiceEventEntryMode;
   /**
    * Общий action type для BASIC-режима — применяется ко всем выбранным узлам.
    * В ADVANCED игнорируется (action type живёт в `items[].actionType`).

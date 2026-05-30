@@ -13,11 +13,9 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
-  filterLeafOptionsUnderTopNodeAncestors,
+  buildRestrictedPlanVehicleLeafPickerSets,
   formatRideStyleChipRu,
   getLeafNodeOptions,
-  getOrderedTopNodeIdsPresentInNodeTree,
-  nodeAncestorPathLabelRu,
   RIDE_LOAD_TYPE_OPTIONS,
   RIDE_RIDING_STYLE_OPTIONS,
   RIDE_USAGE_INTENSITY_OPTIONS,
@@ -29,6 +27,7 @@ import type {
   GarageVehicleItem,
   NodeTreeItem,
   PartRecommendationViewModel,
+  ServiceNodeItem,
   TopServiceNodeItem,
   VehicleDetail,
   VehicleDetailApiRecord,
@@ -42,6 +41,7 @@ import { NodePickerModal } from "@/app/vehicles/[id]/_components/node-picker/Nod
 import type { NodePickerOption } from "@/app/vehicles/[id]/parts/picker/_components/NodePickerPopover";
 import { pickerColors } from "@/app/vehicles/[id]/parts/picker/_components/picker-styles";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
+import { useSubscription } from "@/lib/use-subscription";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
@@ -418,6 +418,8 @@ export function CommunityPartPageClient(props: {
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [nodeTreeError, setNodeTreeError] = useState("");
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
+  const { subscription } = useSubscription();
   const [selectedNodeId, setSelectedNodeId] = useState<string>(props.initialNodeId.trim());
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [garageVehicles, setGarageVehicles] = useState<GarageVehicleItem[]>([]);
@@ -539,10 +541,19 @@ export function CommunityPartPageClient(props: {
     let c = false;
     (async () => {
       try {
-        const data = await api.getTopServiceNodes();
-        if (!c) setTopServiceNodes(data.nodes ?? []);
+        const [topData, catalogData] = await Promise.all([
+          api.getTopServiceNodes(),
+          api.getServiceNodes(),
+        ]);
+        if (!c) {
+          setTopServiceNodes(topData.nodes ?? []);
+          setServiceCatalogNodes(catalogData.nodes ?? []);
+        }
       } catch {
-        if (!c) setTopServiceNodes([]);
+        if (!c) {
+          setTopServiceNodes([]);
+          setServiceCatalogNodes([]);
+        }
       }
     })();
     return () => {
@@ -611,25 +622,43 @@ export function CommunityPartPageClient(props: {
     };
   }, [brandName, sku]);
 
-  const leafPickerOptions: NodePickerOption[] = useMemo(() => {
-    const leaves = getLeafNodeOptions(nodeTree);
-    return leaves.map((opt) => ({
-      id: opt.id,
-      code: opt.code,
-      name: opt.name,
-      pathLabel: nodeAncestorPathLabelRu(nodeTree, opt.id),
-    }));
-  }, [nodeTree]);
-
-  const orderedTopNodeIdsForPicker = useMemo(
-    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
-    [nodeTree, topServiceNodes]
+  const vehicleLeafPickerSets = useMemo(
+    () =>
+      buildRestrictedPlanVehicleLeafPickerSets({
+        nodeTree,
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscription?.capabilities?.canSelectChildNode ?? true,
+      }),
+    [
+      nodeTree,
+      serviceCatalogNodes,
+      subscription?.capabilities?.canSelectChildNode,
+      topServiceNodes,
+    ]
   );
 
-  const leafPickerOptionsTopOnly = useMemo(
-    () => filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafPickerOptions, orderedTopNodeIdsForPicker),
-    [nodeTree, leafPickerOptions, orderedTopNodeIdsForPicker]
+  const leafPickerOptions: NodePickerOption[] = useMemo(
+    () =>
+      vehicleLeafPickerSets.allLeaves.map((opt) => ({
+        id: opt.id,
+        code: opt.code,
+        name: opt.name,
+        pathLabel: opt.pathLabel ?? opt.name,
+        planLocked: opt.planLocked,
+      })),
+    [vehicleLeafPickerSets.allLeaves]
   );
+
+  const leafPickerOptionsTopOnly = vehicleLeafPickerSets.showTopToggle
+    ? (vehicleLeafPickerSets.topLeaves.map((opt) => ({
+        id: opt.id,
+        code: opt.code,
+        name: opt.name,
+        pathLabel: opt.pathLabel ?? opt.name,
+        planLocked: opt.planLocked,
+      })) as NodePickerOption[])
+    : undefined;
 
   const selectedLeafCode = useMemo(() => {
     const hit = leafPickerOptions.find((o) => o.id === selectedNodeId);

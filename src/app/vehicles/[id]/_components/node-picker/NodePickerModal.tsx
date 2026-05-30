@@ -1,9 +1,14 @@
 "use client";
 
-import { groupNodePickerOptionsByTopLevel, nodePickerGroupHeadingRu } from "@mototwin/domain";
+import {
+  groupNodePickerOptionsByTopLevel,
+  NODE_TREE_PLAN_LOCKED_HINT_RU,
+  nodePickerGroupHeadingRu,
+} from "@mototwin/domain";
+import { SubscriptionLock } from "@/components/subscription/SubscriptionLock";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import Image from "next/image";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 
 export type SharedNodePickerOption = {
@@ -13,6 +18,8 @@ export type SharedNodePickerOption = {
   level?: number;
   /** Catalog code — when set, row shows tree icon */
   code?: string;
+  /** Free/Rider: лист вне топ-набора — только просмотр в полном списке. */
+  planLocked?: boolean;
 };
 
 export type NodePickerModalProps = {
@@ -76,6 +83,17 @@ export function NodePickerModal({
   const groupedList = useMemo(() => groupNodePickerOptionsByTopLevel(filtered), [filtered]);
 
   const showTopToggle = Boolean(topOptions && topOptions.length > 0);
+  const hasPlanLockedLeaves = useMemo(
+    () => options.some((option) => option.planLocked),
+    [options]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    if (hasPlanLockedLeaves && showTopToggle) {
+      setTopNodesOnly(true);
+    }
+  }, [hasPlanLockedLeaves, open, showTopToggle]);
 
   if (!open) return null;
 
@@ -156,6 +174,14 @@ export function NodePickerModal({
             {`Выбрано: ${localSelected.size}`}
           </p>
         ) : null}
+        {showTopToggle && !topNodesOnly && hasPlanLockedLeaves ? (
+          <SubscriptionLock
+            variant="surface"
+            title="Полное дерево (просмотр)"
+            description={NODE_TREE_PLAN_LOCKED_HINT_RU}
+            requiredPlan="PRO"
+          />
+        ) : null}
         <div style={listStyle}>
           {filtered.length === 0 ? (
             <div style={emptyStyle}>{emptyLabel}</div>
@@ -164,7 +190,8 @@ export function NodePickerModal({
               <div key={groupKey} style={groupIndex > 0 ? groupWrapStyle : undefined}>
                 <div style={groupHeadingStyle}>{nodePickerGroupHeadingRu(groupKey)}</div>
                 {items.map((opt) => {
-                  const disabled = disabledIds?.has(opt.id) ?? false;
+                  const planLocked = Boolean(opt.planLocked);
+                  const disabled = (disabledIds?.has(opt.id) ?? false) || planLocked;
                   const active = mode === "multi" ? localSelected.has(opt.id) : (selectedIds?.has(opt.id) ?? false);
                   const rowIconSrc = opt.code ? getNodeTreeIconWebSrc(opt.code, opt.name) : "";
                   return (
@@ -181,7 +208,7 @@ export function NodePickerModal({
                         onSelect?.(opt.id);
                         resetAndClose();
                       }}
-                      style={listItemStyle(active, disabled)}
+                      style={listItemStyle(active, disabled, planLocked)}
                     >
                       {mode === "multi" ? (
                         <span style={checkboxStyle(active)} aria-hidden>
@@ -210,7 +237,15 @@ export function NodePickerModal({
                         </span>
                       ) : null}
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: productSemanticColors.textPrimary }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: planLocked
+                              ? productSemanticColors.textMuted
+                              : productSemanticColors.textPrimary,
+                          }}
+                        >
                           {opt.name}
                         </div>
                         {opt.pathLabel ? (
@@ -353,20 +388,24 @@ const groupHeadingStyle: CSSProperties = {
   color: productSemanticColors.textMuted,
 };
 
-function listItemStyle(active: boolean, disabled: boolean): CSSProperties {
+function listItemStyle(active: boolean, disabled: boolean, planLocked: boolean): CSSProperties {
   return {
     display: "flex",
     alignItems: "center",
     gap: 8,
     padding: "10px 12px",
     borderRadius: 10,
-    backgroundColor: active ? "rgba(249, 115, 22, 0.08)" : "transparent",
-    border: `1px solid ${active ? productSemanticColors.primaryAction : productSemanticColors.border}`,
+    backgroundColor: planLocked
+      ? productSemanticColors.cardSubtle
+      : active
+        ? "rgba(249, 115, 22, 0.08)"
+        : "transparent",
+    border: `1px solid ${active && !planLocked ? productSemanticColors.primaryAction : productSemanticColors.border}`,
     color: productSemanticColors.textPrimary,
     textAlign: "left",
     cursor: disabled ? "not-allowed" : "pointer",
     width: "100%",
-    opacity: disabled ? 0.45 : 1,
+    opacity: planLocked ? 0.38 : disabled ? 0.45 : 1,
   };
 }
 

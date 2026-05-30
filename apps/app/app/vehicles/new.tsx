@@ -32,6 +32,9 @@ import type {
 } from "@mototwin/types";
 import { createMobileApiClient } from "../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../src/mobile-auth-guard";
+import { isVehicleLimitErrorMessage } from "../../src/subscription-access";
+import { useMobileSubscription } from "../../src/use-mobile-subscription";
+import { SubscriptionLockBanner } from "../../components/subscription/subscription-lock-banner";
 import { KeyboardAwareScrollScreen } from "../../components/expo-shell/keyboard-aware-scroll-screen";
 import { ScreenHeader } from "../../components/expo-shell/screen-header";
 
@@ -130,6 +133,8 @@ const defaultNewMotorcycleForm = createInitialAddMotorcycleFormValues();
 
 export default function NewVehicleScreen() {
   const router = useRouter();
+  const { capabilities, isLoading: isSubscriptionLoading } = useMobileSubscription();
+  const [garageVehicleCount, setGarageVehicleCount] = useState(0);
 
   const [brands, setBrands] = useState<MotorcycleBrandPickerItem[]>([]);
   const [modelFamilies, setModelFamilies] = useState<MotorcycleModelFamilyPickerItem[]>([]);
@@ -161,6 +166,41 @@ export default function NewVehicleScreen() {
   const [usageIntensity, setUsageIntensity] = useState<RideUsageIntensity>(
     defaultNewMotorcycleForm.usageIntensity
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadGarageCount = async () => {
+      try {
+        const endpoints = createMobileApiClient();
+        const garage = await withAuthGuard(
+          () => endpoints.getGarageVehicles(),
+          () => router.replace("/login")
+        );
+        if (!garage || cancelled) {
+          return;
+        }
+        setGarageVehicleCount(garage.vehicles?.length ?? 0);
+      } catch {
+        if (!cancelled) {
+          setGarageVehicleCount(0);
+        }
+      }
+    };
+    void loadGarageCount();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  const vehicleLimitReached =
+    capabilities.maxVehicles != null && garageVehicleCount >= capabilities.maxVehicles;
+
+  useEffect(() => {
+    if (isSubscriptionLoading || !vehicleLimitReached) {
+      return;
+    }
+    router.replace("/subscription");
+  }, [isSubscriptionLoading, router, vehicleLimitReached]);
 
   useEffect(() => {
     const loadBrands = async () => {
@@ -292,6 +332,11 @@ export default function NewVehicleScreen() {
   }, [motorcycleVariantId, router]);
 
   const submitCreateVehicle = async () => {
+    if (vehicleLimitReached) {
+      router.push("/subscription");
+      return;
+    }
+
     const motorcycleForm: AddMotorcycleFormValues = {
       motorcycleBrandId,
       motorcycleModelFamilyId,
@@ -330,6 +375,11 @@ export default function NewVehicleScreen() {
 
       router.replace("/garage");
     } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (isVehicleLimitErrorMessage(message)) {
+        router.push("/subscription");
+        return;
+      }
       setScreenError("Не удалось добавить мотоцикл. Проверьте данные и попробуйте снова.");
     } finally {
       setIsSaving(false);
@@ -345,6 +395,19 @@ export default function NewVehicleScreen() {
         </Text>
 
         {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
+        {vehicleLimitReached ? (
+          <View style={{ marginTop: 12 }}>
+            <SubscriptionLockBanner
+              title="Лимит мотоциклов в гараже"
+              description={
+                capabilities.maxVehicles === 1
+                  ? "Тариф Free позволяет вести только 1 мотоцикл. Перейдите на Rider, чтобы добавить до 3."
+                  : "Тариф Rider позволяет вести до 3 мотоциклов. Перейдите на Pro для неограниченного гаража."
+              }
+              requiredPlan={capabilities.maxVehicles === 1 ? "RIDER" : "PRO"}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Марка *</Text>
@@ -584,8 +647,8 @@ export default function NewVehicleScreen() {
 
         <Pressable
           onPress={submitCreateVehicle}
-          disabled={isSaving}
-          style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
+          disabled={isSaving || vehicleLimitReached}
+          style={[styles.submitButton, (isSaving || vehicleLimitReached) && styles.submitButtonDisabled]}
         >
           <Text style={styles.submitButtonText}>
             {isSaving ? "Сохраняем..." : "Добавить мотоцикл"}

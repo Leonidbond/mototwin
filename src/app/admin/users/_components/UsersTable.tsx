@@ -124,6 +124,9 @@ function planChipStyle(plan: AdminUserListItemWire["plan"]): React.CSSProperties
   if (plan === "PRO") {
     return chipBase("#FBBF24", "rgba(251,191,36,0.16)", "rgba(251,191,36,0.32)");
   }
+  if (plan === "RIDER") {
+    return chipBase("#60A5FA", "rgba(96,165,250,0.14)", "rgba(96,165,250,0.3)");
+  }
   if (plan === "FREE") {
     return chipBase("#94A3B8", "rgba(148,163,184,0.12)", "rgba(148,163,184,0.24)");
   }

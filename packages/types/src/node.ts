@@ -60,6 +60,10 @@ export type NodeTreeItem = {
   statusExplanation: NodeStatusExplanation | null;
   note: string | null;
   updatedAt: string | null;
+  /** Free/Rider: узел вне набора топ-узлов — только просмотр до Pro. */
+  locked?: boolean;
+  /** Free/Rider: можно выбирать для действий (топ-узлы на Rider). */
+  selectable?: boolean;
   children: NodeTreeItem[];
 };
 
@@ -121,7 +125,11 @@ export type NodeTreeItemViewModel = {
   /** `statusExplanation.reasonShort` when the API provided it (any depth). */
   shortExplanationLabel: string | null;
   hasChildren: boolean;
+  /** В поддереве есть хотя бы один не заблокированный тарифом лист. */
+  hasActiveLeafInSubtree: boolean;
   canAddServiceEvent: boolean;
+  /** Затемнение в UI: заблокирован тарифом и нет активных листьев ниже. */
+  planLocked?: boolean;
   children: NodeTreeItemViewModel[];
   statusExplanation: NodeStatusExplanationViewModel | null;
   actions: NodeTreeActionViewModel;

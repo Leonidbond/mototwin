@@ -54,16 +54,25 @@ const yandexDiscovery: AuthSession.DiscoveryDocument = {
   tokenEndpoint: "https://oauth.yandex.ru/token",
 };
 
-export default function LoginScreen() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"login" | "register">("login");
-  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | "yandex" | null>(null);
+const googleOAuthEnabled = Boolean(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID);
+const yandexOAuthEnabled = Boolean(process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID);
 
-  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
+type OAuthSuccessInput = {
+  provider: "google" | "apple" | "yandex";
+  idToken?: string;
+  accessToken?: string;
+  rawNonce?: string;
+};
+
+function GoogleSignInButton(props: {
+  disabled: boolean;
+  loading: boolean;
+  onPressStart: () => void;
+  onSuccess: (input: OAuthSuccessInput) => Promise<void>;
+  onError: (message: string) => void;
+  onFinish: () => void;
+}) {
+  const [request, response, promptAsync] = Google.useAuthRequest({
     scopes: ["openid", "email", "profile"],
     expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID,
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
@@ -71,7 +80,54 @@ export default function LoginScreen() {
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
   });
 
-  const [yandexRequest, yandexResponse, promptYandexAsync] = AuthSession.useAuthRequest(
+  useEffect(() => {
+    if (response?.type !== "success") {
+      return;
+    }
+    const idToken =
+      response.authentication?.idToken ??
+      (typeof response.params.id_token === "string" ? response.params.id_token : undefined);
+    if (!idToken) {
+      props.onError("Google не вернул idToken.");
+      props.onFinish();
+      return;
+    }
+    void props
+      .onSuccess({ provider: "google", idToken })
+      .catch((err) => {
+        props.onError(err instanceof Error ? err.message : "Ошибка входа через Google.");
+      })
+      .finally(props.onFinish);
+  }, [response]);
+
+  return (
+    <Pressable
+      style={styles.oauthButton}
+      disabled={props.disabled || !request}
+      onPress={() => {
+        props.onPressStart();
+        void promptAsync().catch((err) => {
+          props.onError(err instanceof Error ? err.message : "Ошибка входа через Google.");
+          props.onFinish();
+        });
+      }}
+    >
+      <Text style={styles.oauthButtonText}>
+        {props.loading ? "Google..." : "Войти через Google"}
+      </Text>
+    </Pressable>
+  );
+}
+
+function YandexSignInButton(props: {
+  disabled: boolean;
+  loading: boolean;
+  onPressStart: () => void;
+  onSuccess: (input: OAuthSuccessInput) => Promise<void>;
+  onError: (message: string) => void;
+  onFinish: () => void;
+}) {
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID ?? "",
       responseType: AuthSession.ResponseType.Token,
@@ -84,12 +140,54 @@ export default function LoginScreen() {
     yandexDiscovery
   );
 
-  async function onOAuthSuccess(input: {
-    provider: "google" | "apple" | "yandex";
-    idToken?: string;
-    accessToken?: string;
-    rawNonce?: string;
-  }) {
+  useEffect(() => {
+    if (response?.type !== "success") {
+      return;
+    }
+    const accessToken =
+      typeof response.params.access_token === "string" ? response.params.access_token : undefined;
+    if (!accessToken) {
+      props.onError("Yandex не вернул access token.");
+      props.onFinish();
+      return;
+    }
+    void props
+      .onSuccess({ provider: "yandex", accessToken })
+      .catch((err) => {
+        props.onError(err instanceof Error ? err.message : "Ошибка входа через Yandex.");
+      })
+      .finally(props.onFinish);
+  }, [response]);
+
+  return (
+    <Pressable
+      style={styles.oauthButton}
+      disabled={props.disabled || !request}
+      onPress={() => {
+        props.onPressStart();
+        void promptAsync().catch((err) => {
+          props.onError(err instanceof Error ? err.message : "Ошибка входа через Yandex.");
+          props.onFinish();
+        });
+      }}
+    >
+      <Text style={styles.oauthButtonText}>
+        {props.loading ? "Yandex..." : "Войти через Yandex"}
+      </Text>
+    </Pressable>
+  );
+}
+
+export default function LoginScreen() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | "yandex" | null>(null);
+
+  async function onOAuthSuccess(input: OAuthSuccessInput) {
     const api = createMobileApiClient();
     const result = await api.loginWithMobileOAuth(input);
     if (!result.accessToken || !result.refreshToken || !result.expiresAt) {
@@ -102,45 +200,6 @@ export default function LoginScreen() {
     });
     router.replace("/");
   }
-
-  useEffect(() => {
-    if (googleResponse?.type !== "success") {
-      return;
-    }
-    const idToken =
-      googleResponse.authentication?.idToken ??
-      (typeof googleResponse.params.id_token === "string" ? googleResponse.params.id_token : undefined);
-    if (!idToken) {
-      setError("Google не вернул idToken.");
-      setOauthLoading(null);
-      return;
-    }
-    void onOAuthSuccess({ provider: "google", idToken })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Ошибка входа через Google.");
-      })
-      .finally(() => setOauthLoading(null));
-  }, [googleResponse]);
-
-  useEffect(() => {
-    if (yandexResponse?.type !== "success") {
-      return;
-    }
-    const accessToken =
-      typeof yandexResponse.params.access_token === "string"
-        ? yandexResponse.params.access_token
-        : undefined;
-    if (!accessToken) {
-      setError("Yandex не вернул access token.");
-      setOauthLoading(null);
-      return;
-    }
-    void onOAuthSuccess({ provider: "yandex", accessToken })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Ошибка входа через Yandex.");
-      })
-      .finally(() => setOauthLoading(null));
-  }, [yandexResponse]);
 
   async function onSubmit() {
     setError("");
@@ -204,40 +263,6 @@ export default function LoginScreen() {
         </Pressable>
         <Pressable
           style={styles.oauthButton}
-          disabled={oauthLoading != null || !googleRequest}
-          onPress={() => {
-            setError("");
-            setOauthLoading("google");
-            void promptGoogleAsync()
-              .catch((err) => {
-                setError(err instanceof Error ? err.message : "Ошибка входа через Google.");
-                setOauthLoading(null);
-              });
-          }}
-        >
-          <Text style={styles.oauthButtonText}>
-            {oauthLoading === "google" ? "Google..." : "Войти через Google"}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={styles.oauthButton}
-          disabled={oauthLoading != null || !yandexRequest}
-          onPress={() => {
-            setError("");
-            setOauthLoading("yandex");
-            void promptYandexAsync()
-              .catch((err) => {
-                setError(err instanceof Error ? err.message : "Ошибка входа через Yandex.");
-                setOauthLoading(null);
-              });
-          }}
-        >
-          <Text style={styles.oauthButtonText}>
-            {oauthLoading === "yandex" ? "Yandex..." : "Войти через Yandex"}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={styles.oauthButton}
           disabled={oauthLoading != null}
           onPress={() => {
             setError("");
@@ -262,6 +287,32 @@ export default function LoginScreen() {
             {oauthLoading === "apple" ? "Apple..." : "Войти через Apple"}
           </Text>
         </Pressable>
+        {googleOAuthEnabled ? (
+          <GoogleSignInButton
+            disabled={oauthLoading != null}
+            loading={oauthLoading === "google"}
+            onPressStart={() => {
+              setError("");
+              setOauthLoading("google");
+            }}
+            onSuccess={onOAuthSuccess}
+            onError={setError}
+            onFinish={() => setOauthLoading(null)}
+          />
+        ) : null}
+        {yandexOAuthEnabled ? (
+          <YandexSignInButton
+            disabled={oauthLoading != null}
+            loading={oauthLoading === "yandex"}
+            onPressStart={() => {
+              setError("");
+              setOauthLoading("yandex");
+            }}
+            onSuccess={onOAuthSuccess}
+            onError={setError}
+            onFinish={() => setOauthLoading(null)}
+          />
+        ) : null}
       </View>
     </SafeAreaView>
   );

@@ -2078,11 +2078,13 @@ async function main() {
     update: {
       planType: "FREE",
       status: "ACTIVE",
+      trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
     create: {
       userId: demoUser.id,
       planType: "FREE",
       status: "ACTIVE",
+      trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
   });
 

@@ -1,3 +1,5 @@
+import type { SubscriptionCapabilities, SubscriptionPlan } from "./subscription";
+
 export const MOBILE_CLIENT_HEADER = "x-mototwin-client";
 export const MOBILE_CLIENT_EXPO = "expo";
 
@@ -11,7 +13,10 @@ export type AuthMeResponse = {
   user: AuthUser;
   garageId: string;
   garageTitle: string;
-  planType: "FREE" | "PRO";
+  planType: SubscriptionPlan;
+  trialEndsAt?: string | null;
+  isTrialActive?: boolean;
+  capabilities?: SubscriptionCapabilities;
 };
 
 export type AuthLoginResponse = {

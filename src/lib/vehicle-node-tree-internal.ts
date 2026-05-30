@@ -307,6 +307,87 @@ export function buildMaintainedTreeForVehicle(
   );
 }
 
+/**
+ * Picks curated top-service nodes anywhere in the maintained tree (not only skeleton roots).
+ * Returns a flat list in `codesInOrder`, each node without children (service-event pickers).
+ */
+export function extractMaintenanceNodesByCodes(
+  roots: MaintenanceTreeNode[],
+  codesInOrder: readonly string[]
+): MaintenanceTreeNode[] {
+  const codeSet = new Set(codesInOrder);
+  const byCode = new Map<string, MaintenanceTreeNode>();
+
+  const walk = (node: MaintenanceTreeNode) => {
+    if (codeSet.has(node.code)) {
+      byCode.set(node.code, node);
+    }
+    for (const child of node.children) {
+      walk(child);
+    }
+  };
+
+  for (const root of roots) {
+    walk(root);
+  }
+
+  return codesInOrder
+    .map((code) => byCode.get(code))
+    .filter((node): node is MaintenanceTreeNode => node != null)
+    .map((node) => ({
+      ...node,
+      children: [],
+    }));
+}
+
+export type RestrictedMaintenanceTreeNode = MaintenanceTreeNode & {
+  selectable?: boolean;
+  locked?: boolean;
+};
+
+/**
+ * Keeps skeleton branches that lead to `targetCodes`, with full nested `children`
+ * (Free/Rider node-tree page — same expandable tree UX as Pro).
+ */
+export function pruneMaintenanceTreeToTargetCodes(
+  roots: MaintenanceTreeNode[],
+  targetCodes: readonly string[]
+): MaintenanceTreeNode[] {
+  const codeSet = new Set(targetCodes);
+
+  const prune = (node: MaintenanceTreeNode): MaintenanceTreeNode | null => {
+    const prunedChildren = node.children
+      .map(prune)
+      .filter((child): child is MaintenanceTreeNode => child != null);
+    if (codeSet.has(node.code) || prunedChildren.length > 0) {
+      return { ...node, children: prunedChildren };
+    }
+    return null;
+  };
+
+  return roots
+    .map(prune)
+    .filter((node): node is MaintenanceTreeNode => node != null);
+}
+
+export function annotateMaintenanceTreeAccess(
+  roots: MaintenanceTreeNode[],
+  targetCodes: readonly string[],
+  options: { selectable: boolean }
+): RestrictedMaintenanceTreeNode[] {
+  const codeSet = new Set(targetCodes);
+  const walk = (node: MaintenanceTreeNode): RestrictedMaintenanceTreeNode => {
+    const isTarget = codeSet.has(node.code);
+    return {
+      ...node,
+      selectable: options.selectable && isTarget,
+      locked: !isTarget,
+      children: node.children.map(walk),
+    };
+  };
+  return roots.map(walk);
+}
+
 function maintenanceNodeToNodeTreeItem(node: MaintenanceTreeNode): NodeTreeItem {
   return {
     id: node.id,

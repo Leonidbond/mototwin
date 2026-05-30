@@ -17,13 +17,11 @@ import {
   canOpenServiceInstallLocationOnMap,
   expenseCategoryLabelsRu,
   getServiceInstallLocationAddress,
-  filterLeafOptionsUnderTopNodeAncestors,
+  buildRestrictedPlanVehicleLeafPickerSets,
   filterPaidServiceEvents,
   findNodeTreeItemById,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
-  getLeafNodeOptions,
-  getOrderedTopNodeIdsPresentInNodeTree,
   getTodayDateYmdLocal,
   getWishlistItemIdsFromInstalledPartsJson,
   resolveWishlistItemIdForServiceBundleItem,
@@ -31,7 +29,6 @@ import {
   SERVICE_LOG_DETAIL_LEADING_ICON_PX,
   SERVICE_LOG_JOURNAL_LEADING_ICON_PX,
   isServiceLogTimelineQueryActive,
-  nodeAncestorPathLabelRu,
   SERVICE_ACTION_TYPE_OPTIONS,
 } from "@mototwin/domain";
 import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
@@ -39,7 +36,8 @@ import { Button } from "@/components/ui";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
-import { NodePickerModal, type SharedNodePickerOption } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
+import { NodePickerModal } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
+import { useSubscription } from "@/lib/use-subscription";
 import type {
   NodeTreeItem,
   ServiceActionType,
@@ -51,6 +49,7 @@ import type {
   ServiceLogEntryViewModel,
   ServiceLogMonthGroupViewModel,
   ServiceLogNodeFilter,
+  ServiceNodeItem,
   TopServiceNodeItem,
 } from "@mototwin/types";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
@@ -613,8 +612,15 @@ export default function VehicleServiceLogPage() {
   const [vehicleVin, setVehicleVin] = useState<string | null>(null);
   const [isWideViewport, setIsWideViewport] = useState(false);
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
+  const [serviceMeta, setServiceMeta] = useState<{
+    visibleLimit: number | null;
+    hiddenCount: number;
+    plan: "FREE" | "RIDER" | "PRO";
+  } | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
+  const { subscription } = useSubscription();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
@@ -688,27 +694,25 @@ export default function VehicleServiceLogPage() {
     return new Set(resolved);
   }, [nodeIdFromQuery, nodeIdsFromQuery]);
 
-  const nodePickerOptions = useMemo((): SharedNodePickerOption[] => {
-    return getLeafNodeOptions(nodeTree).map((o) => ({
-      id: o.id,
-      code: o.code,
-      name: o.name,
-      level: o.level,
-      pathLabel: nodeAncestorPathLabelRu(nodeTree, o.id),
-    }));
-  }, [nodeTree]);
-
-  const nodePickerTopOptions = useMemo((): SharedNodePickerOption[] => {
-    const leafRows = getLeafNodeOptions(nodeTree).map((o) => ({
-      id: o.id,
-      code: o.code,
-      name: o.name,
-      level: o.level,
-      pathLabel: nodeAncestorPathLabelRu(nodeTree, o.id),
-    }));
-    const topIds = getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes);
-    return filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafRows, topIds);
-  }, [nodeTree, topServiceNodes]);
+  const vehicleLeafPickerSets = useMemo(
+    () =>
+      buildRestrictedPlanVehicleLeafPickerSets({
+        nodeTree,
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscription?.capabilities?.canSelectChildNode ?? true,
+      }),
+    [
+      nodeTree,
+      serviceCatalogNodes,
+      subscription?.capabilities?.canSelectChildNode,
+      topServiceNodes,
+    ]
+  );
+  const nodePickerOptions = vehicleLeafPickerSets.allLeaves;
+  const nodePickerTopOptions = vehicleLeafPickerSets.showTopToggle
+    ? vehicleLeafPickerSets.topLeaves
+    : undefined;
 
   const applyNodePickerSelection = useCallback(
     (nodeIds: string[]) => {
@@ -740,11 +744,12 @@ export default function VehicleServiceLogPage() {
     try {
       setIsLoading(true);
       setError("");
-      const [detail, service, treeRes, topRes] = await Promise.all([
+      const [detail, service, treeRes, topRes, catalogRes] = await Promise.all([
         api.getVehicleDetail(vehicleId),
         api.getServiceEvents(vehicleId),
         api.getNodeTree(vehicleId),
         api.getTopServiceNodes(),
+        api.getServiceNodes(),
       ]);
       const vehicle = detail.vehicle;
       const title =
@@ -754,8 +759,10 @@ export default function VehicleServiceLogPage() {
       setVehicleTitle(title);
       setVehicleVin(vehicle?.vin ?? null);
       setEvents(service.serviceEvents ?? []);
+      setServiceMeta(service.meta ?? null);
       setNodeTree(treeRes.nodeTree ?? []);
       setTopServiceNodes(topRes.nodes ?? []);
+      setServiceCatalogNodes(catalogRes.nodes ?? []);
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : "Не удалось загрузить журнал обслуживания.");
@@ -1162,6 +1169,22 @@ export default function VehicleServiceLogPage() {
             ) : null}
             {!isLoading && error ? (
               <p style={{ color: productSemanticColors.error, fontSize: 14, padding: "24px 0" }}>{error}</p>
+            ) : null}
+            {!isLoading && !error && serviceMeta?.plan === "FREE" ? (
+              <div
+                style={{
+                  borderRadius: 10,
+                  border: "1px solid rgba(251,146,60,0.35)",
+                  backgroundColor: "rgba(251,146,60,0.12)",
+                  color: productSemanticColors.textPrimary,
+                  padding: "8px 12px",
+                  fontSize: 12,
+                  marginBottom: 10,
+                }}
+              >
+                Free: отображаются последние {serviceMeta.visibleLimit ?? 10} сервисных событий.
+                {serviceMeta.hiddenCount > 0 ? ` Еще ${serviceMeta.hiddenCount} сохранены в истории.` : ""}
+              </div>
             ) : null}
 
             {/* ── Main 2-col split: Journal card | Details card ─────── */}
@@ -2091,7 +2114,7 @@ export default function VehicleServiceLogPage() {
         open={nodePickerOpen}
         title="Узлы для фильтра"
         options={nodePickerOptions}
-        topOptions={nodePickerTopOptions.length > 0 ? nodePickerTopOptions : undefined}
+        topOptions={nodePickerTopOptions}
         mode="multi"
         selectedIds={nodePickerSelectedIds}
         confirmLabel="Применить"

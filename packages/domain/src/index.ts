@@ -1,4 +1,9 @@
 export {
+  filterFavoriteNodeCodesToCatalogLeaves,
+  filterServiceCatalogLeafNodes,
+  type ServiceCatalogNodeRef,
+} from "./service-catalog";
+export {
   buildTopNodeOverviewCards,
   buildTopNodeProfileGroups,
   resolveEditableFavoriteNodeCodes,
@@ -18,11 +23,22 @@ export {
   getStatusExplanationTriggeredByLabel,
 } from "./status";
 export {
+  SUBSCRIPTION_CAPABILITIES,
+  getSubscriptionCapabilities,
+  canUseServiceEventEntryMode,
+  formatPlanLabelRu,
+  isPlanAtLeast,
+} from "./subscription";
+export {
   flattenNodeTreeToSelectOptions,
   flattenNodeTreeForSelection,
   findNodeTreeItemById,
+  findNodeTreeItemByCode,
   findNodePathById,
   nodeAncestorPathLabelRu,
+  catalogNodeAncestorPathLabelRu,
+  resolveNodePickerPathLabelRu,
+  type CatalogPathNode,
   getNodePathById,
   getNodeSelectLevels,
   getAvailableChildrenForSelectedPath,
@@ -42,6 +58,8 @@ export {
   buildNodeTreeItemViewModel,
   buildNodeTreeViewModel,
   canOpenNodeStatusExplanationModal,
+  NODE_TREE_PLAN_LOCKED_HINT_RU,
+  nodeTreeHasPlanLockedNodes,
   getNodePathItemViewModels,
   getNodePathItemViewModelsByNodeId,
 } from "./node-tree-view-models";
@@ -64,6 +82,11 @@ export {
   nodePickerTopGroupKeyFromPathLabel,
   type NodePickerGroupableOption,
 } from "./node-picker-grouping";
+export {
+  buildLeafNodePickerOptionsFromVehicleTree,
+  buildRestrictedPlanVehicleLeafPickerSets,
+  type NodePickerOptionRow,
+} from "./node-picker-options";
 export {
   buildNodeMaintenancePlanSummary,
   buildNodeMaintenancePlanViewModel,

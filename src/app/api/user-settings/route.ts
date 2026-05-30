@@ -8,6 +8,12 @@ import {
   toCurrentUserContextErrorResponse,
 } from "../_shared/current-user-context";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { getCapabilities } from "@/lib/subscription/capabilities";
+import { getOrCreateUserSubscription } from "@/lib/subscription/resolve-plan";
+import {
+  loadActiveServiceCatalogNodes,
+  sanitizeFavoriteNodeCodes,
+} from "@/lib/service-catalog-nodes";
 
 const userSettingsPatchSchema = z
   .object({
@@ -41,6 +47,8 @@ const userSettingsSelect = {
 export async function GET() {
   try {
     const currentUser = await getCurrentUserContext();
+    const subscription = await getOrCreateUserSubscription(currentUser.userId);
+    const capabilities = getCapabilities(subscription.plan);
     const settings = await prisma.userSettings.findUnique({
       where: { userId: currentUser.userId },
       select: userSettingsSelect,
@@ -52,7 +60,21 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ settings: normalizeUserSettings(settings) });
+    const normalized = normalizeUserSettings(settings);
+    if (!capabilities.canCustomizeFavoriteNodes) {
+      normalized.favoriteNodeCodes = [];
+      normalized.defaultNodeView = "top";
+    } else {
+      const catalogNodes = await loadActiveServiceCatalogNodes(prisma);
+      normalized.favoriteNodeCodes = sanitizeFavoriteNodeCodes(
+        normalized.favoriteNodeCodes,
+        catalogNodes
+      );
+      if (!capabilities.defaultNodeViewAll && normalized.defaultNodeView === "all") {
+        normalized.defaultNodeView = "top";
+      }
+    }
+    return NextResponse.json({ settings: normalized });
   } catch (error) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
@@ -66,6 +88,8 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const currentUser = await getCurrentUserContext();
+    const subscription = await getOrCreateUserSubscription(currentUser.userId);
+    const capabilities = getCapabilities(subscription.plan);
     const json = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
     const parsed = userSettingsPatchSchema.safeParse(json);
 
@@ -87,7 +111,22 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const merged = normalizeUserSettings({ ...existing, ...parsed.data });
+    const patch = { ...parsed.data };
+    if (!capabilities.canCustomizeFavoriteNodes) {
+      delete patch.favoriteNodeCodes;
+      patch.defaultNodeView = "top";
+    } else if (!capabilities.defaultNodeViewAll && patch.defaultNodeView === "all") {
+      patch.defaultNodeView = "top";
+    }
+
+    const merged = normalizeUserSettings({ ...existing, ...patch });
+    if (capabilities.canCustomizeFavoriteNodes) {
+      const catalogNodes = await loadActiveServiceCatalogNodes(prisma);
+      merged.favoriteNodeCodes = sanitizeFavoriteNodeCodes(
+        merged.favoriteNodeCodes,
+        catalogNodes
+      );
+    }
 
     const updated = await prisma.userSettings.update({
       where: { userId: currentUser.userId },

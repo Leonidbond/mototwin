@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 }
 
 function parsePlan(value: string | null): AdminUserListFilters["plan"] {
-  if (value === "FREE" || value === "PRO" || value === "all") return value;
+  if (value === "FREE" || value === "RIDER" || value === "PRO" || value === "all") return value;
   return undefined;
 }
 

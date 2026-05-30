@@ -29,11 +29,9 @@ import {
   clearDraft,
   createEmptyDraftCart,
   filterActiveWishlistItems,
-  filterLeafOptionsUnderTopNodeAncestors,
+  buildRestrictedPlanVehicleLeafPickerSets,
   getLeafNodeOptions,
   getNodePathItemViewModelsByNodeId,
-  getOrderedTopNodeIdsPresentInNodeTree,
-  nodeAncestorPathLabelRu,
   removeFromDraft,
   updateSkuDraftItemQuantity,
   vehicleDetailFromApiRecord,
@@ -75,6 +73,7 @@ import {
 } from "../../../../components/vehicle-wishlist/picker-draft-cart-bar";
 import { PickerWhyMatchesPanel } from "../../../../components/vehicle-wishlist/picker-why-matches-panel";
 import { MobileNodePickerModal } from "../../../../components/vehicle-detail/mobile-node-picker-modal";
+import { useMobileSubscription } from "../../../../src/use-mobile-subscription";
 import { buildVehicleWishlistCommunityHref } from "../../../../components/vehicle-wishlist/hrefs";
 
 function skuFromRecommendation(rec: PartRecommendationViewModel): PartSkuViewModel {
@@ -213,6 +212,8 @@ export default function WishlistPickerScreen() {
 
   const [nodeModalOpen, setNodeModalOpen] = useState(false);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
+  const { capabilities: subscriptionCapabilities } = useMobileSubscription();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [includeInactiveSkus, setIncludeInactiveSkus] = useState(false);
@@ -307,9 +308,13 @@ export default function WishlistPickerScreen() {
     (async () => {
       try {
         const endpoints = createMobileApiClient();
-        const data = await endpoints.getTopServiceNodes();
+        const [topData, catalogData] = await Promise.all([
+          endpoints.getTopServiceNodes(),
+          endpoints.getServiceNodes(),
+        ]);
         if (!cancelled) {
-          setTopServiceNodes(data.nodes ?? []);
+          setTopServiceNodes(topData.nodes ?? []);
+          setServiceCatalogNodes(catalogData.nodes ?? []);
         }
       } catch {
         if (!cancelled) {
@@ -324,29 +329,20 @@ export default function WishlistPickerScreen() {
 
   const leafOptions = useMemo(() => getLeafNodeOptions(nodeTree), [nodeTree]);
 
-  const leafRowsForModal = useMemo(
+  const vehicleLeafPickerSets = useMemo(
     () =>
-      leafOptions.map((leaf) => ({
-        ...leaf,
-        pathLabel: nodeAncestorPathLabelRu(nodeTree, leaf.id),
-      })),
-    [leafOptions, nodeTree]
-  );
-
-  const orderedTopNodeIdsForPicker = useMemo(
-    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
-    [nodeTree, topServiceNodes]
-  );
-
-  const topLeafRowsForModal = useMemo(
-    () =>
-      filterLeafOptionsUnderTopNodeAncestors(
+      buildRestrictedPlanVehicleLeafPickerSets({
         nodeTree,
-        leafRowsForModal,
-        orderedTopNodeIdsForPicker
-      ),
-    [nodeTree, leafRowsForModal, orderedTopNodeIdsForPicker]
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscriptionCapabilities?.canSelectChildNode ?? true,
+      }),
+    [nodeTree, serviceCatalogNodes, subscriptionCapabilities?.canSelectChildNode, topServiceNodes]
   );
+  const leafRowsForModal = vehicleLeafPickerSets.allLeaves;
+  const topLeafRowsForModal = vehicleLeafPickerSets.showTopToggle
+    ? vehicleLeafPickerSets.topLeaves
+    : undefined;
 
   useEffect(() => {
     if (leafOptions.length === 0) return;
@@ -969,7 +965,7 @@ export default function WishlistPickerScreen() {
         visible={nodeModalOpen}
         title="Конечный узел"
         options={leafRowsForModal}
-        topOptions={topLeafRowsForModal.length > 0 ? topLeafRowsForModal : undefined}
+        topOptions={topLeafRowsForModal}
         selectedId={selectedNodeId}
         onClose={() => setNodeModalOpen(false)}
         onSelect={setSelectedNodeId}

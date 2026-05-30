@@ -10,6 +10,8 @@ export type RawServiceEventRow = {
   nodeId: string;
   eventKind: string;
   mode: ServiceEventMode | string;
+  entryMode?: string | null;
+  createdUnderPlan?: string | null;
   title: string | null;
   eventDate: Date;
   odometer: number;
@@ -30,6 +32,8 @@ export type RawServiceEventRow = {
   nextReminderDate?: Date | null;
   nextReminderOdometer?: number | null;
   nextReminderEngineHours?: number | null;
+  rotatedOutAt?: Date | null;
+  rotatedOutReason?: string | null;
   createdAt: Date;
   installedPartsJson?: unknown | null;
   node?: {
@@ -145,6 +149,8 @@ export function serializeServiceEventRow(row: RawServiceEventRow): ServiceEventI
       : undefined,
     title: row.title,
     mode: row.mode as ServiceEventItem["mode"],
+    entryMode: (row.entryMode as ServiceEventItem["entryMode"]) ?? "QUICK",
+    createdUnderPlan: (row.createdUnderPlan as ServiceEventItem["createdUnderPlan"]) ?? "FREE",
     odometer: row.odometer,
     engineHours: row.engineHours,
     installedPartsJson: row.installedPartsJson ?? null,
@@ -164,6 +170,8 @@ export function serializeServiceEventRow(row: RawServiceEventRow): ServiceEventI
     nextReminderDate: row.nextReminderDate?.toISOString() ?? null,
     nextReminderOdometer: row.nextReminderOdometer ?? null,
     nextReminderEngineHours: row.nextReminderEngineHours ?? null,
+    rotatedOutAt: row.rotatedOutAt?.toISOString() ?? null,
+    rotatedOutReason: (row.rotatedOutReason as ServiceEventItem["rotatedOutReason"]) ?? null,
     items,
     serviceType: legacyServiceType,
     costAmount: totalCost,

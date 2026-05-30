@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTopServiceNodes } from "@/lib/top-service-nodes";
+import { getCapabilities } from "@/lib/subscription/capabilities";
+import { getOrCreateUserSubscription } from "@/lib/subscription/resolve-plan";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
@@ -9,12 +11,16 @@ import {
 export async function GET() {
   try {
     const currentUser = await getCurrentUserContext();
+    const subscription = await getOrCreateUserSubscription(currentUser.userId);
+    const capabilities = getCapabilities(subscription.plan);
     const settings = await prisma.userSettings.findUnique({
       where: { userId: currentUser.userId },
       select: { favoriteNodeCodes: true },
     });
     const customCodes =
-      settings?.favoriteNodeCodes && settings.favoriteNodeCodes.length > 0
+      capabilities.canCustomizeFavoriteNodes &&
+      settings?.favoriteNodeCodes &&
+      settings.favoriteNodeCodes.length > 0
         ? settings.favoriteNodeCodes
         : null;
     const nodes = await getTopServiceNodes(prisma, customCodes);

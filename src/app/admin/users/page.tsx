@@ -43,6 +43,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
             label: "План",
             options: [
               { value: "FREE", label: "FREE" },
+              { value: "RIDER", label: "RIDER" },
               { value: "PRO", label: "PRO" },
             ],
           },
@@ -80,7 +81,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
 }
 
 function parsePlan(value: string | undefined): AdminUserListFilters["plan"] {
-  if (value === "FREE" || value === "PRO" || value === "all") return value;
+  if (value === "FREE" || value === "RIDER" || value === "PRO" || value === "all") return value;
   return undefined;
 }
 function parseHasVehicles(value: string | undefined): AdminUserListFilters["hasVehicles"] {

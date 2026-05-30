@@ -3,6 +3,9 @@ import { z } from "zod";
 import type { CreateVehicleResponse } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import { toGarageVehicleItem, vehicleWireInclude } from "@/lib/vehicle-wire";
+import { getCapabilities } from "@/lib/subscription/capabilities";
+import { subscriptionErrorResponse } from "@/lib/subscription/errors";
+import { getOrCreateUserSubscription } from "@/lib/subscription/resolve-plan";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
@@ -35,6 +38,27 @@ export async function POST(request: NextRequest) {
     const json = await parseJsonBody<unknown>(request, { maxBytes: 8 * 1024 });
     const data = createVehicleSchema.parse(json);
     const currentUser = await getCurrentUserContext();
+    const subscription = await getOrCreateUserSubscription(currentUser.userId);
+    const capabilities = getCapabilities(subscription.plan);
+
+    if (capabilities.maxVehicles != null) {
+      const existingCount = await prisma.vehicle.count({
+        where: {
+          garageId: currentUser.garageId,
+          trashedAt: null,
+        },
+      });
+      if (existingCount >= capabilities.maxVehicles) {
+        return subscriptionErrorResponse({
+          code: "VEHICLE_LIMIT_REACHED",
+          requiredPlan: subscription.plan === "FREE" ? "RIDER" : "PRO",
+          message:
+            subscription.plan === "FREE"
+              ? "Ваш тариф Free позволяет вести только 1 мотоцикл. Перейдите на Rider, чтобы добавить до 3."
+              : "Ваш тариф Rider позволяет вести до 3 мотоциклов. Перейдите на Pro для неограниченного гаража.",
+        });
+      }
+    }
 
     /** Validate the 4-level FK chain belongs together before creating the vehicle. */
     const generation = await prisma.motorcycleGeneration.findFirst({

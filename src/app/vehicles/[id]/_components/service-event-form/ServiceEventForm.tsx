@@ -7,12 +7,11 @@ import {
   buildAddServiceEventCostBreakdownLines,
   createEmptyBundleItemFormValues,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
-  filterLeafOptionsUnderTopNodeAncestors,
-  flattenNodeTreeToSelectOptions,
+  buildRestrictedPlanVehicleLeafPickerSets,
+  canUseServiceEventEntryMode,
   formatExpenseAmountRu,
   partSkuListPriceToBundlePartCostInput,
   getServiceActionTypeLabelRu,
-  getOrderedTopNodeIdsPresentInNodeTree,
   mergeServiceBundleTemplateIntoAddFormValues,
   mergeWishlistItemIntoAddFormValues,
   normalizeVehicleStatePayload,
@@ -35,6 +34,7 @@ import type {
   BundleItemFormValues,
   InstallableForServiceEventEntry,
   NodeTreeItem,
+  ServiceNodeItem,
   PartSkuViewModel,
   PartWishlistItem,
   ServiceActionType,
@@ -63,10 +63,11 @@ import {
 import {
   cloneAddServiceEventForm,
   currencySuffix,
-  nodeBreadcrumbRu,
   normalizePartNumber,
 } from "./utils";
 import { SERVICE_EVENT_PARTS_UI } from "./styles";
+import { SubscriptionLock } from "@/components/subscription/SubscriptionLock";
+import { useSubscription } from "@/lib/use-subscription";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
@@ -294,10 +295,13 @@ function ServiceEventFormInner({
   const [userTemplatesLoadError, setUserTemplatesLoadError] = useState("");
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [saveTemplateNameDraft, setSaveTemplateNameDraft] = useState("");
+  const [detailedModePaywallVisible, setDetailedModePaywallVisible] = useState(false);
   const [saveIncludeInPartPicker, setSaveIncludeInPartPicker] = useState(true);
   const [saveTemplateBusy, setSaveTemplateBusy] = useState(false);
   const [saveTemplateError, setSaveTemplateError] = useState("");
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const { subscription } = useSubscription();
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
 
   const [installableEntries, setInstallableEntries] = useState<InstallableForServiceEventEntry[]>([]);
   const [installableLoading, setInstallableLoading] = useState(false);
@@ -429,37 +433,31 @@ function ServiceEventFormInner({
     });
   }, []);
 
-  const leafNodeOptions = useMemo(
-    () => flattenNodeTreeToSelectOptions(nodeTree).filter((option) => !option.hasChildren),
-    [nodeTree]
-  );
-  const leafNodePickerOptions = useMemo(
+  const vehicleLeafPickerSets = useMemo(
     () =>
-      leafNodeOptions.map((option) => ({
-        id: option.id,
-        code: option.code,
-        name: option.name,
-        level: option.level,
-        pathLabel: nodeBreadcrumbRu(nodeTree, option.id),
-      })),
-    [leafNodeOptions, nodeTree]
-  );
-  const orderedTopNodeIdsForPicker = useMemo(
-    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
-    [nodeTree, topServiceNodes]
-  );
-  const topLeafNodePickerOptions = useMemo(
-    () =>
-      filterLeafOptionsUnderTopNodeAncestors(
+      buildRestrictedPlanVehicleLeafPickerSets({
         nodeTree,
-        leafNodePickerOptions,
-        orderedTopNodeIdsForPicker
-      ),
-    [leafNodePickerOptions, nodeTree, orderedTopNodeIdsForPicker]
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscription?.capabilities?.canSelectChildNode ?? true,
+      }),
+    [
+      nodeTree,
+      serviceCatalogNodes,
+      subscription?.capabilities?.canSelectChildNode,
+      topServiceNodes,
+    ]
   );
+  const leafNodePickerOptions = vehicleLeafPickerSets.allLeaves;
+  const selectableLeafNodePickerOptions = vehicleLeafPickerSets.selectableLeaves;
+  const topLeafNodePickerOptions = vehicleLeafPickerSets.topLeaves;
+  const pickerShowTopToggle = vehicleLeafPickerSets.showTopToggle;
+  const detailedEntryAllowed =
+    subscription?.capabilities == null ||
+    canUseServiceEventEntryMode(subscription.capabilities, "DETAILED");
   const leafNodeIdsSet = useMemo(
-    () => new Set(leafNodeOptions.map((option) => option.id)),
-    [leafNodeOptions]
+    () => new Set(leafNodePickerOptions.map((option) => option.id)),
+    [leafNodePickerOptions]
   );
 
   const effectiveSkuRowIndex =
@@ -468,6 +466,21 @@ function ServiceEventFormInner({
   useEffect(() => {
     setSkuSearchRowIndex((idx) => Math.min(Math.max(0, idx), Math.max(0, form.items.length - 1)));
   }, [form.items.length]);
+
+  useEffect(() => {
+    if (detailedEntryAllowed) {
+      setDetailedModePaywallVisible(false);
+    }
+  }, [detailedEntryAllowed]);
+
+  useEffect(() => {
+    if (detailedEntryAllowed || form.mode !== "ADVANCED") {
+      return;
+    }
+    setSkuSearchRowIndex(0);
+    setSkuSearchPanelOpen(false);
+    updateForm((prev) => switchFormToBasic(prev));
+  }, [detailedEntryAllowed, form.mode, updateForm]);
 
   const openSkuSearchForRow = useCallback((rowIndex: number) => {
     setSkuSearchRowIndex(rowIndex);
@@ -785,13 +798,17 @@ function ServiceEventFormInner({
 
   useEffect(() => {
     let cancelled = false;
-    void api
-      .getTopServiceNodes()
-      .then((res) => {
-        if (!cancelled) setTopServiceNodes(res.nodes ?? []);
+    void Promise.all([api.getTopServiceNodes(), api.getServiceNodes()])
+      .then(([topRes, catalogRes]) => {
+        if (cancelled) return;
+        setTopServiceNodes(topRes.nodes ?? []);
+        setServiceCatalogNodes(catalogRes.nodes ?? []);
       })
       .catch(() => {
-        if (!cancelled) setTopServiceNodes([]);
+        if (!cancelled) {
+          setTopServiceNodes([]);
+          setServiceCatalogNodes([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -1016,7 +1033,9 @@ function ServiceEventFormInner({
   const isBasic = form.mode === "BASIC";
   const isAdvanced = !isBasic;
   const hasFreeNodes =
-    leafNodeOptions.filter((o) => !form.items.some((it) => it.nodeId.trim() === o.id)).length > 0;
+    selectableLeafNodePickerOptions.filter(
+      (o) => !form.items.some((it) => it.nodeId.trim() === o.id)
+    ).length > 0;
 
   // ----- Section numbering per references -----
   const fastSectionNumbers = { basicInfo: 1, cost: 2, bundle: 3 };
@@ -1168,9 +1187,9 @@ function ServiceEventFormInner({
     <div className="flex flex-col">
       {form.items.map((row, rowIndex) => {
         const nodeIdTrim = row.nodeId.trim();
-        const nodeOpt = leafNodeOptions.find((o) => o.id === nodeIdTrim);
+        const nodeOpt = leafNodePickerOptions.find((o) => o.id === nodeIdTrim);
         const nodeTitle = nodeOpt?.name ?? `Узел ${rowIndex + 1}`;
-        const crumb = nodeIdTrim ? nodeBreadcrumbRu(nodeTree, row.nodeId) : "";
+        const crumb = nodeIdTrim ? (nodeOpt?.pathLabel ?? "") : "";
         const rowActionLabel = getServiceActionTypeLabelRu(form.commonActionType);
         return (
           <BundleNodeRowFast
@@ -1202,9 +1221,9 @@ function ServiceEventFormInner({
   // Extended-mode node cards
   const bundleNodeCardsExtended = form.items.map((row, rowIndex) => {
     const nodeIdTrim = row.nodeId.trim();
-    const nodeOpt = leafNodeOptions.find((o) => o.id === nodeIdTrim);
+    const nodeOpt = leafNodePickerOptions.find((o) => o.id === nodeIdTrim);
     const nodeTitle = nodeOpt?.name ?? `Узел ${rowIndex + 1}`;
-    const crumb = nodeIdTrim ? nodeBreadcrumbRu(nodeTree, row.nodeId) : "";
+    const crumb = nodeIdTrim ? (nodeOpt?.pathLabel ?? "") : "";
     const partsParsed = parseExpenseAmountInputToNumberOrNull(row.partCost.trim());
     const partsCostFormatted =
       partsParsed != null
@@ -1394,20 +1413,34 @@ function ServiceEventFormInner({
     </div>
   );
   const serviceEventModeControl = (
-    <ServiceEventModeControl
-      variant="segmented"
-      isBasic={isBasic}
-      onSelectBasic={() => {
-        setSkuSearchRowIndex(0);
-        setSkuSearchPanelOpen(false);
-        updateForm((prev) => (prev.mode === "BASIC" ? prev : switchFormToBasic(prev)));
-      }}
-      onSelectDetailed={() => {
-        setSkuSearchRowIndex(0);
-        setSkuSearchPanelOpen(false);
-        updateForm((prev) => (prev.mode === "ADVANCED" ? prev : switchFormToAdvanced(prev)));
-      }}
-    />
+    <div className="flex w-full flex-col gap-2">
+      <ServiceEventModeControl
+        variant="segmented"
+        isBasic={isBasic}
+        detailedAllowed={detailedEntryAllowed}
+        onSelectBasic={() => {
+          setDetailedModePaywallVisible(false);
+          setSkuSearchRowIndex(0);
+          setSkuSearchPanelOpen(false);
+          updateForm((prev) => (prev.mode === "BASIC" ? prev : switchFormToBasic(prev)));
+        }}
+        onSelectDetailed={() => {
+          setSkuSearchRowIndex(0);
+          setSkuSearchPanelOpen(false);
+          updateForm((prev) => (prev.mode === "ADVANCED" ? prev : switchFormToAdvanced(prev)));
+        }}
+        onBlockedDetailed={() => setDetailedModePaywallVisible(true)}
+      />
+      {detailedModePaywallVisible && !detailedEntryAllowed ? (
+        <SubscriptionLock
+          variant="surface"
+          title="Подробное ТО доступно в Rider"
+          description="В Free доступна быстрая запись обслуживания. Rider и Pro открывают подробное ТО с выбором узла, деталями работ и расходами."
+          requiredPlan="RIDER"
+          actionLabel="Перейти на Rider"
+        />
+      ) : null}
+    </div>
   );
   const vehicleStateConfirmModal = pendingVehicleStateUpdate ? (
     <div
@@ -1744,7 +1777,7 @@ function ServiceEventFormInner({
             open={addNodeSheetOpen}
             onClose={() => setAddNodeSheetOpen(false)}
             options={leafNodePickerOptions}
-            topOptions={topLeafNodePickerOptions.length > 0 ? topLeafNodePickerOptions : undefined}
+            topOptions={pickerShowTopToggle ? topLeafNodePickerOptions : undefined}
             usedNodeIds={new Set(form.items.map((it) => it.nodeId.trim()).filter(Boolean))}
             onConfirm={confirmAddNodesFromSheet}
           />

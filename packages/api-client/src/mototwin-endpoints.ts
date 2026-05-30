@@ -66,6 +66,9 @@ import type {
   UpdateWishlistItemResponse,
   VehicleDetailResponse,
   TopServiceNodesResponse,
+  SubscriptionCurrentResponse,
+  UpdateSubscriptionPlanInput,
+  UpdateSubscriptionPlanResponse,
   VehicleNodeTreeResponse,
   ServiceNodesResponse,
   VehicleWishlistResponse,
@@ -102,6 +105,17 @@ export function createMotoTwinEndpoints(client: ApiClient) {
   return {
     getAuthMe() {
       return client.request<AuthMeResponse>("/api/auth/me");
+    },
+
+    getSubscriptionCurrent() {
+      return client.request<SubscriptionCurrentResponse>("/api/subscription/current");
+    },
+
+    updateSubscriptionPlan(input: UpdateSubscriptionPlanInput) {
+      return client.request<UpdateSubscriptionPlanResponse>("/api/subscription/plan", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      });
     },
 
     login(input: AuthLoginInput) {

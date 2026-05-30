@@ -42,9 +42,8 @@ import {
   formatSnoozeUntilLabel,
   getDefaultCurrencyFromSettings,
   buildPartWishlistItemViewModel,
+  buildRestrictedPlanVehicleLeafPickerSets,
   createInitialPartWishlistFormValues,
-  flattenNodeTreeToSelectOptions,
-  nodeAncestorPathLabelRu,
   groupPartWishlistItemsByStatus,
   filterActiveWishlistItems,
   normalizeCreatePartWishlistPayload,
@@ -64,7 +63,11 @@ import {
   normalizeUserLocalSettings,
   DEFAULT_USER_LOCAL_SETTINGS,
   USER_LOCAL_SETTINGS_STORAGE_KEY,
+  NODE_TREE_PLAN_LOCKED_HINT_RU,
+  nodeTreeHasPlanLockedNodes,
 } from "@mototwin/domain";
+import { SubscriptionLock } from "@/components/subscription/SubscriptionLock";
+import { useSubscription } from "@/lib/use-subscription";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import { productSemanticColors, statusSemanticTokens, statusTextLabelsRu } from "@mototwin/design-tokens";
 import { ACTION_SVG_BODIES, type ActionIconKey } from "@mototwin/icons";
@@ -101,6 +104,7 @@ import type {
   PartWishlistItemViewModel,
   PartSkuViewModel,
   TopNodeOverviewCard,
+  ServiceNodeItem,
   TopServiceNodeItem,
 } from "@mototwin/types";
 
@@ -1277,6 +1281,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [dashboardExpenses, setDashboardExpenses] = useState<ExpenseItem[]>([]);
   const [isDashboardExpensesLoading, setIsDashboardExpensesLoading] = useState(false);
   const [dashboardExpensesError, setDashboardExpensesError] = useState("");
+  const { subscription } = useSubscription();
+  const nodesReadOnly = subscription?.capabilities?.nodeAccessLevel === "TOP_READ_ONLY";
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [nodeExpenseYear, setNodeExpenseYear] = useState(() => new Date().getFullYear());
   const [nodeExpenseSummaryByNodeId, setNodeExpenseSummaryByNodeId] = useState<
@@ -1285,6 +1291,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [isNodeExpenseSummaryLoading, setIsNodeExpenseSummaryLoading] = useState(false);
   const [nodeExpenseSummaryError, setNodeExpenseSummaryError] = useState("");
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
   const [nodeTreeError, setNodeTreeError] = useState("");
   const [isTopServiceNodesLoading, setIsTopServiceNodesLoading] = useState(false);
@@ -1297,6 +1304,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   const [nodeStatusFilter, setNodeStatusFilter] = useState<NodeStatusFilter>("ALL");
   const [nodeTreeTopOnly, setNodeTreeTopOnly] = useState(false);
   const appliedNodeTreeEntryKeyRef = useRef<string | null>(null);
+  const hasPlanLockedNodeTree = useMemo(() => nodeTreeHasPlanLockedNodes(nodeTree), [nodeTree]);
   const [selectedStatusExplanationNode, setSelectedStatusExplanationNode] =
     useState<NodeTreeItemViewModel | null>(null);
   const [isUsageProfileSectionExpanded, setIsUsageProfileSectionExpanded] = useState(true);
@@ -1587,6 +1595,8 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     if (restoredTopOnly !== null) {
       setNodeTreeTopOnly(restoredTopOnly);
+    } else if (hasPlanLockedNodeTree) {
+      setNodeTreeTopOnly(true);
     } else {
       try {
         const raw = localStorage.getItem(USER_LOCAL_SETTINGS_STORAGE_KEY);
@@ -1628,7 +1638,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         window.history.replaceState(window.history.state, "", nextHref);
       }
     }
-  }, [pageView, targetNodeIdFromSearchParams, topLevelNodeViewModels, vehicleId]);
+  }, [hasPlanLockedNodeTree, pageView, targetNodeIdFromSearchParams, topLevelNodeViewModels, vehicleId]);
 
   const focusIssueNodesInTree = useCallback(
     (nodeIds: string[]) => {
@@ -1855,17 +1865,25 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
     return byWishlistItemId;
   }, [serviceEvents]);
-  const wishlistNodeOptions = useMemo(
+  const wishlistLeafPickerSets = useMemo(
     () =>
-      flattenNodeTreeToSelectOptions(nodeTree).map((option) => ({
-        id: option.id,
-        code: option.code,
-        name: option.name,
-        level: option.level,
-        pathLabel: nodeAncestorPathLabelRu(nodeTree, option.id),
-      })),
-    [nodeTree]
+      buildRestrictedPlanVehicleLeafPickerSets({
+        nodeTree,
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscription?.capabilities?.canSelectChildNode ?? true,
+      }),
+    [
+      nodeTree,
+      serviceCatalogNodes,
+      subscription?.capabilities?.canSelectChildNode,
+      topServiceNodes,
+    ]
   );
+  const wishlistNodeOptions = wishlistLeafPickerSets.allLeaves;
+  const wishlistNodeTopOptions = wishlistLeafPickerSets.showTopToggle
+    ? wishlistLeafPickerSets.topLeaves
+    : undefined;
 
   const wishlistEditingSourceItem = useMemo(
     () => (wishlistEditingId ? wishlistItems.find((w) => w.id === wishlistEditingId) : undefined),
@@ -2495,8 +2513,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     try {
       setIsTopServiceNodesLoading(true);
       setTopServiceNodesError("");
-      const data = await vehicleDetailApi.getTopServiceNodes();
-      setTopServiceNodes(data.nodes ?? []);
+      const [topData, catalogData] = await Promise.all([
+        vehicleDetailApi.getTopServiceNodes(),
+        vehicleDetailApi.getServiceNodes(),
+      ]);
+      setTopServiceNodes(topData.nodes ?? []);
+      setServiceCatalogNodes(catalogData.nodes ?? []);
     } catch (topNodesLoadError) {
       console.error(topNodesLoadError);
       setTopServiceNodesError(
@@ -2505,6 +2527,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
           : "Не удалось загрузить основные узлы."
       );
       setTopServiceNodes([]);
+      setServiceCatalogNodes([]);
     } finally {
       setIsTopServiceNodesLoading(false);
     }
@@ -3283,6 +3306,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         : null;
     if (pageView === "nodeTree") {
       const isSelected = selectedNodeContextId === node.id;
+      const isPlanLocked = Boolean(node.planLocked);
       const metaCount = node.children.length;
       const rowStatusTokens = node.effectiveStatus
         ? statusSemanticTokens[node.effectiveStatus]
@@ -3511,8 +3535,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
             }
             className="flex min-h-[52px] items-stretch text-left transition hover:bg-slate-800/40"
             style={{
-              backgroundColor: productSemanticColors.card,
+              backgroundColor: isPlanLocked
+                ? productSemanticColors.cardSubtle
+                : productSemanticColors.card,
               color: productSemanticColors.textPrimary,
+              opacity: isPlanLocked ? 0.38 : 1,
             }}
           >
             {renderIndentGuides()}
@@ -3568,12 +3595,23 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               <div className="min-w-0 flex-1">
                 <p
                   className="truncate text-sm font-semibold leading-tight"
-                  style={{ color: productSemanticColors.textPrimary }}
+                  style={{
+                    color: isPlanLocked
+                      ? productSemanticColors.textMuted
+                      : productSemanticColors.textPrimary,
+                  }}
                 >
                   {node.name}
                 </p>
                 <div className="mt-0.5 flex items-center gap-2">
-                  <p className="truncate text-[11px] font-medium uppercase tracking-wide" style={{ color: productSemanticColors.textMuted }}>
+                  <p
+                    className="truncate text-[11px] font-medium uppercase tracking-wide"
+                    style={{
+                      color: isPlanLocked
+                        ? productSemanticColors.textSecondary
+                        : productSemanticColors.textMuted,
+                    }}
+                  >
                     {node.code}
                   </p>
                   {metaCount > 0 ? (
@@ -4185,6 +4223,23 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   : "Краткая сводка по основным узлам. Детальная структура доступна в полном дереве."}
               </p>
 
+              {pageView === "nodeTree" && hasPlanLockedNodeTree ? (
+                <div className="mt-3">
+                  <SubscriptionLock
+                    variant="surface"
+                    title={nodeTreeTopOnly ? "ТОП-узлы" : "Полное дерево (просмотр)"}
+                    description={
+                      nodeTreeTopOnly
+                        ? nodesReadOnly
+                          ? "На тарифе Free видны статусы топ-узлов без добавления обслуживания из дерева. Снимите «ТОП-узлы», чтобы увидеть всё дерево в режиме просмотра."
+                          : "Показаны только ваши топ-узлы и путь к ним. Снимите «ТОП-узлы», чтобы увидеть полное дерево."
+                        : NODE_TREE_PLAN_LOCKED_HINT_RU
+                    }
+                    requiredPlan="PRO"
+                  />
+                </div>
+              ) : null}
+
               {isTopServiceNodesLoading ? (
                 <p className="mt-4 text-sm text-slate-300" style={{ color: productSemanticColors.textSecondary }}>
                   Загрузка основных узлов...
@@ -4339,8 +4394,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                         overviewTopNodeIdsOrderedForTree.length === 0
                           ? "Нет узлов из блока «Состояния узлов» в дереве"
                           : nodeTreeTopOnly
-                            ? "Показать полное дерево"
-                            : `До ${NODE_TREE_TOP_NODES_LIMIT} узлов из «Состояния узлов» и родители до корня`
+                            ? hasPlanLockedNodeTree
+                              ? "Показать полное дерево (остальные узлы только просмотр)"
+                              : "Показать полное дерево"
+                            : hasPlanLockedNodeTree
+                              ? "Только ТОП-узлы и путь к ним"
+                              : `До ${NODE_TREE_TOP_NODES_LIMIT} узлов из «Состояния узлов» и родители до корня`
                       }
                       className="h-7 shrink-0 rounded-full border px-2 text-[11px] font-extrabold transition disabled:cursor-not-allowed"
                       style={{
@@ -5981,6 +6040,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         wishlistForm={wishlistForm}
         setWishlistForm={setWishlistForm}
         wishlistNodeOptions={wishlistNodeOptions}
+        wishlistNodeTopOptions={wishlistNodeTopOptions}
         wishlistNodeRequiredError={wishlistNodeRequiredError}
         wishlistEditingSourceItem={wishlistEditingSourceItem}
         wishlistSkuQuery={wishlistSkuQuery}

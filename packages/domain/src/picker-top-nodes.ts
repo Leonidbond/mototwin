@@ -1,5 +1,5 @@
 import type { NodeTreeItem, TopServiceNodeItem } from "@mototwin/types";
-import { findNodePathById, findNodeTreeItemById } from "./node-tree";
+import { findNodePathById, findNodeTreeItemByCode, findNodeTreeItemById } from "./node-tree";
 import { buildTopNodeOverviewCards } from "./top-node-overview";
 
 /** Same cap as «Топ-узлы» on the vehicle node tree (web + Expo). */
@@ -15,10 +15,27 @@ export function getOrderedTopNodeIdsPresentInNodeTree(
   limit = PICKER_MODAL_TOP_NODES_LIMIT
 ): string[] {
   const cards = buildTopNodeOverviewCards(topServiceNodes, new Map());
-  const ordered = cards.flatMap((card) => card.nodes.map((node) => node.id));
-  return ordered
-    .filter((id) => findNodeTreeItemById(nodeTree, id) != null)
-    .slice(0, limit);
+  const orderedCatalogNodes = cards.flatMap((card) => card.nodes);
+  const codeByCatalogId = new Map(topServiceNodes.map((node) => [node.id, node.code]));
+
+  const resolved: string[] = [];
+  const seen = new Set<string>();
+
+  for (const catalogNode of orderedCatalogNodes) {
+    if (resolved.length >= limit) {
+      break;
+    }
+    const byId = findNodeTreeItemById(nodeTree, catalogNode.id);
+    const code = catalogNode.code || codeByCatalogId.get(catalogNode.id);
+    const inTree = byId ?? (code ? findNodeTreeItemByCode(nodeTree, code) : null);
+    if (!inTree || seen.has(inTree.id)) {
+      continue;
+    }
+    seen.add(inTree.id);
+    resolved.push(inTree.id);
+  }
+
+  return resolved;
 }
 
 type HasId = { id: string };

@@ -283,7 +283,7 @@ export interface AdminSelfWire {
   isModerator: boolean;
 }
 
-export type AdminUserPlanFilter = "FREE" | "PRO" | "all";
+export type AdminUserPlanFilter = "FREE" | "RIDER" | "PRO" | "all";
 
 export interface AdminUserListFilters {
   q?: string;
@@ -303,7 +303,7 @@ export interface AdminUserListItemWire {
   blockReason: string | null;
   isModerator: boolean;
   adminRole: AdminRoleWire | null;
-  plan: "FREE" | "PRO" | null;
+  plan: "FREE" | "RIDER" | "PRO" | null;
   vehicleCount: number;
   fitmentReportCount: number;
   expenseCount: number;
@@ -329,7 +329,7 @@ export interface AdminUserDetailWire {
   blockReason: string | null;
   isModerator: boolean;
   adminRole: AdminRoleWire | null;
-  plan: "FREE" | "PRO" | null;
+  plan: "FREE" | "RIDER" | "PRO" | null;
   planStatus: string | null;
   vehicleCount: number;
   fitmentReportCount: number;

@@ -1,4 +1,9 @@
-import { groupNodePickerOptionsByTopLevel, nodePickerGroupHeadingRu } from "@mototwin/domain";
+import {
+  groupNodePickerOptionsByTopLevel,
+  NODE_TREE_PLAN_LOCKED_HINT_RU,
+  nodePickerGroupHeadingRu,
+} from "@mototwin/domain";
+import { SubscriptionLockBanner } from "../subscription/subscription-lock-banner";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ImageSourcePropType } from "react-native";
@@ -22,6 +27,7 @@ export type MobileNodePickerOption = {
   pathLabel?: string;
   level?: number;
   code?: string;
+  planLocked?: boolean;
 };
 
 type MobileNodePickerModalProps = {
@@ -31,6 +37,7 @@ type MobileNodePickerModalProps = {
   topOptions?: MobileNodePickerOption[];
   selectedId?: string | null;
   selectedIds?: string[];
+  disabledIds?: Set<string>;
   searchPlaceholder?: string;
   emptyLabel?: string;
   onClose: () => void;
@@ -45,6 +52,7 @@ export function MobileNodePickerModal({
   topOptions,
   selectedId,
   selectedIds,
+  disabledIds,
   searchPlaceholder = "Поиск по названию узла",
   emptyLabel = "Узлы не найдены",
   onClose,
@@ -61,8 +69,19 @@ export function MobileNodePickerModal({
   }, [visible, selectedIds]);
 
   const showTopToggle = Boolean(topOptions && topOptions.length > 0);
+  const hasPlanLockedLeaves = useMemo(
+    () => options.some((option) => option.planLocked),
+    [options]
+  );
   const multi = Boolean(onConfirmSelection);
   const baseOptions = topOnly && topOptions?.length ? topOptions : options;
+
+  useEffect(() => {
+    if (!visible) return;
+    if (hasPlanLockedLeaves && showTopToggle) {
+      setTopOnly(true);
+    }
+  }, [hasPlanLockedLeaves, showTopToggle, visible]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -112,6 +131,14 @@ export function MobileNodePickerModal({
               </Pressable>
             ) : null}
           </View>
+          {showTopToggle && !topOnly && hasPlanLockedLeaves ? (
+            <SubscriptionLockBanner
+              variant="surface"
+              title="Полное дерево (просмотр)"
+              description={NODE_TREE_PLAN_LOCKED_HINT_RU}
+              requiredPlan="PRO"
+            />
+          ) : null}
           <ScrollView style={styles.list}>
             {filtered.length === 0 ? (
               <Text style={styles.empty}>{emptyLabel}</Text>
@@ -122,14 +149,23 @@ export function MobileNodePickerModal({
                   <Text style={styles.groupHeading}>{nodePickerGroupHeadingRu(groupKey)}</Text>
                   {items.map((option) => {
                     const active = multi ? multiSelected.has(option.id) : selectedId === option.id;
+                    const planLocked = Boolean(option.planLocked);
+                    const disabled = (disabledIds?.has(option.id) ?? false) || planLocked;
                     const rowAsset = option.code
                       ? (getNodeTreeIconAsset(option.code, option.name) as ImageSourcePropType | null)
                       : null;
                     return (
                       <Pressable
                         key={option.id}
-                        style={[styles.row, active && styles.rowActive]}
+                        style={[
+                          styles.row,
+                          active && styles.rowActive,
+                          disabled && styles.rowDisabled,
+                          planLocked && styles.rowPlanLocked,
+                        ]}
+                        disabled={disabled}
                         onPress={() => {
+                          if (disabled) return;
                           if (multi) {
                             setMultiSelected((prev) => {
                               const next = new Set(prev);
@@ -157,7 +193,13 @@ export function MobileNodePickerModal({
                           ) : null}
                           <View style={styles.rowTextCol}>
                             <View style={styles.rowHeader}>
-                              <Text style={[styles.rowTitle, active && styles.rowTitleActive]}>
+                              <Text
+                                style={[
+                                  styles.rowTitle,
+                                  active && styles.rowTitleActive,
+                                  planLocked && styles.rowTitlePlanLocked,
+                                ]}
+                              >
                                 {option.name}
                               </Text>
                               {multi ? (
@@ -306,6 +348,16 @@ const styles = StyleSheet.create({
   rowActive: {
     borderColor: c.primaryAction,
     backgroundColor: "rgba(249, 115, 22, 0.10)",
+  },
+  rowDisabled: {
+    opacity: 0.45,
+  },
+  rowPlanLocked: {
+    opacity: 0.38,
+    backgroundColor: c.cardSubtle,
+  },
+  rowTitlePlanLocked: {
+    color: c.textMuted,
   },
   rowTitle: {
     color: c.textSecondary,

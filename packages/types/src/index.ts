@@ -1,5 +1,13 @@
 export type { NodeStatus, StatusSemanticKey } from "./status";
 export type {
+  SubscriptionPlan,
+  NodeAccessLevel,
+  SubscriptionCapabilities,
+  SubscriptionCurrentResponse,
+  UpdateSubscriptionPlanInput,
+  UpdateSubscriptionPlanResponse,
+} from "./subscription";
+export type {
   AttentionActionSeverity,
   AttentionSnoozeFilter,
   AttentionSeverity,
@@ -41,6 +49,7 @@ export type {
 export type {
   ServiceEventKind,
   ServiceEventMode,
+  ServiceEventEntryMode,
   ServicePerformedBy,
   ServiceActionType,
   ServiceEventNode,

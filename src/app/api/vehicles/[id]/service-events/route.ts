@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ServiceEventMode, ServicePerformedBy } from "@prisma/client";
+import { PlanType, ServiceEventEntryMode, ServiceEventMode, ServicePerformedBy } from "@prisma/client";
 import { z } from "zod";
 import {
   SERVICE_EVENT_BUNDLE_INCLUDE,
@@ -14,8 +14,21 @@ import {
   type RawServiceEventRow,
 } from "@/lib/service-event-serialize";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
-import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
+import {
+  getCurrentUserContext,
+  toCurrentUserContextErrorResponse,
+} from "../../../_shared/current-user-context";
 import { boundedJsonValue } from "@/lib/http/input-validation";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { getCapabilities } from "@/lib/subscription/capabilities";
+import { subscriptionErrorResponse } from "@/lib/subscription/errors";
+import { getOrCreateUserSubscription } from "@/lib/subscription/resolve-plan";
+import {
+  canUseEntryMode,
+  loadNodesForSelection,
+  rotateFreeServiceEventsIfNeeded,
+  validateNodesForPlan,
+} from "@/lib/subscription/service-events";
 
 type RouteContext = {
   params: Promise<{
@@ -56,6 +69,7 @@ const createServiceEventSchema = z
     nodeId: z.string().trim().max(64).optional(),
     title: z.string().trim().min(1).max(300),
     mode: z.enum(["BASIC", "ADVANCED"]),
+    entryMode: z.enum(["QUICK", "DETAILED"]).optional(),
     performedBy: z.enum(["SELF", "SERVICE", "OTHER"]).optional(),
     serviceProviderNote: z.string().trim().max(500).nullable().optional(),
     installLocationAddress: z.string().trim().max(500).nullable().optional(),
@@ -136,6 +150,7 @@ const createServiceEventSchema = z
 export async function GET(_: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
+    const currentUser = await getCurrentUserContext();
 
     const vehicle = await getVehicleInCurrentContext(id, { id: true, odometer: true });
 
@@ -143,9 +158,17 @@ export async function GET(_: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
+    const subscription = await getOrCreateUserSubscription(currentUser.userId);
+    const capabilities = getCapabilities(subscription.plan);
+    const visibleLimit = capabilities.maxVisibleServiceEvents;
+
     const serviceEvents = await prisma.serviceEvent.findMany({
-      where: { vehicleId: id },
+      where: {
+        vehicleId: id,
+        ...(subscription.plan === "FREE" ? { rotatedOutAt: null } : {}),
+      },
       orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
+      ...(visibleLimit != null ? { take: visibleLimit } : {}),
       include: {
         ...SERVICE_EVENT_BUNDLE_INCLUDE,
         expenseItems: {
@@ -155,10 +178,29 @@ export async function GET(_: NextRequest, context: RouteContext) {
       },
     });
 
+    let hiddenCount = 0;
+    if (subscription.plan === "FREE") {
+      const totalServiceEvents = await prisma.serviceEvent.count({
+        where: {
+          vehicleId: id,
+          eventKind: "SERVICE",
+        },
+      });
+      hiddenCount = Math.max(0, totalServiceEvents - serviceEvents.length);
+    }
+
     return NextResponse.json({
       serviceEvents: serviceEvents.map((event) => serializeServiceEventRow(event as unknown as RawServiceEventRow)),
+      meta: {
+        visibleLimit,
+        hiddenCount,
+        plan: subscription.plan,
+      },
     });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;
@@ -186,8 +228,20 @@ export async function GET(_: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const json = await request.json();
+    const currentUser = await getCurrentUserContext();
+    const json = await parseJsonBody<unknown>(request, { maxBytes: 256 * 1024 });
     const data = createServiceEventSchema.parse(json);
+    const entryMode =
+      data.entryMode === "DETAILED" || data.mode === "ADVANCED" ? "DETAILED" : "QUICK";
+    const subscription = await getOrCreateUserSubscription(currentUser.userId);
+    const capabilities = getCapabilities(subscription.plan);
+    if (!canUseEntryMode(subscription.plan, entryMode)) {
+      return subscriptionErrorResponse({
+        code: "SERVICE_EVENT_MODE_NOT_ALLOWED",
+        requiredPlan: "RIDER",
+        message: "Подробный режим ТО доступен в Rider и Pro.",
+      });
+    }
 
     const vehicle = await getVehicleInCurrentContext(id, { id: true, odometer: true });
 
@@ -215,6 +269,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!anchorNodeId) {
       return NextResponse.json({ error: "Anchor nodeId required" }, { status: 400 });
     }
+    const selectedNodeIds = Array.from(new Set([anchorNodeId, ...data.items.map((item) => item.nodeId)]));
+    const nodeMap = await loadNodesForSelection(prisma, selectedNodeIds);
+    const selectedNodes = selectedNodeIds
+      .map((nodeId) => nodeMap.get(nodeId) ?? null)
+      .filter((row): row is NonNullable<typeof row> => row != null);
+    if (selectedNodes.length !== selectedNodeIds.length) {
+      return NextResponse.json({ error: "Node not found" }, { status: 404 });
+    }
+    const nodeValidation = validateNodesForPlan(subscription.plan, selectedNodes);
+    if (!nodeValidation.ok) {
+      if (nodeValidation.reason === "missing") {
+        return NextResponse.json({ error: "Node not found" }, { status: 404 });
+      }
+      return subscriptionErrorResponse({
+        code: "CHILD_NODE_REQUIRES_PRO",
+        requiredPlan: "PRO",
+        message: "Выбор дочерних узлов доступен только в Pro.",
+      });
+    }
 
     // Выбираем total: явный → partsCost+laborCost → null.
     const partsCost = data.partsCost ?? null;
@@ -236,6 +309,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
         anchorNodeId,
         title: data.title,
         mode: data.mode === "ADVANCED" ? ServiceEventMode.ADVANCED : ServiceEventMode.BASIC,
+        entryMode: entryMode === "DETAILED" ? ServiceEventEntryMode.DETAILED : ServiceEventEntryMode.QUICK,
+        createdUnderPlan:
+          subscription.plan === "PRO"
+            ? PlanType.PRO
+            : subscription.plan === "RIDER"
+              ? PlanType.RIDER
+              : PlanType.FREE,
         eventDate,
         odometer: data.odometer,
         engineHours: data.engineHours ?? null,
@@ -299,6 +379,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
         odometer: created.odometer,
         engineHours: created.engineHours,
       });
+      if (subscription.plan === "FREE" && capabilities.maxVisibleServiceEvents != null) {
+        await rotateFreeServiceEventsIfNeeded(tx, id);
+      }
       return created;
     });
 
@@ -319,6 +402,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;

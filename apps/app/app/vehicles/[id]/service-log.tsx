@@ -34,6 +34,8 @@ import type {
   ServiceLogEntryViewModel,
   ServiceLogMonthGroupViewModel,
   ServiceLogNodeFilter,
+  SubscriptionPlan,
+  ServiceNodeItem,
   TopServiceNodeItem,
 } from "@mototwin/types";
 import {
@@ -43,17 +45,14 @@ import {
   getServiceInstallLocationAddress,
   vehicleDetailFromApiRecord,
   expenseCategoryLabelsRu,
-  filterLeafOptionsUnderTopNodeAncestors,
+  buildRestrictedPlanVehicleLeafPickerSets,
   filterPaidServiceEvents,
   findNodeTreeItemById,
   formatExpenseAmountRu,
   formatIsoCalendarDateRu,
-  getLeafNodeOptions,
-  getOrderedTopNodeIdsPresentInNodeTree,
   getTodayDateYmdLocal,
   getWishlistItemIdsFromInstalledPartsJson,
   isServiceLogTimelineQueryActive,
-  nodeAncestorPathLabelRu,
   resolveWishlistItemIdForServiceBundleItem,
   resolvePrimaryCatalogNodeForServiceLogIcon,
   SERVICE_LOG_DETAIL_LEADING_ICON_PX,
@@ -69,6 +68,8 @@ import { GarageBottomNav } from "../../../components/garage/GarageBottomNav";
 import { buildVehicleWishlistItemHighlightHref } from "../../../components/vehicle-wishlist/hrefs";
 import { MobileNodePickerModal, type MobileNodePickerOption } from "../../../components/vehicle-detail/mobile-node-picker-modal";
 import { ServiceLogActionGlyph, type ServiceLogGlyphKind } from "../../../components/vehicle-detail/service-log-action-glyph";
+import { SubscriptionLockBanner } from "../../../components/subscription/subscription-lock-banner";
+import { useMobileSubscription } from "../../../src/use-mobile-subscription";
 
 function readSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) {
@@ -1093,6 +1094,11 @@ export default function ServiceLogScreen() {
     typeof params.returnAttentionNodeId === "string" ? params.returnAttentionNodeId : "";
 
   const [events, setEvents] = useState<ServiceEventItem[]>([]);
+  const [serviceMeta, setServiceMeta] = useState<{
+    visibleLimit: number | null;
+    hiddenCount: number;
+    plan: SubscriptionPlan;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState<ServiceEventsFilters>({
@@ -1164,26 +1170,20 @@ export default function ServiceLogScreen() {
     [expandExpensesFromParams, monthQueryParam, returnNodeId, returnOrigin, returnAttentionNodeId]
   );
 
-  const leafRowsForNodePicker = useMemo((): MobileNodePickerOption[] => {
-    const leafOptions = getLeafNodeOptions(nodeTree);
-    return leafOptions.map((leaf) => ({
-      id: leaf.id,
-      code: leaf.code,
-      name: leaf.name,
-      level: leaf.level,
-      pathLabel: nodeAncestorPathLabelRu(nodeTree, leaf.id),
-    }));
-  }, [nodeTree]);
-
-  const orderedTopNodeIdsForPicker = useMemo(
-    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
-    [nodeTree, topServiceNodes]
+  const vehicleLeafPickerSets = useMemo(
+    () =>
+      buildRestrictedPlanVehicleLeafPickerSets({
+        nodeTree,
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscriptionCapabilities?.canSelectChildNode ?? true,
+      }),
+    [nodeTree, serviceCatalogNodes, subscriptionCapabilities?.canSelectChildNode, topServiceNodes]
   );
-
-  const topLeafRowsForNodePicker = useMemo(
-    () => filterLeafOptionsUnderTopNodeAncestors(nodeTree, leafRowsForNodePicker, orderedTopNodeIdsForPicker),
-    [nodeTree, leafRowsForNodePicker, orderedTopNodeIdsForPicker]
-  );
+  const leafRowsForNodePicker = vehicleLeafPickerSets.allLeaves;
+  const topLeafRowsForNodePicker = vehicleLeafPickerSets.showTopToggle
+    ? vehicleLeafPickerSets.topLeaves
+    : undefined;
 
   const applyPeriodPreset = useCallback((kind: "month" | "quarter" | "year" | "all") => {
     if (kind === "all") {
@@ -1300,6 +1300,7 @@ export default function ServiceLogScreen() {
               endpoints.getServiceEvents(vehicleId),
               endpoints.getNodeTree(vehicleId),
               endpoints.getTopServiceNodes(),
+              endpoints.getServiceNodes(),
               endpoints.getVehicleDetail(vehicleId),
             ]),
           () => router.replace("/login")
@@ -1307,10 +1308,12 @@ export default function ServiceLogScreen() {
         if (!payload) {
           return;
         }
-        const [data, treeRes, topRes, vehicleRes] = payload;
+        const [data, treeRes, topRes, catalogRes, vehicleRes] = payload;
         setEvents(data.serviceEvents ?? []);
+        setServiceMeta(data.meta ?? null);
         setNodeTree(treeRes.nodeTree ?? []);
         setTopServiceNodes(topRes.nodes ?? []);
+        setServiceCatalogNodes(catalogRes.nodes ?? []);
         const v = vehicleRes.vehicle;
         setVehicleDisplayName(
           v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelFamilyName}`.trim() : "") || "Мотоцикл"
@@ -1545,7 +1548,7 @@ export default function ServiceLogScreen() {
     );
   }
 
-  if (events.length === 0) {
+  if (events.length === 0 && !(serviceMeta?.plan === "FREE" && (serviceMeta.hiddenCount ?? 0) > 0)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.stateContainer}>
@@ -1632,6 +1635,16 @@ export default function ServiceLogScreen() {
             <Pressable onPress={() => setActionMessage(null)}>
               <Text style={styles.actionMessageDismiss}>Скрыть</Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {serviceMeta?.plan === "FREE" ? (
+          <View style={{ marginBottom: 10 }}>
+            <SubscriptionLockBanner
+              title="Ограничение тарифа Free"
+              description={`Отображаются последние ${serviceMeta.visibleLimit ?? 10} сервисных событий.${serviceMeta.hiddenCount > 0 ? ` Ещё ${serviceMeta.hiddenCount} сохранены в истории.` : ""}`}
+              requiredPlan="RIDER"
+            />
           </View>
         ) : null}
 

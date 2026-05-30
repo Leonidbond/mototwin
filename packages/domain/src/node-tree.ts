@@ -48,6 +48,22 @@ export function findNodeTreeItemById(
   return null;
 }
 
+export function findNodeTreeItemByCode(
+  nodes: NodeTreeItem[],
+  targetCode: string
+): NodeTreeItem | null {
+  for (const node of nodes) {
+    if (node.code === targetCode) {
+      return node;
+    }
+    const found = findNodeTreeItemByCode(node.children, targetCode);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 export function getNodeSubtreeById<T extends { id: string; children: T[] }>(
   nodes: T[],
   targetNodeId: string
@@ -107,6 +123,55 @@ export function nodeAncestorPathLabelRu(nodes: NodeTreeItem[], nodeId: string): 
     .map((pid) => findNodeTreeItemById(nodes, pid)?.name ?? pid)
     .filter(Boolean)
     .join(" › ");
+}
+
+export type CatalogPathNode = {
+  id: string;
+  parentId: string | null;
+  name: string;
+};
+
+/** Ancestor path from a flat service-node catalog (`parentId` links). */
+export function catalogNodeAncestorPathLabelRu(
+  nodes: CatalogPathNode[],
+  nodeId: string
+): string {
+  const id = nodeId.trim();
+  if (!id) {
+    return "";
+  }
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const parts: string[] = [];
+  const visited = new Set<string>();
+  let current = byId.get(id);
+  if (!current) {
+    return "";
+  }
+  while (current.parentId) {
+    if (visited.has(current.parentId)) {
+      break;
+    }
+    visited.add(current.parentId);
+    const parent = byId.get(current.parentId);
+    if (!parent) {
+      break;
+    }
+    parts.unshift(parent.name);
+    current = parent;
+  }
+  return parts.join(" › ");
+}
+
+/** Vehicle tree first; flat catalog fallback (Free/Rider trimmed trees). */
+export function resolveNodePickerPathLabelRu(
+  vehicleTree: NodeTreeItem[],
+  catalogNodes: CatalogPathNode[],
+  nodeId: string
+): string {
+  return (
+    nodeAncestorPathLabelRu(vehicleTree, nodeId) ||
+    catalogNodeAncestorPathLabelRu(catalogNodes, nodeId)
+  );
 }
 
 export function getNodeSelectLevels(

@@ -31,6 +31,8 @@ import Svg, { Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createMobileApiClient } from "../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../src/mobile-auth-guard";
+import { useMobileSubscription } from "../../../src/use-mobile-subscription";
+import { SubscriptionLockBanner } from "../../../components/subscription/subscription-lock-banner";
 import {
   buildAttentionSummaryFromNodeTree,
   buildVehicleDashboardExpensesViewModel,
@@ -61,6 +63,8 @@ import {
   getRecentServiceEventsForNode,
   formatNodeBadgeSingleLine,
   getNodeTightUiDisplayName,
+  NODE_TREE_PLAN_LOCKED_HINT_RU,
+  nodeTreeHasPlanLockedNodes,
   resolveGarageVehicleSilhouette,
   type PartsCartSummary,
 } from "@mototwin/domain";
@@ -382,6 +386,7 @@ function NodeRow({
       : undefined,
   };
   const rowNode = treeItemContract.item;
+  const isPlanLocked = Boolean(rowNode.planLocked);
   const hasChildren = rowNode.hasChildren;
   const isExpanded = treeItemContract.isExpanded;
   const status = rowNode.effectiveStatus as NodeStatus | null;
@@ -486,6 +491,7 @@ function NodeRow({
             borderWidth: 1,
           },
           accentColor !== "transparent" && { borderLeftColor: accentColor, borderLeftWidth: 3 },
+          isPlanLocked && styles.nodeRowPlanLocked,
           pressed && styles.nodeRowPressed,
         ]}
       >
@@ -527,11 +533,19 @@ function NodeRow({
             />
           </View>
           <View style={styles.nodeNameBlock}>
-            <Text style={[styles.nodeName, depth === 0 && styles.nodeNameTop]}>
+            <Text
+              style={[
+                styles.nodeName,
+                depth === 0 && styles.nodeNameTop,
+                isPlanLocked && styles.nodeNamePlanLocked,
+              ]}
+            >
               {rowNode.name}
             </Text>
             <View style={styles.nodeMetaRow}>
-              <Text style={styles.nodeCodeText}>{rowNode.code}</Text>
+              <Text style={[styles.nodeCodeText, isPlanLocked && styles.nodeCodePlanLocked]}>
+                {rowNode.code}
+              </Text>
               {childCount > 0 ? (
                 <View style={styles.nodeChildCount}>
                   <MaterialIcons name="content-copy" size={10} color={c.textMuted} />
@@ -645,6 +659,11 @@ type VehicleDetailScreenProps = {
 
 export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const router = useRouter();
+  const { capabilities: subscriptionCapabilities } = useMobileSubscription();
+  const nodesReadOnly = subscriptionCapabilities?.nodeAccessLevel === "TOP_READ_ONLY";
+  const nodesFullTreeLocked =
+    subscriptionCapabilities != null &&
+    subscriptionCapabilities.nodeAccessLevel !== "FULL_TREE";
   const { width, height } = useWindowDimensions();
   const dashboardScrollViewRef = useRef<ScrollView | null>(null);
   const subtreeScrollViewRef = useRef<ScrollView | null>(null);
@@ -700,6 +719,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
+  const hasPlanLockedNodeTree = useMemo(() => nodeTreeHasPlanLockedNodes(nodeTree), [nodeTree]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1253,10 +1273,15 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   );
   const openAddServiceFromTreeNode = useCallback(
     (leafNodeId: string) => {
+      const rawNode = findNodeTreeItemById(nodeTree, leafNodeId);
+      if (nodesReadOnly || rawNode?.locked) {
+        router.push("/subscription");
+        return;
+      }
       setHighlightedNodeId(null);
       router.push(`/vehicles/${vehicleId}/service-events/new?source=tree&nodeId=${leafNodeId}`);
     },
-    [router, vehicleId]
+    [nodeTree, nodesReadOnly, router, vehicleId]
   );
   const openStatusExplanationFromTreeNode = useCallback((node: NodeTreeItemViewModel) => {
     setHighlightedNodeId(null);
@@ -1468,13 +1493,15 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
           focusNodeInTree(state.selectedNodeId, { resetFilters: false });
         });
       } else {
-        setNodeTreeTopOnly(localSettings.defaultNodeView === "top");
+        setNodeTreeTopOnly(
+          nodesFullTreeLocked ? true : localSettings.defaultNodeView === "top"
+        );
       }
     });
     return () => {
       isCancelled = true;
     };
-  }, [focusNodeInTree, isNodeTreePage, topLevelNodeViewModels.length, vehicleId]);
+  }, [focusNodeInTree, isNodeTreePage, nodesFullTreeLocked, topLevelNodeViewModels.length, vehicleId]);
   useEffect(() => {
     if (!isNodeTreePage || !highlightIssueNodeIdsParam || topLevelNodeViewModels.length === 0) {
       return;
@@ -1947,6 +1974,22 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                 router.replace("/garage");
               }}
             />
+            {hasPlanLockedNodeTree ? (
+              <View style={{ marginBottom: 10, paddingHorizontal: 16 }}>
+                <SubscriptionLockBanner
+                  variant="surface"
+                  title={nodeTreeTopOnly ? "ТОП-узлы" : "Полное дерево (просмотр)"}
+                  description={
+                    nodeTreeTopOnly
+                      ? nodesReadOnly
+                        ? "На тарифе Free видны статусы топ-узлов без добавления обслуживания из дерева. Снимите «ТОП-узлы», чтобы увидеть всё дерево в режиме просмотра."
+                        : "Показаны только ваши топ-узлы и путь к ним. Снимите «ТОП-узлы», чтобы увидеть полное дерево."
+                      : NODE_TREE_PLAN_LOCKED_HINT_RU
+                  }
+                  requiredPlan="PRO"
+                />
+              </View>
+            ) : null}
             <View style={styles.fullTreeSection}>
               <View style={styles.nodeTreeControls}>
                 <View style={styles.nodeTreeTopControlsRow}>
@@ -5360,6 +5403,16 @@ const styles = StyleSheet.create({
   },
   nodeRowPressed: {
     backgroundColor: c.divider,
+  },
+  nodeRowPlanLocked: {
+    opacity: 0.36,
+    backgroundColor: c.cardSubtle,
+  },
+  nodeNamePlanLocked: {
+    color: c.textMuted,
+  },
+  nodeCodePlanLocked: {
+    color: c.textSecondary,
   },
   nodeRowLeft: {
     flexDirection: "row",

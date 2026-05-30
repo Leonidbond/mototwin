@@ -7,9 +7,14 @@ import type { AddServiceEventFormValues, ServiceEventMode } from "@mototwin/type
 export function ServiceEventModeSegment({
   mode,
   onChange,
+  detailedAllowed = true,
+  onBlockedDetailed,
 }: {
   mode: ServiceEventMode;
   onChange: (mode: ServiceEventMode) => void;
+  /** False on Free — «Подробно» (ADVANCED / DETAILED entryMode) недоступен. */
+  detailedAllowed?: boolean;
+  onBlockedDetailed?: () => void;
 }) {
   return (
     <View style={shellStyles.modeGrid}>
@@ -25,7 +30,14 @@ export function ServiceEventModeSegment({
         icon="schedule"
         title="Подробно"
         subtitle="С деталями и запчастями"
-        onPress={() => onChange("ADVANCED")}
+        visuallyDisabled={!detailedAllowed}
+        onPress={() => {
+          if (!detailedAllowed) {
+            onBlockedDetailed?.();
+            return;
+          }
+          onChange("ADVANCED");
+        }}
       />
     </View>
   );
@@ -37,22 +49,26 @@ function ModeTile({
   title,
   subtitle,
   onPress,
+  visuallyDisabled,
 }: {
   active: boolean;
   icon: keyof typeof MaterialIcons.glyphMap;
   title: string;
   subtitle: string;
   onPress: () => void;
+  /** Затемнение без `disabled` — иначе onPress не сработает для paywall. */
+  visuallyDisabled?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected: active }}
+      accessibilityState={{ selected: active, disabled: Boolean(visuallyDisabled) }}
       onPress={onPress}
       style={({ pressed }) => [
         shellStyles.modeTile,
         active && shellStyles.modeTileActive,
-        pressed && shellStyles.pressed,
+        visuallyDisabled && shellStyles.disabled,
+        pressed && !visuallyDisabled && shellStyles.pressed,
       ]}
     >
       <MaterialIcons

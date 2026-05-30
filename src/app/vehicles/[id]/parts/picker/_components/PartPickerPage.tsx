@@ -24,11 +24,9 @@ import {
   clearDraft,
   createEmptyDraftCart,
   filterActiveWishlistItems,
-  filterLeafOptionsUnderTopNodeAncestors,
+  buildRestrictedPlanVehicleLeafPickerSets,
   getLeafNodeOptions,
   getNodePathItemViewModelsByNodeId,
-  getOrderedTopNodeIdsPresentInNodeTree,
-  nodeAncestorPathLabelRu,
   removeFromDraft,
   updateSkuDraftItemQuantity,
   vehicleDetailFromApiRecord,
@@ -48,10 +46,12 @@ import type {
   PickerQuantitySubmitResolution,
   PickerSubmitPreview,
   ServiceKitViewModel,
+  ServiceNodeItem,
   TopServiceNodeItem,
   VehicleDetail,
   VehicleDetailApiRecord,
 } from "@mototwin/types";
+import { useSubscription } from "@/lib/use-subscription";
 import { PARTS_CART_REF } from "../../_components/parts-cart-reference-theme";
 import { buildPartSkuViewModelFromRecommendation } from "../../_components/part-picker-utils";
 import { NodeChip, ResetSelectionChip } from "./PickerChips";
@@ -100,6 +100,8 @@ export function PartPickerPage({
   const [nodeTreeError, setNodeTreeError] = useState("");
 
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
+  const { subscription } = useSubscription();
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const bootstrapNodeRef = useRef(false);
@@ -187,13 +189,18 @@ export function PartPickerPage({
     let cancelled = false;
     (async () => {
       try {
-        const data = await vehiclePickerApi.getTopServiceNodes();
+        const [topData, catalogData] = await Promise.all([
+          vehiclePickerApi.getTopServiceNodes(),
+          vehiclePickerApi.getServiceNodes(),
+        ]);
         if (!cancelled) {
-          setTopServiceNodes(data.nodes ?? []);
+          setTopServiceNodes(topData.nodes ?? []);
+          setServiceCatalogNodes(catalogData.nodes ?? []);
         }
       } catch {
         if (!cancelled) {
           setTopServiceNodes([]);
+          setServiceCatalogNodes([]);
         }
       }
     })();
@@ -425,30 +432,43 @@ export function PartPickerPage({
     kitsSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [initialFocus, kitsLoading]);
 
-  const leafPickerOptions: NodePickerOption[] = useMemo(() => {
-    const leaves = getLeafNodeOptions(nodeTree);
-    return leaves.map((opt) => ({
-      id: opt.id,
-      code: opt.code,
-      name: opt.name,
-      pathLabel: nodeAncestorPathLabelRu(nodeTree, opt.id),
-    }));
-  }, [nodeTree]);
-
-  const orderedTopNodeIdsForPicker = useMemo(
-    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
-    [nodeTree, topServiceNodes]
-  );
-
-  const leafPickerOptionsTopOnly = useMemo(
+  const vehicleLeafPickerSets = useMemo(
     () =>
-      filterLeafOptionsUnderTopNodeAncestors(
+      buildRestrictedPlanVehicleLeafPickerSets({
         nodeTree,
-        leafPickerOptions,
-        orderedTopNodeIdsForPicker
-      ),
-    [nodeTree, leafPickerOptions, orderedTopNodeIdsForPicker]
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscription?.capabilities?.canSelectChildNode ?? true,
+      }),
+    [
+      nodeTree,
+      serviceCatalogNodes,
+      subscription?.capabilities?.canSelectChildNode,
+      topServiceNodes,
+    ]
   );
+
+  const leafPickerOptions: NodePickerOption[] = useMemo(
+    () =>
+      vehicleLeafPickerSets.allLeaves.map((opt) => ({
+        id: opt.id,
+        code: opt.code,
+        name: opt.name,
+        pathLabel: opt.pathLabel ?? opt.name,
+        planLocked: opt.planLocked,
+      })),
+    [vehicleLeafPickerSets.allLeaves]
+  );
+
+  const leafPickerOptionsTopOnly = vehicleLeafPickerSets.showTopToggle
+    ? (vehicleLeafPickerSets.topLeaves.map((opt) => ({
+        id: opt.id,
+        code: opt.code,
+        name: opt.name,
+        pathLabel: opt.pathLabel ?? opt.name,
+        planLocked: opt.planLocked,
+      })) as NodePickerOption[])
+    : undefined;
 
   const selectedPathVm = useMemo(() => {
     if (!selectedNodeId || nodeTree.length === 0) return null;
@@ -1004,9 +1024,7 @@ export function PartPickerPage({
             key={nodePickerOpen ? "node-picker-open" : "node-picker-closed"}
             isOpen={nodePickerOpen}
             options={leafPickerOptions}
-            topLeafOptions={
-              leafPickerOptionsTopOnly.length > 0 ? leafPickerOptionsTopOnly : undefined
-            }
+            topLeafOptions={leafPickerOptionsTopOnly}
             onClose={() => setNodePickerOpen(false)}
             onSelect={(id) => {
               setSelectedNodeId(id);

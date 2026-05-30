@@ -21,10 +21,8 @@ import {
   RIDE_RIDING_STYLE_OPTIONS,
   RIDE_USAGE_INTENSITY_OPTIONS,
   RIDE_USAGE_TYPE_OPTIONS,
-  filterLeafOptionsUnderTopNodeAncestors,
+  buildRestrictedPlanVehicleLeafPickerSets,
   getLeafNodeOptions,
-  getOrderedTopNodeIdsPresentInNodeTree,
-  nodeAncestorPathLabelRu,
   vehicleDetailFromApiRecord,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
@@ -32,6 +30,7 @@ import type {
   FitmentReportResultWire,
   NodeTreeItem,
   PartRecommendationViewModel,
+  ServiceNodeItem,
   TopServiceNodeItem,
   VehicleDetail,
   VehicleDetailApiRecord,
@@ -43,6 +42,7 @@ import { getNodeTreeIconAsset } from "../../../../src/node-tree-icons";
 import { InternalScreenChrome } from "../expo-shell/internal-screen-chrome";
 import { GarageVehicleContextPlaque } from "../garage/GarageVehicleContextPlaque";
 import { MobileNodePickerModal } from "../vehicle-detail/mobile-node-picker-modal";
+import { useMobileSubscription } from "../../src/use-mobile-subscription";
 import {
   buildVehicleWishlistItemHighlightHref,
   buildVehicleWishlistNewHref,
@@ -153,6 +153,8 @@ export function CommunityPartScreen(props: {
   const [vehicleError, setVehicleError] = useState("");
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
+  const { capabilities: subscriptionCapabilities } = useMobileSubscription();
   const [selectedNodeId, setSelectedNodeId] = useState(props.initialNodeId.trim());
   const [nodeModalOpen, setNodeModalOpen] = useState(false);
   const [recs, setRecs] = useState<PartRecommendationViewModel[]>([]);
@@ -240,17 +242,20 @@ export function CommunityPartScreen(props: {
     void Promise.all([
       endpoints.getNodeTree(props.vehicleId),
       endpoints.getTopServiceNodes(),
+      endpoints.getServiceNodes(),
     ])
-      .then(([treeRes, topRes]) => {
+      .then(([treeRes, topRes, catalogRes]) => {
         if (!cancelled) {
           setNodeTree(treeRes.nodeTree ?? []);
           setTopServiceNodes(topRes.nodes ?? []);
+          setServiceCatalogNodes(catalogRes.nodes ?? []);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setNodeTree([]);
           setTopServiceNodes([]);
+          setServiceCatalogNodes([]);
         }
       });
     return () => {
@@ -346,29 +351,20 @@ export function CommunityPartScreen(props: {
 
   const leafOptions = useMemo(() => getLeafNodeOptions(nodeTree), [nodeTree]);
 
-  const leafRowsForModal = useMemo(
+  const vehicleLeafPickerSets = useMemo(
     () =>
-      leafOptions.map((leaf) => ({
-        ...leaf,
-        pathLabel: nodeAncestorPathLabelRu(nodeTree, leaf.id),
-      })),
-    [leafOptions, nodeTree]
-  );
-
-  const orderedTopNodeIdsForPicker = useMemo(
-    () => getOrderedTopNodeIdsPresentInNodeTree(nodeTree, topServiceNodes),
-    [nodeTree, topServiceNodes]
-  );
-
-  const topLeafRowsForModal = useMemo(
-    () =>
-      filterLeafOptionsUnderTopNodeAncestors(
+      buildRestrictedPlanVehicleLeafPickerSets({
         nodeTree,
-        leafRowsForModal,
-        orderedTopNodeIdsForPicker
-      ),
-    [nodeTree, leafRowsForModal, orderedTopNodeIdsForPicker]
+        catalogNodes: serviceCatalogNodes,
+        topServiceNodes,
+        canSelectChildNode: subscriptionCapabilities?.canSelectChildNode ?? true,
+      }),
+    [nodeTree, serviceCatalogNodes, subscriptionCapabilities?.canSelectChildNode, topServiceNodes]
   );
+  const leafRowsForModal = vehicleLeafPickerSets.allLeaves;
+  const topLeafRowsForModal = vehicleLeafPickerSets.showTopToggle
+    ? vehicleLeafPickerSets.topLeaves
+    : undefined;
 
   const selectedLeaf = useMemo(
     () => leafRowsForModal.find((o) => o.id === selectedNodeId),
@@ -1036,7 +1032,7 @@ export function CommunityPartScreen(props: {
         visible={nodeModalOpen}
         title="Выберите узел"
         options={leafRowsForModal}
-        topOptions={topLeafRowsForModal.length > 0 ? topLeafRowsForModal : undefined}
+        topOptions={topLeafRowsForModal}
         selectedId={selectedNodeId}
         onClose={() => setNodeModalOpen(false)}
         onSelect={setSelectedNodeId}

@@ -28,6 +28,7 @@
 |---|--------|-------|------------|
 | 1 | первичный аудит | OAuth audience, rate-limit auth, headers, body-size guard, fetch timeouts, env validation, RBAC moderation/admin | `MT-SEC-001`..`MT-SEC-064`; [roadmap.md#итерация-1--что-закрыто](./roadmap.md#итерация-1--что-закрыто) |
 | 2 | Input Validation audit | Полный обход 122 route handler-ов, новые helpers (`strictObject`, `boundedText/Number/JsonValue`, `safeUrl`, `parseSearchParam*`, `safeRenderUrl`), `parseJsonBody` на write-ручках, auth+rate-limit на `geocode`/`recommended-skus`/`duplicates` | `MT-SEC-065`..`MT-SEC-075`; [findings.md#input-validation-audit-итерация-2--полный-обход-97-ручек--122-handler-ов](./findings.md#input-validation-audit-итерация-2--полный-обход-97-ручек--122-handler-ов); [roadmap.md#итерация-2--input-validation-audit-закрыто](./roadmap.md#итерация-2--input-validation-audit-закрыто) |
+| 3 | Infra hardening | Nginx → HTTPS + Mozilla intermediate + HSTS + security headers + 301 redirect (`MT-SEC-029` resolved); `mototwin.dump` untracked (`MT-SEC-027` partial — open: rewrite history + ротация секретов) | [roadmap.md#итерация-3--infra-hardening-частично-закрыто](./roadmap.md#итерация-3--infra-hardening-частично-закрыто) |
 
 ## Как читать
 
@@ -43,12 +44,13 @@
 
 ## Дата и состояние
 
-- Версия отчета: **1.1** (после итерации 2 — Input Validation audit).
-- Дата: 2026-05-24.
+- Версия отчета: **1.2** (после итерации 3 — Infra hardening).
+- Дата: 2026-05-30.
 - HEAD на момент аудита: см. `git log -1` (на момент составления — ветка main, без коммитов с пометкой `security:*`).
 - Артефакты согласованы между собой: при правке `findings.md` правьте per-stream-файл (или наоборот) — оба источника должны совпадать.
 
 ### Changelog
 
+- **1.2** (2026-05-30) — итерация 3 «Infra hardening»: `MT-SEC-029` resolved (nginx переписан); `MT-SEC-027` partial (untracked, open follow-up на rewrite history + ротация секретов).
 - **1.1** (2026-05-24) — добавлен раздел «Input validation audit» в `findings.md`; `roadmap.md` дополнен «Итерация 2»; статусы `resolved` проставлены `MT-SEC-065`..`MT-SEC-075`.
 - **1.0** (2026-05-24) — первичный аудит и первая итерация фиксов (`MT-SEC-001`..`MT-SEC-064`).

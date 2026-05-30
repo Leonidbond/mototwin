@@ -46,8 +46,10 @@ function formatSidebarUserLabel(displayName: string | null | undefined, email: s
   return local || "Пользователь";
 }
 
-function formatPlanLabelRu(planType: "FREE" | "PRO"): string {
-  return planType === "PRO" ? "Pro тариф" : "Free тариф";
+function formatPlanLabelRu(planType: "FREE" | "RIDER" | "PRO"): string {
+  if (planType === "PRO") return "Pro тариф";
+  if (planType === "RIDER") return "Rider тариф";
+  return "Free тариф";
 }
 
 function userAvatarInitial(displayName: string | null | undefined, email: string): string {

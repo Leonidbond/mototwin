@@ -94,4 +94,35 @@ describe("picker-top-nodes", () => {
     assert.ok(ordered.includes("filt"));
     assert.ok(!ordered.includes("missing"));
   });
+
+  it("getOrderedTopNodeIdsPresentInNodeTree maps catalog ids to vehicle tree ids by code", () => {
+    const tree: NodeTreeItem[] = [
+      leafTree("vehicle-oil-1", "ENGINE.LUBE.OIL", "Oil", []),
+      leafTree("vehicle-filt-1", "ENGINE.LUBE.FILTER", "Filter", []),
+    ];
+    const top: TopServiceNodeItem[] = [
+      {
+        id: "catalog-oil",
+        code: "ENGINE.LUBE.OIL",
+        name: "Oil",
+        parentId: null,
+        level: 2,
+        displayOrder: 0,
+        serviceGroup: null,
+        topNodeOrder: 1,
+      },
+      {
+        id: "catalog-filt",
+        code: "ENGINE.LUBE.FILTER",
+        name: "Filter",
+        parentId: null,
+        level: 2,
+        displayOrder: 1,
+        serviceGroup: null,
+        topNodeOrder: 2,
+      },
+    ];
+    const ordered = getOrderedTopNodeIdsPresentInNodeTree(tree, top, 15);
+    assert.deepEqual(ordered, ["vehicle-oil-1", "vehicle-filt-1"]);
+  });
 });

@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import type { GarageVehicleItem } from "@mototwin/types";
+import type { GarageVehicleItem, SubscriptionCurrentResponse } from "@mototwin/types";
 import { createMobileApiClient } from "../src/create-mobile-api-client";
 import { readLastViewedVehicleId } from "../src/ui-last-viewed-vehicle";
 import { AppScreenHelpBar } from "../components/expo-shell/app-screen-help-bar";
@@ -28,6 +28,7 @@ export default function GarageScreen() {
   const [error, setError] = useState("");
   const [trashCount, setTrashCount] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [subscription, setSubscription] = useState<SubscriptionCurrentResponse | null>(null);
   const [lastViewedVehicleId, setLastViewedVehicleId] = useState<string | null>(null);
 
   const loadGarage = useCallback(async () => {
@@ -35,10 +36,11 @@ export default function GarageScreen() {
       setIsLoading(true);
       setError("");
       const endpoints = createMobileApiClient();
-      const [garageResult, trashResult, notificationsResult] = await Promise.allSettled([
+      const [garageResult, trashResult, notificationsResult, subscriptionResult] = await Promise.allSettled([
         endpoints.getGarageVehicles(),
         endpoints.getTrashedVehicles(),
         endpoints.getNotifications({ limit: 1 }),
+        endpoints.getSubscriptionCurrent(),
       ]);
 
       if (garageResult.status === "rejected") {
@@ -55,6 +57,11 @@ export default function GarageScreen() {
         setNotificationCount(notificationsResult.value.unreadCount ?? 0);
       } else {
         setNotificationCount(0);
+      }
+      if (subscriptionResult && subscriptionResult.status === "fulfilled") {
+        setSubscription(subscriptionResult.value);
+      } else {
+        setSubscription(null);
       }
     } catch (requestError) {
       console.error(requestError);
@@ -85,7 +92,14 @@ export default function GarageScreen() {
   const openTrash = useCallback(() => router.push("/trash"), [router]);
   const openNotifications = useCallback(() => router.push("/notifications"), [router]);
   const openProfile = useCallback(() => router.push("/profile"), [router]);
-  const openAddVehicle = useCallback(() => router.push("/vehicles/new"), [router]);
+  const openAddVehicle = useCallback(() => {
+    const maxVehicles = subscription?.capabilities.maxVehicles;
+    if (maxVehicles != null && vehicles.length >= maxVehicles) {
+      router.push("/subscription");
+      return;
+    }
+    router.push("/vehicles/new");
+  }, [router, subscription?.capabilities.maxVehicles, vehicles.length]);
   const reloadGarage = useCallback(() => void loadGarage(), [loadGarage]);
   const openVehicle = useCallback((id: string) => router.push(`/vehicles/${id}`), [router]);
   const openServiceEvent = useCallback(

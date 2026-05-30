@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCapabilities } from "@/lib/subscription/capabilities";
+import { isTrialActive } from "@/lib/subscription/resolve-plan";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
@@ -19,7 +21,7 @@ export async function GET() {
       }),
       prisma.subscription.findUnique({
         where: { userId: currentUser.userId },
-        select: { planType: true },
+        select: { planType: true, trialEndsAt: true },
       }),
     ]);
 
@@ -27,6 +29,7 @@ export async function GET() {
       return NextResponse.json({ error: "Пользователь не найден." }, { status: 404 });
     }
 
+    const planType = subscription?.planType ?? "FREE";
     return NextResponse.json({
       user: {
         id: user.id,
@@ -35,7 +38,10 @@ export async function GET() {
       },
       garageId: garage.id,
       garageTitle: garage.title,
-      planType: subscription?.planType === "PRO" ? "PRO" : "FREE",
+      planType,
+      trialEndsAt: subscription?.trialEndsAt?.toISOString() ?? null,
+      isTrialActive: isTrialActive(subscription?.trialEndsAt ?? null),
+      capabilities: getCapabilities(planType),
     });
   } catch (error) {
     const ctxError = toCurrentUserContextErrorResponse(error);

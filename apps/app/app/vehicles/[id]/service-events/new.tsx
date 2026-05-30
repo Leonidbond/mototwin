@@ -28,6 +28,7 @@ import type {
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../../src/mobile-auth-guard";
+import { useMobileSubscription } from "../../../../src/use-mobile-subscription";
 import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
 import {
   InternalScreenChrome,
@@ -77,6 +78,7 @@ export default function NewServiceEventScreen() {
   const wishlistPendingInstall =
     pendingInstallRaw === "1" || pendingInstallRaw.toLowerCase() === "true";
   const apiBaseUrl = getApiBaseUrl();
+  const { capabilities: subscriptionCapabilities } = useMobileSubscription();
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -385,11 +387,21 @@ export default function NewServiceEventScreen() {
         router.replace(`/vehicles/${vehicleId}/service-log?${q.toString()}`);
       }
     } catch (requestError) {
-      setError(
+      const message =
         requestError instanceof Error
           ? requestError.message
-          : "Не удалось сохранить сервисное событие."
-      );
+          : "Не удалось сохранить сервисное событие.";
+      const normalized = message.toLowerCase();
+      if (
+        normalized.includes("тариф") ||
+        normalized.includes("rider") ||
+        normalized.includes("подробн") ||
+        normalized.includes("pro")
+      ) {
+        router.push("/subscription");
+        return;
+      }
+      setError(message);
     } finally {
       setIsSaving(false);
     }
@@ -451,6 +463,7 @@ export default function NewServiceEventScreen() {
               ? "После сохранения позиция будет отмечена как установленная."
               : undefined
           }
+          subscriptionCapabilities={subscriptionCapabilities}
         />
       </KeyboardAwareScrollScreen>
     </SafeAreaView>
