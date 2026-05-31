@@ -3,6 +3,7 @@ import type { ExpenseCategory, ExpenseInstallationStatus, ExpenseNodeSummaryItem
 import { prisma } from "@/lib/prisma";
 import { toCurrentUserContextErrorResponse } from "../../_shared/current-user-context";
 import { getVehicleInCurrentContext } from "../../_shared/vehicle-context";
+import { parseSearchParamInt, parseSearchParamText } from "@/lib/http/input-validation";
 
 const TECHNICAL_CATEGORIES: ExpenseCategory[] = [
   "PART",
@@ -46,9 +47,14 @@ function getAncestorIds(nodeId: string, parentByNodeId: Map<string, string | nul
 
 export async function GET(request: NextRequest) {
   try {
-    const vehicleId = request.nextUrl.searchParams.get("vehicleId")?.trim();
-    const requestedYear = Number(request.nextUrl.searchParams.get("year"));
-    const year = Number.isFinite(requestedYear) ? Math.trunc(requestedYear) : new Date().getFullYear();
+    // MT-SEC-071: cap params before DB lookup; year is range-bound to a
+    // reasonable window to keep DB scans cheap.
+    const vehicleId = parseSearchParamText(request.nextUrl.searchParams.get("vehicleId"), { max: 64 });
+    const year = parseSearchParamInt(request.nextUrl.searchParams.get("year"), {
+      min: 1990,
+      max: 2100,
+      fallback: new Date().getFullYear(),
+    });
 
     if (!vehicleId) {
       return NextResponse.json({ error: "vehicleId is required" }, { status: 400 });

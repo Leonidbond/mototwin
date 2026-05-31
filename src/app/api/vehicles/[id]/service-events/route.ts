@@ -18,7 +18,7 @@ import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
 } from "../../../_shared/current-user-context";
-import { boundedJsonValue } from "@/lib/http/input-validation";
+import { boundedJsonValue, strictObject } from "@/lib/http/input-validation";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 import { getCapabilities } from "@/lib/subscription/capabilities";
 import { subscriptionErrorResponse } from "@/lib/subscription/errors";
@@ -52,8 +52,8 @@ const nextReminderDateInputSchema = z
   ])
   .optional();
 
-// MT-SEC-070: bound text + numeric fields on the per-item schema.
-const createServiceBundleItemSchema = z.object({
+// MT-SEC-068 + MT-SEC-070: strict bound text + numeric fields on the per-item schema.
+const createServiceBundleItemSchema = strictObject({
   nodeId: z.string().trim().min(1).max(64),
   actionType: z.enum(ACTION_TYPE_VALUES),
   partName: z.string().trim().max(300).nullable().optional(),
@@ -64,8 +64,7 @@ const createServiceBundleItemSchema = z.object({
   comment: z.string().trim().max(2_000).nullable().optional(),
 });
 
-const createServiceEventSchema = z
-  .object({
+const createServiceEventSchema = strictObject({
     nodeId: z.string().trim().max(64).optional(),
     title: z.string().trim().min(1).max(300),
     mode: z.enum(["BASIC", "ADVANCED"]),
@@ -75,6 +74,8 @@ const createServiceEventSchema = z
     installLocationAddress: z.string().trim().max(500).nullable().optional(),
     installLocationLat: z.number().min(-90).max(90).nullable().optional(),
     installLocationLng: z.number().min(-180).max(180).nullable().optional(),
+    servicePlaceId: z.string().trim().min(1).max(64).nullable().optional(),
+    servicePlaceSnapshot: boundedJsonValue({ maxSerializedBytes: 64 * 1024, maxDepth: 24 }).nullable().optional(),
     attachReceiptRequested: z.boolean().optional(),
     attachFileRequested: z.boolean().optional(),
     nextReminderEnabled: z.boolean().optional(),
@@ -100,9 +101,10 @@ const createServiceEventSchema = z
     currency: z.string().trim().max(12).nullable().optional(),
     comment: z.string().trim().max(2_000).nullable().optional(),
     // MT-SEC-070: cap array lengths to prevent DoS via huge service-event payloads.
-    installedExpenseItemIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
-    items: z.array(createServiceBundleItemSchema).min(1).max(200),
-  })
+  installedExpenseItemIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
+  items: z.array(createServiceBundleItemSchema).min(1).max(200),
+})
+  // MT-SEC-068: cross-field rules; `strictObject` already rejects unknown keys.
   .superRefine((value, ctx) => {
     if (value.mode === "BASIC") {
       value.items.forEach((item, index) => {
@@ -296,6 +298,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const computedTotal =
       partsCost != null || laborCost != null ? (partsCost ?? 0) + (laborCost ?? 0) : null;
     const totalCost = explicitTotal ?? computedTotal;
+    const servicePlaceId = data.servicePlaceId?.trim() || null;
+    if (servicePlaceId) {
+      const existingPlace = await prisma.servicePlace.findFirst({
+        where: {
+          id: servicePlaceId,
+          userId: currentUser.userId,
+        },
+        select: { id: true },
+      });
+      if (!existingPlace) {
+        return NextResponse.json({ error: "Service place not found" }, { status: 404 });
+      }
+    }
 
     const serviceEvent = await prisma.$transaction(async (tx) => {
       const nextReminderRaw = data.nextReminderDate?.trim();
@@ -329,6 +344,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         installLocationAddress: data.installLocationAddress?.trim() || null,
         installLocationLat: data.installLocationLat ?? null,
         installLocationLng: data.installLocationLng ?? null,
+        servicePlaceId,
+        servicePlaceSnapshot: data.servicePlaceSnapshot ?? null,
         attachReceiptRequested: data.attachReceiptRequested ?? false,
         attachFileRequested: data.attachFileRequested ?? false,
         nextReminderEnabled: data.nextReminderEnabled ?? false,

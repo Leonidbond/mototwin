@@ -8,6 +8,7 @@ import {
   toCurrentUserContextErrorResponse,
 } from "../_shared/current-user-context";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 import { getCapabilities } from "@/lib/subscription/capabilities";
 import { getOrCreateUserSubscription } from "@/lib/subscription/resolve-plan";
 import {
@@ -15,23 +16,21 @@ import {
   sanitizeFavoriteNodeCodes,
 } from "@/lib/service-catalog-nodes";
 
-const userSettingsPatchSchema = z
-  .object({
-    defaultCurrency: z.enum(["RUB", "USD", "EUR"]).optional(),
-    distanceUnit: z.enum(["km", "mi"]).optional(),
-    engineHoursUnit: z.literal("h").optional(),
-    dateFormat: z.enum(["DD.MM.YYYY", "YYYY-MM-DD"]).optional(),
-    defaultSnoozeDays: z.union([z.literal(7), z.literal(14), z.literal(30)]).optional(),
-    vehicleTrashRetentionDays: z
-      .union([z.literal(7), z.literal(14), z.literal(30), z.literal(60), z.literal(90)])
-      .optional(),
-    favoriteNodeCodes: z
-      .array(z.string().min(1).max(64))
-      .max(MAX_FAVORITE_NODE_CODES)
-      .optional(),
-    defaultNodeView: z.enum(["top", "all"]).optional(),
-  })
-  .strict();
+const userSettingsPatchSchema = strictObject({
+  defaultCurrency: z.enum(["RUB", "USD", "EUR"]).optional(),
+  distanceUnit: z.enum(["km", "mi"]).optional(),
+  engineHoursUnit: z.literal("h").optional(),
+  dateFormat: z.enum(["DD.MM.YYYY", "YYYY-MM-DD"]).optional(),
+  defaultSnoozeDays: z.union([z.literal(7), z.literal(14), z.literal(30)]).optional(),
+  vehicleTrashRetentionDays: z
+    .union([z.literal(7), z.literal(14), z.literal(30), z.literal(60), z.literal(90)])
+    .optional(),
+  favoriteNodeCodes: z
+    .array(z.string().min(1).max(64))
+    .max(MAX_FAVORITE_NODE_CODES)
+    .optional(),
+  defaultNodeView: z.enum(["top", "all"]).optional(),
+});
 
 const userSettingsSelect = {
   defaultCurrency: true,

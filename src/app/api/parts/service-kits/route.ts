@@ -17,6 +17,7 @@ import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
 } from "@/app/api/_shared/current-user-context";
+import { parseSearchParamText } from "@/lib/http/input-validation";
 
 async function loadUserTemplateKitDefinitionsForPicker(args: {
   vehicle: VehicleFitmentContext;
@@ -115,8 +116,9 @@ async function loadUserTemplateKitDefinitionsForPicker(args: {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const nodeId = searchParams.get("nodeId")?.trim() || null;
-    const vehicleId = searchParams.get("vehicleId")?.trim() || null;
+    // MT-SEC-071: cap ids; nodeId hits prisma.node.findUnique, vehicleId hits prisma.vehicle.findUnique.
+    const nodeId = parseSearchParamText(searchParams.get("nodeId"), { max: 64 });
+    const vehicleId = parseSearchParamText(searchParams.get("vehicleId"), { max: 64 });
 
     let contextNodeCode: string | null = null;
     if (nodeId) {

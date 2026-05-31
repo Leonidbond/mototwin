@@ -87,7 +87,7 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
   const pathname = usePathname();
   const router = useRouter();
   const pathVehicleId = useMemo(() => getVehicleIdFromPathname(pathname), [pathname]);
-  const [contextVehicleId, setContextVehicleId] = useState<string | null>(null);
+  const [contextVehicleId, setContextVehicleId] = useState<string | null>(pathVehicleId);
 
   /* eslint-disable react-hooks/set-state-in-effect -- контекст ТС из URL и localStorage для href навигации */
   useLayoutEffect(() => {
@@ -261,7 +261,10 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
   );
 
   return (
-    <aside style={{ ...asideStyle, padding: collapsed ? "14px 7px" : "18px 14px" }}>
+    <aside
+      suppressHydrationWarning
+      style={{ ...asideStyle, padding: collapsed ? "14px 7px" : "18px 14px" }}
+    >
       <div>
         <div
           style={{

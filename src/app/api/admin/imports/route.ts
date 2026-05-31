@@ -7,6 +7,7 @@ import {
   loadImportBatchList,
   parseImportFile,
 } from "@/lib/admin-imports";
+import { parseSearchParamInt } from "@/lib/http/input-validation";
 
 const TYPES: AdminImportBatchTypeWire[] = [
   "PARTS",
@@ -34,7 +35,8 @@ export async function GET(request: Request) {
     const typeParam = url.searchParams.get("type");
     const statusParam = url.searchParams.get("status");
     const data = await loadImportBatchList({
-      page: Number(url.searchParams.get("page") ?? 1),
+      // MT-SEC-071: bounded page; type/status are already enum-validated below.
+      page: parseSearchParamInt(url.searchParams.get("page"), { min: 1, max: 10_000, fallback: 1 }),
       type: TYPES.includes(typeParam as AdminImportBatchTypeWire)
         ? (typeParam as AdminImportBatchTypeWire)
         : undefined,

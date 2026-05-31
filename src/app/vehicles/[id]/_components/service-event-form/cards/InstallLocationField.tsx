@@ -2,12 +2,11 @@
 
 import {
   isYandexMapsConfigured,
-  YandexMapPlacePickerModal,
-  type YandexMapPlace,
 } from "@/components/integrations/yandex-maps";
 import type { AddServiceEventFormValues } from "@mototwin/types";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { FIELD_IN_STACK, FOCUS_RING, LABEL_STYLE, SERVICE_EVENT_PARTS_UI } from "../styles";
+import { ServicePlacePicker } from "../service-place-picker";
 
 const INSTALL_LOCATION_MAX_LENGTH = 500;
 
@@ -16,27 +15,17 @@ export type InstallLocationFieldProps = {
   onPatch: (patch: Partial<AddServiceEventFormValues>) => void;
 };
 
-function formPlaceToYandex(form: AddServiceEventFormValues): YandexMapPlace | null {
-  const address = form.installLocationAddress.trim();
-  const latRaw = form.installLocationLat.trim();
-  const lngRaw = form.installLocationLng.trim();
-  if (!address || !latRaw || !lngRaw) return null;
-  const lat = Number(latRaw);
-  const lng = Number(lngRaw);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { address, lat, lng };
-}
-
 export function InstallLocationField({ form, onPatch }: InstallLocationFieldProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const mapsAvailable = isYandexMapsConfigured();
-  const initialPlace = useMemo(() => formPlaceToYandex(form), [form]);
 
   const clearLocation = () => {
     onPatch({
       installLocationAddress: "",
       installLocationLat: "",
       installLocationLng: "",
+      servicePlaceId: "",
+      servicePlaceSnapshot: null,
     });
   };
 
@@ -53,7 +42,13 @@ export function InstallLocationField({ form, onPatch }: InstallLocationFieldProp
           <input
             value={form.installLocationAddress}
             maxLength={INSTALL_LOCATION_MAX_LENGTH}
-            onChange={(e) => onPatch({ installLocationAddress: e.target.value })}
+            onChange={(e) =>
+              onPatch({
+                installLocationAddress: e.target.value,
+                servicePlaceId: "",
+                servicePlaceSnapshot: null,
+              })
+            }
             placeholder="Название сервиса или адрес…"
             style={FIELD_IN_STACK}
             className={`min-w-0 flex-1 [&::placeholder]:text-[#AAB4C0] ${FOCUS_RING}`}
@@ -112,19 +107,18 @@ export function InstallLocationField({ form, onPatch }: InstallLocationFieldProp
         ) : null}
       </label>
 
-      <YandexMapPlacePickerModal
+      <ServicePlacePicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        initialPlace={initialPlace}
-        title="Место установки"
-        onConfirm={(place) => {
+        initialAddress={form.installLocationAddress}
+        initialLat={form.installLocationLat}
+        initialLng={form.installLocationLng}
+        onApply={(patch) =>
           onPatch({
-            installLocationAddress: place.address.slice(0, INSTALL_LOCATION_MAX_LENGTH),
-            installLocationLat: String(place.lat),
-            installLocationLng: String(place.lng),
-          });
-          setPickerOpen(false);
-        }}
+            ...patch,
+            installLocationAddress: (patch.installLocationAddress ?? "").slice(0, INSTALL_LOCATION_MAX_LENGTH),
+          })
+        }
       />
     </>
   );

@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/session-service";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 import { rateLimit, rateLimit429 } from "@/lib/http/rate-limit";
+import { logAuthEvent } from "@/lib/auth-audit";
 
 export async function POST(request: Request) {
   try {
@@ -31,7 +32,18 @@ export async function POST(request: Request) {
       windowMs: 60_000,
       extraKey: email.trim().toLowerCase(),
     });
-    if (!decision.allowed) return rateLimit429(decision);
+    if (!decision.allowed) {
+      void logAuthEvent({
+        event: "auth.rate_limited",
+        reasonCode: "auth:login",
+        metadata: { endpoint: "/api/auth/login" },
+      });
+      return rateLimit429(decision);
+    }
+
+    const requestHeaders = await headers();
+    const isMobile = requestHeaders.get(MOBILE_CLIENT_HEADER) === "expo";
+    const client = isMobile ? "mobile" : "web";
 
     const user = await verifyUserCredentials(email, password);
     const garage = await prisma.garage.findFirst({
@@ -43,14 +55,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Гараж не найден." }, { status: 503 });
     }
 
-    const requestHeaders = await headers();
-    const isMobile = requestHeaders.get(MOBILE_CLIENT_HEADER) === "expo";
-
     const userPayload = {
       id: user.userId,
       email: user.email,
       displayName: user.displayName,
     };
+
+    void logAuthEvent({
+      event: "login.success",
+      userId: user.userId,
+      metadata: { client },
+    });
 
     if (isMobile) {
       const tokens = await createMobileTokens(user.userId);
@@ -83,6 +98,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
     if (error instanceof AuthServiceError) {
+      void logAuthEvent({
+        event: "login.failure",
+        reasonCode: error.code,
+      });
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
     console.error(

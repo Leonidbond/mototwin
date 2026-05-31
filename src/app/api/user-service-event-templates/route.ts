@@ -13,17 +13,16 @@ import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
 } from "../_shared/current-user-context";
-import { boundedJsonValue } from "@/lib/http/input-validation";
+import { boundedJsonValue, strictObject } from "@/lib/http/input-validation";
+import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 
-const postBodySchema = z
-  .object({
-    baseTitle: z.string().max(200).optional().nullable(),
-    // MT-SEC-067: form snapshots are opaque, but we still cap them at 128 KB
-    // serialized and 20 levels deep to prevent DB bloat / parser DoS.
-    formSnapshot: boundedJsonValue({ maxSerializedBytes: 128 * 1024, maxDepth: 20 }),
-    includeInPartPicker: z.boolean().optional(),
-  })
-  .strict();
+const postBodySchema = strictObject({
+  baseTitle: z.string().max(200).optional().nullable(),
+  // MT-SEC-067: form snapshots are opaque, but we still cap them at 128 KB
+  // serialized and 20 levels deep to prevent DB bloat / parser DoS.
+  formSnapshot: boundedJsonValue({ maxSerializedBytes: 128 * 1024, maxDepth: 20 }),
+  includeInPartPicker: z.boolean().optional(),
+});
 
 function toMode(value: string): ServiceEventMode {
   return value === "ADVANCED" ? "ADVANCED" : "BASIC";
@@ -73,7 +72,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUserContext();
-    const json = await request.json();
+    // MT-SEC-069: 144 KB ≈ formSnapshot cap (128 KB) + envelope (baseTitle, flags).
+    const json = await parseJsonBody<unknown>(request, { maxBytes: 144 * 1024 });
     const parsed = postBodySchema.safeParse(json);
     if (!parsed.success) {
       return NextResponse.json({ error: "Неверный формат запроса." }, { status: 400 });
@@ -133,6 +133,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ template: wireFromRow(created) });
   } catch (error) {
+    if (error instanceof BodyParseError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     const ctxErr = toCurrentUserContextErrorResponse(error);
     if (ctxErr) {
       return ctxErr;

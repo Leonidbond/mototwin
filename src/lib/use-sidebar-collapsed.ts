@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useIsNarrow } from "./use-is-narrow";
 
 function readUserCollapsedFromStorage(storageKey?: string): boolean {
@@ -32,9 +32,12 @@ export function useSidebarCollapsed(
   options?: { narrowMaxWidthPx?: number }
 ): readonly [boolean, () => void] {
   const isNarrow = useIsNarrow(options?.narrowMaxWidthPx ?? 1023);
-  const [userCollapsed, setUserCollapsed] = useState(() =>
-    readUserCollapsedFromStorage(storageKey)
-  );
+  /** Всегда false до mount — иначе SSR (без localStorage) ≠ первый клиентский рендер. */
+  const [userCollapsed, setUserCollapsed] = useState(false);
+
+  useEffect(() => {
+    setUserCollapsed(readUserCollapsedFromStorage(storageKey));
+  }, [storageKey]);
 
   const toggle = useCallback(() => {
     if (isNarrow) {

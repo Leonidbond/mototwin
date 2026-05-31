@@ -71,6 +71,9 @@ import type {
   UpdateSubscriptionPlanResponse,
   VehicleNodeTreeResponse,
   ServiceNodesResponse,
+  ServicePlacesSearchResponse,
+  CreateServicePlaceInput,
+  CreateServicePlaceResponse,
   VehicleWishlistResponse,
   PartMasterDuplicatesResponse,
   CreatePartMasterInput,
@@ -330,6 +333,26 @@ export function createMotoTwinEndpoints(client: ApiClient) {
 
     getServiceNodes() {
       return client.request<ServiceNodesResponse>("/api/nodes/service");
+    },
+
+    searchServicePlaces(params: {
+      query: string;
+      mode?: "AUTO" | "ADDRESS" | "ORGANIZATION";
+      latitude?: number;
+      longitude?: number;
+    }) {
+      const q = new URLSearchParams({ query: params.query.trim() });
+      if (params.mode) q.set("mode", params.mode);
+      if (Number.isFinite(params.latitude)) q.set("latitude", String(params.latitude));
+      if (Number.isFinite(params.longitude)) q.set("longitude", String(params.longitude));
+      return client.request<ServicePlacesSearchResponse>(`/api/service-places/search?${q.toString()}`);
+    },
+
+    createServicePlace(input: CreateServicePlaceInput) {
+      return client.request<CreateServicePlaceResponse>("/api/service-places", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
     },
 
     getPartSkus(filters: PartSkuSearchFilters = {}) {

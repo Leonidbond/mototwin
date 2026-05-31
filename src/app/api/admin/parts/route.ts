@@ -7,21 +7,19 @@ import { logAdminAction } from "@/lib/admin-audit";
 import { loadAdminPartList, normalizeBrand } from "@/lib/admin-parts";
 import { prisma } from "@/lib/prisma";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
-import { parseSearchParamInt, parseSearchParamText } from "@/lib/http/input-validation";
+import { parseSearchParamInt, parseSearchParamText, strictObject } from "@/lib/http/input-validation";
 
 const STATUSES: AdminPartStatusWire[] = ["DRAFT", "PENDING_REVIEW", "ACTIVE", "MERGED", "REJECTED"];
 
-const CreateSchema = z
-  .object({
-    brandName: z.string().min(1).max(80),
-    sku: z.string().min(1).max(80),
-    title: z.string().min(1).max(200),
-    subcategory: z.string().max(80).optional(),
-    description: z.string().max(2000).optional(),
-    imageUrl: z.string().url().max(400).optional(),
-    status: z.enum(["DRAFT", "PENDING_REVIEW", "ACTIVE", "MERGED", "REJECTED"]).optional(),
-  })
-  .strict();
+const CreateSchema = strictObject({
+  brandName: z.string().min(1).max(80),
+  sku: z.string().min(1).max(80),
+  title: z.string().min(1).max(200),
+  subcategory: z.string().max(80).optional(),
+  description: z.string().max(2000).optional(),
+  imageUrl: z.string().url().max(400).optional(),
+  status: z.enum(["DRAFT", "PENDING_REVIEW", "ACTIVE", "MERGED", "REJECTED"]).optional(),
+});
 
 export async function GET(request: Request) {
   try {

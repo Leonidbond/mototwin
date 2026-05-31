@@ -11,7 +11,7 @@
 
 ## Сводка статусов
 
-После двух итераций фиксов (см. `MT-SEC-001`..`MT-SEC-064` — итерация 1; `MT-SEC-065`..`MT-SEC-075` — итерация 2 «Input validation audit»). Полный список новых helpers и подробности по каждой записи — раздел [Input validation audit](#input-validation-audit-итерация-2--полный-обход-97-ручек--122-handler-ов) ниже.
+После трёх итераций фиксов (см. `MT-SEC-001`..`MT-SEC-064` — итерация 1; `MT-SEC-065`..`MT-SEC-075` — итерация 2 «Input validation audit»; итерация 3 — infra hardening + input-validation follow-up). Полный список новых helpers и подробности по каждой записи — раздел [Input validation audit](#input-validation-audit-итерация-2--полный-обход-97-ручек--122-handler-ов) ниже.
 
 | ID | Severity | Status | Где исправлено |
 |----|----------|--------|----------------|
@@ -35,16 +35,18 @@
 | `MT-SEC-043` | P2 | **resolved** | `instrumentation.ts` + `src/lib/env/server-env.ts` — zod-валидация env на boot |
 | `MT-SEC-044` | P2 | **partial** | `push-subscriptions/test` — 3/мин per-user. Полное «закрыть dev-ручки в проде» — follow-up |
 | `MT-SEC-048` | P2 | **resolved** | `next.config.ts` — `allowedDevOrigins = []` в prod |
-| `MT-SEC-050` | P1 | **partial** | `session-service.ts` — forensic log при auto-link. Полная mitigation = email-уведомление — follow-up |
+| `MT-SEC-050` | P1 | **partial** | `session-service.ts` — forensic log при auto-link + `oauth.linked` в `AuthAuditLog`. Полная mitigation = email-уведомление — follow-up |
+| `MT-SEC-054` | P1 | **resolved** | `AuthAuditLog` Prisma model + migration `20260531120000_auth_audit_log`; `src/lib/auth-audit.ts` (`logAuthEvent`); wiring в login/register/logout/refresh/forgot/reset/oauth + `session-service`; admin UI `/admin/audit?type=auth`; smoke `npm run qa:auth-audit-smoke` |
+| `MT-SEC-055` | P2 | **resolved** | `src/lib/auth-audit-retention.ts` — purge старше 90 дней (`AUTH_AUDIT_RETENTION_DAYS`); cron `scripts/cron-auth-audit-retention.ts` (`--purge-only` daily, `--alerts-only` каждые 5 мин); алерты `[auth-audit:alert]` при ≥10 `login.failure`/min на IP или userId. Внешний paging (Grafana/PagerDuty) — ops follow-up |
 | `MT-SEC-056` | P2 | **resolved** | `src/app/layout.tsx` — `metadata.title = "MotoTwin"` |
 | `MT-SEC-063` | P2 | **resolved** | `apps/app/src/auth-storage.ts` — `keychainAccessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY` |
 | `MT-SEC-065` | **P0** | **resolved** | `fitment/evidence` — `safeUrl()` zod helper; `part-compatibility-report` — `safeRenderUrl()` фильтрация legacy записей в БД |
 | `MT-SEC-066` | P1 | **resolved** | `vehicles/[id]/service-events` POST+PATCH — `boundedJsonValue({64KB, depth 24})` вместо `z.any()`/`z.unknown()` |
 | `MT-SEC-067` | P1 | **resolved** | `user-service-event-templates` POST — `boundedJsonValue({128KB, depth 20})` для `formSnapshot` |
-| `MT-SEC-068` | P1 | **resolved (топ-20 ручек)** | `strictObject()` helper применён к expenses / vehicles / wishlist / fitment-reports / part-masters / service-events / admin/team / admin/parts / admin/moderation. Полная миграция оставшихся 14 ручек — follow-up |
-| `MT-SEC-069` | P1 | **resolved (топ-25 ручек)** | `parseJsonBody` применён к ~25 write-handlers (expenses, vehicles, wishlist, fitment, part-masters, admin/team/parts/users/moderation, push-subscriptions, notification-settings, user-settings, auth/logout). Полная миграция оставшихся ручек — follow-up |
-| `MT-SEC-070` | P1 | **resolved (топ-15 schemas)** | Все user-controlled text-поля capped: `comment`/`vendor`/`partName`/`description` → max(200..2000); `quantity`/`amount`/`odometer`/`engineHours` → range-bounded; arrays `items`/`installedExpenseItemIds` → max(200..500) |
-| `MT-SEC-071` | P2 | **resolved (топ-12 ручек)** | `parseSearchParamText`/`parseSearchParamInt` применён к expenses, vehicles/*/{fitment-reports,wishlist/kits}, admin/parts. Остальные GET-ручки с unbounded query — follow-up |
+| `MT-SEC-068` | P1 | **resolved** | `strictObject()` применён ко всем JSON-write-ручкам (итерация 2 + итерация 3 follow-up: `admin/{models/[id]/support-level,moderation/action,parts,parts/[id],parts/[id]/merge,parts/[id]/aliases,team,users/[id]}`, `user-settings`, `user-service-event-templates`, `vehicles/[id]`, `vehicles/[id]/wishlist{,/[itemId]}`, `vehicles/[id]/service-events{,/[eventId]}` — outer + nested `items[]`/`rideProfile`). Защита от регрессий — ESLint guard `no-restricted-syntax` на `z.object(` в `src/app/api/**/route.ts` |
+| `MT-SEC-069` | P1 | **resolved** | `parseJsonBody` применён ко всем JSON-write-ручкам (итерация 3 follow-up: `user-service-event-templates` — последнее место с `await request.json()`). Защита от регрессий — ESLint guard `no-restricted-syntax` на `await request.json()` в `src/app/api/**/route.ts` |
+| `MT-SEC-070` | P1 | **resolved** | Все user-controlled text/numeric поля capped: outer и nested item-schemas (`createServiceBundleItemSchema`/`updateServiceBundleItemSchema` теперь `strictObject`); `comment`/`vendor`/`partName`/`description` → max(200..2000); `quantity`/`amount`/`odometer`/`engineHours` → range-bounded; arrays `items`/`installedExpenseItemIds` → max(200..500) |
+| `MT-SEC-071` | P2 | **resolved** | `parseSearchParamText`/`parseSearchParamInt` применён ко всем GET-ручкам с user-controlled query. Итерация 3 закрыла оставшиеся admin (`audit-log`, `users`, `vehicles`, `models`, `search`, `moderation/inspector`, `imports`) и user-domain (`expenses/{uninstalled,node-summary}`, `vehicles/[id]/{installable,part-compatibility-report}`, `parts/{skus,service-kits}`, `part-masters/[id]`). Лимиты: id → max 64, free-text q → max 200, page/year → range-bounded |
 | `MT-SEC-072` | P1 | **resolved** | `parts/recommended-skus`, `geocode`, `part-masters/duplicates` — все search params length-capped перед DB/API вызовами |
 | `MT-SEC-073` | **P0** (IDOR) | **resolved** | `parts/recommended-skus` — добавлен `getVehicleInCurrentContext` (был полностью без auth); `part-masters/duplicates` — добавлен `getCurrentUserContext` + rate-limit |
 | `MT-SEC-074` | P1 | **resolved** | `geocode` — добавлен `getCurrentUserContext` + rate-limit 60/min per-user (был полностью без auth, paid Yandex API → cost abuse) |
@@ -56,8 +58,7 @@
 
 - `MT-SEC-010` (Yandex mobile implicit → code+PKCE) — требует client-side refactor login.tsx + EXPO_PUBLIC_YANDEX_CLIENT_ID/SECRET, оставлено follow-up'ом.
 - `MT-SEC-049` (npm audit) — операционная задача, требует решения по обновлению `next-auth` 4 → 5.
-- `MT-SEC-054` (audit-log auth-событий) — требует новой Prisma-модели + миграции, отложено.
-- `MT-SEC-068`/`069`/`070`/`071` (input-validation hardening) — основная масса критичных ручек закрыта; оставшиеся 14 admin/notification routes — follow-up той же итерации.
+- `MT-SEC-068`/`069`/`070`/`071` (input-validation hardening) — **полностью закрыты** в итерации 3 (см. ниже). Регрессий не будет — ESLint guard в `eslint.config.mjs` блокирует `await request.json()` и `z.object(` в `src/app/api/**/route.ts`.
 
 ## Содержание
 
@@ -551,7 +552,7 @@ export async function fetchWithTimeout(url: string, opts: RequestInit & { timeou
 - **Severity:** P1
 - **OWASP:** A09
 - **Scope:** api
-- **Status:** open
+- **Status:** **resolved** (итерация 4)
 - **Owner:** backend
 - **Effort:** M (1 день)
 
@@ -570,12 +571,14 @@ export async function fetchWithTimeout(url: string, opts: RequestInit & { timeou
 
 Хранение — в Postgres, 90 дней ретеншна (см. MT-SEC-055).
 
+**Fix (итерация 4):** `AuthAuditLog` model + `logAuthEvent()` в [src/lib/auth-audit.ts](../../src/lib/auth-audit.ts). События пишутся из auth route handlers и `session-service`. Admin UI: вкладка «Auth-события» на `/admin/audit?type=auth`. Smoke: `npm run qa:auth-audit-smoke`.
+
 **Acceptance criteria:**
 
-- [ ] Новая Prisma модель `AuthAuditLog` с миграцией.
-- [ ] Все 6 типов событий пишутся.
-- [ ] Админ UI: `/admin/audit?type=auth` показывает события (с фильтрами).
-- [ ] Интеграционный тест: 5 неудачных login → 5 записей `login.failure`.
+- [x] Новая Prisma модель `AuthAuditLog` с миграцией.
+- [x] Все 6 типов событий пишутся (+ `auth.rate_limited`, `password_reset.failure`, `oauth.login.success`).
+- [x] Админ UI: `/admin/audit?type=auth` показывает события (с фильтрами).
+- [x] Интеграционный smoke: 5 неудачных login → 5 записей `login.failure` (`scripts/qa-auth-audit-smoke.ts`).
 
 ---
 
@@ -611,7 +614,7 @@ export async function fetchWithTimeout(url: string, opts: RequestInit & { timeou
 | `MT-SEC-051` | Две параллельные веб-сессии (кастомная + Auth.js) | A07 | api / web | M | Переход на единый источник (любой из двух), документировать выбранный |
 | `MT-SEC-052` | (scope:supply-chain) `npm ci --ignore-scripts` для prod | A08 | infra | S | Обновить deploy script |
 | `MT-SEC-053` | (scope:supply-chain) SRI / CSP `script-src` | A08 / A05 | web | M | Покрывается MT-SEC-006 + MT-SEC-047 |
-| `MT-SEC-055` | Ретеншн логов и алертинг | A09 | api / infra | M | 90-дневный ретеншн `AuthAuditLog`, алерты на 10+ failed login/min |
+| `MT-SEC-055` | Ретеншн логов и алертинг | A09 | api / infra | M | **resolved (итерация 5):** 90-дневный purge `AuthAuditLog` + cron alerting на всплески `login.failure`. Внешний paging — ops |
 | `MT-SEC-056` | `metadata.title = "Create Next App"` | A05 (косметика) | web | XS | Заменить на «MotoTwin» |
 | `MT-SEC-057` | Нет biometric-gate на запуск приложения | M3 | mobile | M | `expo-local-authentication` гейт |
 | `MT-SEC-058` | Нет certificate pinning | M5 | mobile | L | Для MASVS L2; через `expo-ssl-pinning` или нативный модуль |

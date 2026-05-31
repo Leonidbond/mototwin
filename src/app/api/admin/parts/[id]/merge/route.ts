@@ -5,13 +5,12 @@ import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { prisma } from "@/lib/prisma";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
-const MergeSchema = z
-  .object({
-    intoPartMasterId: z.string().min(1).max(64),
-    reason: z.string().min(3).max(500),
-  })
-  .strict();
+const MergeSchema = strictObject({
+  intoPartMasterId: z.string().min(1).max(64),
+  reason: z.string().min(3).max(500),
+});
 
 /**
  * Merge `[id]` (the duplicate) **into** `intoPartMasterId` (the survivor).

@@ -70,10 +70,19 @@ export async function POST(request: Request) {
 }
 ```
 
+### ESLint guard
+
+Регрессии блокируются автоматически. В [eslint.config.mjs](../eslint.config.mjs) для `src/app/api/**/route.ts` включён `no-restricted-syntax`, который при попытке добавить:
+
+- `await request.json()` — потребует `parseJsonBody(...)` (MT-SEC-069).
+- `z.object({ ... })` — потребует `strictObject({ ... })` (MT-SEC-068 mass-assignment defence).
+
+Если есть **легитимная причина** обойти guard (например, `multipart/form-data` через `request.formData()` или `.passthrough()` для специфической схемы) — добавьте `// eslint-disable-next-line no-restricted-syntax -- <причина / MT-SEC-link>`, чтобы ревью могло аудировать исключение.
+
 ### Чек-лист на ревью
 
 - [ ] Тело читается через `parseJsonBody<T>(request, { maxBytes: ... })`, а не `await request.json()`.
-- [ ] Zod-схема — `strictObject({ ... })` (для вложенных object-полей — тоже `.strict()`).
+- [ ] Zod-схема — `strictObject({ ... })` (для вложенных object-полей — тоже `strictObject`).
 - [ ] Все user-controlled `string` поля имеют `.max(...)` через `boundedText`/`boundedTextOptional`.
 - [ ] Все `number`/`int` поля имеют `min`/`max` через `boundedNumber`/`boundedInt`.
 - [ ] Все массивы имеют `.max(...)` через `boundedArray`.
@@ -186,6 +195,7 @@ export async function POST(request: Request) {
 - Request notes:
   - **`nextReminderDate`**: допускается **`null`** при выключенном напоминании или при включённом напоминании без даты (только пробег/моточасы); см. Zod-схему в `service-events/route.ts`
   - **`installLocationAddress`**, **`installLocationLat`**, **`installLocationLng`**: опционально; адрес до 500 символов; широта −90…90, долгота −180…180 (Zod в `service-events/route.ts` и `…/[eventId]/route.ts`). UI и ключ Яндекс.Карт — [web-service-event-form.md](./web-service-event-form.md), §5.1.
+  - **`servicePlaceId`** (`string | null`) и **`servicePlaceSnapshot`** (`Json | null`) — опционально. Если `servicePlaceId` передан, он должен принадлежать текущему пользователю; иначе `404`.
 - Side effects after create (транзакция):
   - `NodeState` для **каждого** узла из `items` и anchor (`RECENTLY_REPLACED`, `lastServiceEventId`)
   - пересчёт **`TopNodeState`** по мотоциклу
@@ -193,6 +203,36 @@ export async function POST(request: Request) {
   - **`linkInstalledExpenseItemsToServiceEvent`** — привязка выбранных **`installedExpenseItemIds`**, перевод связанных wishlist-строк в **`INSTALLED`** там, где у расхода задан `shoppingListItemId`
 - Response `201`: `{ serviceEvent }`
 - Response `400` / `404` / `500` depending on failure class
+
+### `PATCH /api/vehicles/[id]/service-events/[eventId]`
+
+- Обновляет существующее bundle-событие.
+- Поддерживает те же place-поля, что и create: `servicePlaceId`, `servicePlaceSnapshot`, legacy `installLocation*`.
+- Проверка `servicePlaceId` аналогична create (только place текущего пользователя).
+- Response `200`: `{ serviceEvent }`
+
+## 3.4.1 Service places
+
+### `GET /api/service-places/search?query=...&mode=AUTO|ADDRESS|ORGANIZATION&latitude=&longitude=`
+
+- Auth required.
+- Нормализованный поиск мест сервиса для web/expo pickers.
+- Источники:
+  - `ORGANIZATION`/`AUTO`: Geosuggest (`types=biz`) при наличии `YANDEX_GEOSUGGEST_API_KEY`.
+  - fallback и `ADDRESS`: HTTP geocoder (`YANDEX_GEOCODER_API_KEY`).
+- **Лимит выдачи:** не более **10** мест за запрос (`SERVICE_PLACE_SEARCH_MAX_RESULTS` в `src/lib/service-place-search.ts`). Это совпадает с лимитом API «Геосаджест» (`results` ≤ 10) и намеренно меньше, чем просмотр категории в приложении Яндекс.Карт (сотни POI) — там другой продукт (справочник/Places API с пагинацией). Для полного каталога по категории потребуется отдельная интеграция Places API.
+- Подсказка по запросу: указывайте город («мотосервис, Москва»), иначе Geosuggest вернёт мало релевантных подсказок.
+- Response `200`:
+  - `places: ServicePlaceSearchResultItem[]` (0–10)
+  - `meta: { query, mode, source }` — `source`: `geosuggest` | `geocoder` | `manual`
+  - optional `warning` (например, ключ suggest недоступен, 403).
+
+### `POST /api/service-places`
+
+- Auth required.
+- Создаёт (или переиспользует по dedupe `(userId, provider, providerPlaceId)`) сохранённое место сервиса.
+- Request body: `provider`, `providerPlaceId?`, `type`, `title`, `address`, `latitude?`, `longitude?`, `category?`, `contact?`, `metadata?`.
+- Response `200`: `{ place, snapshot }`, где `snapshot` готов к записи в `ServiceEvent.servicePlaceSnapshot`.
 
 ### `DELETE /api/vehicles/[id]/wishlist/[itemId]`
 - Удаляет позицию корзины замен и связанные **`ExpenseItem`** с тем же `shoppingListItemId`

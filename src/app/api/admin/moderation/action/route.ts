@@ -6,24 +6,23 @@ import { logAdminAction } from "@/lib/admin-audit";
 import { ADMIN_CACHE_TAGS } from "@/lib/admin-cache";
 import { prisma } from "@/lib/prisma";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
 // MT-SEC-068 + MT-SEC-070: strict + bounded id length.
-const PayloadSchema = z
-  .object({
-    kind: z.enum(["PART_MASTER", "FITMENT_REPORT", "FITMENT_CONFIDENCE"]),
-    id: z.string().min(1).max(64),
-    action: z.enum([
-      "approve",
-      "reject",
-      "publish",
-      "needs_review",
-      "hide",
-      "verify",
-      "community_confirm",
-    ]),
-    reason: z.string().max(500).optional(),
-  })
-  .strict();
+const PayloadSchema = strictObject({
+  kind: z.enum(["PART_MASTER", "FITMENT_REPORT", "FITMENT_CONFIDENCE"]),
+  id: z.string().min(1).max(64),
+  action: z.enum([
+    "approve",
+    "reject",
+    "publish",
+    "needs_review",
+    "hide",
+    "verify",
+    "community_confirm",
+  ]),
+  reason: z.string().max(500).optional(),
+});
 
 /** Apply a moderation action and write to the audit log. */
 export async function POST(request: Request) {

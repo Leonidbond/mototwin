@@ -3,6 +3,7 @@ import { issuePasswordResetToken } from "@/lib/auth/session-service";
 import { buildPasswordResetUrl, sendPasswordResetEmail } from "@/lib/auth/password-reset-email";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 import { rateLimit, rateLimit429 } from "@/lib/http/rate-limit";
+import { logAuthEvent } from "@/lib/auth-audit";
 
 export async function POST(request: Request) {
   try {
@@ -24,7 +25,14 @@ export async function POST(request: Request) {
       windowMs: 10 * 60_000,
       extraKey: email.toLowerCase(),
     });
-    if (!decision.allowed) return rateLimit429(decision);
+    if (!decision.allowed) {
+      void logAuthEvent({
+        event: "auth.rate_limited",
+        reasonCode: "auth:forgot-password",
+        metadata: { endpoint: "/api/auth/forgot-password" },
+      });
+      return rateLimit429(decision);
+    }
 
     const token = await issuePasswordResetToken(email);
     if (token) {

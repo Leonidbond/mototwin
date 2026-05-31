@@ -1,5 +1,5 @@
 import type { ServiceEventMode } from "@prisma/client";
-import type { ExpenseItem, ServiceBundleItem, ServiceEventItem } from "@mototwin/types";
+import type { ExpenseItem, ServiceBundleItem, ServiceEventItem, ServicePlaceType } from "@mototwin/types";
 import { getServiceActionTypeLabelRu } from "@mototwin/domain";
 
 type DecimalLike = { toString(): string } | number | null;
@@ -26,6 +26,7 @@ export type RawServiceEventRow = {
   installLocationAddress?: string | null;
   installLocationLat?: number | null;
   installLocationLng?: number | null;
+  servicePlaceSnapshot?: unknown | null;
   attachReceiptRequested?: boolean | null;
   attachFileRequested?: boolean | null;
   nextReminderEnabled?: boolean | null;
@@ -43,6 +44,20 @@ export type RawServiceEventRow = {
     level: number;
     displayOrder: number;
   };
+  servicePlace?: {
+    id: string;
+    provider: string;
+    providerPlaceId: string | null;
+    type: string;
+    title: string;
+    address: string;
+    latitude: number | null;
+    longitude: number | null;
+    contactPhone: string | null;
+    contactUrl: string | null;
+    category: string | null;
+    metadata: unknown | null;
+  } | null;
   items?: Array<{
     id: string;
     nodeId: string;
@@ -164,6 +179,23 @@ export function serializeServiceEventRow(row: RawServiceEventRow): ServiceEventI
     installLocationAddress: row.installLocationAddress ?? null,
     installLocationLat: row.installLocationLat ?? null,
     installLocationLng: row.installLocationLng ?? null,
+    servicePlace: row.servicePlace
+      ? {
+          id: row.servicePlace.id,
+          provider: row.servicePlace.provider,
+          providerPlaceId: row.servicePlace.providerPlaceId,
+          type: row.servicePlace.type as ServicePlaceType,
+          title: row.servicePlace.title,
+          address: row.servicePlace.address,
+          latitude: row.servicePlace.latitude,
+          longitude: row.servicePlace.longitude,
+          contactPhone: row.servicePlace.contactPhone,
+          contactUrl: row.servicePlace.contactUrl,
+          category: row.servicePlace.category,
+          metadata: row.servicePlace.metadata ?? null,
+        }
+      : null,
+    servicePlaceSnapshot: row.servicePlaceSnapshot ?? null,
     attachReceiptRequested: Boolean(row.attachReceiptRequested),
     attachFileRequested: Boolean(row.attachFileRequested),
     nextReminderEnabled: Boolean(row.nextReminderEnabled),

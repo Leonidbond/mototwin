@@ -754,6 +754,27 @@ export interface AdminAuditLogListResponse {
   items: AdminAuditLogEntryWire[];
 }
 
+/** MT-SEC-054 — user authentication forensic trail. */
+export interface AuthAuditLogEntryWire {
+  id: string;
+  createdAt: string;
+  userId: string | null;
+  userLabel: string;
+  event: string;
+  reasonCode: string | null;
+  metadata: unknown;
+  ip: string | null;
+  userAgent: string | null;
+}
+
+export interface AuthAuditLogListResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  items: AuthAuditLogEntryWire[];
+}
+
 export interface AdminBrandRefRow {
   id: string;
   name: string;

@@ -28,7 +28,11 @@
 |---|--------|-------|------------|
 | 1 | первичный аудит | OAuth audience, rate-limit auth, headers, body-size guard, fetch timeouts, env validation, RBAC moderation/admin | `MT-SEC-001`..`MT-SEC-064`; [roadmap.md#итерация-1--что-закрыто](./roadmap.md#итерация-1--что-закрыто) |
 | 2 | Input Validation audit | Полный обход 122 route handler-ов, новые helpers (`strictObject`, `boundedText/Number/JsonValue`, `safeUrl`, `parseSearchParam*`, `safeRenderUrl`), `parseJsonBody` на write-ручках, auth+rate-limit на `geocode`/`recommended-skus`/`duplicates` | `MT-SEC-065`..`MT-SEC-075`; [findings.md#input-validation-audit-итерация-2--полный-обход-97-ручек--122-handler-ов](./findings.md#input-validation-audit-итерация-2--полный-обход-97-ручек--122-handler-ов); [roadmap.md#итерация-2--input-validation-audit-закрыто](./roadmap.md#итерация-2--input-validation-audit-закрыто) |
-| 3 | Infra hardening | Nginx → HTTPS + Mozilla intermediate + HSTS + security headers + 301 redirect (`MT-SEC-029` resolved); `mototwin.dump` untracked (`MT-SEC-027` partial — open: rewrite history + ротация секретов) | [roadmap.md#итерация-3--infra-hardening-частично-закрыто](./roadmap.md#итерация-3--infra-hardening-частично-закрыто) |
+| 3 | Infra hardening + Input-validation follow-up | Nginx → HTTPS + Mozilla intermediate + HSTS + security headers + 301 redirect (`MT-SEC-029` resolved); `mototwin.dump` untracked (`MT-SEC-027` partial — open: rewrite history + ротация секретов); `MT-SEC-068`/`069`/`070`/`071` **закрыты полностью**: оставшиеся 18 handler-ов мигрированы на `strictObject`/`parseJsonBody`/`parseSearchParam*`; добавлен ESLint guard `no-restricted-syntax` против регрессий | [roadmap.md#итерация-3--infra-hardening--input-validation-follow-up-закрыто](./roadmap.md#итерация-3--infra-hardening--input-validation-follow-up-закрыто) |
+
+| 4 | Auth audit log | `AuthAuditLog` model + `logAuthEvent` во всех auth flows; admin `/admin/audit?type=auth`; smoke `qa:auth-audit-smoke` (`MT-SEC-054` resolved) | [roadmap.md#итерация-4--auth-audit-log-закрыто](./roadmap.md#итерация-4--auth-audit-log-закрыто) |
+
+| 5 | Auth audit retention | 90-day purge + failed-login burst alerts; cron + VPS crontab (`MT-SEC-055` resolved) | [roadmap.md#итерация-5--auth-audit-retention--alerting-закрыто](./roadmap.md#итерация-5--auth-audit-retention--alerting-закрыто) |
 
 ## Как читать
 
@@ -44,13 +48,16 @@
 
 ## Дата и состояние
 
-- Версия отчета: **1.2** (после итерации 3 — Infra hardening).
-- Дата: 2026-05-30.
+- Версия отчета: **1.5** (после итерации 5 — Auth audit retention).
+- Дата: 2026-05-31.
 - HEAD на момент аудита: см. `git log -1` (на момент составления — ветка main, без коммитов с пометкой `security:*`).
 - Артефакты согласованы между собой: при правке `findings.md` правьте per-stream-файл (или наоборот) — оба источника должны совпадать.
 
 ### Changelog
 
+- **1.5** (2026-05-31) — итерация 5 «Auth audit retention»: `MT-SEC-055` resolved (90-day purge cron + failed-login burst alerts).
+- **1.4** (2026-05-31) — итерация 4 «Auth audit log»: `MT-SEC-054` resolved (`AuthAuditLog`, `logAuthEvent`, admin UI, smoke test).
+- **1.3** (2026-05-31) — итерация 3 продолжена: `MT-SEC-068`/`069`/`070`/`071` **полностью закрыты** (18 оставшихся handler-ов мигрированы на `strictObject`/`parseJsonBody`/`parseSearchParam*`; outer + nested item-схемы; service-events / wishlist / vehicles `rideProfile`); ESLint guard `no-restricted-syntax` в `eslint.config.mjs` блокирует регрессии. `findings.md` / `roadmap.md` обновлены.
 - **1.2** (2026-05-30) — итерация 3 «Infra hardening»: `MT-SEC-029` resolved (nginx переписан); `MT-SEC-027` partial (untracked, open follow-up на rewrite history + ротация секретов).
 - **1.1** (2026-05-24) — добавлен раздел «Input validation audit» в `findings.md`; `roadmap.md` дополнен «Итерация 2»; статусы `resolved` проставлены `MT-SEC-065`..`MT-SEC-075`.
 - **1.0** (2026-05-24) — первичный аудит и первая итерация фиксов (`MT-SEC-001`..`MT-SEC-064`).

@@ -22,6 +22,7 @@ import { prisma } from "@/lib/prisma";
 import { toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
 import { getVehicleInCurrentContext } from "@/app/api/_shared/vehicle-context";
 import { buildRecommendationsForNodeWithCommunity } from "@/lib/build-recommendations-for-node-with-community";
+import { parseSearchParamText } from "@/lib/http/input-validation";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -29,8 +30,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId } = await context.params;
     const { searchParams } = new URL(request.url);
-    const nodeId = searchParams.get("nodeId")?.trim();
-    const partMasterId = searchParams.get("partMasterId")?.trim();
+    // MT-SEC-071: cap ids before DB lookups.
+    const nodeId = parseSearchParamText(searchParams.get("nodeId"), { max: 64 });
+    const partMasterId = parseSearchParamText(searchParams.get("partMasterId"), { max: 64 });
 
     if (!nodeId || !partMasterId) {
       return NextResponse.json({ error: "Укажите nodeId и partMasterId." }, { status: 400 });

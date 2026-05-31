@@ -3,6 +3,7 @@ import type { ExpenseItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import { toCurrentUserContextErrorResponse } from "../../_shared/current-user-context";
 import { getVehicleInCurrentContext } from "../../_shared/vehicle-context";
+import { parseSearchParamText } from "@/lib/http/input-validation";
 
 type ExpenseRow = Omit<
   ExpenseItem,
@@ -30,8 +31,9 @@ function toWire(row: ExpenseRow): ExpenseItem {
 
 export async function GET(request: NextRequest) {
   try {
-    const vehicleId = request.nextUrl.searchParams.get("vehicleId")?.trim();
-    const nodeId = request.nextUrl.searchParams.get("nodeId")?.trim() || null;
+    // MT-SEC-071: cap id params before DB lookup.
+    const vehicleId = parseSearchParamText(request.nextUrl.searchParams.get("vehicleId"), { max: 64 });
+    const nodeId = parseSearchParamText(request.nextUrl.searchParams.get("nodeId"), { max: 64 });
 
     if (!vehicleId) {
       return NextResponse.json({ error: "vehicleId is required" }, { status: 400 });

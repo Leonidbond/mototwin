@@ -2,25 +2,27 @@ import { NextResponse } from "next/server";
 import type { AdminVehicleListFilters, AdminVehicleSortKey } from "@mototwin/types";
 import { requireAnyAdmin, toAdminErrorResponse } from "@/lib/admin-auth";
 import { loadAdminVehicleList } from "@/lib/admin-vehicles";
+import { parseSearchParamInt, parseSearchParamText } from "@/lib/http/input-validation";
 
 export async function GET(request: Request) {
   try {
     await requireAnyAdmin();
     const url = new URL(request.url);
+    // MT-SEC-071: cap user-controlled filter strings.
     const filters: AdminVehicleListFilters = {
       motorcycleBrandId:
-        url.searchParams.get("motorcycleBrandId") ?? undefined,
+        parseSearchParamText(url.searchParams.get("motorcycleBrandId"), { max: 64 }) ?? undefined,
       motorcycleModelFamilyId:
-        url.searchParams.get("motorcycleModelFamilyId") ?? undefined,
+        parseSearchParamText(url.searchParams.get("motorcycleModelFamilyId"), { max: 64 }) ?? undefined,
       motorcycleVariantId:
-        url.searchParams.get("motorcycleVariantId") ?? undefined,
+        parseSearchParamText(url.searchParams.get("motorcycleVariantId"), { max: 64 }) ?? undefined,
       motorcycleGenerationId:
-        url.searchParams.get("motorcycleGenerationId") ?? undefined,
-      year: parseInt(url.searchParams.get("year") ?? "", 10) || undefined,
-      q: url.searchParams.get("q") ?? undefined,
+        parseSearchParamText(url.searchParams.get("motorcycleGenerationId"), { max: 64 }) ?? undefined,
+      year: parseSearchParamInt(url.searchParams.get("year"), { min: 1900, max: 2100, fallback: 0 }) || undefined,
+      q: parseSearchParamText(url.searchParams.get("q"), { max: 200 }) ?? undefined,
       sort: parseSort(url.searchParams.get("sort")),
     };
-    const page = Number(url.searchParams.get("page") ?? 1);
+    const page = parseSearchParamInt(url.searchParams.get("page"), { min: 1, max: 10_000, fallback: 1 });
     const data = await loadAdminVehicleList({ filters, page });
     return NextResponse.json(data);
   } catch (error) {

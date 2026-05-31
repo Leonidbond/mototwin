@@ -5,6 +5,7 @@ import { resolveMobileOAuthProfile } from "@/lib/auth/oauth-mobile";
 import { getPrimaryGarage } from "@/lib/auth/user-bootstrap";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 import { rateLimit, rateLimit429 } from "@/lib/http/rate-limit";
+import { logAuthEvent } from "@/lib/auth-audit";
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +16,14 @@ export async function POST(request: Request) {
       limit: 20,
       windowMs: 60_000,
     });
-    if (!decision.allowed) return rateLimit429(decision);
+    if (!decision.allowed) {
+      void logAuthEvent({
+        event: "auth.rate_limited",
+        reasonCode: "auth:oauth-mobile",
+        metadata: { endpoint: "/api/auth/oauth/mobile" },
+      });
+      return rateLimit429(decision);
+    }
 
     // OAuth idTokens can be a few kB; cap at 16 KB.
     const body = await parseJsonBody<{
@@ -50,6 +58,12 @@ export async function POST(request: Request) {
       select: { id: true, email: true, displayName: true },
     });
 
+    void logAuthEvent({
+      event: "oauth.login.success",
+      userId: user.userId,
+      metadata: { provider, client: "mobile" },
+    });
+
     return NextResponse.json({
       user: {
         id: freshUser?.id ?? user.userId,
@@ -67,6 +81,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
     if (error instanceof AuthServiceError) {
+      void logAuthEvent({
+        event: "login.failure",
+        reasonCode: error.code,
+        metadata: { flow: "oauth-mobile", provider: undefined },
+      });
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
     // MT-SEC-022: avoid leaking provider tokens/PII via raw error.

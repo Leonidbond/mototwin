@@ -7,19 +7,18 @@ import { logAdminAction } from "@/lib/admin-audit";
 import { loadAdminPartDetail, normalizeBrand } from "@/lib/admin-parts";
 import { prisma } from "@/lib/prisma";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
 // MT-SEC-068: strict mode prevents mass assignment on partial updates.
-const UpdateSchema = z
-  .object({
-    brandName: z.string().min(1).max(80).optional(),
-    sku: z.string().min(1).max(80).optional(),
-    title: z.string().min(1).max(200).optional(),
-    subcategory: z.string().max(80).nullable().optional(),
-    description: z.string().max(2000).nullable().optional(),
-    imageUrl: z.string().url().max(400).nullable().optional(),
-    status: z.enum(["DRAFT", "PENDING_REVIEW", "ACTIVE", "MERGED", "REJECTED"]).optional(),
-  })
-  .strict();
+const UpdateSchema = strictObject({
+  brandName: z.string().min(1).max(80).optional(),
+  sku: z.string().min(1).max(80).optional(),
+  title: z.string().min(1).max(200).optional(),
+  subcategory: z.string().max(80).nullable().optional(),
+  description: z.string().max(2000).nullable().optional(),
+  imageUrl: z.string().url().max(400).nullable().optional(),
+  status: z.enum(["DRAFT", "PENDING_REVIEW", "ACTIVE", "MERGED", "REJECTED"]).optional(),
+});
 
 export async function GET(
   _request: Request,

@@ -33,12 +33,27 @@ export function geocodeCoordinates(lat: number, lng: number): Promise<GeocodeRes
   return fetchGeocode(`/api/geocode?${params.toString()}`);
 }
 
-export async function searchPlacesViaApi(query: string): Promise<YandexMapPlace[]> {
-  const params = new URLSearchParams({ query, list: "1" });
+export type PlaceSearchResult = {
+  places: YandexMapPlace[];
+  warning?: string;
+  source?: string;
+};
+
+export async function searchPlacesViaApi(query: string): Promise<PlaceSearchResult> {
+  const params = new URLSearchParams({ query, list: "1", biz: "1" });
   const res = await fetch(`/api/geocode?${params.toString()}`, { cache: "no-store" });
-  const data = (await res.json()) as { places?: YandexMapPlace[]; error?: string };
+  const data = (await res.json()) as {
+    places?: YandexMapPlace[];
+    error?: string;
+    warning?: string;
+    meta?: { source?: string; geosuggestStatus?: number | null };
+  };
   if (!res.ok) {
     throw new Error(data.error ?? "Не удалось выполнить поиск");
   }
-  return data.places ?? [];
+  return {
+    places: data.places ?? [],
+    warning: data.warning,
+    source: data.meta?.source,
+  };
 }

@@ -6,24 +6,23 @@ import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { prisma } from "@/lib/prisma";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
-const PayloadSchema = z
-  .object({
-    supportLevel: z
-      .enum([
-        "MVP_CORE",
-        "MVP_CORE_LEGACY",
-        "COMMUNITY_SUPPORT",
-        "EARLY_BETA",
-        "NO_FITMENT_DATA_YET",
-      ])
-      .nullable(),
-    reason: z
-      .string()
-      .min(3, "Укажите краткое обоснование (минимум 3 символа)")
-      .max(500, "Обоснование слишком длинное"),
-  })
-  .strict();
+const PayloadSchema = strictObject({
+  supportLevel: z
+    .enum([
+      "MVP_CORE",
+      "MVP_CORE_LEGACY",
+      "COMMUNITY_SUPPORT",
+      "EARLY_BETA",
+      "NO_FITMENT_DATA_YET",
+    ])
+    .nullable(),
+  reason: z
+    .string()
+    .min(3, "Укажите краткое обоснование (минимум 3 символа)")
+    .max(500, "Обоснование слишком длинное"),
+});
 
 export async function PATCH(
   request: Request,

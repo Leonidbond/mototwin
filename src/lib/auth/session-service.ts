@@ -10,6 +10,7 @@ import { generateRawToken, hashToken, normalizeEmail } from "./tokens";
 import { hashPassword, validatePassword, verifyPassword } from "./password";
 import { isRegistrationAllowed, registrationBlockedMessage } from "./beta-allowlist";
 import { ensureUserBootstrap } from "./user-bootstrap";
+import { logAuthEvent } from "@/lib/auth-audit";
 
 export type AuthTokens = {
   accessToken: string;
@@ -213,6 +214,7 @@ export async function refreshMobileSession(refreshTokenRaw: string): Promise<Aut
   });
 
   if (!existing) {
+    void logAuthEvent({ event: "refresh.invalid", reasonCode: "INVALID_REFRESH_TOKEN" });
     throw new AuthServiceError("INVALID_REFRESH_TOKEN", 401, "Сессия истекла. Войдите снова.");
   }
   await assertUserNotBlocked(existing.userId);
@@ -224,7 +226,13 @@ export async function refreshMobileSession(refreshTokenRaw: string): Promise<Aut
     }),
   ]);
 
-  return createMobileTokens(existing.userId);
+  const tokens = await createMobileTokens(existing.userId);
+  void logAuthEvent({
+    event: "refresh.rotated",
+    userId: existing.userId,
+    metadata: { client: "mobile" },
+  });
+  return tokens;
 }
 
 export async function resolveOrCreateOAuthUser(input: {
@@ -310,6 +318,11 @@ export async function resolveOrCreateOAuthUser(input: {
   });
 
   if (linkedToExistingEmail) {
+    void logAuthEvent({
+      event: "oauth.linked",
+      userId: user.id,
+      metadata: { provider, providerAccountId },
+    });
     // Auto-linking an OAuth account to a pre-existing local user is a
     // sensitive event (MT-SEC-050). For verified-email providers (Google,
     // Apple) the risk is low — Yandex linking is disabled at the provider
@@ -340,12 +353,20 @@ export async function assertUserNotBlocked(userId: string): Promise<void> {
   }
 }
 
-export async function revokeAllUserSessions(userId: string): Promise<void> {
+export async function revokeAllUserSessions(
+  userId: string,
+  options?: { cause?: "password_reset" | "admin" }
+): Promise<void> {
   await prisma.$transaction([
     prisma.authSession.deleteMany({ where: { userId } }),
     prisma.refreshToken.deleteMany({ where: { userId } }),
     prisma.session.deleteMany({ where: { userId } }),
   ]);
+  void logAuthEvent({
+    event: "session.revoked",
+    userId,
+    metadata: { cause: options?.cause ?? "admin" },
+  });
 }
 
 export async function issuePasswordResetToken(
@@ -381,6 +402,11 @@ export async function issuePasswordResetToken(
       tokenHash: hashToken(rawToken),
       expiresAt: new Date(now.getTime() + PASSWORD_RESET_TOKEN_TTL_MS),
     },
+  });
+
+  void logAuthEvent({
+    event: "password_reset.requested",
+    userId: user.id,
   });
 
   return { email: user.email, rawToken };
@@ -429,6 +455,16 @@ export async function resetPasswordWithToken(input: {
     prisma.refreshToken.deleteMany({ where: { userId: token.userId } }),
     prisma.session.deleteMany({ where: { userId: token.userId } }),
   ]);
+
+  void logAuthEvent({
+    event: "password_reset.applied",
+    userId: token.userId,
+  });
+  void logAuthEvent({
+    event: "session.revoked",
+    userId: token.userId,
+    metadata: { cause: "password_reset" },
+  });
 }
 
 export class AuthServiceError extends Error {

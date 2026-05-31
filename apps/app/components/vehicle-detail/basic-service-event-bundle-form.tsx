@@ -51,6 +51,7 @@ import type {
   ServiceNodeItem,
   TopServiceNodeItem,
   UserServiceEventFormTemplateWire,
+  ServicePlaceSearchResultItem,
 } from "@mototwin/types";
 import { SubscriptionLockBanner } from "../subscription/subscription-lock-banner";
 import { MobileNodePickerModal } from "./mobile-node-picker-modal";
@@ -305,6 +306,8 @@ function normalizeDateInputYmd(input: string): string {
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
+type ServicePlaceDraft = ServicePlaceSearchResultItem & { id?: string | null };
+
 export type BasicServiceEventBundleFormProps = {
   vehicleId: string;
   apiBaseUrl: string;
@@ -361,6 +364,16 @@ export function BasicServiceEventBundleForm({
     engineHours?: string;
     currency?: string;
   }>({});
+  const [servicePlacePickerOpen, setServicePlacePickerOpen] = useState(false);
+  const [servicePlaceQuery, setServicePlaceQuery] = useState("");
+  const [servicePlaceMode, setServicePlaceMode] = useState<"AUTO" | "ADDRESS" | "ORGANIZATION">("AUTO");
+  const [servicePlaceResults, setServicePlaceResults] = useState<ServicePlaceSearchResultItem[]>([]);
+  const [servicePlaceSelected, setServicePlaceSelected] = useState<ServicePlaceDraft | null>(null);
+  const [servicePlaceLoading, setServicePlaceLoading] = useState(false);
+  const [servicePlaceError, setServicePlaceError] = useState("");
+  const [servicePlaceWarning, setServicePlaceWarning] = useState("");
+  const [manualServicePlaceTitle, setManualServicePlaceTitle] = useState("");
+  const [manualServicePlaceAddress, setManualServicePlaceAddress] = useState("");
 
   const [skuLookup, setSkuLookup] = useState("");
   const [skuResults, setSkuResults] = useState<PartSkuViewModel[]>([]);
@@ -413,8 +426,6 @@ export function BasicServiceEventBundleForm({
   const topLeafPickerRows = vehicleLeafPickerSets.topLeaves;
   const selectableLeafPickerRows = vehicleLeafPickerSets.selectableLeaves;
   const pickerShowTopToggle = vehicleLeafPickerSets.showTopToggle;
-  const allowChildNodes =
-    subscriptionCapabilities == null || subscriptionCapabilities.canSelectChildNode;
   const detailedEntryAllowed =
     subscriptionCapabilities == null ||
     canUseServiceEventEntryMode(subscriptionCapabilities, "DETAILED");
@@ -933,6 +944,60 @@ export function BasicServiceEventBundleForm({
     }
   }, [apiBaseUrl, pendingVehicleState, vehicleId]);
 
+  const searchServicePlaces = useCallback(async () => {
+    if (!servicePlaceQuery.trim()) {
+      setServicePlaceResults([]);
+      return;
+    }
+    try {
+      setServicePlaceLoading(true);
+      setServicePlaceError("");
+      const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
+      const response = await endpoints.searchServicePlaces({
+        query: servicePlaceQuery.trim(),
+        mode: servicePlaceMode,
+      });
+      setServicePlaceResults(response.places ?? []);
+      setServicePlaceWarning(response.warning ?? "");
+      if (response.places?.length) {
+        setServicePlaceSelected(response.places[0]);
+      }
+    } catch (error) {
+      setServicePlaceError(error instanceof Error ? error.message : "Не удалось выполнить поиск мест.");
+      setServicePlaceResults([]);
+    } finally {
+      setServicePlaceLoading(false);
+    }
+  }, [apiBaseUrl, servicePlaceMode, servicePlaceQuery]);
+
+  const persistServicePlace = useCallback(
+    async (draft: ServicePlaceDraft) => {
+      const endpoints = createMobileApiClientForBaseUrl(apiBaseUrl);
+      const result = await endpoints.createServicePlace({
+        provider: draft.provider,
+        providerPlaceId: draft.providerPlaceId ?? null,
+        type: draft.type,
+        title: draft.title,
+        address: draft.address,
+        latitude: draft.latitude ?? null,
+        longitude: draft.longitude ?? null,
+        category: draft.category ?? null,
+        contact: draft.contact ?? null,
+        metadata: draft.metadata ?? null,
+      });
+      updateForm((prev) => ({
+        ...prev,
+        installLocationAddress: draft.address,
+        installLocationLat: draft.latitude != null ? String(draft.latitude) : "",
+        installLocationLng: draft.longitude != null ? String(draft.longitude) : "",
+        servicePlaceId: result.place.id,
+        servicePlaceSnapshot: result.snapshot,
+      }));
+      setServicePlacePickerOpen(false);
+    },
+    [apiBaseUrl, updateForm]
+  );
+
   const save = async () => {
     if (!runUiGuardsBeforeSubmit()) {
       return;
@@ -1136,6 +1201,36 @@ export function BasicServiceEventBundleForm({
           />
         </Field>
       ) : null}
+      <Field label="Место обслуживания">
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <TextInput
+              value={form.installLocationAddress}
+              onChangeText={(t) =>
+                updateForm((p) => ({
+                  ...p,
+                  installLocationAddress: t,
+                  servicePlaceId: "",
+                  servicePlaceSnapshot: null,
+                }))
+              }
+              style={[styles.input, { flex: 1 }]}
+              placeholder="Адрес или название сервиса"
+            />
+            <Pressable
+              onPress={() => setServicePlacePickerOpen(true)}
+              style={({ pressed }) => [styles.templatePickBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.templatePickBtnTxt}>Выбрать</Text>
+            </Pressable>
+          </View>
+          {form.installLocationLat.trim() && form.installLocationLng.trim() ? (
+            <Text style={styles.muted}>
+              Координаты: {form.installLocationLat}, {form.installLocationLng}
+            </Text>
+          ) : null}
+        </View>
+      </Field>
       <Field label="Комментарий">
         <TextInput
           value={form.comment}
@@ -1934,6 +2029,128 @@ export function BasicServiceEventBundleForm({
             <Pressable onPress={() => setInstallableModalOpen(false)} style={styles.modalClose}>
               <Text style={styles.modalCloseTxt}>Готово</Text>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={servicePlacePickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setServicePlacePickerOpen(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setServicePlacePickerOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Выбор места сервиса</Text>
+            <View style={{ gap: 8 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {(["AUTO", "ORGANIZATION", "ADDRESS"] as const).map((value) => {
+                  const active = servicePlaceMode === value;
+                  const label =
+                    value === "AUTO" ? "Все" : value === "ORGANIZATION" ? "Организации" : "Адреса";
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() => setServicePlaceMode(value)}
+                      style={({ pressed }) => [
+                        styles.filterChip,
+                        active && styles.filterChipActive,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TextInput
+                  value={servicePlaceQuery}
+                  onChangeText={setServicePlaceQuery}
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="Название сервиса или адрес"
+                />
+                <Pressable
+                  onPress={() => void searchServicePlaces()}
+                  style={({ pressed }) => [styles.templatePickBtn, pressed && styles.pressed]}
+                >
+                  <Text style={styles.templatePickBtnTxt}>
+                    {servicePlaceLoading ? "Поиск…" : "Найти"}
+                  </Text>
+                </Pressable>
+              </View>
+              {servicePlaceWarning ? <Text style={styles.muted}>{servicePlaceWarning}</Text> : null}
+              {servicePlaceError ? <Text style={styles.err}>{servicePlaceError}</Text> : null}
+              <ScrollView style={{ maxHeight: 260 }}>
+                {servicePlaceResults.map((place, index) => {
+                  const selected =
+                    servicePlaceSelected?.address === place.address &&
+                    servicePlaceSelected?.provider === place.provider &&
+                    servicePlaceSelected?.providerPlaceId === place.providerPlaceId;
+                  return (
+                    <Pressable
+                      key={`${place.provider}-${place.providerPlaceId ?? "na"}-${index}`}
+                      onPress={() => setServicePlaceSelected(place)}
+                      style={({ pressed }) => [
+                        styles.installableRow,
+                        selected && styles.installableRowSelected,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.installableTitle}>{place.title}</Text>
+                        <Text style={styles.installableMeta}>{place.address}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              {servicePlaceSelected ? (
+                <Pressable
+                  onPress={() => void persistServicePlace(servicePlaceSelected)}
+                  style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}
+                >
+                  <Text style={[styles.modalCloseTxt, { color: SE.orange, fontWeight: "700" }]}>
+                    Подтвердить выбор
+                  </Text>
+                </Pressable>
+              ) : null}
+              <View style={styles.customCurrencyBox}>
+                <Text style={styles.label}>Вручную</Text>
+                <TextInput
+                  value={manualServicePlaceTitle}
+                  onChangeText={setManualServicePlaceTitle}
+                  style={styles.input}
+                  placeholder="Название"
+                />
+                <TextInput
+                  value={manualServicePlaceAddress}
+                  onChangeText={setManualServicePlaceAddress}
+                  style={styles.input}
+                  placeholder="Адрес"
+                />
+                <Pressable
+                  onPress={() =>
+                    void persistServicePlace({
+                      provider: "CUSTOM",
+                      providerPlaceId: null,
+                      type: "CUSTOM",
+                      title: manualServicePlaceTitle.trim(),
+                      address: manualServicePlaceAddress.trim(),
+                      latitude: null,
+                      longitude: null,
+                      category: null,
+                      contact: null,
+                      metadata: null,
+                    })
+                  }
+                  style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}
+                  disabled={!manualServicePlaceTitle.trim() || !manualServicePlaceAddress.trim()}
+                >
+                  <Text style={styles.modalCloseTxt}>Выбрать вручную</Text>
+                </Pressable>
+              </View>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

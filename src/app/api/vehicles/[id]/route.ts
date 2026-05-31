@@ -11,6 +11,7 @@ import {
 } from "../../_shared/current-user-context";
 import { nextResponseFromUnexpectedRouteError } from "../../_shared/route-error-response";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
 type RouteContext = {
   params: Promise<{
@@ -18,21 +19,17 @@ type RouteContext = {
   }>;
 };
 
-const updateVehicleProfileSchema = z
-  .object({
-    nickname: z.string().trim().max(80).nullable(),
-    vin: z.string().trim().max(32).nullable(),
-    // MT-SEC-068: nested object made strict to block mass assignment.
-    rideProfile: z
-      .object({
-        usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
-        ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
-        loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
-        usageIntensity: z.enum(["LOW", "MEDIUM", "HIGH"]),
-      })
-      .strict(),
-  })
-  .strict();
+const updateVehicleProfileSchema = strictObject({
+  nickname: z.string().trim().max(80).nullable(),
+  vin: z.string().trim().max(32).nullable(),
+  // MT-SEC-068: nested object also strict to block mass assignment.
+  rideProfile: strictObject({
+    usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
+    ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
+    loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
+    usageIntensity: z.enum(["LOW", "MEDIUM", "HIGH"]),
+  }),
+});
 
 export async function GET(_: Request, context: RouteContext) {
   try {

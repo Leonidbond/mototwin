@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseSearchParamText } from "@/lib/http/input-validation";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const nodeId = new URL(request.url).searchParams.get("nodeId")?.trim() ?? "";
+    // MT-SEC-071: cap nodeId before DB lookup.
+    const nodeId = parseSearchParamText(new URL(request.url).searchParams.get("nodeId"), { max: 64 }) ?? "";
 
     const pm = await prisma.partMaster.findUnique({
       where: { id },

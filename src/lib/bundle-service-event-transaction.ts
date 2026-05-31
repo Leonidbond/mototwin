@@ -49,6 +49,8 @@ export type CreateBundleServiceEventInTxInput = {
   installLocationAddress?: string | null;
   installLocationLat?: number | null;
   installLocationLng?: number | null;
+  servicePlaceId?: string | null;
+  servicePlaceSnapshot?: Prisma.InputJsonValue | null;
   attachReceiptRequested?: boolean;
   attachFileRequested?: boolean;
   nextReminderEnabled?: boolean;
@@ -80,6 +82,8 @@ export type ServiceEventInclude = {
   installLocationAddress?: string | null;
   installLocationLat?: number | null;
   installLocationLng?: number | null;
+  servicePlaceId?: string | null;
+  servicePlaceSnapshot?: Prisma.JsonValue | null;
   attachReceiptRequested?: boolean;
   attachFileRequested?: boolean;
   nextReminderEnabled?: boolean;
@@ -97,6 +101,20 @@ export type ServiceEventInclude = {
     level: number;
     displayOrder: number;
   };
+  servicePlace?: {
+    id: string;
+    provider: string;
+    providerPlaceId: string | null;
+    type: string;
+    title: string;
+    address: string;
+    latitude: number | null;
+    longitude: number | null;
+    contactPhone: string | null;
+    contactUrl: string | null;
+    category: string | null;
+    metadata: Prisma.JsonValue | null;
+  } | null;
   items?: Array<{
     id: string;
     nodeId: string;
@@ -140,6 +158,22 @@ const SERVICE_EVENT_INCLUDE = {
           displayOrder: true,
         },
       },
+    },
+  },
+  servicePlace: {
+    select: {
+      id: true,
+      provider: true,
+      providerPlaceId: true,
+      type: true,
+      title: true,
+      address: true,
+      latitude: true,
+      longitude: true,
+      contactPhone: true,
+      contactUrl: true,
+      category: true,
+      metadata: true,
     },
   },
 } satisfies Prisma.ServiceEventInclude;
@@ -447,6 +481,11 @@ export async function createBundleServiceEventInTransaction(
       installLocationAddress: input.installLocationAddress?.trim() || null,
       installLocationLat: input.installLocationLat ?? null,
       installLocationLng: input.installLocationLng ?? null,
+      servicePlaceId: input.servicePlaceId ?? null,
+      servicePlaceSnapshot:
+        input.servicePlaceSnapshot === null || input.servicePlaceSnapshot === undefined
+          ? Prisma.JsonNull
+          : input.servicePlaceSnapshot,
       attachReceiptRequested: input.attachReceiptRequested ?? false,
       attachFileRequested: input.attachFileRequested ?? false,
       nextReminderEnabled: input.nextReminderEnabled ?? false,
@@ -539,6 +578,11 @@ export async function updateBundleServiceEventInTransaction(
       installLocationAddress: input.installLocationAddress?.trim() || null,
       installLocationLat: input.installLocationLat ?? null,
       installLocationLng: input.installLocationLng ?? null,
+      servicePlaceId: input.servicePlaceId ?? null,
+      servicePlaceSnapshot:
+        input.servicePlaceSnapshot === null || input.servicePlaceSnapshot === undefined
+          ? Prisma.JsonNull
+          : input.servicePlaceSnapshot,
       attachReceiptRequested: input.attachReceiptRequested ?? false,
       attachFileRequested: input.attachFileRequested ?? false,
       nextReminderEnabled: input.nextReminderEnabled ?? false,

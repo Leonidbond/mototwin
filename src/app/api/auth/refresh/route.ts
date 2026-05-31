@@ -2,12 +2,20 @@ import { NextResponse } from "next/server";
 import { AuthServiceError, refreshMobileSession } from "@/lib/auth/session-service";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 import { rateLimit, rateLimit429 } from "@/lib/http/rate-limit";
+import { logAuthEvent } from "@/lib/auth-audit";
 
 export async function POST(request: Request) {
   try {
     // MT-SEC-002: refresh is hit-per-30min in legitimate use; cap aggressively.
     const decision = rateLimit({ bucket: "auth:refresh", request, limit: 30, windowMs: 60_000 });
-    if (!decision.allowed) return rateLimit429(decision);
+    if (!decision.allowed) {
+      void logAuthEvent({
+        event: "auth.rate_limited",
+        reasonCode: "auth:refresh",
+        metadata: { endpoint: "/api/auth/refresh" },
+      });
+      return rateLimit429(decision);
+    }
 
     const body = await parseJsonBody<{ refreshToken?: string }>(request, { maxBytes: 2 * 1024 });
     const refreshToken = typeof body.refreshToken === "string" ? body.refreshToken.trim() : "";

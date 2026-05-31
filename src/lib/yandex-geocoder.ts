@@ -139,6 +139,14 @@ export async function yandexGeocodeReverse(lat: number, lng: number): Promise<Ya
   return fetchGeocode(params);
 }
 
+/** Разрешение объекта по uri из Geosuggest (параметр geocode = uri). */
+export async function yandexGeocodeByUri(uri: string): Promise<YandexGeocodedPlace | null> {
+  const trimmed = uri.trim();
+  if (!trimmed) return null;
+  const params = new URLSearchParams({ geocode: trimmed });
+  return fetchGeocode(params);
+}
+
 export function formatCoordsFallback(lat: number, lng: number): string {
   return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 }

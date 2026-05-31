@@ -2,10 +2,17 @@ import { NextResponse } from "next/server";
 import {
   formatCoordsFallback,
   getYandexGeocoderApiKey,
+  yandexGeocodeByUri,
   yandexGeocodeForward,
   yandexGeocodeForwardAll,
   yandexGeocodeReverse,
 } from "@/lib/yandex-geocoder";
+import {
+  geosuggestErrorMessage,
+  getYandexGeosuggestApiKey,
+  YandexGeosuggestError,
+  yandexGeosuggestOrganizations,
+} from "@/lib/yandex-geosuggest";
 import {
   getCurrentUserContext,
   toCurrentUserContextErrorResponse,
@@ -49,15 +56,69 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   // MT-SEC-072: cap query length (Yandex limit + DoS protection).
   const query = parseSearchParamText(searchParams.get("query"), { max: GEOCODE_QUERY_MAX });
+  const uri = parseSearchParamText(searchParams.get("uri"), { max: 2048 });
   const latRaw = searchParams.get("lat");
   const lngRaw = searchParams.get("lng");
 
   try {
+    if (uri) {
+      const place = await yandexGeocodeByUri(uri);
+      if (!place) {
+        return NextResponse.json({ error: "Объект не найден по uri" }, { status: 404 });
+      }
+      return NextResponse.json({ place });
+    }
+
     if (query) {
       const list = searchParams.get("list") === "1";
       if (list) {
-        const places = await yandexGeocodeForwardAll(query);
-        return NextResponse.json({ places });
+        const preferBiz = searchParams.get("biz") === "1";
+        let places: Awaited<ReturnType<typeof yandexGeocodeForwardAll>> = [];
+        let source: "geosuggest" | "geocoder" | "none" = "none";
+        let geosuggestStatus: number | null = null;
+        let warning: string | undefined;
+
+        if (preferBiz && getYandexGeosuggestApiKey()) {
+          try {
+            const pageReferer =
+              request.headers.get("referer")?.trim() ||
+              (() => {
+                const origin = request.headers.get("origin")?.trim();
+                return origin ? `${origin}/` : "";
+              })() ||
+              undefined;
+            places = await yandexGeosuggestOrganizations(query, { referer: pageReferer });
+            if (places.length > 0) source = "geosuggest";
+          } catch (suggestError) {
+            const status =
+              suggestError instanceof YandexGeosuggestError
+                ? suggestError.status
+                : null;
+            if (status != null) {
+              geosuggestStatus = status;
+              warning = geosuggestErrorMessage(status);
+            }
+            console.error("Yandex geosuggest failed:", suggestError);
+          }
+        }
+
+        const geosuggestRejected = preferBiz && geosuggestStatus != null;
+        if (places.length === 0 && !geosuggestRejected) {
+          places = await yandexGeocodeForwardAll(query);
+          if (places.length > 0) {
+            source = "geocoder";
+            if (preferBiz && getYandexGeosuggestApiKey() && !warning) {
+              warning =
+                "Поиск организаций недоступен — показаны адреса из геокодера. Подключите ключ «Геосаджест» в кабинете Яндекса.";
+            }
+          }
+        }
+
+        return NextResponse.json({
+          places,
+          meta: { source, geosuggestStatus },
+          warning,
+        });
       }
       const place = await yandexGeocodeForward(query);
       if (!place) {

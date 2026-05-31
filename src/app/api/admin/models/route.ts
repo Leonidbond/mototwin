@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { AdminSupportLevel } from "@mototwin/types";
 import { requireAnyAdmin, toAdminErrorResponse } from "@/lib/admin-auth";
 import { loadAdminModelList } from "@/lib/admin-models";
+import { parseSearchParamInt, parseSearchParamText } from "@/lib/http/input-validation";
 
 const SUPPORT_LEVELS: AdminSupportLevel[] = [
   "MVP_CORE",
@@ -15,15 +16,16 @@ export async function GET(request: Request) {
   try {
     await requireAnyAdmin();
     const url = new URL(request.url);
+    // MT-SEC-071: cap user-controlled filter strings.
     const filters = {
-      q: url.searchParams.get("q") ?? undefined,
+      q: parseSearchParamText(url.searchParams.get("q"), { max: 200 }) ?? undefined,
       motorcycleBrandId:
-        url.searchParams.get("motorcycleBrandId") ??
-        url.searchParams.get("brandId") ??
+        parseSearchParamText(url.searchParams.get("motorcycleBrandId"), { max: 64 }) ??
+        parseSearchParamText(url.searchParams.get("brandId"), { max: 64 }) ??
         undefined,
       supportLevel: parseSupportLevel(url.searchParams.get("supportLevel")),
     };
-    const page = Number(url.searchParams.get("page") ?? 1);
+    const page = parseSearchParamInt(url.searchParams.get("page"), { min: 1, max: 10_000, fallback: 1 });
     const data = await loadAdminModelList({ filters, page });
     return NextResponse.json(data);
   } catch (error) {

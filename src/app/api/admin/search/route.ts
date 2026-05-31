@@ -5,6 +5,7 @@ import type {
 } from "@mototwin/types";
 import { requireAnyAdmin, toAdminErrorResponse } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { parseSearchParamText } from "@/lib/http/input-validation";
 
 const MAX_PER_GROUP = 5;
 
@@ -12,7 +13,9 @@ export async function GET(request: Request) {
   try {
     await requireAnyAdmin();
     const url = new URL(request.url);
-    const query = (url.searchParams.get("q") ?? "").trim();
+    // MT-SEC-071: cap free-form admin search — fan-out runs 5 ILIKE queries
+    // across 5 tables; a 1MB pattern would amplify each by orders of magnitude.
+    const query = parseSearchParamText(url.searchParams.get("q"), { max: 200 }) ?? "";
     if (query.length < 2) {
       return NextResponse.json({
         query,

@@ -5,15 +5,14 @@ import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { prisma } from "@/lib/prisma";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
-const CreateAliasSchema = z
-  .object({
-    alias: z.string().min(1).max(80),
-    source: z.string().max(40).optional(),
-  })
-  .strict();
+const CreateAliasSchema = strictObject({
+  alias: z.string().min(1).max(80),
+  source: z.string().max(40).optional(),
+});
 
-const DeleteAliasSchema = z.object({ aliasId: z.string().min(1).max(64) }).strict();
+const DeleteAliasSchema = strictObject({ aliasId: z.string().min(1).max(64) });
 
 export async function POST(
   request: Request,

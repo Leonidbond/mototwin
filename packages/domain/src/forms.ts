@@ -287,6 +287,8 @@ export function createInitialAddServiceEventFormValues(): AddServiceEventFormVal
     installLocationAddress: "",
     installLocationLat: "",
     installLocationLng: "",
+    servicePlaceId: "",
+    servicePlaceSnapshot: null,
     attachReceiptRequested: false,
     attachFileRequested: false,
     nextReminderEnabled: false,
@@ -1059,6 +1061,8 @@ export function createInitialEditServiceEventValues(
       event.installLocationLng != null && Number.isFinite(event.installLocationLng)
         ? String(event.installLocationLng)
         : "",
+    servicePlaceId: event.servicePlace?.id ?? "",
+    servicePlaceSnapshot: event.servicePlaceSnapshot ?? event.servicePlace ?? null,
     attachReceiptRequested: Boolean(event.attachReceiptRequested),
     attachFileRequested: Boolean(event.attachFileRequested),
     nextReminderEnabled: Boolean(event.nextReminderEnabled),
@@ -1227,6 +1231,8 @@ export function normalizeAddServiceEventPayload(
       installLocationLng = lng;
     }
   }
+  const servicePlaceId = values.servicePlaceId?.trim() ?? "";
+  const servicePlaceSnapshot = values.servicePlaceSnapshot ?? null;
   const nextReminderEnabled = values.nextReminderEnabled;
   let nextReminderDateIso: string | null = null;
   let nextReminderOdometer: number | null = null;
@@ -1274,6 +1280,8 @@ export function normalizeAddServiceEventPayload(
     installLocationAddress: installAddress ? installAddress : null,
     installLocationLat: installAddress && installLocationLat != null ? installLocationLat : null,
     installLocationLng: installAddress && installLocationLng != null ? installLocationLng : null,
+    servicePlaceId: servicePlaceId || null,
+    servicePlaceSnapshot,
     attachReceiptRequested: values.attachReceiptRequested,
     attachFileRequested: values.attachFileRequested,
     nextReminderEnabled,

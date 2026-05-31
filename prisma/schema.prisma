@@ -91,6 +91,12 @@ enum ServicePerformedBy {
   OTHER
 }
 
+enum ServicePlaceType {
+  ORGANIZATION
+  ADDRESS
+  CUSTOM
+}
+
 enum ServiceActionType {
   REPLACE
   SERVICE
@@ -350,6 +356,7 @@ model User {
   vehicles     Vehicle[]
   garages      Garage[]
   serviceEventFormTemplates UserServiceEventFormTemplate[]
+  servicePlaces             ServicePlace[]
   notifications            Notification[]
   pushSubscriptions        PushSubscription[]
   mileageHoursUpdateLogs   MileageHoursUpdateLog[]
@@ -357,6 +364,7 @@ model User {
   fitmentReportsCreated     FitmentReport[]     @relation("FitmentReportCreatedBy")
   fitmentVotes              FitmentVote[]
   adminAuditLogs            AdminAuditLog[]
+  authAuditLogs             AuthAuditLog[]
   importBatches             ImportBatch[]
   authSessions              AuthSession[]
   refreshTokens             RefreshToken[]
@@ -742,6 +750,8 @@ model ServiceEvent {
   installLocationAddress    String?
   installLocationLat        Float?
   installLocationLng        Float?
+  servicePlaceId            String?
+  servicePlaceSnapshot      Json?
   attachReceiptRequested    Boolean          @default(false)
   attachFileRequested       Boolean          @default(false)
   nextReminderEnabled       Boolean          @default(false)
@@ -754,14 +764,42 @@ model ServiceEvent {
 
   vehicle      Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   node         Node               @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  servicePlace ServicePlace?      @relation(fields: [servicePlaceId], references: [id], onDelete: SetNull)
   items        ServiceEventItem[]
   expenseItems ExpenseItem[]
   fitmentReports FitmentReport[]
 
   @@index([vehicleId])
   @@index([nodeId])
+  @@index([servicePlaceId])
   @@index([vehicleId, rotatedOutAt, eventDate])
   @@map("service_events")
+}
+
+model ServicePlace {
+  id              String           @id @default(cuid())
+  userId          String
+  provider        String
+  providerPlaceId String?
+  type            ServicePlaceType @default(ADDRESS)
+  title           String
+  address         String
+  latitude        Float?
+  longitude       Float?
+  contactPhone    String?
+  contactUrl      String?
+  category        String?
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceEvents ServiceEvent[]
+
+  @@unique([userId, provider, providerPlaceId])
+  @@index([userId, title])
+  @@index([userId, address])
+  @@map("service_places")
 }
 
 /**
@@ -1472,6 +1510,30 @@ model AdminAuditLog {
   @@index([action, createdAt])
   @@index([importBatchId])
   @@map("admin_audit_logs")
+}
+
+/**
+ * Forensic trail for user authentication events (MT-SEC-054).
+ * Retention target: 90 days (operational cleanup — MT-SEC-055).
+ */
+model AuthAuditLog {
+  id         String   @id @default(cuid())
+  /** Null when the user is unknown (e.g. failed login with bad credentials). */
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /** Dot-namespaced event id, e.g. "login.success", "session.revoked". */
+  event      String
+  /** Machine-readable reason (AuthServiceError.code, rate-limit bucket, etc.). Never passwords/tokens. */
+  reasonCode String?
+  metadata   Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([event, createdAt])
+  @@index([createdAt])
+  @@map("auth_audit_logs")
 }
 
 /**

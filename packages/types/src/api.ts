@@ -4,6 +4,12 @@ import type { PartRecommendationViewModel } from "./part-recommendation";
 import type { AddServiceKitToWishlistResult, ServiceKitViewModel } from "./service-kit";
 import type { ServiceEventItem } from "./service-event";
 import type {
+  ServicePlaceItem,
+  ServicePlaceSearchMode,
+  ServicePlaceSearchResultItem,
+  ServicePlaceSnapshot,
+} from "./service-place";
+import type {
   CreateExpenseItemResponse,
   CreateExpenseFromShoppingListResponse,
   DeleteExpenseItemResponse,
@@ -80,6 +86,37 @@ export type ServiceNodeItem = {
 
 export type ServiceNodesResponse = {
   nodes: ServiceNodeItem[];
+};
+
+export type ServicePlacesSearchResponse = {
+  places: ServicePlaceSearchResultItem[];
+  meta: {
+    query: string;
+    mode: ServicePlaceSearchMode;
+    source: "geosuggest" | "geocoder" | "manual";
+  };
+  warning?: string;
+};
+
+export type CreateServicePlaceInput = {
+  provider: string;
+  providerPlaceId?: string | null;
+  type: "ORGANIZATION" | "ADDRESS" | "CUSTOM";
+  title: string;
+  address: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  category?: string | null;
+  contact?: {
+    phone?: string | null;
+    url?: string | null;
+  } | null;
+  metadata?: unknown | null;
+};
+
+export type CreateServicePlaceResponse = {
+  place: ServicePlaceItem;
+  snapshot: ServicePlaceSnapshot;
 };
 
 export type ServiceEventsResponse = {

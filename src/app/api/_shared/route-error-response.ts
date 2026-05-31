@@ -29,16 +29,22 @@ export function nextResponseFromUnexpectedRouteError(
   console.error(args.logLabel, error);
 
   const prisma = asPrismaLikeError(error);
-  if (prisma?.code === "P1001") {
+  const prismaCode =
+    prisma?.code ??
+    (error && typeof error === "object" && typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : undefined);
+
+  if (prismaCode === "P1001" || prismaCode === "ECONNREFUSED") {
     return NextResponse.json(
       {
         error:
-          "Не удалось подключиться к базе данных. Запустите PostgreSQL и проверьте DATABASE_URL (Prisma P1001).",
+          "Не удалось подключиться к базе данных. Запустите PostgreSQL (`docker compose up -d` в корне репозитория) и проверьте DATABASE_URL.",
       },
       { status: 503 }
     );
   }
-  if (prisma?.code === "P1000" || prisma?.code === "P1017") {
+  if (prismaCode === "P1000" || prismaCode === "P1017") {
     return NextResponse.json(
       {
         error:

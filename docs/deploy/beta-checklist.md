@@ -10,6 +10,7 @@
 - [ ] Два аккаунта: `GET /api/garage` изолированы; чужой `vehicleId` → 404
 - [ ] Ежедневный бэкап Postgres (`deploy/scripts/backup.sh` в cron)
 - [ ] Cron уведомлений (опционально): `scripts/cron-recalculate-all-users.ts`
+- [ ] Cron auth audit (`MT-SEC-055`): purge daily + alerts every 5 min — см. [vps.md §8.1](./vps.md#81-cron-auth-audit-mt-sec-055)
 - [ ] Expo-сборки с `EXPO_PUBLIC_API_BASE_URL=https://...`
 
 ## Smoke (локально против staging)

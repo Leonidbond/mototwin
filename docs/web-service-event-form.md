@@ -80,21 +80,27 @@
 | Когда / пробег | `eventDate`, `odometer`, `engineHours`. |
 | Деньги (верх «Стоимость») | `partsCost`, `laborCost`, `currency`; валюта выбирается в заголовке карточки «Стоимость». |
 | Текст | `comment`, **`serviceProviderNote`** (поле названия сервиса показывается только при исполнителе **Сервис**). |
-| Место установки | **`installLocationAddress`**, **`installLocationLat`**, **`installLocationLng`** — опционально; адрес вручную или через Яндекс.Карты (см. §5.1). |
+| Место обслуживания | legacy `installLocationAddress` / `installLocationLat` / `installLocationLng` + новые `servicePlaceId` / `servicePlaceSnapshot` (см. §5.1). |
 | Исполнитель | `performedBy` (`SELF` \| `SERVICE` \| `OTHER`). |
 | Вложения | `attachReceiptRequested`, `attachFileRequested`. |
 | Напоминание | `nextReminderEnabled`, даты/пробег/моточасы напоминания. |
 | Bundle | `items[]` — `key`, `nodeId`, `actionType`, деталь, SKU, количество, цена детали за единицу, работа, комментарий узла. |
 | Установки (запчасти) | `installedPartsJson`, `installedExpenseItemIds`. |
 
-### 5.1. Место установки и Яндекс.Карты (web)
+### 5.1. ServicePlace picker и Яндекс.Карты (web)
 
-**Где в UI:** карточка «Основная информация» — **`InstallLocationField`** (`cards/InstallLocationField.tsx`), сразу после блока исполнителя / поля «Сервис», перед «Комментарий».
+**Где в UI:** карточка «Основная информация» — **`InstallLocationField`** (`cards/InstallLocationField.tsx`), сразу после блока исполнителя / поля «Сервис», перед «Комментарий». Поле открывает модульный picker `service-place-picker/*`.
 
 **Поведение:**
 
 - Подпись **«Место установки (опционально)»**; текстовое поле адреса (до 500 символов, `ADD_SERVICE_EVENT_INSTALL_LOCATION_MAX_LENGTH` в `@mototwin/domain`).
-- Кнопка **«На карте»** открывает модалку **`YandexMapPlacePickerModal`** — встроенный поиск `SearchControl` Яндекса, клик по организации с подтверждением, клик по карте, обратное геокодирование; по **«Выбрать»** в форму подставляются адрес и координаты.
+- Кнопка **«На карте»** внутри picker открывает `YandexMapPlacePickerModal` (`overlayZIndex=100`, выше overlay picker `z-[90]`, чтобы клики по организациям на карте доходили до JS API).
+- Поиск в picker: `GET /api/service-places/search` (`AUTO|ORGANIZATION|ADDRESS`) + список результатов (до **10** подсказок — лимит Geosuggest API, не полный каталог категории как в Яндекс.Картах).
+- Ручной fallback: `CUSTOM` место (название + адрес).
+- При подтверждении picker создаёт/переиспользует место через `POST /api/service-places` и пишет в форму:
+  - `servicePlaceId`
+  - `servicePlaceSnapshot`
+  - legacy `installLocation*` (для обратной совместимости).
 - Кнопка **×** очищает адрес и координаты.
 - При заданных координатах под полем показывается строка «Координаты: …».
 
@@ -108,21 +114,26 @@
 **Переменная окружения** (корневой `.env`, см. `.env.example`):
 
 ```bash
-NEXT_PUBLIC_YANDEX_MAPS_API_KEY="ключ-из-кабинета-разработчика"
+NEXT_PUBLIC_YANDEX_MAPS_API_KEY="ключ-javascript-api-карт"
 YANDEX_GEOCODER_API_KEY="ключ-http-геокодера"
+YANDEX_GEOSUGGEST_API_KEY="ключ-геосаджест"
+YANDEX_GEOSUGGEST_REFERER="http://localhost:3000/"
 ```
 
-- Нужны оба ключа: JS API (карта + SearchControl) и HTTP Геокодер (fallback-поиск и reverse через `/api/geocode`).
+- Минимум: JS API (`NEXT_PUBLIC_YANDEX_MAPS_API_KEY`) + HTTP Геокодер (`YANDEX_GEOCODER_API_KEY`) для карты, поиска адресов и reverse.
+- Для поиска **организаций** в picker обязателен отдельный ключ **«Геосаджест»** (`YANDEX_GEOSUGGEST_API_KEY`, `types=biz`). Без него режимы `AUTO`/`ORGANIZATION` откатываются на геокодер (адреса, не полный справочник сервисов).
+- **Почему в приложении ~10 сервисов, а в Яндекс.Картах по категории — сотни:** picker использует Geosuggest (автодополнение, max 10 за запрос). Просмотр категории «ремонт мототехники» в картах — другой API/UX; расширение до десятков/сотен результатов — отдельная задача (Places API + пагинация).
 - Без `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` поле адреса работает; кнопка «На карте» скрыта, под полем — подсказка про ключ.
-- Без `YANDEX_GEOCODER_API_KEY` карта откроется, но fallback-поиск и reverse геокодирование будут недоступны.
+- Без `YANDEX_GEOCODER_API_KEY` карта откроется, но поиск и reverse геокодирование будут недоступны.
+- В кабинете Яндекса для JS-ключа в **HTTP Referrer** укажите `localhost` и хост dev-сервера (например `10.5.56.92`), иначе встроенный поиск Яндекса вернёт «Сервер не смог обработать запрос» (401).
 - После добавления ключа перезапустите `npm run dev` (переменные `NEXT_PUBLIC_*` читаются при старте Next.js).
 - В кабинете Яндекса ограничьте ключ по **HTTP Referrer** (для локальной разработки — `localhost`).
 
-**Сохранение:** `normalizeAddServiceEventPayload` отправляет в API `installLocationAddress` и, если адрес непустой и координаты валидны, `installLocationLat` / `installLocationLng`; иначе координаты в БД — `null`. Валидация формы: длина адреса; широта/долгота задаются парой (−90…90 / −180…180).
+**Сохранение:** `normalizeAddServiceEventPayload` отправляет и legacy `installLocation*`, и новые поля `servicePlaceId` / `servicePlaceSnapshot`.
 
-**Expo:** те же поля есть в **`AddServiceEventFormValues`** и API, но UI выбора на карте **пока только на web** (см. [shared-form-contracts.md](./shared-form-contracts.md)).
+**Expo:** в mobile-форме добавлен аналогичный picker по API (`search + manual + persist`) с записью тех же полей (`servicePlaceId`, `servicePlaceSnapshot`, `installLocation*`).
 
-**Миграция БД:** `prisma/migrations/20260516143000_service_event_install_location/`.
+**Миграции БД:** `prisma/migrations/20260516143000_service_event_install_location/` (legacy `installLocation*`), `prisma/migrations/20260531153000_service_places/` (`ServicePlace`, `servicePlaceId`, `servicePlaceSnapshot`).
 
 ---
 
@@ -250,7 +261,8 @@ Expo/mobile намеренно оставляет один экран **`apps/ap
 | `body/ServiceEventModalBodyUnified.tsx` | Двухколоночный layout (matchMedia + grid), плотные отступы в карточке узлов. |
 | `cards/BasicInfoCard.tsx` | Заголовок секции «1. Основная информация» + **`BasicInfoPrimaryFields`**. |
 | `cards/basic-info-primary-fields.tsx` | **Общие** поля основной информации для обоих режимов (шаблон → название → дата/пробег/моточасы → …); подключает **`InstallLocationField`**. |
-| `cards/InstallLocationField.tsx` | Поле «Место установки» + кнопка «На карте» → **`YandexMapPlacePickerModal`**. |
+| `cards/InstallLocationField.tsx` | Поле «Место обслуживания» + запуск `ServicePlacePicker`. |
+| `service-place-picker/*` | Модульные части picker: `ServicePlacePicker`, `ServicePlaceSearchInput`, `ServicePlaceResultsList`, `ServicePlaceMap`, `SelectedServicePlaceCard`, `ManualServicePlaceForm`. |
 | `cards/*` (остальные) | Cost, **`AdditionalCardFast`** (общий для режимов). `AdditionalCardExtended`, `PreliminarySummaryCard` в каталоге, в текущем layout не выводятся. |
 | `bundle/*` | Header, строки fast, карточки extended, totals. |
 | `node-picker/NodePickerModal.tsx` | Общая модалка выбора узла (single/multi); см. [node-picker-reuse.md](./node-picker-reuse.md). |

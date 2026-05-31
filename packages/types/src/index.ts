@@ -60,6 +60,16 @@ export type {
   UpdateServiceEventInput,
 } from "./service-event";
 export type {
+  ServicePlaceType,
+  ServicePlaceProvider,
+  ServicePlaceContact,
+  ServicePlaceBase,
+  ServicePlaceItem,
+  ServicePlaceSnapshot,
+  ServicePlaceSearchMode,
+  ServicePlaceSearchResultItem,
+} from "./service-place";
+export type {
   ServiceBundleTemplateItemWire,
   ServiceBundleTemplateWire,
 } from "./service-bundle-template";
@@ -189,6 +199,9 @@ export type {
   TopServiceNodesResponse,
   ServiceNodesResponse,
   ServiceNodeItem,
+  ServicePlacesSearchResponse,
+  CreateServicePlaceInput,
+  CreateServicePlaceResponse,
   ServiceEventsResponse,
   CreateServiceEventResponse,
   UpdateServiceEventResponse,
@@ -425,6 +438,8 @@ export type {
   AdminImportBatchDetailWire,
   AdminAuditLogEntryWire,
   AdminAuditLogListResponse,
+  AuthAuditLogEntryWire,
+  AuthAuditLogListResponse,
   AdminBrandRefRow,
   AdminNodeRefRow,
   AdminTeamMemberWire,

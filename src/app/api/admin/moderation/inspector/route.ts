@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireAnyAdmin, toAdminErrorResponse } from "@/lib/admin-auth";
 import { loadModerationInspector } from "@/lib/admin-moderation";
+import { parseSearchParamText } from "@/lib/http/input-validation";
 
 export async function GET(request: Request) {
   try {
     await requireAnyAdmin();
     const url = new URL(request.url);
     const kind = url.searchParams.get("kind");
-    const id = url.searchParams.get("id");
+    // MT-SEC-071: cap id length before passing to DB lookup.
+    const id = parseSearchParamText(url.searchParams.get("id"), { max: 64 });
     if (
       !id ||
       (kind !== "PART_MASTER" && kind !== "FITMENT_REPORT" && kind !== "FITMENT_CONFIDENCE")

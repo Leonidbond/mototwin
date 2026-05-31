@@ -14,6 +14,7 @@ import type {
   UpdateVehicleProfilePayload,
   UpdateVehicleStateInput,
 } from "./vehicle";
+import type { ServicePlaceSnapshot } from "./service-place";
 
 /**
  * Stringly-typed form values для одного пункта bundle (узел + детали).
@@ -71,6 +72,10 @@ export type AddServiceEventFormValues = {
   installLocationLat: string;
   /** Долгота (строка из input). */
   installLocationLng: string;
+  /** Persisted user place id to link service events. */
+  servicePlaceId?: string;
+  /** Immutable place snapshot captured at submit time. */
+  servicePlaceSnapshot?: ServicePlaceSnapshot | null;
   attachReceiptRequested: boolean;
   attachFileRequested: boolean;
   nextReminderEnabled: boolean;

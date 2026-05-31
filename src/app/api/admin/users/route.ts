@@ -5,19 +5,21 @@ import type {
 } from "@mototwin/types";
 import { requireAnyAdmin, toAdminErrorResponse } from "@/lib/admin-auth";
 import { loadAdminUserList } from "@/lib/admin-users";
+import { parseSearchParamInt, parseSearchParamText } from "@/lib/http/input-validation";
 
 export async function GET(request: Request) {
   try {
     await requireAnyAdmin();
     const url = new URL(request.url);
+    // MT-SEC-071: cap free-form search; multi-table ILIKE is expensive.
     const filters: AdminUserListFilters = {
-      q: url.searchParams.get("q") ?? undefined,
+      q: parseSearchParamText(url.searchParams.get("q"), { max: 200 }) ?? undefined,
       plan: parsePlan(url.searchParams.get("plan")),
       hasVehicles: parseHasVehicles(url.searchParams.get("hasVehicles")),
       role: parseRole(url.searchParams.get("role")),
       status: parseStatus(url.searchParams.get("status")),
     };
-    const page = Number(url.searchParams.get("page") ?? 1);
+    const page = parseSearchParamInt(url.searchParams.get("page"), { min: 1, max: 10_000, fallback: 1 });
     const data = await loadAdminUserList({ filters, page });
     return NextResponse.json(data);
   } catch (error) {

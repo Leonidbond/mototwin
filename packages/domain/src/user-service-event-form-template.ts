@@ -79,6 +79,8 @@ export function stripAddServiceEventFormValuesForUserTemplate(
     ...form,
     installedExpenseItemIds: [],
     installedPartsJson: "",
+    servicePlaceId: "",
+    servicePlaceSnapshot: null,
   };
 }
 
@@ -126,6 +128,8 @@ export function addServiceEventFormValuesFromUserTemplateJson(
     installLocationAddress: parseString(o.installLocationAddress),
     installLocationLat: parseString(o.installLocationLat),
     installLocationLng: parseString(o.installLocationLng),
+    servicePlaceId: "",
+    servicePlaceSnapshot: null,
     attachReceiptRequested: parseBool(o.attachReceiptRequested, base.attachReceiptRequested),
     attachFileRequested: parseBool(o.attachFileRequested, base.attachFileRequested),
     nextReminderEnabled: parseBool(o.nextReminderEnabled, base.nextReminderEnabled),

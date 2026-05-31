@@ -6,17 +6,16 @@ import { logAdminAction } from "@/lib/admin-audit";
 import { loadAdminTeam } from "@/lib/admin-settings";
 import { prisma } from "@/lib/prisma";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
 // MT-SEC-068 + MT-SEC-070: strict + bounded userId length.
-const PayloadSchema = z
-  .object({
-    userId: z.string().min(1).max(64),
-    adminRole: z
-      .enum(["SUPER_ADMIN", "CATALOG_MANAGER", "MODERATOR", "ANALYST"])
-      .nullable(),
-    reason: z.string().min(3).max(500),
-  })
-  .strict();
+const PayloadSchema = strictObject({
+  userId: z.string().min(1).max(64),
+  adminRole: z
+    .enum(["SUPER_ADMIN", "CATALOG_MANAGER", "MODERATOR", "ANALYST"])
+    .nullable(),
+  reason: z.string().min(3).max(500),
+});
 
 export async function GET() {
   try {

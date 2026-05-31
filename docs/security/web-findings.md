@@ -119,7 +119,7 @@
   - смена пароля / сброс;
   - выпуск/ротация refresh-токена;
   - привязка/отвязка OAuth-аккаунта.
-- **`MT-SEC-055`** (P2) — нет ретеншна логов и алертинга. На бету достаточно, для прода — план.
+- **`MT-SEC-055`** (P2) — **resolved (итерация 5):** 90-дневный purge `AuthAuditLog` + cron alerting на всплески `login.failure`. Внешний paging — ops.
 
 ## A10:2021 — Server-Side Request Forgery
 

@@ -1,14 +1,21 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import { revokeRefreshToken, revokeWebSession } from "@/lib/auth/session-service";
+import {
+  resolveUserIdFromSessionToken,
+  revokeRefreshToken,
+  revokeWebSession,
+} from "@/lib/auth/session-service";
 import { parseJsonBody } from "@/lib/http/parse-json-body";
+import { logAuthEvent } from "@/lib/auth-audit";
 
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    let userId: string | null = null;
     if (sessionCookie) {
+      userId = await resolveUserIdFromSessionToken(sessionCookie);
       await revokeWebSession(sessionCookie);
     }
 
@@ -23,6 +30,14 @@ export async function POST(request: Request) {
       if (refreshToken.length <= 4_096) {
         await revokeRefreshToken(refreshToken);
       }
+    }
+
+    if (userId) {
+      void logAuthEvent({
+        event: "session.revoked",
+        userId,
+        metadata: { cause: "logout" },
+      });
     }
 
     const response = NextResponse.json({ ok: true });

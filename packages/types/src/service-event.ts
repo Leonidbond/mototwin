@@ -1,4 +1,5 @@
 import type { ExpenseItem } from "./expense-item";
+import type { ServicePlaceItem, ServicePlaceSnapshot } from "./service-place";
 
 export type ServiceEventKind = "SERVICE" | "STATE_UPDATE";
 
@@ -86,6 +87,8 @@ export type ServiceEventItem = {
   installLocationAddress?: string | null;
   installLocationLat?: number | null;
   installLocationLng?: number | null;
+  servicePlace?: ServicePlaceItem | null;
+  servicePlaceSnapshot?: ServicePlaceSnapshot | null;
   attachReceiptRequested?: boolean;
   attachFileRequested?: boolean;
   nextReminderEnabled?: boolean;
@@ -154,6 +157,8 @@ export type CreateServiceEventInput = {
   installLocationAddress?: string | null;
   installLocationLat?: number | null;
   installLocationLng?: number | null;
+  servicePlaceId?: string | null;
+  servicePlaceSnapshot?: ServicePlaceSnapshot | null;
   attachReceiptRequested?: boolean;
   attachFileRequested?: boolean;
   nextReminderEnabled?: boolean;

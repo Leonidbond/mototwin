@@ -128,8 +128,25 @@ chmod +x deploy/scripts/backup.sh
 
 ```bash
 # crontab -e (deploy):
-*/15 * * * * cd /opt/mototwin/app && npx tsx scripts/cron-recalculate-all-users.ts >> /var/log/mototwin-cron.log 2>&1
+*/15 * * * * cd /opt/mototwin/app/mototwin && npx tsx scripts/cron-recalculate-all-users.ts >> /var/log/mototwin-cron.log 2>&1
 ```
+
+## 8.1. Cron auth audit (`MT-SEC-055`)
+
+Ежедневная очистка `auth_audit_logs` старше 90 дней и периодическая проверка всплесков `login.failure` (credential stuffing).
+
+```bash
+# crontab -e (deploy):
+# Purge rows older than AUTH_AUDIT_RETENTION_DAYS (default 90) — once per day at 04:00
+0 4 * * * cd /opt/mototwin/app/mototwin && npx tsx scripts/cron-auth-audit-retention.ts --purge-only >> /var/log/mototwin-cron.log 2>&1
+
+# Alert on ≥10 failed logins per IP/user in the last minute — every 5 minutes
+*/5 * * * * cd /opt/mototwin/app/mototwin && npx tsx scripts/cron-auth-audit-retention.ts --alerts-only >> /var/log/mototwin-cron.log 2>&1
+```
+
+Строки с префиксом `[auth-audit:alert]` в `/var/log/mototwin-cron.log` можно подхватить logwatch / Grafana Loki / email-on-grep.
+
+Опциональные env: `AUTH_AUDIT_RETENTION_DAYS`, `AUTH_AUDIT_ALERT_FAILED_LOGIN_THRESHOLD`, `AUTH_AUDIT_ALERT_WINDOW_MS` (см. `.env.example`).
 
 ## 9. Expo
 

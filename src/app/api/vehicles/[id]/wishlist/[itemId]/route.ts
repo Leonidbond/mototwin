@@ -10,7 +10,13 @@ import type { PartWishlistItem } from "@mototwin/types";
 import { isVehicleInCurrentContext } from "../../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../../_shared/current-user-context";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
-import { boundedInt, boundedNumber, boundedText, boundedTextOptional } from "@/lib/http/input-validation";
+import {
+  boundedInt,
+  boundedNumber,
+  boundedText,
+  boundedTextOptional,
+  strictObject,
+} from "@/lib/http/input-validation";
 
 type WishlistSkuRow = Parameters<typeof buildWishlistItemSkuInfo>[0];
 
@@ -38,42 +44,40 @@ const wishlistSkuSelect = {
   },
 } as const;
 
-// MT-SEC-070: bound all user-controlled text/numeric fields.
-const patchWishlistSchema = z
-  .object({
-    title: boundedText({ min: 1, max: 300 }).optional(),
-    quantity: boundedInt({ min: 1, max: 10_000 }).optional(),
-    nodeId: z
-      .union([z.string().max(64), z.null(), z.undefined()])
-      .transform((v) => {
-        if (v === undefined) {
-          return undefined;
-        }
-        if (v === null) {
-          return null;
-        }
-        const t = String(v).trim();
-        return t.length > 0 ? t : null;
-      }),
-    skuId: z
-      .union([z.string().max(64), z.null(), z.undefined()])
-      .transform((v) => {
-        if (v === undefined) {
-          return undefined;
-        }
-        if (v === null) {
-          return null;
-        }
-        const t = String(v).trim();
-        return t.length > 0 ? t : null;
-      }),
-    comment: boundedTextOptional({ max: 2_000 }),
-    status: statusEnum.optional(),
-    costAmount: z.union([boundedNumber({ min: 0, max: 1_000_000_000 }), z.null()]).optional(),
-    currency: z.union([z.string().trim().max(12), z.null()]).optional(),
-    source: z.enum(["RECOMMENDATION", "USER_ADDED"]).optional(),
-  })
-  .strict();
+// MT-SEC-068 + MT-SEC-070: strict + bound all user-controlled text/numeric fields.
+const patchWishlistSchema = strictObject({
+  title: boundedText({ min: 1, max: 300 }).optional(),
+  quantity: boundedInt({ min: 1, max: 10_000 }).optional(),
+  nodeId: z
+    .union([z.string().max(64), z.null(), z.undefined()])
+    .transform((v) => {
+      if (v === undefined) {
+        return undefined;
+      }
+      if (v === null) {
+        return null;
+      }
+      const t = String(v).trim();
+      return t.length > 0 ? t : null;
+    }),
+  skuId: z
+    .union([z.string().max(64), z.null(), z.undefined()])
+    .transform((v) => {
+      if (v === undefined) {
+        return undefined;
+      }
+      if (v === null) {
+        return null;
+      }
+      const t = String(v).trim();
+      return t.length > 0 ? t : null;
+    }),
+  comment: boundedTextOptional({ max: 2_000 }),
+  status: statusEnum.optional(),
+  costAmount: z.union([boundedNumber({ min: 0, max: 1_000_000_000 }), z.null()]).optional(),
+  currency: z.union([z.string().trim().max(12), z.null()]).optional(),
+  source: z.enum(["RECOMMENDATION", "USER_ADDED"]).optional(),
+});
 
 async function resolveLeafNodeIdOrError(nodeId: string) {
   const node = await prisma.node.findUnique({

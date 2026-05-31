@@ -5049,6 +5049,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         </div>
       ) : null}
       <main
+        suppressHydrationWarning
         style={{
           width: "100%",
           minHeight: "100vh",
@@ -5056,6 +5057,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
         }}
       >
         <div
+          suppressHydrationWarning
           style={{
             width: "100%",
             display: "grid",

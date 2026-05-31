@@ -9,6 +9,7 @@ import type {
 import { prisma } from "@/lib/prisma";
 import { getVehicleInCurrentContext } from "../../../_shared/vehicle-context";
 import { toCurrentUserContextErrorResponse } from "../../../_shared/current-user-context";
+import { parseSearchParamText } from "@/lib/http/input-validation";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -63,7 +64,8 @@ function decimalToNumber(value: { toString(): string } | number | null | undefin
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id: vehicleId } = await context.params;
-    const nodeIdParam = request.nextUrl.searchParams.get("nodeId")?.trim() || null;
+    // MT-SEC-071: cap nodeId before DB lookup.
+    const nodeIdParam = parseSearchParamText(request.nextUrl.searchParams.get("nodeId"), { max: 64 });
 
     const vehicle = await getVehicleInCurrentContext(vehicleId, { id: true });
     if (!vehicle) {

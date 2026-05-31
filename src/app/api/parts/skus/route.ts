@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { buildPartSkuViewModel, normalizePartNumber } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
+import { parseSearchParamText } from "@/lib/http/input-validation";
 
 const listInclude = {
   primaryNode: { select: { id: true, code: true, name: true } },
@@ -16,8 +17,9 @@ const listInclude = {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const nodeId = searchParams.get("nodeId")?.trim() || undefined;
-    const searchRaw = searchParams.get("search")?.trim() || "";
+    // MT-SEC-071: cap public-catalog search params (no auth on this endpoint).
+    const nodeId = parseSearchParamText(searchParams.get("nodeId"), { max: 64 }) ?? undefined;
+    const searchRaw = parseSearchParamText(searchParams.get("search"), { max: 200 }) ?? "";
     const activeOnly = searchParams.get("isActive") !== "false";
 
     const where: Prisma.PartSkuWhereInput = {};

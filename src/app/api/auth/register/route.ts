@@ -10,6 +10,7 @@ import {
 import { headers } from "next/headers";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 import { rateLimit, rateLimit429 } from "@/lib/http/rate-limit";
+import { logAuthEvent } from "@/lib/auth-audit";
 
 export async function POST(request: Request) {
   try {
@@ -21,7 +22,14 @@ export async function POST(request: Request) {
       limit: 5,
       windowMs: 5 * 60_000,
     });
-    if (!decision.allowed) return rateLimit429(decision);
+    if (!decision.allowed) {
+      void logAuthEvent({
+        event: "auth.rate_limited",
+        reasonCode: "auth:register",
+        metadata: { endpoint: "/api/auth/register" },
+      });
+      return rateLimit429(decision);
+    }
 
     const body = await parseJsonBody<{
       email?: string;
@@ -43,6 +51,7 @@ export async function POST(request: Request) {
 
     const requestHeaders = await headers();
     const isMobile = requestHeaders.get(MOBILE_CLIENT_HEADER) === "expo";
+    const client = isMobile ? "mobile" : "web";
 
     const garage = await prisma.garage.findUnique({
       where: { id: registered.garageId },
@@ -54,6 +63,12 @@ export async function POST(request: Request) {
       email: registered.email,
       displayName: registered.displayName,
     };
+
+    void logAuthEvent({
+      event: "register.success",
+      userId: registered.userId,
+      metadata: { client },
+    });
 
     if (isMobile) {
       const tokens = await createMobileTokens(registered.userId);
@@ -86,6 +101,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
     if (error instanceof AuthServiceError) {
+      void logAuthEvent({
+        event: "register.failure",
+        reasonCode: error.code,
+      });
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
     // MT-SEC-022: Prisma errors may include unique-constraint field values

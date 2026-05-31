@@ -6,14 +6,13 @@ import { logAdminAction } from "@/lib/admin-audit";
 import { prisma } from "@/lib/prisma";
 import { revokeAllUserSessions } from "@/lib/auth/session-service";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
+import { strictObject } from "@/lib/http/input-validation";
 
-// MT-SEC-068: .strict() prevents extra fields slipping into the audit log payload.
-const UpdateUserBlockSchema = z
-  .object({
-    isBlocked: z.boolean(),
-    reason: z.string().trim().min(3).max(500),
-  })
-  .strict();
+// MT-SEC-068: strictObject prevents extra fields slipping into the audit log payload.
+const UpdateUserBlockSchema = strictObject({
+  isBlocked: z.boolean(),
+  reason: z.string().trim().min(3).max(500),
+});
 
 export async function GET(
   _request: Request,
@@ -89,7 +88,7 @@ export async function PATCH(
     });
 
     if (updated.isBlocked) {
-      await revokeAllUserSessions(id);
+      await revokeAllUserSessions(id, { cause: "admin" });
     }
 
     await logAdminAction({

@@ -8,6 +8,7 @@
 
 - `PlanType`: `FREE`, `RIDER`, `PRO`
 - `ServiceEventEntryMode`: `QUICK`, `DETAILED` — доступ по тарифу (`allowedEntryModes`); см. [subscription-access-mvp.md](./subscription-access-mvp.md)
+- `ServicePlaceType`: `ORGANIZATION`, `ADDRESS`, `CUSTOM`
 - `SubscriptionStatus`: `ACTIVE`, `INACTIVE`, `CANCELED`, `TRIAL`
 - `UsageType`: `CITY`, `HIGHWAY`, `MIXED`, `OFFROAD`
 - `RidingStyle`: `CALM`, `ACTIVE`, `AGGRESSIVE`
@@ -91,15 +92,25 @@
 ### ServiceEvent
 
 - `ServiceEvent` belongs to `Vehicle` and `Node`.
+- Опционально связан с `ServicePlace` через `servicePlaceId`.
 - `eventKind` distinguishes:
   - `SERVICE`
   - `STATE_UPDATE`
 - `mode`: `BASIC` | `ADVANCED` (форма быстрый / подробный бандл).
 - `entryMode`: `QUICK` | `DETAILED` (ограничение тарифа; подробный UI ⇒ `DETAILED`).
 - Stores operation facts: `eventDate`, `odometer`, `engineHours`, `serviceType`, optional cost/comment/parts json.
-- Optional **place of service / installation** (web form «Место установки»): `installLocationAddress` (`String?`), `installLocationLat` / `installLocationLng` (`Float?`); координаты сохраняются только вместе с непустым адресом.
+- Optional **place of service / installation**:
+  - legacy: `installLocationAddress`, `installLocationLat`, `installLocationLng`
+  - new: `servicePlaceId` + immutable `servicePlaceSnapshot` (`Json`) для исторического снимка.
 - Form extras (also on `ServiceEvent`): `performedBy`, `serviceProviderNote`, attachment intent flags, next-service reminder fields — see [web-service-event-form.md](./web-service-event-form.md).
 - A service event with valid `costAmount/currency` is mirrored into linked `ExpenseItem` for analytics.
+
+### ServicePlace
+
+- `ServicePlace` belongs to `User`.
+- Поля: `provider`, `providerPlaceId?`, `type` (`ServicePlaceType`), `title`, `address`, `latitude?`, `longitude?`, `category?`, `contactPhone?`, `contactUrl?`, `metadata?`.
+- Уникальность: `@@unique([userId, provider, providerPlaceId])` для dedupe провайдерных мест.
+- `ServiceEvent` хранит ссылку на запись и JSON snapshot, чтобы старые события не менялись при редактировании карточки места.
 
 ### ExpenseItem
 
