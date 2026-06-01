@@ -43,6 +43,7 @@ export function ServicePlaceMap({ selected, onSelect }: Props) {
         onClose={() => setOpen(false)}
         initialPlace={initialPlace}
         title="Выбор места сервиса"
+        overlayZIndex={120}
         onConfirm={(place) => {
           onSelect({
             provider: "YANDEX",

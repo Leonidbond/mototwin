@@ -29,14 +29,8 @@ type AnyEvent = { get: (key: string) => unknown };
 
 type AnyMap = {
   setCenter: (coords: [number, number], zoom?: number) => void;
-  events: { add: (type: string, cb: (event: AnyEvent) => void) => void };
-  balloon: {
-    events: { add: (type: string, cb: () => void) => void };
-    getPosition: () => number[] | null;
-    getData: () => unknown;
-    close: () => void;
-  };
 };
+
 function readGeoProperty(geo: AnyGeoObject, key: string): string {
   try {
     const v = geo.properties?.get?.(key);
@@ -73,13 +67,6 @@ function placeFromGeoObject(raw: unknown): YandexMapPlace | null {
   return { address, lat, lng };
 }
 
-function placeFromBalloonData(raw: unknown): YandexMapPlace | null {
-  const direct = placeFromGeoObject(raw);
-  if (direct) return direct;
-  const wrapped = raw as { geoObject?: unknown; GeoObject?: unknown } | null;
-  return placeFromGeoObject(wrapped?.geoObject ?? wrapped?.GeoObject ?? null);
-}
-
 function labelFromBalloonProperties(data: unknown): string | undefined {
   const name = readBalloonProperty(data, "name");
   const desc = readBalloonProperty(data, "description");
@@ -101,38 +88,55 @@ export function YandexMapPlacePickerModal({
 }: YandexMapPlacePickerModalProps) {
   const apiKey = getYandexMapsApiKey();
   const mapRef = useRef<AnyMap | null>(null);
-  const boundMapInstancesRef = useRef(new WeakSet<AnyMap>());
   const fallbackQueryInFlightRef = useRef<string | null>(null);
 
   const [draft, setDraft] = useState<YandexMapPlace | null>(initialPlace ?? null);
-  const [pendingPlace, setPendingPlace] = useState<YandexMapPlace | null>(null);
   const [fallbackPlaces, setFallbackPlaces] = useState<YandexMapPlace[]>([]);
   const [fallbackLoading, setFallbackLoading] = useState(false);
+  const [resolvingCoords, setResolvingCoords] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [mapSearchQuery, setMapSearchQuery] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setDraft(initialPlace ?? null);
-    setPendingPlace(null);
     setFallbackPlaces([]);
     setLoadError("");
     setMapSearchQuery("");
+    setResolvingCoords(false);
     fallbackQueryInFlightRef.current = null;
   }, [open, initialPlace]);
 
-  const setPendingFromCoords = useCallback((place: YandexMapPlace) => {
-    setPendingPlace(place);
-    mapRef.current?.setCenter([place.lat, place.lng], 16);
-  }, []);
-
   const applyPlace = useCallback((place: YandexMapPlace) => {
     setDraft(place);
-    setPendingPlace(null);
     setFallbackPlaces([]);
     setLoadError("");
     mapRef.current?.setCenter([place.lat, place.lng], 16);
   }, []);
+
+  const resolveAndApplyCoords = useCallback(
+    async (lat: number, lng: number, labelHint?: string) => {
+      setResolvingCoords(true);
+      setLoadError("");
+      try {
+        const { place } = await geocodeCoordinates(lat, lng);
+        const address =
+          labelHint && !place.address.toLowerCase().includes(labelHint.toLowerCase())
+            ? `${labelHint}, ${place.address}`
+            : place.address;
+        applyPlace({ ...place, address });
+      } catch {
+        applyPlace({
+          address: labelHint ?? `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+          lat,
+          lng,
+        });
+      } finally {
+        setResolvingCoords(false);
+      }
+    },
+    [applyPlace]
+  );
 
   const runFallbackSearch = useCallback(async (rawQuery: string) => {
     const query = rawQuery.trim();
@@ -147,7 +151,7 @@ export function YandexMapPlacePickerModal({
         setLoadError(warning);
       } else if (places.length === 0) {
         setLoadError(
-          "Ничего не найдено. Добавьте город к запросу (например: «мотосервис, Москва») или выберите точку на карте."
+          "Ничего не найдено. Добавьте город к запросу (например: «мотосервис, Москва») или кликните точку на карте."
         );
       } else {
         setLoadError("");
@@ -161,81 +165,31 @@ export function YandexMapPlacePickerModal({
     }
   }, []);
 
-  const selectFromBalloon = useCallback((lat: number, lng: number, labelHint?: string) => {
-    void (async () => {
-      setLoadError("");
-      try {
-        const { place } = await geocodeCoordinates(lat, lng);
-        const address =
-          labelHint && !place.address.toLowerCase().includes(labelHint.toLowerCase())
-            ? `${labelHint}, ${place.address}`
-            : place.address;
-        const next = { ...place, address };
-        setPendingPlace(next);
-        mapRef.current?.setCenter([next.lat, next.lng], 16);
-      } catch {
-        const fallback: YandexMapPlace = { address: labelHint ?? `${lat.toFixed(6)}, ${lng.toFixed(6)}`, lat, lng };
-        setPendingPlace(fallback);
-        mapRef.current?.setCenter([fallback.lat, fallback.lng], 16);
+  const handleMapClick = useCallback(
+    (event: AnyEvent) => {
+      const target = event.get("target");
+      const coords = event.get("coords") as number[] | null;
+      const placeFromTarget = placeFromGeoObject(target);
+
+      if (placeFromTarget) {
+        applyPlace(placeFromTarget);
+        return;
       }
-    })();
-  }, []);
 
-  const handleMapInstance = useCallback(
-    (instance: unknown) => {
-      mapRef.current = (instance as AnyMap) ?? null;
-      if (!instance) return;
+      if (!coords || coords.length < 2) return;
+      const lat = Number(coords[0]);
+      const lng = Number(coords[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-      const map = instance as AnyMap;
-      if (boundMapInstancesRef.current.has(map)) return;
-      boundMapInstancesRef.current.add(map);
-
-      const handlePoiPick = (lat: number, lng: number, data: unknown) => {
-        const placeFromData = placeFromBalloonData(data);
-        const label = labelFromBalloonProperties(data);
-        if (placeFromData) {
-          setPendingFromCoords(placeFromData);
-          return;
-        }
-        if (label) {
-          setPendingFromCoords({ address: label, lat, lng });
-          return;
-        }
-        selectFromBalloon(lat, lng, label);
-      };
-
-      map.balloon.events.add("open", () => {
-        const pos = map.balloon.getPosition();
-        if (!pos || pos.length < 2) return;
-        const lat = Number(pos[0]);
-        const lng = Number(pos[1]);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-        const data = map.balloon.getData();
-        handlePoiPick(lat, lng, data);
-        map.balloon.close();
-      });
-
-      map.events.add("click", (event: AnyEvent) => {
-        const target = event.get("target");
-        const coords = event.get("coords") as number[] | null;
-        const placeFromTarget = placeFromGeoObject(target);
-
-        if (placeFromTarget) {
-          setPendingFromCoords(placeFromTarget);
-          return;
-        }
-
-        if (!coords || coords.length < 2) return;
-        const lat = Number(coords[0]);
-        const lng = Number(coords[1]);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-        const label = labelFromBalloonProperties(target);
-        handlePoiPick(lat, lng, label ? target : null);
-      });
+      const label = labelFromBalloonProperties(target);
+      void resolveAndApplyCoords(lat, lng, label);
     },
-    [selectFromBalloon, setPendingFromCoords]
+    [applyPlace, resolveAndApplyCoords]
   );
+
+  const handleMapInstance = useCallback((instance: unknown) => {
+    mapRef.current = (instance as AnyMap) ?? null;
+  }, []);
 
   const submitMapSearch = useCallback(() => {
     void runFallbackSearch(mapSearchQuery);
@@ -288,7 +242,7 @@ export function YandexMapPlacePickerModal({
                 </button>
               </div>
               <p className="m-0 text-[11px] leading-snug" style={{ color: productSemanticColors.textMuted }}>
-                Для поиска сервисов укажите город. Можно также кликнуть организацию на карте.
+                Кликните точку или организацию на карте — адрес подставится автоматически, затем нажмите «Выбрать».
               </p>
             </div>
 
@@ -315,6 +269,7 @@ export function YandexMapPlacePickerModal({
               <YMaps query={{ apikey: apiKey, lang: "ru_RU" }}>
                 <Map
                   instanceRef={handleMapInstance as (value: unknown) => void}
+                  onClick={handleMapClick as (...args: unknown[]) => unknown}
                   defaultState={{ center, zoom }}
                   width="100%"
                   height="360px"
@@ -326,43 +281,14 @@ export function YandexMapPlacePickerModal({
                       properties={{ balloonContent: draft.address, hintContent: draft.address }}
                     />
                   ) : null}
-                  {pendingPlace ? (
-                    <Placemark
-                      geometry={[pendingPlace.lat, pendingPlace.lng]}
-                      properties={{ balloonContent: pendingPlace.address, hintContent: pendingPlace.address }}
-                    />
-                  ) : null}
                 </Map>
               </YMaps>
             </div>
 
-            {pendingPlace ? (
-              <div className="rounded-xl border px-3 py-2.5" style={{ borderColor: productSemanticColors.border }}>
-                <p className="m-0 text-xs leading-snug" style={{ color: productSemanticColors.textSecondary }}>
-                  Найдена организация: {pendingPlace.address}
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => applyPlace(pendingPlace)}
-                    className="rounded-lg px-3 py-1.5 text-xs font-semibold"
-                    style={{
-                      backgroundColor: productSemanticColors.primaryAction,
-                      color: productSemanticColors.onPrimaryAction,
-                    }}
-                  >
-                    Выбрать эту организацию
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingPlace(null)}
-                    className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
-                    style={{ borderColor: productSemanticColors.border, color: productSemanticColors.textSecondary }}
-                  >
-                    Отменить
-                  </button>
-                </div>
-              </div>
+            {resolvingCoords ? (
+              <p className="text-[11px]" style={{ color: productSemanticColors.textMuted }}>
+                Определяем адрес…
+              </p>
             ) : null}
 
             {fallbackLoading ? (
@@ -390,11 +316,15 @@ export function YandexMapPlacePickerModal({
           </p>
         ) : (
           <p className="text-xs" style={{ color: productSemanticColors.textMuted }}>
-            Место не выбрано
+            Место не выбрано — кликните на карте или выберите из результатов поиска
           </p>
         )}
 
-        <PickerFooter onClose={onClose} onConfirm={() => draft && onConfirm(draft)} confirmDisabled={!draft} />
+        <PickerFooter
+          onClose={onClose}
+          onConfirm={() => draft && onConfirm(draft)}
+          confirmDisabled={!draft || resolvingCoords}
+        />
       </div>
     </PickerOverlayShell>
   );
