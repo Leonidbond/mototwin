@@ -1,5 +1,5 @@
 import type { ServiceEventMode } from "@prisma/client";
-import type { ExpenseItem, ServiceBundleItem, ServiceEventItem, ServicePlaceType } from "@mototwin/types";
+import type { ExpenseItem, ServiceBundleItem, ServiceEventItem, ServicePlaceSnapshot, ServicePlaceType } from "@mototwin/types";
 import { getServiceActionTypeLabelRu } from "@mototwin/domain";
 
 type DecimalLike = { toString(): string } | number | null;
@@ -57,6 +57,8 @@ export type RawServiceEventRow = {
     contactUrl: string | null;
     category: string | null;
     metadata: unknown | null;
+    createdAt: Date;
+    updatedAt: Date;
   } | null;
   items?: Array<{
     id: string;
@@ -189,13 +191,17 @@ export function serializeServiceEventRow(row: RawServiceEventRow): ServiceEventI
           address: row.servicePlace.address,
           latitude: row.servicePlace.latitude,
           longitude: row.servicePlace.longitude,
-          contactPhone: row.servicePlace.contactPhone,
-          contactUrl: row.servicePlace.contactUrl,
           category: row.servicePlace.category,
+          contact: {
+            phone: row.servicePlace.contactPhone,
+            url: row.servicePlace.contactUrl,
+          },
           metadata: row.servicePlace.metadata ?? null,
+          createdAt: row.servicePlace.createdAt.toISOString(),
+          updatedAt: row.servicePlace.updatedAt.toISOString(),
         }
       : null,
-    servicePlaceSnapshot: row.servicePlaceSnapshot ?? null,
+    servicePlaceSnapshot: (row.servicePlaceSnapshot as ServicePlaceSnapshot | null) ?? null,
     attachReceiptRequested: Boolean(row.attachReceiptRequested),
     attachFileRequested: Boolean(row.attachFileRequested),
     nextReminderEnabled: Boolean(row.nextReminderEnabled),

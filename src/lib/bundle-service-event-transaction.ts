@@ -174,6 +174,8 @@ const SERVICE_EVENT_INCLUDE = {
       contactUrl: true,
       category: true,
       metadata: true,
+      createdAt: true,
+      updatedAt: true,
     },
   },
 } satisfies Prisma.ServiceEventInclude;

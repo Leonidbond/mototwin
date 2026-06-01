@@ -39,7 +39,7 @@ export type PartsAdvancedFilterState = {
   maxPrice: string;
 };
 
-export type PartsNodeFilterOption = { id: string; name: string; level: number };
+export type PartsNodeFilterOption = { id: string; name: string; level?: number };
 
 const PARTS_SELECTION_INITIAL_VISIBLE_COUNT = 4;
 const PARTS_SELECTION_COLLAPSED_VISIBLE_COUNT = 5;
@@ -860,7 +860,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
                         <option value="">Все узлы</option>
                         {nodeFilterOptions.map((option) => (
                           <option key={option.id} value={option.id}>
-                            {"\u00A0".repeat(Math.max(0, option.level - 1) * 2)}
+                            {"\u00A0".repeat(Math.max(0, (option.level ?? 1) - 1) * 2)}
                             {option.name}
                           </option>
                         ))}

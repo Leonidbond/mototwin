@@ -22,7 +22,7 @@ export type WishlistNodeSelectOption = {
   id: string;
   code: string;
   name: string;
-  level: number;
+  level?: number;
   pathLabel?: string;
   planLocked?: boolean;
 };
@@ -35,6 +35,7 @@ export type WishlistItemEditModalProps = {
   wishlistForm: PartWishlistFormValues;
   setWishlistForm: React.Dispatch<React.SetStateAction<PartWishlistFormValues>>;
   wishlistNodeOptions: WishlistNodeSelectOption[];
+  wishlistNodeTopOptions?: WishlistNodeSelectOption[];
   wishlistNodeRequiredError: boolean;
   wishlistEditingSourceItem: PartWishlistItem | undefined;
   wishlistSkuQuery: string;

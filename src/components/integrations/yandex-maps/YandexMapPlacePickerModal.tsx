@@ -414,8 +414,7 @@ function PickerOverlayShell({
   return (
     <div
       className="fixed inset-0 flex items-start justify-center overflow-y-auto px-3 py-6 sm:items-center"
-      style={{ zIndex: overlayZIndex }}
-      style={{ backgroundColor: productSemanticColors.overlayModal }}
+      style={{ zIndex: overlayZIndex, backgroundColor: productSemanticColors.overlayModal }}
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();

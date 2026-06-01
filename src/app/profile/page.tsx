@@ -378,27 +378,25 @@ export default function ProfilePage() {
     [leafServiceNodes, serviceNodes]
   );
 
-  const topNodePickerOptions = useMemo(
-    (): SharedNodePickerOption[] =>
-      topServiceNodes
-        .map((node) => {
-          const catalogNode =
-            leafServiceNodes.find((item) => item.id === node.id) ??
-            leafServiceNodes.find((item) => item.code === node.code);
-          if (!catalogNode) {
-            return null;
-          }
-          return {
-            id: catalogNode.id,
-            code: node.code,
-            name: node.name,
-            level: catalogNode.level,
-            pathLabel: catalogNodeAncestorPathLabelRu(serviceNodes, catalogNode.id),
-          };
-        })
-        .filter((option): option is SharedNodePickerOption => option !== null),
-    [leafServiceNodes, serviceNodes, topServiceNodes]
-  );
+  const topNodePickerOptions = useMemo((): SharedNodePickerOption[] => {
+    return topServiceNodes.flatMap((node) => {
+      const catalogNode =
+        leafServiceNodes.find((item) => item.id === node.id) ??
+        leafServiceNodes.find((item) => item.code === node.code);
+      if (!catalogNode) {
+        return [];
+      }
+      return [
+        {
+          id: catalogNode.id,
+          code: node.code,
+          name: node.name,
+          level: catalogNode.level,
+          pathLabel: catalogNodeAncestorPathLabelRu(serviceNodes, catalogNode.id),
+        },
+      ];
+    });
+  }, [leafServiceNodes, serviceNodes, topServiceNodes]);
 
   const favoriteNodeIds = useMemo(() => {
     const codeSet = new Set(editableFavoriteCodes);
