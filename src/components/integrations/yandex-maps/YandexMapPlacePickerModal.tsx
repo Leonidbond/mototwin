@@ -29,6 +29,12 @@ type AnyEvent = { get: (key: string) => unknown };
 
 type AnyMap = {
   setCenter: (coords: [number, number], zoom?: number) => void;
+  balloon: {
+    events: { add: (type: string, cb: () => void) => void };
+    getPosition: () => number[] | null;
+    getData: () => unknown;
+    close: () => void;
+  };
 };
 
 function readGeoProperty(geo: AnyGeoObject, key: string): string {
@@ -67,6 +73,13 @@ function placeFromGeoObject(raw: unknown): YandexMapPlace | null {
   return { address, lat, lng };
 }
 
+function placeFromBalloonData(raw: unknown): YandexMapPlace | null {
+  const direct = placeFromGeoObject(raw);
+  if (direct) return direct;
+  const wrapped = raw as { geoObject?: unknown; GeoObject?: unknown } | null;
+  return placeFromGeoObject(wrapped?.geoObject ?? wrapped?.GeoObject ?? null);
+}
+
 function labelFromBalloonProperties(data: unknown): string | undefined {
   const name = readBalloonProperty(data, "name");
   const desc = readBalloonProperty(data, "description");
@@ -74,7 +87,19 @@ function labelFromBalloonProperties(data: unknown): string | undefined {
   if (name && desc) return `${name}, ${desc}`;
   if (name) return name;
   if (desc) return desc;
-  if (balloonBody) return balloonBody;
+  if (balloonBody) {
+    const plain = balloonBody.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (plain) return plain;
+  }
+
+  const record = data as Record<string, unknown> | null;
+  if (typeof record?.name === "string" && record.name.trim()) return record.name.trim();
+
+  const geocoderText = (
+    data as { metaDataProperty?: { GeocoderMetaData?: { text?: string } } } | null
+  )?.metaDataProperty?.GeocoderMetaData?.text?.trim();
+  if (geocoderText) return geocoderText;
+
   return undefined;
 }
 
@@ -88,6 +113,7 @@ export function YandexMapPlacePickerModal({
 }: YandexMapPlacePickerModalProps) {
   const apiKey = getYandexMapsApiKey();
   const mapRef = useRef<AnyMap | null>(null);
+  const boundMapInstancesRef = useRef(new WeakSet<AnyMap>());
   const fallbackQueryInFlightRef = useRef<string | null>(null);
 
   const [draft, setDraft] = useState<YandexMapPlace | null>(initialPlace ?? null);
@@ -165,6 +191,23 @@ export function YandexMapPlacePickerModal({
     }
   }, []);
 
+  const pickFromPoi = useCallback(
+    (lat: number, lng: number, data: unknown) => {
+      const placeFromData = placeFromBalloonData(data);
+      const label = labelFromBalloonProperties(data);
+      if (placeFromData) {
+        applyPlace(placeFromData);
+        return;
+      }
+      if (label) {
+        void resolveAndApplyCoords(lat, lng, label);
+        return;
+      }
+      void resolveAndApplyCoords(lat, lng);
+    },
+    [applyPlace, resolveAndApplyCoords]
+  );
+
   const handleMapClick = useCallback(
     (event: AnyEvent) => {
       const target = event.get("target");
@@ -187,9 +230,28 @@ export function YandexMapPlacePickerModal({
     [applyPlace, resolveAndApplyCoords]
   );
 
-  const handleMapInstance = useCallback((instance: unknown) => {
-    mapRef.current = (instance as AnyMap) ?? null;
-  }, []);
+  const handleMapInstance = useCallback(
+    (instance: unknown) => {
+      mapRef.current = (instance as AnyMap) ?? null;
+      if (!instance) return;
+
+      const map = instance as AnyMap;
+      if (boundMapInstancesRef.current.has(map)) return;
+      boundMapInstancesRef.current.add(map);
+
+      // Built-in POI / org pins open Yandex balloon instead of map onClick.
+      map.balloon.events.add("open", () => {
+        const pos = map.balloon.getPosition();
+        if (!pos || pos.length < 2) return;
+        const lat = Number(pos[0]);
+        const lng = Number(pos[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        pickFromPoi(lat, lng, map.balloon.getData());
+        map.balloon.close();
+      });
+    },
+    [pickFromPoi]
+  );
 
   const submitMapSearch = useCallback(() => {
     void runFallbackSearch(mapSearchQuery);
