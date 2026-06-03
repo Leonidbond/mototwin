@@ -11,6 +11,12 @@ import { refreshMobileSessionIfNeeded } from "../src/create-mobile-api-client";
 
 void SplashScreen.preventAutoHideAsync();
 
+/** Публичные маршруты без сессии (как `/` на web). */
+function isPublicMobileRoute(segments: readonly string[]): boolean {
+  const first = segments[0];
+  return first == null || first === "index" || first === "login";
+}
+
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
@@ -43,7 +49,8 @@ export default function RootLayout() {
       const ok = tokens ? await refreshMobileSessionIfNeeded() : false;
       if (cancelled) return;
       const onLogin = segments[0] === "login";
-      if (!ok && !onLogin) {
+      const isPublic = isPublicMobileRoute(segments);
+      if (!ok && !isPublic) {
         router.replace("/login");
       } else if (ok && onLogin) {
         router.replace("/");
