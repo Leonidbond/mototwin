@@ -54,9 +54,9 @@ export async function searchServicePlaces(params: SearchServicePlacesParams): Pr
       });
       places = suggested.map((item) => ({
         provider: "YANDEX",
-        providerPlaceId: null,
-        type: "ORGANIZATION",
-        title: item.address,
+        providerPlaceId: item.providerPlaceId ?? null,
+        type: "ORGANIZATION" as const,
+        title: item.label?.trim() || item.address,
         address: item.address,
         latitude: item.lat,
         longitude: item.lng,

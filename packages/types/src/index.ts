@@ -88,6 +88,7 @@ export type {
   VehicleDetail,
   VehicleDetailApiRecord,
   VehicleTechnicalSpecsView,
+  GarageAttentionItemWire,
   GarageAttentionSummaryWire,
   GarageVehicleItem,
   VehicleSummaryViewModel,

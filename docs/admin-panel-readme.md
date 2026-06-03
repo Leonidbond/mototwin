@@ -52,7 +52,10 @@ The script hits every admin page (17 routes) and every read-only admin API (17 e
 | `/admin/dictionaries`                 | Brands and node tree (read-only)                     |
 | `/admin/reports`                      | Hub of links into pre-filtered sections              |
 | `/admin/settings`                     | Team role management (SUPER_ADMIN only)              |
-| `/admin/service-rules`, `/admin/notifications`, `/admin/subscriptions` | Stubs marked "В планах" |
+| `/admin/service-rules`, `/admin/service-rules/new` | Список регламентов ТО + форма создания (`POST /api/admin/service-rules`) |
+| `/admin/notifications` | Журнал доставки уведомлений (read-only) |
+| `/admin/subscriptions` | Сводка подписок (управление Stripe — в планах) |
+| `/admin/fitment/conflicts`, `/admin/fitment/conflicts/[id]` | Legacy URLs → redirect на `/admin/moderation?queue=mixedFitments` |
 
 The legacy `/moderation/fitment` 308-redirects to `/admin/moderation`.
 

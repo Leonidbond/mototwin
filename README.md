@@ -54,6 +54,8 @@ In a second terminal, start the web API for local data: `npm run dev` (port 3000
 - [`docs/user-settings-mvp.md`](docs/user-settings-mvp.md) — настройки профиля
 - [`docs/custom-top-nodes-mvp.md`](docs/custom-top-nodes-mvp.md) — персональный ТОП узлов и вид дерева
 - [`docs/garage-dashboard-mvp.md`](docs/garage-dashboard-mvp.md) — garage semantics and parity notes
+- [`docs/parity/cross-platform-parity.md`](docs/parity/cross-platform-parity.md) — web ↔ Expo parity matrix
+- [`docs/mototwin_recent_implementation_notes_ru.md`](docs/mototwin_recent_implementation_notes_ru.md) — сводка недавних изменений UI/API (§10 — навигация 2026-06)
 
 ssh root@195.24.71.143  
 ssh mototwin-vps

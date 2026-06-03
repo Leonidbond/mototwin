@@ -42,7 +42,7 @@ import type {
   TopServiceNodeItem,
   UserServiceEventFormTemplateWire,
 } from "@mototwin/types";
-
+import { useRouter } from "next/navigation";
 import { ServiceEventModeControl } from "./ServiceEventModeControl";
 import { PostSaveExplainer } from "./PostSaveExplainer";
 import { BasicInfoCard } from "./cards/BasicInfoCard";
@@ -270,6 +270,7 @@ function ServiceEventFormInner({
   pageSubtitle,
   pageBreadcrumbs = [],
 }: ServiceEventFormInnerProps) {
+  const router = useRouter();
   const [form, setForm] = useState<AddServiceEventFormValues>(() => cloneAddServiceEventForm(initialForm));
   const [localValidationError, setLocalValidationError] = useState("");
   const [skuSearchRowIndex, setSkuSearchRowIndex] = useState(0);
@@ -1082,6 +1083,20 @@ function ServiceEventFormInner({
       form={form}
       editingServiceEventId={editingServiceEventId}
       onPatch={onPatch}
+      onRepeat={
+        editingServiceEventId
+          ? () => {
+              const returnTo = encodeURIComponent(
+                typeof window !== "undefined"
+                  ? `${window.location.pathname}${window.location.search}`
+                  : `/vehicles/${vehicleId}/service-log`
+              );
+              router.push(
+                `/vehicles/${vehicleId}/service-events/new?repeatOf=${encodeURIComponent(editingServiceEventId)}&returnTo=${returnTo}`
+              );
+            }
+          : undefined
+      }
     />
   );
 

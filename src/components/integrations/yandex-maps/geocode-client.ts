@@ -1,3 +1,4 @@
+import { normalizeApiPlace } from "./map-place-utils";
 import type { YandexMapPlace } from "./types";
 
 type GeocodeApiResponse = {
@@ -39,8 +40,15 @@ export type PlaceSearchResult = {
   source?: string;
 };
 
-export async function searchPlacesViaApi(query: string): Promise<PlaceSearchResult> {
+export async function searchPlacesViaApi(
+  query: string,
+  options?: { centerLonLat?: [number, number] }
+): Promise<PlaceSearchResult> {
   const params = new URLSearchParams({ query, list: "1", biz: "1" });
+  if (options?.centerLonLat) {
+    const [lng, lat] = options.centerLonLat;
+    params.set("ll", `${lng},${lat}`);
+  }
   const res = await fetch(`/api/geocode?${params.toString()}`, { cache: "no-store" });
   const data = (await res.json()) as {
     places?: YandexMapPlace[];
@@ -52,7 +60,36 @@ export async function searchPlacesViaApi(query: string): Promise<PlaceSearchResu
     throw new Error(data.error ?? "Не удалось выполнить поиск");
   }
   return {
-    places: data.places ?? [],
+    places: (data.places ?? []).map(normalizeApiPlace),
+    warning: data.warning,
+    source: data.meta?.source,
+  };
+}
+
+export async function searchPlacesNearViaApi(
+  lat: number,
+  lng: number,
+  queryHint?: string
+): Promise<PlaceSearchResult> {
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lng: String(lng),
+    nearbyBiz: "1",
+  });
+  const hint = queryHint?.trim();
+  if (hint) params.set("query", hint);
+  const res = await fetch(`/api/geocode?${params.toString()}`, { cache: "no-store" });
+  const data = (await res.json()) as {
+    places?: YandexMapPlace[];
+    error?: string;
+    warning?: string;
+    meta?: { source?: string };
+  };
+  if (!res.ok) {
+    throw new Error(data.error ?? "Не удалось найти организации рядом");
+  }
+  return {
+    places: (data.places ?? []).map(normalizeApiPlace),
     warning: data.warning,
     source: data.meta?.source,
   };

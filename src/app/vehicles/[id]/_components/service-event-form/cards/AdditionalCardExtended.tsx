@@ -104,7 +104,7 @@ export function AdditionalCardExtended({
 }: AdditionalCardExtendedProps) {
   const locked =
     Boolean(editingServiceEventId) &&
-    (form.attachReceiptRequested || form.attachFileRequested || form.nextReminderEnabled);
+    (form.nextReminderEnabled);
 
   return (
     <div style={SECTION_CARD_STYLE}>
@@ -125,27 +125,6 @@ export function AdditionalCardExtended({
         </p>
       ) : (
         <div className="mt-2 divide-y" style={{ borderColor: productSemanticColors.border }}>
-          <Row
-            icon={
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M4 7h3l1.5-2h7L17 7h3a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <circle cx="12" cy="13" r="3.25" stroke="currentColor" strokeWidth="1.5" />
-              </svg>
-            }
-            title="Прикрепить фото / чек"
-            subtitle="Добавить фотографии или чек по обслуживанию"
-          >
-            <ToggleSwitch
-              checked={form.attachReceiptRequested}
-              onChange={(next) => onPatch({ attachReceiptRequested: next })}
-              label="Прикрепить фото / чек"
-            />
-          </Row>
-          <div style={dividerStyle} />
           <Row
             icon={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>

@@ -1,65 +1,58 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { isYandexMapsConfigured, YandexMapPlacePickerModal } from "@/components/integrations/yandex-maps";
+import { useMemo } from "react";
+import { isYandexMapsConfigured, YandexMapPlacePickerModal, type YandexMapPlace } from "@/components/integrations/yandex-maps";
 import type { ServicePlaceDraft } from "./types";
-import { SERVICE_EVENT_PARTS_UI } from "../styles";
 
 type Props = {
   selected: ServicePlaceDraft | null;
+  markerPlaces: YandexMapPlace[];
   onSelect: (place: ServicePlaceDraft) => void;
 };
 
-export function ServicePlaceMap({ selected, onSelect }: Props) {
-  const [open, setOpen] = useState(false);
+function toMapPlace(place: ServicePlaceDraft): YandexMapPlace | null {
+  if (place.latitude == null || place.longitude == null) return null;
+  return {
+    address: place.address,
+    lat: place.latitude,
+    lng: place.longitude,
+    label: place.title || undefined,
+    providerPlaceId: place.providerPlaceId ?? null,
+  };
+}
+
+function toServicePlaceDraft(place: YandexMapPlace): ServicePlaceDraft {
+  return {
+    provider: "YANDEX",
+    providerPlaceId: place.providerPlaceId ?? null,
+    type: "ORGANIZATION",
+    title: place.label?.trim() || place.address,
+    address: place.address,
+    latitude: place.lat,
+    longitude: place.lng,
+    category: null,
+    contact: null,
+    metadata: null,
+  };
+}
+
+export function ServicePlaceMap({ selected, markerPlaces, onSelect }: Props) {
   const mapsAvailable = isYandexMapsConfigured();
-  const initialPlace = useMemo(() => {
-    if (!selected?.latitude || !selected?.longitude) return null;
-    return {
-      address: selected.address,
-      lat: selected.latitude,
-      lng: selected.longitude,
-    };
-  }, [selected]);
+  const initialPlace = useMemo(() => (selected ? toMapPlace(selected) : null), [selected]);
 
   if (!mapsAvailable) return null;
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded-xl border px-3 py-2 text-xs font-semibold"
-        style={{
-          borderColor: SERVICE_EVENT_PARTS_UI.border,
-          backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
-          color: SERVICE_EVENT_PARTS_UI.text,
-        }}
-      >
-        Выбрать на карте
-      </button>
-      <YandexMapPlacePickerModal
-        open={open}
-        onClose={() => setOpen(false)}
-        initialPlace={initialPlace}
-        title="Выбор места сервиса"
-        overlayZIndex={120}
-        onConfirm={(place) => {
-          onSelect({
-            provider: "YANDEX",
-            providerPlaceId: null,
-            type: "ADDRESS",
-            title: place.address,
-            address: place.address,
-            latitude: place.lat,
-            longitude: place.lng,
-            category: null,
-            contact: null,
-            metadata: null,
-          });
-          setOpen(false);
-        }}
-      />
-    </>
+    <YandexMapPlacePickerModal
+      embedded
+      open
+      hideSearch
+      markerPlaces={markerPlaces}
+      initialPlace={initialPlace}
+      title="Выбор места сервиса"
+      onClose={() => {}}
+      onConfirm={(place) => onSelect(toServicePlaceDraft(place))}
+      onPlaceChange={(place) => onSelect(toServicePlaceDraft(place))}
+    />
   );
 }

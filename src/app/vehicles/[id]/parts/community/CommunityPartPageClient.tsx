@@ -1667,36 +1667,8 @@ export function CommunityPartPageClient(props: {
                     </button>
                   );
                 })}
-                <button
-                  type="button"
-                  disabled
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "10px 14px",
-                    borderRadius: 999,
-                    border: `1px solid ${REF.panelBorder}`,
-                    opacity: 0.55,
-                    color: REF.muted,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "default",
-                  }}
-                >
-                  {iconWrap(22, <IcoBan />)}
-                  Не подошла
-                </button>
               </div>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 13, color: REF.muted }}>
-                  Выберите «Установил» или «Не подошла», чтобы заполнить отчёт.
-                </span>
-              </div>
-            )}
-
-            {lifeStatus === "rejected" ? (
+            ) : lifeStatus === "rejected" ? (
               <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
                 {iconWrap(22, <IcoBan />)}
                 <span style={{ fontWeight: 700, color: REF.text }}>Не подошла — зафиксируем как несовместимую с узлом</span>

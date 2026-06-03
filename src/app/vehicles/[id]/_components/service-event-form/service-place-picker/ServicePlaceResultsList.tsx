@@ -19,7 +19,7 @@ export function ServicePlaceResultsList({ results, selectedKey, onSelect }: Prop
   }
 
   return (
-    <div className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
+    <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1">
       {results.map((item, index) => {
         const key = `${item.provider}|${item.providerPlaceId ?? ""}|${item.address}|${index}`;
         const active = selectedKey === key;

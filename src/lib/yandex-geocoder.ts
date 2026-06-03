@@ -11,6 +11,10 @@ export type YandexGeocodedPlace = {
   address: string;
   lat: number;
   lng: number;
+  /** Название из Geosuggest (title). */
+  label?: string;
+  /** uri из Geosuggest — идентификатор у провайдера, не для HTTP geocode by uri. */
+  providerPlaceId?: string | null;
 };
 
 type YandexGeocodeJson = {

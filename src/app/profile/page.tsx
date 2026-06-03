@@ -38,6 +38,7 @@ import {
   NodePickerModal,
   type SharedNodePickerOption,
 } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
+import { NotificationSettingsSection } from "@/components/notification-settings-section";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
 type ProfileViewModel = {
@@ -803,6 +804,16 @@ export default function ProfilePage() {
           />
           </>
           ) : null}
+        </section>
+
+        <section
+          className="rounded-2xl border border-gray-200 bg-white p-5"
+          style={{
+            backgroundColor: productSemanticColors.card,
+            borderColor: productSemanticColors.border,
+          }}
+        >
+          <NotificationSettingsSection />
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5">

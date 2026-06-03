@@ -61,7 +61,9 @@ Defined in `apps/app/app/_layout.tsx`:
 - Uses shared `@mototwin/domain` + mobile API client (`createMobileApiClient`).
 - Loads `/api/garage` (+ trash count and notifications).
 - States: loading / error / empty / list.
-- Primary action: `Добавить мотоцикл` -> `vehicles/new`.
+- Primary action: `Добавить мотоцикл` -> `vehicles/new` (subscription limit → `/subscription`).
+- Card quick actions: `Добавить ТО` → `service-events/new`; **`Расход` → `vehicles/[id]/expenses`** (не журнал).
+- Bottom nav **«Узлы»** с `garage`, `/expenses`, `wishlist/picker` → `vehicles/{lastViewedId}/nodes`.
 - Refresh on focus (`useFocusEffect`).
 - Header matches current Garage product hierarchy:
   - large title `Мой гараж`
@@ -82,12 +84,18 @@ Defined in `apps/app/app/_layout.tsx`:
   - silhouette block
   - dedicated `Garage Score` panel
   - short `Требует внимания` section
-  - quick actions `Открыть`, `Добавить ТО`, `Расход`
+  - quick actions: `Открыть` → dashboard; `Добавить ТО` → `service-events/new`; `Расход` → `expenses`
 - Garage Score legend uses Russian status labels:
   - `В норме`
   - `Скоро`
   - `Просрочено`
   - `Недавно`
+
+### 3.3.1 Notifications (`notifications.tsx`)
+
+- Loads inbox via mobile API client; row action **`actionLabel`** → `router.push(actionUrl)`.
+- Push registration via Expo notifications API.
+- Web parity: same `actionUrl` contract; mileage uses `?openVehicleState=1` on dashboard (redirect to `state` screen on Expo).
 
 ### 3.4 Add Motorcycle (`vehicles/new.tsx`)
 - Progressive single-screen flow с 4-уровневым каскадом по новому стандарту иерархии (`MotorcycleBrand → MotorcycleModelFamily → MotorcycleVariant → MotorcycleGeneration`, см. [data-model.md](./data-model.md), [expo-add-motorcycle-flow.md](./expo-add-motorcycle-flow.md))
@@ -115,7 +123,7 @@ Defined in `apps/app/app/_layout.tsx`:
 - Shows:
   - first-screen dashboard aligned with web semantics:
     - hero/identity card with edit, trash, and primary orange mileage update action
-    - quick actions: `Добавить ТО`, `Расход`, `Деталь`
+    - quick actions: `Добавить ТО`, `Расход` (→ `expenses`), `Деталь`
     - KPI strip: `Garage Score`, current mileage/engine hours, `Ride readiness`, season readiness
     - compact `Требует внимания` rows from shared attention summary
     - compact `Состояние узлов` cards from `buildTopNodeOverviewCards` (only groups with nodes; includes **Прочее** when needed): the card itself is static, the group icon drills into issue nodes (`SOON` / `OVERDUE`), and each leaf badge opens the exact node in the tree

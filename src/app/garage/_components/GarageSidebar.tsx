@@ -335,7 +335,7 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
               Больше возможностей для вашего гаража
             </div>
             <div style={{ marginTop: 12 }}>
-              <Link href="/pro" className="no-underline">
+              <Link href="/subscription" className="no-underline">
                 <Button variant="ghost" size="sm" block style={proButtonStyle}>
                   Перейти на Pro
                 </Button>

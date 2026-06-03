@@ -336,7 +336,7 @@ async function createOverdueAndUpcomingNotifications(userId: string) {
           title: "Скоро обслуживание",
           body: `${vehicleName}: скоро потребуется обслуживание узла ${topNodeState.node.name}.`,
           actionLabel: "Открыть узел",
-          actionUrl: `/vehicles/${vehicle.id}/nodes`,
+          actionUrl: `/vehicles/${vehicle.id}/nodes?nodeId=${encodeURIComponent(topNodeState.nodeId)}`,
           dedupeKey: `service_upcoming:${vehicle.id}:${topNodeState.nodeId}`,
           channels,
         });
@@ -356,7 +356,7 @@ async function createOverdueAndUpcomingNotifications(userId: string) {
         title: "Обновите пробег",
         body: `Пробег ${vehicleName} не обновлялся ${staleMileageDays} дн.`,
         actionLabel: "Обновить",
-        actionUrl: `/vehicles/${vehicle.id}/state?focus=mileage`,
+        actionUrl: `/vehicles/${vehicle.id}?openVehicleState=1&focus=mileage`,
         dedupeKey: `mileage_stale:${vehicle.id}`,
         channels,
       });

@@ -246,9 +246,7 @@ export function ServiceEventPreviewSheet({
             {form.serviceProviderNote.trim() ? (
               <PreviewRow label="Сервис" value={form.serviceProviderNote.trim()} />
             ) : null}
-            {(form.attachReceiptRequested || form.attachFileRequested) ? (
-              <PreviewRow label="Вложения" value="Отмечено в записи" />
-            ) : null}
+
             <PreviewRow label="Узлов" value={String(form.items.filter((it) => it.nodeId.trim()).length)} />
             {totalLine ? <PreviewRow label="Итого" value={totalLine} accent /> : null}
             {form.nextReminderEnabled ? (

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import type { AddServiceEventFormValues, ServicePlaceSnapshot } from "@mototwin/types";
+import { isYandexMapsConfigured } from "@/components/integrations/yandex-maps";
 import { SERVICE_EVENT_PARTS_UI } from "../styles";
 import { ServicePlaceSearchInput } from "./ServicePlaceSearchInput";
 import { ServicePlaceResultsList } from "./ServicePlaceResultsList";
@@ -39,6 +40,20 @@ export function ServicePlacePicker({ open, initialAddress, initialLat, initialLn
   const [manualTitle, setManualTitle] = useState("");
   const [manualAddress, setManualAddress] = useState("");
   const selectedKey = useMemo(() => keyFromPlace(selected), [selected]);
+  const mapsAvailable = isYandexMapsConfigured();
+  const mapMarkers = useMemo(
+    () =>
+      results
+        .filter((place) => place.latitude != null && place.longitude != null)
+        .map((place) => ({
+          address: place.address,
+          lat: place.latitude as number,
+          lng: place.longitude as number,
+          label: place.title || undefined,
+          providerPlaceId: place.providerPlaceId ?? null,
+        })),
+    [results]
+  );
 
   if (!open) return null;
 
@@ -130,16 +145,16 @@ export function ServicePlacePicker({ open, initialAddress, initialLat, initialLn
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/65 p-4">
+    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/65 p-4 sm:items-center">
       <div
-        className="w-full max-w-2xl rounded-2xl border p-4"
+        className="flex max-h-[min(92vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border"
         style={{
           borderColor: SERVICE_EVENT_PARTS_UI.border,
           backgroundColor: SERVICE_EVENT_PARTS_UI.surface,
           color: SERVICE_EVENT_PARTS_UI.text,
         }}
       >
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3" style={{ borderBottomColor: SERVICE_EVENT_PARTS_UI.border }}>
           <h3 className="text-sm font-semibold">Выбор места сервиса</h3>
           <button
             type="button"
@@ -151,77 +166,109 @@ export function ServicePlacePicker({ open, initialAddress, initialLat, initialLn
           </button>
         </div>
 
-        <ServicePlaceSearchInput
-          query={query}
-          mode={mode}
-          loading={loading}
-          onQueryChange={setQuery}
-          onModeChange={setMode}
-          onSubmit={() => void runSearch()}
-        />
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          <ServicePlaceMap
-            selected={selected}
-            onSelect={(place) => {
-              setSelected(place);
-              setResults((prev) => [place, ...prev]);
-            }}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <ServicePlaceSearchInput
+            query={query}
+            mode={mode}
+            loading={loading}
+            onQueryChange={setQuery}
+            onModeChange={setMode}
+            onSubmit={() => void runSearch()}
           />
-          {(initialAddress || initialLat || initialLng) && !selected ? (
-            <button
-              type="button"
-              onClick={() =>
-                setSelected({
-                  provider: "CUSTOM",
-                  providerPlaceId: null,
-                  type: "CUSTOM",
-                  title: initialAddress || "Текущее место",
-                  address: initialAddress || "Без адреса",
-                  latitude: Number.isFinite(Number(initialLat)) ? Number(initialLat) : null,
-                  longitude: Number.isFinite(Number(initialLng)) ? Number(initialLng) : null,
-                  category: null,
-                  contact: null,
-                  metadata: null,
-                })
-              }
-              className="rounded-xl border px-3 py-2 text-xs font-semibold"
-              style={{
-                borderColor: SERVICE_EVENT_PARTS_UI.border,
-                backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
-                color: SERVICE_EVENT_PARTS_UI.textMuted,
-              }}
-            >
-              Использовать текущее значение
-            </button>
+
+          {mapsAvailable ? (
+            <div className="mt-3">
+              <ServicePlaceMap
+                selected={selected}
+              markerPlaces={mapMarkers}
+              onSelect={(place) => {
+                  setSelected(place);
+                  setResults((prev) => {
+                    const key = keyFromPlace(place);
+                    if (prev.some((item) => keyFromPlace(item) === key)) return prev;
+                    return [place, ...prev];
+                  });
+                }}
+              />
+            </div>
           ) : null}
-        </div>
 
-        {warning ? (
-          <p className="mt-2 text-xs" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
-            {warning}
-          </p>
-        ) : null}
-        {error ? (
-          <p className="mt-2 text-xs text-red-400">{error}</p>
-        ) : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(initialAddress || initialLat || initialLng) && !selected ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setSelected({
+                    provider: "CUSTOM",
+                    providerPlaceId: null,
+                    type: "CUSTOM",
+                    title: initialAddress || "Текущее место",
+                    address: initialAddress || "Без адреса",
+                    latitude: Number.isFinite(Number(initialLat)) ? Number(initialLat) : null,
+                    longitude: Number.isFinite(Number(initialLng)) ? Number(initialLng) : null,
+                    category: null,
+                    contact: null,
+                    metadata: null,
+                  })
+                }
+                className="rounded-xl border px-3 py-2 text-xs font-semibold"
+                style={{
+                  borderColor: SERVICE_EVENT_PARTS_UI.border,
+                  backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
+                  color: SERVICE_EVENT_PARTS_UI.textMuted,
+                }}
+              >
+                Использовать текущее значение
+              </button>
+            ) : null}
+          </div>
 
-        <div className="mt-3">
-          <ServicePlaceResultsList
-            results={results}
-            selectedKey={selectedKey}
-            onSelect={(item) => setSelected(item)}
-          />
+          {warning ? (
+            <p className="mt-2 text-xs" style={{ color: SERVICE_EVENT_PARTS_UI.textMuted }}>
+              {warning}
+            </p>
+          ) : null}
+          {error ? (
+            <p className="mt-2 text-xs text-red-400">{error}</p>
+          ) : null}
+
+          {results.length > 0 ? (
+            <div className="mt-3">
+              <ServicePlaceResultsList
+                results={results}
+                selectedKey={selectedKey}
+                onSelect={(item) => setSelected(item)}
+              />
+            </div>
+          ) : null}
+
+          {selected ? (
+            <div className="mt-3 space-y-2">
+              <SelectedServicePlaceCard place={selected} onClear={() => setSelected(null)} />
+            </div>
+          ) : null}
+
+          <div className="mt-4">
+            <ManualServicePlaceForm
+              title={manualTitle}
+              address={manualAddress}
+              onTitleChange={setManualTitle}
+              onAddressChange={setManualAddress}
+              onConfirm={() => void applyManual()}
+            />
+          </div>
         </div>
 
         {selected ? (
-          <div className="mt-3 space-y-2">
-            <SelectedServicePlaceCard place={selected} onClear={() => setSelected(null)} />
+          <div
+            className="flex shrink-0 justify-end border-t px-4 py-3"
+            style={{ borderTopColor: SERVICE_EVENT_PARTS_UI.border }}
+          >
             <button
               type="button"
               onClick={() => void applySelected()}
               disabled={loading}
-              className="rounded-xl border px-3 py-2 text-xs font-semibold disabled:opacity-60"
+              className="rounded-xl border px-4 py-2 text-xs font-semibold disabled:opacity-60"
               style={{
                 borderColor: SERVICE_EVENT_PARTS_UI.orange,
                 backgroundColor: SERVICE_EVENT_PARTS_UI.orange,
@@ -232,16 +279,6 @@ export function ServicePlacePicker({ open, initialAddress, initialLat, initialLn
             </button>
           </div>
         ) : null}
-
-        <div className="mt-4">
-          <ManualServicePlaceForm
-            title={manualTitle}
-            address={manualAddress}
-            onTitleChange={setManualTitle}
-            onAddressChange={setManualAddress}
-            onConfirm={() => void applyManual()}
-          />
-        </div>
       </div>
     </div>
   );

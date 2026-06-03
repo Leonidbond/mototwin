@@ -61,9 +61,7 @@ export function PreviewOverlay({ open, form, totalLabel, onClose }: PreviewOverl
           {form.serviceProviderNote.trim() ? (
             <Row label="Сервис" value={form.serviceProviderNote.trim()} />
           ) : null}
-          {form.attachReceiptRequested || form.attachFileRequested ? (
-            <Row label="Вложения" value="Отмечено в записи" />
-          ) : null}
+
           <Row label="Узлов" value={String(form.items.length)} />
           {totalLabel ? (
             <div

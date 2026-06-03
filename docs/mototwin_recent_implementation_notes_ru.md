@@ -110,7 +110,36 @@
   - Обновлены `src/app/admin/page.tsx` и компоненты `AdminTopBar`, `AdminFilterBar`, `AdminDataTable`, `DashboardSection`, `FitmentQualityDonut`, `WorkQueueCard`.
   - Улучшено поведение на узких ширинах: auto-fit grid, корректные переносы, min-width для таблиц, wrap для action-кнопок и контролов.
 
-## 10. Следующие шаги (по продуктовому плану)
+## 10. Навигация и chrome (2026-06, web + Expo)
+
+Аудит «подпись vs экран» и последующие правки UI.
+
+### Гараж
+
+- **Web `VehicleCard`:** `Добавить ТО` → `/vehicles/{id}/service-events/new`; `Расход` → `/expenses` (убраны мёртвые query `open=service-event`, `open=expense`).
+- **Expo `VehicleCard`:** `Расход` → `/expenses` (ранее вёл в `service-log`).
+- **Expo bottom nav:** «Узлы» с `garage`, `/expenses`, `wishlist/picker` → `/vehicles/{id}/nodes`.
+- **Web CTA «Добавить мотоцикл»:** `GarageHeader` и `AddMotorcycleCard` — одна `<Link>`, без вложенного `<Button>`; вся пунктирная карточка с «+» кликабельна.
+
+### Дашборд мотоцикла (web)
+
+- `VehicleDashboardTopBar`: стрелка «←» и «Мой гараж» → `/garage`.
+
+### Уведомления
+
+- **Web `/notifications`:** кнопка `actionLabel` / `actionUrl` (как в Expo); legacy `/state?focus=mileage` нормализуется в `?openVehicleState=1`.
+- **`src/lib/notifications.ts`:** «Открыть узел» → `/nodes?nodeId=…`; пробег → `?openVehicleState=1&focus=mileage`.
+- **Web:** `vehicle-detail-client` обрабатывает `openVehicleState=1`; `src/app/vehicles/[id]/state/page.tsx` — redirect для старых ссылок.
+- **Expo:** `vehicles/[id]/index` редиректит `openVehicleState=1` на экран `state`.
+
+### Admin (web)
+
+- CTA конфликтов fitment и legacy `/admin/fitment/conflicts*` → `/admin/moderation?queue=mixedFitments`.
+- `/admin/service-rules/new` + `POST /api/admin/service-rules`; список регламентов с ссылкой «Создать регламент».
+
+Документация: `docs/garage-dashboard-mvp.md`, `docs/frontend-web.md`, `docs/frontend-expo.md`, `docs/parity/cross-platform-parity.md`, `docs/mototwin_notifications_spec.md` §11.5, `docs/ui-action-icons-mvp.md`.
+
+## 11. Следующие шаги (по продуктовому плану)
 
 - Довести UI страницы отчёта до полного соответствия [mototwin_part_compatibility_report_ui_spec_ru.md](mototwin_part_compatibility_report_ui_spec_ru.md) v1.1 (если остались секции спеки).
 - Регрессия web/Expo: пикер → отчёт, панель деталей корзины → сводка совместимости, community → wishlist + fitment-report.

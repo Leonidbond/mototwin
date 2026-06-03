@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { OPEN_APP_HELP_EVENT } from "./app-help-trigger";
 
 type HelpIconRow = {
   icon: string;
@@ -29,6 +30,12 @@ const WORKFLOW_STEPS = [
 export function AppHelpFab() {
   const [isOpen, setIsOpen] = useState(false);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
+
+  useEffect(() => {
+    const onOpen = () => setIsOpen(true);
+    window.addEventListener(OPEN_APP_HELP_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_APP_HELP_EVENT, onOpen);
+  }, []);
 
   return (
     <>

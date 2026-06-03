@@ -106,8 +106,8 @@ export default function GarageScreen() {
     (id: string) => router.push(`/vehicles/${id}/service-events/new`),
     [router]
   );
-  const openServiceLog = useCallback(
-    (id: string) => router.push(`/vehicles/${id}/service-log`),
+  const openExpenses = useCallback(
+    (id: string) => router.push(`/vehicles/${id}/expenses`),
     [router]
   );
   const primaryVehicleId = vehicles[0]?.id ?? null;
@@ -115,16 +115,15 @@ export default function GarageScreen() {
   const openGarage = useCallback(() => router.push("/garage"), [router]);
   const openNodes = useCallback(() => {
     if (!navVehicleId) return;
-    router.push(`/vehicles/${navVehicleId}`);
+    router.push(`/vehicles/${navVehicleId}/nodes`);
   }, [navVehicleId, router]);
   const openJournal = useCallback(() => {
     if (!navVehicleId) return;
     router.push(`/vehicles/${navVehicleId}/service-log`);
   }, [navVehicleId, router]);
-  const openExpenses = useCallback(() => {
-    if (!navVehicleId) return;
-    router.push(`/vehicles/${navVehicleId}/expenses`);
-  }, [navVehicleId, router]);
+  const openGarageExpenses = useCallback(() => {
+    router.push("/expenses");
+  }, [router]);
   const openPicker = useCallback(() => {
     if (!navVehicleId) return;
     router.push(`/vehicles/${navVehicleId}/wishlist`);
@@ -175,7 +174,7 @@ export default function GarageScreen() {
                 vehicle={item}
                 onOpenVehicle={openVehicle}
                 onAddServiceEvent={openServiceEvent}
-                onOpenServiceLog={openServiceLog}
+                onOpenExpenses={openExpenses}
               />
             )}
             ListHeaderComponent={
@@ -203,7 +202,7 @@ export default function GarageScreen() {
           onOpenNodes={openNodes}
           onOpenJournal={openJournal}
           onOpenPicker={openPicker}
-          onOpenExpenses={openExpenses}
+          onOpenExpenses={openGarageExpenses}
           onOpenProfile={openProfile}
           hasVehicleContext={!!navVehicleId}
         />

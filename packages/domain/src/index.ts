@@ -309,6 +309,9 @@ export {
 } from "./node-snooze";
 export {
   buildGarageAttentionIndicatorViewModel,
+  buildGarageAttentionSummaryFromNodeTree,
+  resolveGarageAttentionIconKey,
+  type GarageAttentionIconKey,
   getAttentionSeverityFromStatuses,
 } from "./garage-attention";
 export {

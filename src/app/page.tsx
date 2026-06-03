@@ -198,10 +198,10 @@ export default function Home() {
                 Перейти к onboarding
               </Link>
               <Link
-                href="/api/brands"
+                href="/garage"
                 className="inline-flex items-center justify-center rounded-xl border border-white/20 px-6 py-3 text-sm font-medium text-white transition hover:bg-white/10"
               >
-                Проверить live data
+                Открыть гараж
               </Link>
             </div>
           </div>

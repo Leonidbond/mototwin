@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   buildGarageCardProps,
   getVehicleSilhouetteClassLabel,
+  resolveGarageAttentionIconKey,
   resolveGarageVehicleSilhouette,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
@@ -142,24 +143,16 @@ export function VehicleCard({ vehicle, silhouettePriority }: Props) {
           <>
             <div style={attentionTitleStyle}>Требует внимания</div>
             <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 6 }}>
-              {overdueCount > 0 ? (
+              {(vehicle.attentionSummary?.items ?? []).map((item) => (
                 <AttentionRow
-                  tone="overdue"
-                  iconKey="tires_rear"
-                  title="Задняя шина"
-                  badgeLabel="Просрочено"
-                  subtitle="Рекомендуется замена"
+                  key={item.nodeId}
+                  tone={item.effectiveStatus === "OVERDUE" ? "overdue" : "soon"}
+                  iconKey={resolveGarageAttentionIconKey(item.code)}
+                  title={item.name}
+                  badgeLabel={item.statusLabelRu}
+                  subtitle={item.subtitle}
                 />
-              ) : null}
-              {soonCount > 0 ? (
-                <AttentionRow
-                  tone="soon"
-                  iconKey="brakes_front_pads"
-                  title="Тормозные колодки"
-                  badgeLabel="Скоро"
-                  subtitle="Проверить через 450 км"
-                />
-              ) : null}
+              ))}
             </div>
           </>
         ) : (
@@ -171,10 +164,13 @@ export function VehicleCard({ vehicle, silhouettePriority }: Props) {
         <Link href={`/vehicles/${vehicle.id}`} className="no-underline">
           <Button variant="primary">Открыть</Button>
         </Link>
-        <Link href={`/vehicles/${vehicle.id}?open=service-event`} className="no-underline">
+        <Link
+          href={`/vehicles/${vehicle.id}/service-events/new?returnTo=${encodeURIComponent(`/garage`)}`}
+          className="no-underline"
+        >
           <Button variant="ghost" leadingIcon={<ClipboardIcon />}>Добавить ТО</Button>
         </Link>
-        <Link href={`/vehicles/${vehicle.id}/service-log?open=expense`} className="no-underline">
+        <Link href={`/vehicles/${vehicle.id}/expenses`} className="no-underline">
           <Button variant="ghost" leadingIcon={<WalletIcon />}>Расход</Button>
         </Link>
       </div>
@@ -272,7 +268,7 @@ function HealthyRow() {
         <div style={{ ...attentionTitleRowStyle, color: productSemanticColors.textPrimary }}>
           Все в порядке
         </div>
-        <div style={attentionSubStyle}>Следующее ТО через 1 200 км</div>
+        <div style={attentionSubStyle}>Нет просроченных задач</div>
       </div>
     </div>
   );

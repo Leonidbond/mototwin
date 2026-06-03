@@ -677,6 +677,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
     highlightIssueNodeIds?: string;
     returnFocus?: string;
     attentionNodeId?: string;
+    openVehicleState?: string;
     view?: string | string[];
   }>();
   const vehicleId =
@@ -703,6 +704,8 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const returnFocusParam = typeof params.returnFocus === "string" ? params.returnFocus : "";
   const returnAttentionNodeIdParam =
     typeof params.attentionNodeId === "string" ? params.attentionNodeId : "";
+  const openVehicleStateParam =
+    typeof params.openVehicleState === "string" ? params.openVehicleState : "";
 
   const pushWishlistFromDashboardForScrollOnReturn = useCallback(
     (href: string) => {
@@ -724,6 +727,12 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const hasPlanLockedNodeTree = useMemo(() => nodeTreeHasPlanLockedNodes(nodeTree), [nodeTree]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    if (!vehicleId || openVehicleStateParam !== "1" || isLoading) {
+      return;
+    }
+    router.replace(`/vehicles/${vehicleId}/state`);
+  }, [isLoading, openVehicleStateParam, router, vehicleId]);
   const [error, setError] = useState("");
   const [nodeTreeError, setNodeTreeError] = useState("");
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);

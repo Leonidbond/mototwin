@@ -1,64 +1,85 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { resolveGarageAttentionIconKey, type GarageAttentionIconKey } from "@mototwin/domain";
 import { Card } from "@/components/ui";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type { GarageVehicleItem } from "@mototwin/types";
 import brakesIcon from "../../../../images/top-node-icons-dark/brakes/brakes_front_pads.png";
 import engineCoolingIcon from "../../../../images/top-node-icons-dark/engine_cooling/engine_cooling.png";
 import tiresIcon from "../../../../images/top-node-icons-dark/tires/tires_rear.png";
+import chainSprocketsIcon from "../../../../images/top-node-icons-dark/chain_sprockets/chain_sprockets.png";
+import lubricationIcon from "../../../../images/top-node-icons-dark/lubrication/lubrication.png";
+import suspensionIcon from "../../../../images/top-node-icons-dark/suspension/suspension.png";
+import brakesFrontPadsIcon from "../../../../images/top-node-icons-dark/brakes/brakes_front_pads.png";
+import tiresRearIcon from "../../../../images/top-node-icons-dark/tires/tires_rear.png";
 
-type TaskIconKind = "brake" | "engine" | "tire";
-
-const TASK_ICONS = {
-  brake: brakesIcon,
-  engine: engineCoolingIcon,
-  tire: tiresIcon,
-} as const;
+const TASK_ICONS: Record<GarageAttentionIconKey, typeof brakesIcon> = {
+  brakes: brakesIcon,
+  brakes_front_pads: brakesFrontPadsIcon,
+  chain_sprockets: chainSprocketsIcon,
+  engine_cooling: engineCoolingIcon,
+  lubrication: lubricationIcon,
+  suspension: suspensionIcon,
+  tires: tiresIcon,
+  tires_rear: tiresRearIcon,
+};
 
 type TaskItem = {
   key: string;
-  icon: TaskIconKind;
+  icon: GarageAttentionIconKey;
   caption: string;
   title: string;
   meta: string;
   metaTone: "muted" | "danger";
 };
 
-const ICON_CYCLE: TaskIconKind[] = ["brake", "engine", "tire"];
-
 export function GarageTasksStrip(props: { vehicles: GarageVehicleItem[] }) {
-  const items: TaskItem[] = props.vehicles.slice(0, 3).map((vehicle, index) => {
+  const serviceLogVehicle =
+    props.vehicles.find((v) => (v.attentionSummary?.totalCount ?? 0) > 0) ?? props.vehicles[0];
+  const serviceLogHref = serviceLogVehicle
+    ? `/vehicles/${serviceLogVehicle.id}/service-log`
+    : null;
+
+  const items: TaskItem[] = props.vehicles.slice(0, 3).map((vehicle) => {
+    const preview = vehicle.attentionSummary?.items?.[0];
+    const vehicleLabel =
+      vehicle.nickname?.trim() ||
+      `${vehicle.motorcycleBrand.name} ${vehicle.motorcycleModelFamily.name}`;
+
+    if (preview) {
+      return {
+        key: `${vehicle.id}-${preview.nodeId}`,
+        icon: resolveGarageAttentionIconKey(preview.code),
+        caption: vehicleLabel,
+        title: preview.name,
+        meta: preview.subtitle || preview.statusLabelRu,
+        metaTone: preview.effectiveStatus === "OVERDUE" ? "danger" : "muted",
+      };
+    }
+
     const overdueCount = vehicle.attentionSummary?.overdueCount ?? 0;
     const soonCount = vehicle.attentionSummary?.soonCount ?? 0;
-    const icon = ICON_CYCLE[index % ICON_CYCLE.length];
+    if (overdueCount > 0 || soonCount > 0) {
+      return {
+        key: vehicle.id,
+        icon: "lubrication" as GarageAttentionIconKey,
+        caption: vehicleLabel,
+        title: "Требует внимания",
+        meta:
+          overdueCount > 0
+            ? `${overdueCount} просрочено`
+            : `${soonCount} скоро потребует ТО`,
+        metaTone: overdueCount > 0 ? "danger" : "muted",
+      };
+    }
 
-    if (overdueCount > 0) {
-      return {
-        key: vehicle.id,
-        icon,
-        caption: iconCaption(icon),
-        title: iconDefaultTitle(icon),
-        meta: "Просрочено",
-        metaTone: "danger",
-      };
-    }
-    if (soonCount > 0) {
-      return {
-        key: vehicle.id,
-        icon,
-        caption: iconCaption(icon),
-        title: iconDefaultTitle(icon),
-        meta: "через 450 км",
-        metaTone: "muted",
-      };
-    }
     return {
       key: vehicle.id,
-      icon,
-      caption: iconCaption(icon),
+      icon: "lubrication" as GarageAttentionIconKey,
+      caption: vehicleLabel,
       title: "Все в порядке",
-      meta: "ближайшее ТО через 1 200 км",
+      meta: "Нет просроченных задач",
       metaTone: "muted",
     };
   });
@@ -79,9 +100,11 @@ export function GarageTasksStrip(props: { vehicles: GarageVehicleItem[] }) {
         }}
       >
         <h3 style={titleStyle}>Ближайшие задачи</h3>
-        <Link href="/service-log" className="no-underline" style={linkStyle}>
-          Смотреть все задачи <span aria-hidden>›</span>
-        </Link>
+        {serviceLogHref ? (
+          <Link href={serviceLogHref} className="no-underline" style={linkStyle}>
+            Смотреть все задачи <span aria-hidden>›</span>
+          </Link>
+        ) : null}
       </div>
 
       <div
@@ -114,7 +137,10 @@ export function GarageTasksStrip(props: { vehicles: GarageVehicleItem[] }) {
                 width: 36,
                 height: 36,
                 objectFit: "contain",
-                filter: item.metaTone === "danger" ? "drop-shadow(0 0 6px #F04F47)" : "drop-shadow(0 0 6px #F6C453)",
+                filter:
+                  item.metaTone === "danger"
+                    ? "drop-shadow(0 0 6px #F04F47)"
+                    : "drop-shadow(0 0 6px #F6C453)",
                 flex: "0 0 auto",
               }}
             />
@@ -130,18 +156,6 @@ export function GarageTasksStrip(props: { vehicles: GarageVehicleItem[] }) {
       </div>
     </Card>
   );
-}
-
-function iconCaption(kind: TaskIconKind): string {
-  if (kind === "brake") return "Тормоза";
-  if (kind === "engine") return "Двигатель";
-  return "Шины";
-}
-
-function iconDefaultTitle(kind: TaskIconKind): string {
-  if (kind === "brake") return "Проверить колодки";
-  if (kind === "engine") return "Замена масла";
-  return "Задняя шина";
 }
 
 const titleStyle: CSSProperties = {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -1225,9 +1226,23 @@ export function BasicServiceEventBundleForm({
             </Pressable>
           </View>
           {form.installLocationLat.trim() && form.installLocationLng.trim() ? (
-            <Text style={styles.muted}>
-              Координаты: {form.installLocationLat}, {form.installLocationLng}
-            </Text>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.muted}>
+                Координаты: {form.installLocationLat}, {form.installLocationLng}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  const lat = form.installLocationLat.trim();
+                  const lng = form.installLocationLng.trim();
+                  void Linking.openURL(
+                    `https://yandex.ru/maps/?pt=${encodeURIComponent(lng)},${encodeURIComponent(lat)}&z=16&l=map`
+                  );
+                }}
+                style={({ pressed }) => [styles.templatePickBtn, pressed && styles.pressed]}
+              >
+                <Text style={styles.templatePickBtnTxt}>Открыть на карте</Text>
+              </Pressable>
+            </View>
           ) : null}
         </View>
       </Field>
@@ -1588,30 +1603,6 @@ export function BasicServiceEventBundleForm({
       </ServiceEventCard>
 
       <ServiceEventCard title="4. Дополнительно">
-      <ToggleRow
-        icon="photo-camera"
-        title="Прикрепить фото / чек"
-        subtitle="Добавить фотографии или чек обслуживания"
-        active={form.attachReceiptRequested}
-        onToggle={() =>
-          updateForm((prev) => ({
-            ...prev,
-            attachReceiptRequested: !prev.attachReceiptRequested,
-          }))
-        }
-      />
-      <ToggleRow
-        icon="attach-file"
-        title="Прикрепить файл"
-        subtitle="Добавить документ к событию"
-        active={form.attachFileRequested}
-        onToggle={() =>
-          updateForm((prev) => ({
-            ...prev,
-            attachFileRequested: !prev.attachFileRequested,
-          }))
-        }
-      />
       <ToggleRow
         icon="notifications-none"
         title="Напомнить о следующем обслуживании"

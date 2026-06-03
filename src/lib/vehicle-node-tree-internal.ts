@@ -1,5 +1,5 @@
-import { buildAttentionSummaryFromNodeTree } from "@mototwin/domain";
-import type { NodeStatus, NodeTreeItem } from "@mototwin/types";
+import { buildGarageAttentionSummaryFromNodeTree } from "@mototwin/domain";
+import type { GarageAttentionSummaryWire, NodeStatus, NodeTreeItem } from "@mototwin/types";
 import {
   aggregateEffectiveStatus,
   evaluateLeafStatus,
@@ -406,13 +406,20 @@ function maintenanceNodeToNodeTreeItem(node: MaintenanceTreeNode): NodeTreeItem 
   };
 }
 
+export function attentionSummaryFromMaintenanceRoots(
+  roots: MaintenanceTreeNode[]
+): GarageAttentionSummaryWire {
+  const domainRoots = roots.map(maintenanceNodeToNodeTreeItem);
+  return buildGarageAttentionSummaryFromNodeTree(domainRoots);
+}
+
+/** @deprecated Use {@link attentionSummaryFromMaintenanceRoots} for items preview. */
 export function attentionSummaryCountsFromMaintenanceRoots(roots: MaintenanceTreeNode[]): {
   totalCount: number;
   overdueCount: number;
   soonCount: number;
 } {
-  const domainRoots = roots.map(maintenanceNodeToNodeTreeItem);
-  const summary = buildAttentionSummaryFromNodeTree(domainRoots);
+  const summary = attentionSummaryFromMaintenanceRoots(roots);
   return {
     totalCount: summary.totalCount,
     overdueCount: summary.overdueCount,
@@ -567,8 +574,8 @@ export async function loadVehicleNodeTreeJson(
 export async function computeGarageAttentionByVehicleId(
   prisma: PrismaClient,
   vehicles: Array<{ id: string; odometer: number; engineHours: number | null }>
-): Promise<Map<string, { totalCount: number; overdueCount: number; soonCount: number }>> {
-  const out = new Map<string, { totalCount: number; overdueCount: number; soonCount: number }>();
+): Promise<Map<string, GarageAttentionSummaryWire>> {
+  const out = new Map<string, GarageAttentionSummaryWire>();
   if (vehicles.length === 0) {
     return out;
   }
@@ -648,7 +655,7 @@ export async function computeGarageAttentionByVehicleId(
       now
     );
 
-    out.set(vehicle.id, attentionSummaryCountsFromMaintenanceRoots(nodeTree));
+    out.set(vehicle.id, attentionSummaryFromMaintenanceRoots(nodeTree));
   }
 
   return out;

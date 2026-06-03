@@ -23,7 +23,7 @@ Current MVP scope:
 1. Header:
    - title `Мой гараж`;
    - subtitle `Ваши мотоциклы, обслуживание и расходы в одном месте`;
-   - prominent CTA `Добавить мотоцикл`.
+   - prominent CTA `Добавить мотоцикл` → `/onboarding` (web). **Не** вкладывать `<Button>` внутрь `<Link>` — только одна ссылка со стилями primary-кнопки (`GarageHeader.tsx`).
 2. Compact summary (from existing garage payload only):
    - motorcycles count;
    - motorcycles requiring attention;
@@ -35,9 +35,9 @@ Current MVP scope:
    - separate `Garage Score` block with status legend;
    - short `Требует внимания` block or healthy fallback state;
    - quick actions:
-     - `Открыть`
-     - `Добавить ТО`
-     - `Расход`
+     - `Открыть` → `/vehicles/{id}` (дашборд)
+     - `Добавить ТО` → `/vehicles/{id}/service-events/new?returnTo=/garage`
+     - `Расход` → `/vehicles/{id}/expenses` (не журнал)
 4. Profile entry point:
    - web: карточка пользователя внизу левого сайдбара (ссылка на `/profile`); отдельного пункта «Профиль» в меню сайдбара нет;
    - Expo: available from bottom navigation.
@@ -81,6 +81,10 @@ When no motorcycles exist:
   disabling page scroll.
 - Garage Score legend uses Russian status labels (`В норме`, `Скоро`, `Просрочено`, `Недавно`).
 
+### Web: карточка «+» в сетке
+
+- `AddMotorcycleCard.tsx`: пунктирная карточка с кругом «+» — **целиком** `<Link href="/onboarding">`; отдельная кнопка внутри не используется.
+
 ### Web: левый сайдбар (`GarageSidebar`)
 
 Компонент: `src/app/garage/_components/GarageSidebar.tsx`. Используется на гараже, карточке мотоцикла, расходах, профиле, подборе деталей, формах сервисного события и др. экранах с «гаражным» хромом.
@@ -122,6 +126,8 @@ When no motorcycles exist:
   - `apps/app/app/garage.tsx` — garage dashboard screen.
 - Garage dashboard keeps same semantics with mobile-first header, summary KPI cards, and web-aligned garage cards.
 - Garage includes fixed bottom navigation with `Мой гараж`, `Узлы`, `Журнал`, `Расходы`, `Профиль`.
+- Bottom nav **«Узлы»** с экранов гаража / расходов гаража / подбора ведёт на `/vehicles/{lastViewedId}/nodes` (не на дашборд ТС). Контекст последнего мотоцикла — `mototwin.lastViewedVehicleId`.
+- На карточке гаража quick action **«Расход»** → `/vehicles/{id}/expenses`; **«Добавить ТО»** → `/vehicles/{id}/service-events/new`.
 - Garage has profile entry action in the bottom navigation that navigates to `profile` screen.
 - Garage has `Свалка` entry action that navigates to `trash` screen.
 - Garage Score legend uses Russian status labels (`В норме`, `Скоро`, `Просрочено`, `Недавно`).

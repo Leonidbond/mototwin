@@ -8,6 +8,7 @@ export type AdditionalCardFastProps = {
   form: AddServiceEventFormValues;
   editingServiceEventId: string | null;
   onPatch: (patch: Partial<AddServiceEventFormValues>) => void;
+  onRepeat?: () => void;
 };
 
 function buttonStyle(active: boolean, disabled?: boolean): CSSProperties {
@@ -62,10 +63,10 @@ function ActionButton({
   );
 }
 
-export function AdditionalCardFast({ form, editingServiceEventId, onPatch }: AdditionalCardFastProps) {
-  const locked =
-    Boolean(editingServiceEventId) &&
-    (form.attachReceiptRequested || form.attachFileRequested);
+export function AdditionalCardFast({ editingServiceEventId, onRepeat }: AdditionalCardFastProps) {
+  if (!editingServiceEventId || !onRepeat) {
+    return null;
+  }
 
   return (
     <div
@@ -86,40 +87,8 @@ export function AdditionalCardFast({ form, editingServiceEventId, onPatch }: Add
         style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.5rem" }}
       >
         <ActionButton
-          active={form.attachReceiptRequested}
-          disabled={locked}
-          onClick={() => onPatch({ attachReceiptRequested: !form.attachReceiptRequested })}
-          icon={
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M4 7h3l1.5-2h7L17 7h3a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              />
-              <circle cx="12" cy="13" r="3.25" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-          }
-          label="Добавить фото / чек"
-        />
-        <ActionButton
-          active={form.attachFileRequested}
-          disabled={locked}
-          onClick={() => onPatch({ attachFileRequested: !form.attachFileRequested })}
-          icon={
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M8 11V7a4 4 0 118 0v4M6 19h12a2 2 0 002-2v-4a2 2 0 00-2-2H6a2 2 0 00-2 2v4a2 2 0 002 2z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          }
-          label="Прикрепить файл"
-        />
-        <ActionButton
           active={false}
-          disabled
+          onClick={onRepeat}
           icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path

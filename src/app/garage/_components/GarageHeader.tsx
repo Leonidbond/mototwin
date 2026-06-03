@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { Button } from "@/components/ui";
-import { productSemanticColors } from "@mototwin/design-tokens";
+import { AppHelpTrigger } from "@/components/app-help-trigger";
+import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 
 export function GarageHeader({
   trashCount,
@@ -38,13 +38,14 @@ export function GarageHeader({
         <IconLink href="/notifications" label="Уведомления" badgeCount={notificationCount}>
           <BellIcon />
         </IconLink>
-        <IconLink href="/help" label="Помощь">
-          <HelpIcon />
-        </IconLink>
-        <Link href="/onboarding" className="no-underline">
-          <Button variant="primary" leadingIcon={<PlusIcon />}>
-            Добавить мотоцикл
-          </Button>
+        <AppHelpTrigger label="Помощь" style={iconLinkStyle}>
+          <span style={iconLinkInnerStyle}>
+            <HelpIcon />
+          </span>
+        </AppHelpTrigger>
+        <Link href="/onboarding" className="no-underline" style={addVehicleLinkStyle}>
+          <PlusIcon />
+          Добавить мотоцикл
         </Link>
       </div>
     </div>
@@ -166,4 +167,20 @@ const badgeStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   border: `2px solid ${productSemanticColors.canvas}`,
+};
+
+const addVehicleLinkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  height: 42,
+  padding: "0 16px",
+  borderRadius: radiusScale.md,
+  fontWeight: 600,
+  fontSize: 14,
+  lineHeight: 1,
+  backgroundColor: productSemanticColors.primaryAction,
+  color: productSemanticColors.onPrimaryAction,
+  border: "1px solid transparent",
 };

@@ -163,7 +163,7 @@ export async function loadWorkQueue(
         statusLabel: statusKey,
         confirmations: voteByReport.get(report.id) ?? 0,
         reviewHref: `/admin/moderation?focus=fr-${report.id}`,
-        detailsHref: `/admin/fitment/reports/${report.id}`,
+        detailsHref: `/admin/moderation?focus=fr-${report.id}`,
       });
     }
   }
@@ -208,8 +208,8 @@ export async function loadWorkQueue(
         statusKey: "mixed-reports",
         statusLabel: "Mixed reports",
         confirmations: conflict.reportCount,
-        reviewHref: `/admin/fitment/conflicts/${conflict.id}`,
-        detailsHref: `/admin/fitment/conflicts/${conflict.id}`,
+        reviewHref: `/admin/moderation?queue=mixedFitments`,
+        detailsHref: `/admin/moderation?queue=mixedFitments`,
       });
     }
   }
@@ -348,7 +348,7 @@ export async function loadProblemAreas(): Promise<AdminProblemAreasResponse> {
       description: `${conflict.reportCount} конфликтующих отчетов · ${conflict.node.name}`,
       recommendation: "Ручная модерация safety-critical категорий",
       ctaLabel: "Проверить конфликты",
-      ctaHref: `/admin/fitment/conflicts/${conflict.id}`,
+      ctaHref: `/admin/moderation?queue=mixedFitments`,
     });
     if (cards.length >= 4) break;
   }
@@ -520,7 +520,7 @@ export async function loadAlerts(): Promise<AdminAlertsResponse> {
   const items: AdminAlertWire[] = [
     { key: "moderation-pending", label: "Pending parts", count: moderationPending, href: "/admin/moderation?tab=new-parts" },
     { key: "fitment-pending", label: "Pending fitment", count: fitmentPending, href: "/admin/moderation?tab=fitment" },
-    { key: "conflicts", label: "Conflicts", count: conflicts, href: "/admin/fitment/conflicts" },
+    { key: "conflicts", label: "Conflicts", count: conflicts, href: "/admin/moderation?queue=mixedFitments" },
     { key: "safety-critical", label: "Safety-critical", count: safety, href: "/admin/moderation?tab=safety" },
     { key: "import-errors", label: "Import errors", count: importErrors, href: "/admin/imports" },
   ];

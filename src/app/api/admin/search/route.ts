@@ -185,7 +185,7 @@ export async function GET(request: Request) {
             ? `${report.partMaster.brandName} ${report.partMaster.sku}`
             : "Fitment-отчет",
           subtitle: report.node?.name ?? "",
-          href: `/admin/fitment/reports/${report.id}`,
+          href: `/admin/moderation?focus=fr-${report.id}`,
         })),
       });
     }

@@ -3,7 +3,9 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   buildGarageCardProps,
   getVehicleSilhouetteClassLabel,
+  resolveGarageAttentionIconKey,
   resolveGarageVehicleSilhouette,
+  type GarageAttentionIconKey,
 } from "@mototwin/domain";
 import type { GarageVehicleItem } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
@@ -11,20 +13,31 @@ import { Button, Card } from "../ui";
 import { GarageScore } from "./GarageScore";
 import { VehicleSilhouette } from "./VehicleSilhouette";
 import brakesFrontPadsIcon from "../../../../images/top-node-icons-dark/brakes/brakes_front_pads.png";
+import chainSprocketsIcon from "../../../../images/top-node-icons-dark/chain_sprockets/chain_sprockets.png";
+import engineCoolingIcon from "../../../../images/top-node-icons-dark/engine_cooling/engine_cooling.png";
+import lubricationIcon from "../../../../images/top-node-icons-dark/lubrication/lubrication.png";
+import suspensionIcon from "../../../../images/top-node-icons-dark/suspension/suspension.png";
+import tiresIcon from "../../../../images/top-node-icons-dark/tires/tires.png";
 import tiresRearIcon from "../../../../images/top-node-icons-dark/tires/tires_rear.png";
 
-type AttentionTone = "soon" | "overdue";
-
-const TOP_NODE_ICONS = {
+const TOP_NODE_ICONS: Record<GarageAttentionIconKey, typeof brakesFrontPadsIcon> = {
   brakes: brakesFrontPadsIcon,
-  tires: tiresRearIcon,
-} as const;
+  brakes_front_pads: brakesFrontPadsIcon,
+  chain_sprockets: chainSprocketsIcon,
+  engine_cooling: engineCoolingIcon,
+  lubrication: lubricationIcon,
+  suspension: suspensionIcon,
+  tires: tiresIcon,
+  tires_rear: tiresRearIcon,
+};
+
+type AttentionTone = "soon" | "overdue";
 
 export function VehicleCard(props: {
   vehicle: GarageVehicleItem;
   onOpenVehicle: (id: string) => void;
   onAddServiceEvent: (id: string) => void;
-  onOpenServiceLog: (id: string) => void;
+  onOpenExpenses: (id: string) => void;
 }) {
   const card = buildGarageCardProps(props.vehicle);
   const openVehicle = () => props.onOpenVehicle(props.vehicle.id);
@@ -80,24 +93,16 @@ export function VehicleCard(props: {
           <>
             <Text style={styles.attentionTitle}>Требует внимания</Text>
             <View style={styles.attentionList}>
-              {overdueCount > 0 ? (
+              {(props.vehicle.attentionSummary?.items ?? []).map((item) => (
                 <AttentionRow
-                  tone="overdue"
-                  iconKey="tires"
-                  title="Задняя шина"
-                  badgeLabel="Просрочено"
-                  subtitle="Рекомендуется замена"
+                  key={item.nodeId}
+                  tone={item.effectiveStatus === "OVERDUE" ? "overdue" : "soon"}
+                  iconKey={resolveGarageAttentionIconKey(item.code)}
+                  title={item.name}
+                  badgeLabel={item.statusLabelRu}
+                  subtitle={item.subtitle}
                 />
-              ) : null}
-              {soonCount > 0 ? (
-                <AttentionRow
-                  tone="soon"
-                  iconKey="brakes"
-                  title="Тормозные колодки"
-                  badgeLabel="Скоро"
-                  subtitle="Проверить через 450 км"
-                />
-              ) : null}
+              ))}
             </View>
           </>
         ) : (
@@ -121,7 +126,7 @@ export function VehicleCard(props: {
         <Button
           variant="ghost"
           size="sm"
-          onPress={() => props.onOpenServiceLog(props.vehicle.id)}
+          onPress={() => props.onOpenExpenses(props.vehicle.id)}
           style={styles.secondaryButton}
           leadingIcon={<MaterialIcons name="account-balance-wallet" size={16} color={c.textPrimary} />}
         >
@@ -134,7 +139,7 @@ export function VehicleCard(props: {
 
 function AttentionRow(props: {
   tone: AttentionTone;
-  iconKey: keyof typeof TOP_NODE_ICONS;
+  iconKey: GarageAttentionIconKey;
   title: string;
   badgeLabel: string;
   subtitle: string;
@@ -170,7 +175,7 @@ function HealthyRow() {
       </View>
       <View style={styles.attentionTextWrap}>
         <Text style={styles.healthyTitle}>Все в порядке</Text>
-        <Text style={styles.attentionSubtitle}>Следующее ТО через 1 200 км</Text>
+        <Text style={styles.attentionSubtitle}>Нет просроченных задач</Text>
       </View>
     </View>
   );

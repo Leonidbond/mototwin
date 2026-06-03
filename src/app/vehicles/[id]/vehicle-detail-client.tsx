@@ -4003,6 +4003,23 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     setIsEditingVehicleState(true);
   };
 
+  useEffect(() => {
+    if (!vehicleId || !vehicle) {
+      return;
+    }
+    if (searchParams.get("openVehicleState") !== "1") {
+      return;
+    }
+    openVehicleStateEditor();
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("openVehicleState");
+    nextParams.delete("focus");
+    const query = nextParams.toString();
+    router.replace(query ? `/vehicles/${vehicleId}?${query}` : `/vehicles/${vehicleId}`, {
+      scroll: false,
+    });
+  }, [router, searchParams, vehicle, vehicleId]);
+
   const openEditProfileModal = () => {
     if (!vehicle) {
       return;

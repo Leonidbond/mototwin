@@ -26,8 +26,8 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: "imports", label: "Массовые загрузки", href: "/admin/imports", icon: "Upload" },
   { key: "service-rules", label: "Регламенты ТО", href: "/admin/service-rules", icon: "Wrench" },
   { key: "dictionaries", label: "Справочники", href: "/admin/dictionaries", icon: "Library" },
-  { key: "notifications", label: "Уведомления", href: "/admin/notifications", icon: "Bell", hasAlertDot: true },
-  { key: "subscriptions", label: "Подписки", href: "/admin/subscriptions", icon: "CreditCard" },
+  { key: "notifications", label: "Уведомления", href: "/admin/notifications", icon: "Bell" },
+  { key: "subscriptions", label: "Подписки", href: "/admin/subscriptions", icon: "CreditCard", hasAlertDot: true },
   { key: "audit", label: "Аудит", href: "/admin/audit", icon: "ScrollText" },
   { key: "settings", label: "Настройки", href: "/admin/settings", icon: "Settings" },
 ];

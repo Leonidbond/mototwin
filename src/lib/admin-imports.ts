@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import type { Prisma } from "@prisma/client";
+import type { MaintenanceTriggerMode, Prisma } from "@prisma/client";
 import { normalizePartNumber } from "@mototwin/domain";
 import type {
   AdminImportBatchDetailWire,
@@ -13,7 +13,7 @@ import type {
 } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 
-const SUPPORTED_TYPES: AdminImportBatchTypeWire[] = ["PARTS", "PART_ALIASES"];
+const SUPPORTED_TYPES: AdminImportBatchTypeWire[] = ["PARTS", "PART_ALIASES", "SERVICE_RULES"];
 
 const EMPTY_SUMMARY: AdminImportBatchSummaryWire = {
   total: 0,
@@ -223,7 +223,9 @@ export async function dryRunBatch(batchId: string): Promise<AdminImportBatchSumm
     const result =
       batch.type === "PARTS"
         ? await validatePartsRow(raw)
-        : await validatePartAliasesRow(raw);
+        : batch.type === "SERVICE_RULES"
+          ? await validateServiceRulesRow(raw)
+          : await validatePartAliasesRow(raw);
     summary[result.summaryKey] += 1;
     await prisma.importBatchRow.update({
       where: { id: row.id },
@@ -265,7 +267,9 @@ export async function commitBatch(batchId: string): Promise<AdminImportBatchSumm
       const result =
         batch.type === "PARTS"
           ? await applyPartsRow(raw, batch.createdById)
-          : await applyPartAliasesRow(raw);
+          : batch.type === "SERVICE_RULES"
+            ? await applyServiceRulesRow(raw)
+            : await applyPartAliasesRow(raw);
       summary[result.summaryKey] += 1;
       await prisma.importBatchRow.update({
         where: { id: row.id },
@@ -491,6 +495,74 @@ async function applyPartAliasesRow(raw: Record<string, string>): Promise<RowOutc
     },
   });
   return { ...validation, entityId: created.id };
+}
+
+function parseOptionalInt(raw: Record<string, string>, key: string): number | null {
+  const value = (raw[key] ?? "").trim();
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
+function parseTriggerMode(raw: Record<string, string>): MaintenanceTriggerMode {
+  const value = (raw["triggerMode"] ?? raw["trigger"] ?? "WHICHEVER_COMES_FIRST").trim();
+  if (value === "ANY" || value === "ALL" || value === "WHICHEVER_COMES_FIRST") {
+    return value;
+  }
+  return "WHICHEVER_COMES_FIRST";
+}
+
+async function validateServiceRulesRow(raw: Record<string, string>): Promise<RowOutcome> {
+  const nodeCode = (raw["nodeCode"] ?? raw["code"] ?? "").trim();
+  if (!nodeCode) {
+    return errorOutcome("Поле nodeCode обязательно");
+  }
+  const node = await prisma.node.findFirst({
+    where: { code: nodeCode },
+    select: { id: true },
+  });
+  if (!node) {
+    return errorOutcome(`Узел ${nodeCode} не найден`);
+  }
+  const existing = await prisma.nodeMaintenanceRule.findUnique({
+    where: { nodeId: node.id },
+    select: { id: true },
+  });
+  return {
+    action: existing ? "update" : "create",
+    status: "ok",
+    summaryKey: existing ? "updated" : "created",
+    errorMessage: null,
+    entityId: node.id,
+  };
+}
+
+async function applyServiceRulesRow(raw: Record<string, string>): Promise<RowOutcome> {
+  const validation = await validateServiceRulesRow(raw);
+  if (validation.status === "error" || !validation.entityId) return validation;
+  const nodeCode = (raw["nodeCode"] ?? raw["code"] ?? "").trim();
+  const node = await prisma.node.findFirst({
+    where: { code: nodeCode },
+    select: { id: true },
+  });
+  if (!node) return errorOutcome(`Узел ${nodeCode} не найден`);
+  const data = {
+    intervalKm: parseOptionalInt(raw, "intervalKm"),
+    intervalHours: parseOptionalInt(raw, "intervalHours"),
+    intervalDays: parseOptionalInt(raw, "intervalDays"),
+    warningKm: parseOptionalInt(raw, "warningKm"),
+    warningHours: parseOptionalInt(raw, "warningHours"),
+    warningDays: parseOptionalInt(raw, "warningDays"),
+    triggerMode: parseTriggerMode(raw),
+    isActive: (raw["isActive"] ?? "true").trim().toLowerCase() !== "false",
+  };
+  const rule = await prisma.nodeMaintenanceRule.upsert({
+    where: { nodeId: node.id },
+    create: { nodeId: node.id, ...data },
+    update: data,
+  });
+  return { ...validation, entityId: rule.id };
 }
 
 function errorOutcome(message: string): RowOutcome {

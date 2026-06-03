@@ -12,9 +12,9 @@ interface ActionTile {
 }
 
 const QUICK_ACTIONS: ActionTile[] = [
-  { label: ruAdmin.dashboard.quickActions.addPart, href: "/admin/catalog/new", Icon: Plus, iconColor: "#F97316" },
+  { label: ruAdmin.dashboard.quickActions.addPart, href: "/admin/catalog", Icon: Plus, iconColor: "#F97316" },
   { label: ruAdmin.dashboard.quickActions.uploadCsv, href: "/admin/imports/new", Icon: Upload, iconColor: "#F97316" },
-  { label: ruAdmin.dashboard.quickActions.createFitmentRule, href: "/admin/fitment/new", Icon: Combine, iconColor: "#F97316" },
+  { label: ruAdmin.dashboard.quickActions.createFitmentRule, href: "/admin/fitment", Icon: Combine, iconColor: "#F97316" },
   { label: ruAdmin.dashboard.quickActions.openModeration, href: "/admin/moderation", Icon: ShieldCheck, iconColor: "#F97316" },
 ];
 
@@ -39,7 +39,7 @@ export function QuickActionsCard() {
         ))}
       </div>
       <Link
-        href="/admin/fitment/recalculate"
+        href="/admin/fitment"
         prefetch={false}
         style={{ ...tileStyle, marginTop: 10, gridColumn: "span 2" }}
       >

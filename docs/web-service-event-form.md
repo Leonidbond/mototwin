@@ -94,8 +94,9 @@
 **Поведение:**
 
 - Подпись **«Место установки (опционально)»**; текстовое поле адреса (до 500 символов, `ADD_SERVICE_EVENT_INSTALL_LOCATION_MAX_LENGTH` в `@mototwin/domain`).
-- Кнопка **«На карте»** внутри picker открывает `YandexMapPlacePickerModal` (`overlayZIndex=100`, выше overlay picker `z-[90]`, чтобы клики по организациям на карте доходили до JS API).
-- Поиск в picker: `GET /api/service-places/search` (`AUTO|ORGANIZATION|ADDRESS`) + список результатов (до **10** подсказок — лимит Geosuggest API, не полный каталог категории как в Яндекс.Картах).
+- Карта встроена в picker (`ServicePlaceMap` → `YandexMapPlacePickerModal`, `embedded`): текстовый поиск + список результатов + синие маркеры на карте.
+- **Выбор организации:** только через **наши маркеры** или строку в списке (данные с сервера: Geosuggest + геокодер). Клик по фону карты запрашивает организации рядом (`GET /api/geocode?nearbyBiz=1`); при нескольких кандидатах автовыбор отключён. Встроенные POI-тайлы Яндекса отключены (`yandexMapDisablePoiInteractivity`).
+- Поиск в picker: `GET /api/service-places/search` (`AUTO|ORGANIZATION|ADDRESS`) + список результатов (до **10** подсказок — лимит Geosuggest API, не полный каталог категории как в Яндекс.Картах). `providerPlaceId` (uri Geosuggest) сохраняется при поиске и выборе с карты.
 - Ручной fallback: `CUSTOM` место (название + адрес).
 - При подтверждении picker создаёт/переиспользует место через `POST /api/service-places` и пишет в форму:
   - `servicePlaceId`
@@ -108,7 +109,7 @@
 
 | Путь | Назначение |
 |------|------------|
-| `src/components/integrations/yandex-maps/` | Модалка выбора точки на `@iminside/react-yandex-maps`, клиент `/api/geocode`, тип `YandexMapPlace`. |
+| `src/components/integrations/yandex-maps/` | Модалка/встроенная карта на `@iminside/react-yandex-maps`, хук `useMapPlaceCandidates`, клиент `/api/geocode`, тип `YandexMapPlace`. |
 | `index.ts` | Экспорт: `YandexMapPlacePickerModal`, `getYandexMapsApiKey`, `isYandexMapsConfigured`. |
 
 **Переменная окружения** (корневой `.env`, см. `.env.example`):
@@ -280,7 +281,7 @@ Expo/mobile намеренно оставляет один экран **`apps/ap
 4. Из **service-log** — переходы new / repeat / edit с **`returnTo`**.
 5. Из **vehicle-detail** — new, edit, wishlist / узел (query-параметры), без регрессии навигации.
 6. Пробег/моточасы **выше текущих** → модалка; **«Не обновлять»** / фон / крестик → в полях снова **текущие** показатели ТС; **«Обновить»** → успешный PATCH и поля без отката.
-7. **Место установки:** ручной ввод адреса; с **`NEXT_PUBLIC_YANDEX_MAPS_API_KEY`** — «На карте» → поиск через SearchControl/клик по карте → адрес и координаты в форме; при ошибке SearchControl включается fallback через `/api/geocode`; после сохранения события поля приходят в API и при повторном edit.
+7. **Место установки:** ручной ввод адреса; с **`NEXT_PUBLIC_YANDEX_MAPS_API_KEY`** — picker с картой: текстовый поиск → маркеры и список → выбор организации; клик по карте → nearby orgs или reverse-адрес; после сохранения события поля приходят в API и при повторном edit.
 
 Линт по области формы (в zsh квадратные скобки в пути — в кавычках):
 

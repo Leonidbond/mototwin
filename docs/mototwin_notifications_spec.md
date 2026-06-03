@@ -1012,12 +1012,14 @@ Payload для Web Push:
 `Notification.actionUrl` хранит относительный путь и query-параметры, например:
 
 - `/vehicles/:vehicleId/service-events/new?nodeId=:nodeId`
-- `/vehicles/:vehicleId/state?focus=mileage`
+- `/vehicles/:vehicleId/nodes?nodeId=:nodeId` (уведомление «Открыть узел»)
+- `/vehicles/:vehicleId?openVehicleState=1&focus=mileage` (обновление пробега; web открывает модалку на дашборде)
+- Legacy: `/vehicles/:vehicleId/state?focus=mileage` — web redirect → `?openVehicleState=1`; Expo — экран `state`
 - `/notifications?notificationId=:id`
 
 Правила:
 
-- для web — переход в Next.js route;
+- для web — переход в Next.js route; inbox `/notifications` показывает кнопку с `actionLabel` и выполняет переход (legacy `/state` нормализуется перед push);
 - для mobile — переход в Expo Router route с тем же path;
 - если пользователь не авторизован, сохраняется `returnTo` и после входа выполняется возврат;
 - запрещены внешние URL, кроме allowlist доменов продукта.

@@ -85,10 +85,22 @@ export type GarageDashboardSummaryViewModel = {
 };
 
 /** Counts from the same attention rules as `buildAttentionSummaryFromNodeTree` (garage API). */
+export type GarageAttentionItemWire = {
+  nodeId: string;
+  code: string;
+  name: string;
+  effectiveStatus: "OVERDUE" | "SOON";
+  statusLabelRu: string;
+  /** Short maintenance reason line (km/hours/days remaining or overdue). */
+  subtitle: string;
+};
+
 export type GarageAttentionSummaryWire = {
   totalCount: number;
   overdueCount: number;
   soonCount: number;
+  /** Top priority attention nodes for garage card preview (typically 1–2). */
+  items?: GarageAttentionItemWire[];
 };
 
 /**

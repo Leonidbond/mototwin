@@ -120,6 +120,57 @@ export function PartCompatibilityReportPageClient(props: {
   const [mediaExtra, setMediaExtra] = useState<"all" | "photo" | "service">("all");
   const [sortKey, setSortKey] = useState<"new" | "helpful" | "negative_first">("new");
   const [evidenceTypeFilter, setEvidenceTypeFilter] = useState<string>("ALL");
+  const [voteBusyReportId, setVoteBusyReportId] = useState<string | null>(null);
+  const [voteMessage, setVoteMessage] = useState("");
+
+  const reloadReport = useCallback(async () => {
+    setLoadError("");
+    try {
+      const u = new URL(
+        `/api/vehicles/${encodeURIComponent(props.vehicleId)}/part-compatibility-report`,
+        typeof window !== "undefined" ? window.location.origin : "http://local"
+      );
+      u.searchParams.set("partMasterId", props.partMasterId);
+      u.searchParams.set("nodeId", props.nodeId);
+      const res = await fetch(u.toString());
+      const json = (await res.json()) as PartCompatibilityReportWire & { error?: string };
+      if (!res.ok) {
+        setLoadError(json.error || "Не удалось загрузить отчёт.");
+        setData(null);
+        return;
+      }
+      setData(json);
+    } catch {
+      setLoadError("Сеть недоступна");
+      setData(null);
+    }
+  }, [props.nodeId, props.partMasterId, props.vehicleId]);
+
+  const castReportVote = useCallback(
+    async (reportId: string, voteType: "CONFIRM" | "REJECT" | "HELPFUL") => {
+      setVoteBusyReportId(reportId);
+      setVoteMessage("");
+      try {
+        const res = await fetch(`/api/fitment/reports/${encodeURIComponent(reportId)}/votes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voteType }),
+        });
+        const json = (await res.json()) as { error?: string };
+        if (!res.ok) {
+          setVoteMessage(json.error || "Не удалось сохранить голос.");
+          return;
+        }
+        await reloadReport();
+        setVoteMessage("Голос учтён");
+      } catch {
+        setVoteMessage("Не удалось сохранить голос.");
+      } finally {
+        setVoteBusyReportId(null);
+      }
+    },
+    [reloadReport]
+  );
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");
@@ -1041,9 +1092,34 @@ export function PartCompatibilityReportPageClient(props: {
                     <div style={{ marginTop: 10, fontSize: 11, color: MUTED }}>
                       {new Date(r.updatedAt).toLocaleString("ru-RU")} · {voteSummaryLine(r.votes)}
                     </div>
-                    <div style={{ marginTop: 8, fontSize: 11, color: MUTED, fontStyle: "italic" }}>
-                      Голосование по отчётам открывается из общего потока сообщества (MVP: только просмотр).
-                    </div>
+                    {r.moderationStatus === "PUBLISHED" ? (
+                      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          disabled={voteBusyReportId === r.id}
+                          onClick={() => void castReportVote(r.id, "CONFIRM")}
+                          style={secondaryGhostBtn}
+                        >
+                          Подтверждаю
+                        </button>
+                        <button
+                          type="button"
+                          disabled={voteBusyReportId === r.id}
+                          onClick={() => void castReportVote(r.id, "REJECT")}
+                          style={secondaryGhostBtn}
+                        >
+                          Не согласен
+                        </button>
+                        <button
+                          type="button"
+                          disabled={voteBusyReportId === r.id}
+                          onClick={() => void castReportVote(r.id, "HELPFUL")}
+                          style={secondaryGhostBtn}
+                        >
+                          Полезно
+                        </button>
+                      </div>
+                    ) : null}
                   </article>
                 ))}
               </div>
@@ -1268,9 +1344,12 @@ export function PartCompatibilityReportPageClient(props: {
               <Link href={communityHref} style={primaryLinkBtn}>
                 Добавить свой опыт
               </Link>
-              <button type="button" disabled title="Скоро: корзина замен" style={secondaryGhostBtn}>
-                Добавить в корзину замен
-              </button>
+              <Link
+                href={`/vehicles/${encodeURIComponent(props.vehicleId)}/parts`}
+                style={secondaryGhostBtn}
+              >
+                Открыть корзину замен
+              </Link>
             </div>
           </div>
 

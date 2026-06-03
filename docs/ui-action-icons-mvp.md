@@ -44,6 +44,13 @@ Action-heavy screens use compact, conventional icons to reduce visual clutter wh
 
 Do not force icon-only for primary form/page actions (for example: `Сохранить`, `Отмена`, `Добавить мотоцикл`, `Вернуться в гараж`).
 
+## Navigation CTAs (not icon-only)
+
+Primary navigation actions (`Добавить мотоцикл`, back to garage) must be a **single** interactive element:
+
+- **Web:** `<Link href="…">` styled as a button — **не** `<Link><Button>…</Button></Link>` (вложенный `<button>` в `<a>` ломает клик в браузере).
+- Whole dashed **add-motorcycle** card may be one link including the decorative «+» circle.
+
 ## Placement rules
 
 - Place icon actions near the entity they affect.

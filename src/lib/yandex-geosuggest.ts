@@ -1,6 +1,6 @@
 import { fetchWithTimeout } from "@/lib/http/fetch-with-timeout";
 import type { YandexGeocodedPlace } from "@/lib/yandex-geocoder";
-import { yandexGeocodeForward } from "@/lib/yandex-geocoder";
+import { yandexGeocodeForward, yandexGeocodeReverse } from "@/lib/yandex-geocoder";
 
 const SUGGEST_BASE = "https://suggest-maps.yandex.ru/v1/suggest";
 const SUGGEST_TIMEOUT_MS = 6_000;
@@ -117,9 +117,14 @@ export async function yandexGeosuggestOrganizations(
   }
 
   const data = (rawBody.trim() ? JSON.parse(rawBody) : {}) as GeosuggestJson;
+  return resolveGeosuggestItems(data.results ?? []);
+}
 
+async function resolveGeosuggestItems(
+  items: NonNullable<GeosuggestJson["results"]>
+): Promise<YandexGeocodedPlace[]> {
   const places: YandexGeocodedPlace[] = [];
-  for (const item of data.results ?? []) {
+  for (const item of items) {
     const title = item.title?.text?.trim();
     const subtitle = item.subtitle?.text?.trim();
     const address =
@@ -131,10 +136,91 @@ export async function yandexGeosuggestOrganizations(
     if (geoQuery) {
       const resolved = await yandexGeocodeForward(geoQuery);
       if (resolved) {
-        places.push({ address: address || resolved.address, lat: resolved.lat, lng: resolved.lng });
+        const uri = item.uri?.trim();
+        places.push({
+          address,
+          lat: resolved.lat,
+          lng: resolved.lng,
+          label: title || undefined,
+          providerPlaceId: uri || null,
+        });
       }
     }
   }
-
   return places;
+}
+
+function geosuggestAddressFromReverse(reverseAddress: string): string {
+  const parts = reverseAddress
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return reverseAddress.trim();
+
+  let trimmed = [...parts];
+  while (trimmed.length > 0 && /^(россия|russia)$/i.test(trimmed[trimmed.length - 1]!)) {
+    trimmed.pop();
+  }
+  // Geosuggest types=biz не возвращает orgs, если в query есть город.
+  if (trimmed.length >= 3) {
+    return trimmed.slice(0, 2).join(", ");
+  }
+  return trimmed.join(", ");
+}
+
+/** Организации в здании по координатам клика: reverse geocode → geosuggest по адресу. */
+export async function yandexGeosuggestOrganizationsAtClick(
+  lat: number,
+  lng: number,
+  options?: { referer?: string }
+): Promise<YandexGeocodedPlace[]> {
+  const centerLonLat: [number, number] = [lng, lat];
+  const reversed = await yandexGeocodeReverse(lat, lng);
+  const addressQuery = reversed?.address?.trim();
+  if (!addressQuery) return [];
+
+  const suggestOpts = { centerLonLat, referer: options?.referer };
+  const buildingQuery = geosuggestAddressFromReverse(addressQuery);
+  let places = await yandexGeosuggestOrganizations(buildingQuery, suggestOpts);
+  let maxDistanceM = 150;
+
+  if (places.length === 0 && buildingQuery !== addressQuery) {
+    places = await yandexGeosuggestOrganizations(addressQuery, suggestOpts);
+  }
+
+  if (places.length === 0) {
+    const streetOnly = buildingQuery.split(",")[0]?.trim();
+    if (streetOnly && streetOnly !== buildingQuery) {
+      places = await yandexGeosuggestOrganizations(streetOnly, suggestOpts);
+      maxDistanceM = 250;
+    }
+  }
+  return places
+    .map((place) => ({
+      place,
+      distance: distanceMeters(place.lat, place.lng, lat, lng),
+    }))
+    .filter(({ distance }) => distance <= maxDistanceM)
+    .sort((a, b) => a.distance - b.distance)
+    .map(({ place }) => place);
+}
+
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** @deprecated используйте yandexGeosuggestOrganizationsAtClick */
+export async function yandexGeosuggestOrganizationsNearPoint(
+  centerLonLat: [number, number],
+  _queryHint: string,
+  options?: { referer?: string }
+): Promise<YandexGeocodedPlace[]> {
+  const [lng, lat] = centerLonLat;
+  return yandexGeosuggestOrganizationsAtClick(lat, lng, options);
 }

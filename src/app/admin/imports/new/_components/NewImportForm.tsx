@@ -24,6 +24,12 @@ const TYPE_OPTIONS: Array<{
     supported: true,
   },
   {
+    value: "SERVICE_RULES",
+    label: "Регламенты ТО (NodeMaintenanceRule)",
+    hint: "Колонки: nodeCode, intervalKm?, intervalDays?, intervalHours?, triggerMode?",
+    supported: true,
+  },
+  {
     value: "FITMENT_RULES",
     label: "Fitment rules",
     hint: "Появится в следующем релизе",

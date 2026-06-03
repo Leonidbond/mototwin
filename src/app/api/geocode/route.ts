@@ -12,6 +12,7 @@ import {
   getYandexGeosuggestApiKey,
   YandexGeosuggestError,
   yandexGeosuggestOrganizations,
+  yandexGeosuggestOrganizationsAtClick,
 } from "@/lib/yandex-geosuggest";
 import {
   getCurrentUserContext,
@@ -87,7 +88,17 @@ export async function GET(request: Request) {
                 return origin ? `${origin}/` : "";
               })() ||
               undefined;
-            places = await yandexGeosuggestOrganizations(query, { referer: pageReferer });
+            const centerLonLat = (() => {
+              const llRaw = searchParams.get("ll");
+              if (!llRaw) return undefined;
+              const parts = llRaw.split(",").map((part) => Number(part.trim()));
+              if (parts.length < 2 || !parts.every(Number.isFinite)) return undefined;
+              return [parts[0], parts[1]] as [number, number];
+            })();
+            places = await yandexGeosuggestOrganizations(query, {
+              referer: pageReferer,
+              centerLonLat,
+            });
             if (places.length > 0) source = "geosuggest";
           } catch (suggestError) {
             const status =
@@ -132,6 +143,34 @@ export async function GET(request: Request) {
       const lng = Number(lngRaw);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         return NextResponse.json({ error: "Некорректные координаты" }, { status: 400 });
+      }
+
+      if (searchParams.get("nearbyBiz") === "1" && getYandexGeosuggestApiKey()) {
+        const pageReferer =
+          request.headers.get("referer")?.trim() ||
+          (() => {
+            const origin = request.headers.get("origin")?.trim();
+            return origin ? `${origin}/` : "";
+          })() ||
+          undefined;
+        try {
+          const places = await yandexGeosuggestOrganizationsAtClick(lat, lng, {
+            referer: pageReferer,
+          });
+          return NextResponse.json({
+            places,
+            meta: { source: places.length > 0 ? "geosuggest" : "none" },
+          });
+        } catch (suggestError) {
+          const status =
+            suggestError instanceof YandexGeosuggestError ? suggestError.status : null;
+          console.error("Yandex geosuggest near point failed:", suggestError);
+          return NextResponse.json({
+            places: [],
+            meta: { source: "none", geosuggestStatus: status },
+            warning: status != null ? geosuggestErrorMessage(status) : undefined,
+          });
+        }
       }
 
       try {

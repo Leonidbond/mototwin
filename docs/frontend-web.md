@@ -9,6 +9,7 @@
 - `src/app/page.tsx` — landing page
 - `src/app/onboarding/page.tsx` — add motorcycle flow (web)
 - `src/app/garage/page.tsx` — garage list
+- `src/app/notifications/page.tsx` — in-app notification inbox (action buttons, snooze, push)
 - `src/app/profile/page.tsx` — user profile (settings, custom TOP nodes)
 - `src/app/vehicles/[id]/page.tsx` — vehicle operational page
 
@@ -41,6 +42,9 @@
 - Loads `/api/garage`
 - States: loading / error / empty / list
 - Shows vehicle cards with summary and navigation to `/vehicles/[id]`
+- **Header CTA** `Добавить мотоцикл` → `/onboarding`: одна ссылка со стилями primary-кнопки (`GarageHeader.tsx`); не вкладывать `<button>` в `<a>`.
+- **Card quick actions** (`VehicleCard.tsx`): `Открыть` → дашборд; `Добавить ТО` → `/vehicles/[id]/service-events/new?returnTo=/garage`; `Расход` → `/vehicles/[id]/expenses`.
+- **Dashed add card** (`AddMotorcycleCard.tsx`): вся карточка (включая «+») — ссылка на `/onboarding`.
 - Left-side navigation is a collapsible **`GarageSidebar`** (`src/app/garage/_components/GarageSidebar.tsx`); collapsed state is persisted in `localStorage` (`garage.sidebar.collapsed`). Контекст мотоцикла для ссылок меню, плашка с выбором байка и поведение пунктов описаны в [garage-dashboard-mvp.md](./garage-dashboard-mvp.md) (раздел «Web: левый сайдбар»).
 - Empty state shows illustration `images/empty_garage.png` with caption
   `В вашем гараже пока нет мотоциклов`; primary action `Добавить мотоцикл`
@@ -51,11 +55,19 @@
   (`В норме`, `Скоро`, `Просрочено`, `Недавно`)
 - Durable Garage behavior/spec lives in `garage-dashboard-mvp.md`
 
+### 3.4.1 Notifications (`/notifications`)
+
+- Loads `GET /api/notifications` (include resolved).
+- Actions per row: primary **`actionLabel`** → `actionUrl` (with legacy `/state` → `?openVehicleState=1` normalization), snooze 7/30 d, seen/read/dismiss.
+- «Подключить push» → `registerWebPushSubscription` + `PATCH` notification settings.
+- Parity with Expo inbox action button; settings live on `/profile`.
+
 ### 3.5 Vehicle detail (web workspace)
 
 The page consolidates multiple operational blocks and modal flows:
+- **Dashboard top bar** (`VehicleDashboardTopBar`): «←» и «Мой гараж» → `/garage`; quick actions ТО / расход / подбор на той же полосе.
 - vehicle identity/profile
-- current state with inline update (`PATCH /state`)
+- current state with inline update (`PATCH /state`); deep link `?openVehicleState=1` opens mileage modal; `/vehicles/[id]/state` redirects to dashboard with that query
 - node tree with expand/collapse and status badges
 - link to **Service Log** page `/vehicles/[id]/service-log` (primary journal UX: фильтры — узлы через **`NodePickerModal`**, период, раскрываемая строка пробег/сумма/тип работы/исполнитель, сортировка; см. [service-log-mvp.md](./service-log-mvp.md), [web-expo-service-log-parity-fixes.md](./parity/web-expo-service-log-parity-fixes.md))
 - **`ServiceEventForm`** (`src/app/vehicles/[id]/_components/service-event-form/`) — создание / редактирование / повтор (bundle, только **листовые** узлы); страницы **`/vehicles/[id]/service-events/new`** и **`…/edit`**; навигация из **`vehicle-detail-client.tsx`** и **`service-log/page.tsx`** (см. [service-log-mvp.md](./service-log-mvp.md), [web-service-event-form.md](./web-service-event-form.md))

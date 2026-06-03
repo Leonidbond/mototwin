@@ -1,44 +1,42 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { Button, Card } from "@/components/ui";
-import { productSemanticColors } from "@mototwin/design-tokens";
+import { Card } from "@/components/ui";
+import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 
 export function AddMotorcycleCard() {
   return (
-    <Card
-      padding="lg"
-      style={{
-        borderStyle: "dashed",
-        borderColor: productSemanticColors.borderStrong,
-        minHeight: 468,
-      }}
-    >
-      <div
+    <Link href="/onboarding" className="no-underline" style={{ display: "block", minWidth: 0 }}>
+      <Card
+        padding="lg"
         style={{
-          display: "flex",
-          height: "100%",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
+          borderStyle: "dashed",
+          borderColor: productSemanticColors.borderStrong,
+          minHeight: 468,
+          cursor: "pointer",
+          transition: "border-color 0.15s ease, background-color 0.15s ease",
         }}
       >
-        <div style={plusCircleStyle}>
-          <PlusIcon />
+        <div
+          style={{
+            display: "flex",
+            height: "100%",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+          }}
+        >
+          <div style={plusCircleStyle}>
+            <PlusIcon />
+          </div>
+          <h3 style={titleStyle}>Добавить мотоцикл</h3>
+          <p style={{ marginTop: 10, maxWidth: 260, ...textStyle }}>
+            Расширяйте гараж и держите всю технику под контролем.
+          </p>
+          <span style={outlineButtonStyle}>Добавить мотоцикл</span>
         </div>
-        <h3 style={titleStyle}>Добавить мотоцикл</h3>
-        <p style={{ marginTop: 10, maxWidth: 260, ...textStyle }}>
-          Расширяйте гараж и держите всю технику под контролем.
-        </p>
-        <div style={{ marginTop: 20 }}>
-          <Link href="/onboarding" className="no-underline">
-            <Button variant="ghost" style={outlineButtonStyle}>
-              Добавить мотоцикл
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </Card>
+      </Card>
+    </Link>
   );
 }
 
@@ -76,6 +74,15 @@ const textStyle: CSSProperties = {
 };
 
 const outlineButtonStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  marginTop: 20,
+  height: 34,
+  padding: "0 12px",
+  borderRadius: radiusScale.md,
+  fontWeight: 600,
+  fontSize: 13,
   color: productSemanticColors.primaryAction,
-  borderColor: productSemanticColors.primaryAction,
+  border: `1px solid ${productSemanticColors.primaryAction}`,
 };

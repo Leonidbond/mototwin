@@ -1,6 +1,7 @@
 "use client";
 
 import Image, { type StaticImageData } from "next/image";
+import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -996,8 +997,10 @@ function VehicleDashboardTopBar(props: {
     <Card variant="subtle" padding="none" style={{ padding: "8px 10px 8px 12px" }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span
-            aria-hidden
+          <Link
+            href="/garage"
+            aria-label="Вернуться в гараж"
+            className="no-underline"
             style={{
               display: "inline-flex",
               width: 32,
@@ -1008,12 +1011,15 @@ function VehicleDashboardTopBar(props: {
               border: `1px solid ${productSemanticColors.borderStrong}`,
               backgroundColor: productSemanticColors.card,
               color: productSemanticColors.textPrimary,
+              transition: "background-color 0.15s ease",
             }}
           >
             <ArrowLeftIcon />
-          </span>
+          </Link>
           <div>
-            <div style={{ color: productSemanticColors.textMuted, fontSize: 11 }}>Мой гараж</div>
+            <Link href="/garage" className="no-underline" style={{ color: "inherit" }}>
+              <div style={{ color: productSemanticColors.textMuted, fontSize: 11 }}>Мой гараж</div>
+            </Link>
             <div style={{ color: productSemanticColors.textPrimary, fontSize: 14, fontWeight: 600 }}>
               Обзор мотоцикла
             </div>
