@@ -3,6 +3,14 @@ import { DEMO_GARAGE_TITLE } from "@/app/api/_shared/current-user-context";
 import { getOrCreateUserNotificationSettings } from "@/lib/notifications";
 
 export async function ensureUserBootstrap(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  if (!user) {
+    return;
+  }
+
   const [garage, settings, subscription] = await Promise.all([
     prisma.garage.findFirst({
       where: { ownerUserId: userId },

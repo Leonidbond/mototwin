@@ -47,9 +47,17 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) {
       if (user.id) {
         await assertUserNotBlocked(user.id);
-        await ensureUserBootstrap(user.id);
       }
       return true;
+    },
+  },
+  events: {
+    // OAuth signIn callback runs before PrismaAdapter persists a new user;
+    // bootstrap here so garages_ownerUserId_fkey is satisfied.
+    async signIn({ user }) {
+      if (user.id) {
+        await ensureUserBootstrap(user.id);
+      }
     },
   },
   pages: {
