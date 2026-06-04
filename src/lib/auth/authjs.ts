@@ -7,8 +7,7 @@ import Apple from "next-auth/providers/apple";
 import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers/oauth";
 
 type Provider = NonNullable<NextAuthOptions["providers"]>[number];
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
+import { mototwinPrismaAdapter } from "./prisma-auth-adapter";
 import { ensureUserBootstrap } from "./user-bootstrap";
 import { assertUserNotBlocked, verifyUserCredentials } from "./session-service";
 
@@ -34,7 +33,7 @@ function YandexProvider(config: OAuthUserConfig<Record<string, never>>): OAuthCo
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
-  adapter: PrismaAdapter(prisma),
+  adapter: mototwinPrismaAdapter(),
   session: { strategy: "database" },
   providers: buildProviders(),
   callbacks: {
