@@ -189,6 +189,54 @@ export default function OnboardingPage() {
     loadGenerations();
   }, [selectedVariantId]);
 
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      // #region agent log
+      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+        body: JSON.stringify({
+          sessionId: "6800ea",
+          runId: "run-garage-link-1",
+          hypothesisId: "H7",
+          location: "src/app/onboarding/page.tsx:194",
+          message: "beforeunload fired on onboarding",
+          data: {
+            href: typeof window !== "undefined" ? window.location.href : "server",
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    };
+    const onVisibilityChange = () => {
+      // #region agent log
+      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+        body: JSON.stringify({
+          sessionId: "6800ea",
+          runId: "run-garage-link-1",
+          hypothesisId: "H7",
+          location: "src/app/onboarding/page.tsx:213",
+          message: "visibility changed on onboarding",
+          data: {
+            state: typeof document !== "undefined" ? document.visibilityState : "n/a",
+            href: typeof window !== "undefined" ? window.location.href : "server",
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
   const selectedBrand = useMemo(
     () => brands.find((brand) => brand.id === selectedBrandId) ?? null,
     [brands, selectedBrandId]
@@ -254,6 +302,28 @@ export default function OnboardingPage() {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (!submitSuccess) return;
+    // #region agent log
+    fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+      body: JSON.stringify({
+        sessionId: "6800ea",
+        runId: "run-garage-link-1",
+        hypothesisId: "H8",
+        location: "src/app/onboarding/page.tsx:310",
+        message: "Submit success shown",
+        data: {
+          successMessage: submitSuccess,
+          href: typeof window !== "undefined" ? window.location.href : "server",
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [submitSuccess]);
 
   return (
     <main className="mt-internal-page min-h-screen" style={{ backgroundColor: productSemanticColors.canvas }}>
@@ -567,6 +637,28 @@ export default function OnboardingPage() {
                     <p className="text-sm text-green-600">{submitSuccess}</p>
                     <a
                       href="/garage"
+                      onClick={() => {
+                        // #region agent log
+                        fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            "X-Debug-Session-Id": "6800ea",
+                          },
+                          body: JSON.stringify({
+                            sessionId: "6800ea",
+                            runId: "run-garage-link-1",
+                            hypothesisId: "H9",
+                            location: "src/app/onboarding/page.tsx:640",
+                            message: "Clicked go to garage link",
+                            data: {
+                              href: typeof window !== "undefined" ? window.location.href : "server",
+                            },
+                            timestamp: Date.now(),
+                          }),
+                        }).catch(() => {});
+                        // #endregion
+                      }}
                       className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
                     >
                       Перейти в гараж
