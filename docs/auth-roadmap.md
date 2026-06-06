@@ -9,8 +9,9 @@ Detailed ownership architecture and migration strategy:
 
 - Authorization is **implemented for local accounts** on web + Expo:
   - `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me`.
-- Web now supports Auth.js sessions and OAuth providers (Google/Apple/Yandex) when env credentials are configured.
+- Web supports Auth.js sessions and OAuth providers (Google/Apple/Yandex) when env credentials are configured.
 - Web `/login`: email/password → custom `/api/auth/login`; OAuth → Auth.js (see [auth-oauth-production.md](./auth-oauth-production.md)).
+- **Web auth resilience (2026-06):** SSR guards on `/garage` and `/profile`, non-blocking auth probe, OAuth→`mototwin_session` sync via `WebAuthReadyProvider`, lightweight `GET /api/auth/session-state` — see [auth-web-architecture.md](./auth-web-architecture.md).
 - OAuth user creation uses `mototwinPrismaAdapter()` (`displayName` mapping) + post-sign-in bootstrap via `events.signIn`.
 - Expo keeps token-based auth (access + refresh), and can sign in through provider tokens via `POST /api/auth/oauth/mobile`.
 - Password recovery flow is implemented:
@@ -86,7 +87,7 @@ Future iterations should add:
 - Vehicle context read now uses ownership predicate in the final data read query (`findFirst` with ownership `where`).
 - Seed remains the only source of demo/dev context bootstrap data.
 
-### Phase 3 — Auth session layer (planned)
+### Phase 3 — Auth session layer (implemented)
 
 Implemented:
 
@@ -94,7 +95,8 @@ Implemented:
 - Expo token + refresh flow;
 - Auth.js integration for web session/OAuth;
 - mobile OAuth exchange endpoint;
-- password recovery endpoints and UI.
+- password recovery endpoints and UI;
+- web auth resilience: SSR guards, session-state probe, OAuth bridge, non-blocking client checks ([auth-web-architecture.md](./auth-web-architecture.md)).
 
 Open hardening tasks:
 

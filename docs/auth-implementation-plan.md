@@ -32,13 +32,12 @@ Scope:
 - Production ignores dev header and keeps pre-auth demo fallback behavior.
 - This is not real auth and not a security boundary.
 
-## 2.2 Pre-auth profile surface (implemented)
+## 2.2 Profile surface (implemented)
 
-- Web route: `/profile`.
+- Web route: `/profile` — protected by SSR layout guard (`profile/layout.tsx`).
 - Expo route: `profile`.
 - Garage acts as dashboard entry point and links to Profile.
-- Profile currently shows pre-auth context info (name/email/garage, fallback-safe values).
-- This is not sign-in and must not imply authenticated session state.
+- Profile shows authenticated identity from session (`GET /api/auth/me`).
 
 ## 3. Auth options comparison
 
@@ -315,6 +314,23 @@ Conflict policy for MVP:
 - replace guest placeholders with authenticated identity;
 - expose session actions and status.
 
+### Phase 3G — Web auth resilience (implemented, 2026-06)
+
+Goals: auth must not block page rendering; errors must be visible; OAuth must reliably bridge to `mototwin_session`.
+
+Implemented:
+
+- **Single web auth contract:** `GET /api/auth/session-state` (`AuthSessionStateResponse`) for lightweight probes; `GET /api/auth/me?mode=lite` skips subscription fetch.
+- **SSR route guards:** `/garage` and `/profile` layouts call `resolveAuthenticatedUserId()` server-side; removed blocking `AuthGate` from garage/profile pages.
+- **Non-blocking client probe:** `AuthGate` shows inline warnings instead of full-screen loading; uses `getWebSessionState()` with `authProbe` client profile.
+- **OAuth bridge:** `WebAuthReadyProvider` mounted in `AuthSessionProvider`; one-shot `GET /api/auth/sync-web-session`; logout clears Auth.js + `mototwin_session` cookies.
+- **API client profiles:** `authProbe` (5s), `default` (12s), `heavyRead` (25s) in `createWebApiClient`.
+- **Client cache:** TTL for session (60s) and session-state (15s); `invalidateWebSessionCache()` on probe errors.
+- **Garage latency:** split load (`includeAttention: false` then background `true`); server-side attention cache (~20s); sidebar inline warnings on load failure.
+- **Login hardening:** server-component login page with `sanitizeNextPath()`; login form uses `redirectOn401: false`.
+
+Canonical reference: [auth-web-architecture.md](./auth-web-architecture.md).
+
 ## 12. QA plan for auth rollout
 
 Core checks:
@@ -345,4 +361,5 @@ Cross-platform parity checks:
 - [auth-roadmap.md](./auth-roadmap.md)
 - [auth-data-ownership-architecture.md](./auth-data-ownership-architecture.md)
 - [auth-oauth-production.md](./auth-oauth-production.md)
+- [auth-web-architecture.md](./auth-web-architecture.md)
 - [data-model.md](./data-model.md)

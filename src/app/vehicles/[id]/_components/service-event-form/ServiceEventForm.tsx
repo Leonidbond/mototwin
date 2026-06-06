@@ -68,6 +68,7 @@ import {
 import { SERVICE_EVENT_PARTS_UI } from "./styles";
 import { SubscriptionLock } from "@/components/subscription/SubscriptionLock";
 import { useSubscription } from "@/lib/use-subscription";
+import { useIsNarrow } from "@/lib/use-is-narrow";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
 
@@ -301,6 +302,7 @@ function ServiceEventFormInner({
   pageBreadcrumbs = [],
 }: ServiceEventFormInnerProps) {
   const router = useRouter();
+  const isNarrowViewport = useIsNarrow();
   const [form, setForm] = useState<AddServiceEventFormValues>(() => cloneAddServiceEventForm(initialForm));
   const [localValidationError, setLocalValidationError] = useState("");
   const [skuSearchRowIndex, setSkuSearchRowIndex] = useState(0);
@@ -1415,12 +1417,12 @@ function ServiceEventFormInner({
       ? "Сохранить изменения"
       : "Сохранить событие";
   const serviceEventActions = (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:justify-end">
       {editingServiceEventId ? null : (
         <button
           type="button"
           onClick={openSaveTemplateModal}
-          className="inline-flex h-9 min-w-[9rem] items-center justify-center rounded-lg border px-3 text-xs font-bold leading-none transition hover:opacity-90"
+          className="inline-flex h-9 w-full min-w-0 items-center justify-center rounded-lg border px-3 text-xs font-bold leading-none transition hover:opacity-90 sm:w-auto sm:min-w-[9rem]"
           style={{
             borderColor: SERVICE_EVENT_PARTS_UI.border,
             backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
@@ -1433,7 +1435,7 @@ function ServiceEventFormInner({
       <button
         type="button"
         onClick={onCancel}
-        className="inline-flex h-9 min-w-[7rem] items-center justify-center rounded-lg border px-4 text-xs font-bold leading-none transition hover:opacity-90"
+        className="inline-flex h-9 w-full min-w-0 items-center justify-center rounded-lg border px-4 text-xs font-bold leading-none transition hover:opacity-90 sm:w-auto sm:min-w-[7rem]"
         style={{
           borderColor: SERVICE_EVENT_PARTS_UI.border,
           backgroundColor: SERVICE_EVENT_PARTS_UI.surfaceElevated,
@@ -1446,7 +1448,7 @@ function ServiceEventFormInner({
         type="button"
         onClick={() => void save()}
         disabled={isSubmitting}
-        className="inline-flex h-9 min-w-[10.5rem] items-center justify-center rounded-lg border px-4 text-xs font-bold leading-none transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
+        className="inline-flex h-9 w-full min-w-0 items-center justify-center rounded-lg border px-4 text-xs font-bold leading-none transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:min-w-[10.5rem]"
         style={{
           borderColor: SERVICE_EVENT_PARTS_UI.orange,
           backgroundColor: SERVICE_EVENT_PARTS_UI.orange,
@@ -1755,6 +1757,7 @@ function ServiceEventFormInner({
             belowTitle={serviceEventModeControl}
             subtitle={resolvedSubtitle.trim() ? resolvedSubtitle : undefined}
             actions={serviceEventActions}
+            actionsPlacement="belowTitleBand"
           />
 
           {contextHint ? (
@@ -1887,9 +1890,15 @@ function ServiceEventFormInner({
             </h1>
           </div>
         </div>
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
-          <div className="min-w-[220px] flex-1">{serviceEventModeControl}</div>
-          <div className="shrink-0">{serviceEventActions}</div>
+        <div
+          className={`flex w-full flex-wrap gap-2 ${
+            isNarrowViewport ? "flex-col items-stretch" : "items-center justify-between"
+          }`}
+        >
+          <div className={isNarrowViewport ? "w-full min-w-0" : "min-w-[220px] flex-1"}>
+            {serviceEventModeControl}
+          </div>
+          <div className={isNarrowViewport ? "w-full" : "shrink-0"}>{serviceEventActions}</div>
         </div>
         {contextHint ? (
           <div className="text-sm" style={{ color: productSemanticColors.textSecondary }}>

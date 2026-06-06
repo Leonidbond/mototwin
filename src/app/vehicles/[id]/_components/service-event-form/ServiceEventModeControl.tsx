@@ -73,7 +73,7 @@ export function ServiceEventModeControl({
   if (variant === "segmented") {
     return (
       <div
-        className="flex w-full max-w-lg rounded-lg border p-0.5 sm:max-w-xl"
+        className="flex w-full max-w-lg flex-col rounded-lg border p-0.5 sm:max-w-xl sm:flex-row"
         style={{
           borderColor: productSemanticColors.border,
           backgroundColor: productSemanticColors.cardSubtle,
@@ -84,7 +84,7 @@ export function ServiceEventModeControl({
         <button
           type="button"
           onClick={onSelectBasic}
-          className="flex min-h-[58px] min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left tracking-tight transition hover:opacity-95 sm:min-h-[60px] sm:gap-2.5 sm:px-3"
+          className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left tracking-tight transition hover:opacity-95 sm:min-h-[60px] sm:gap-2.5 sm:px-3"
           style={segmentStyle(isBasic)}
           aria-pressed={isBasic}
           title={BASIC_MODE_SUBTITLE}
@@ -118,7 +118,7 @@ export function ServiceEventModeControl({
               {BASIC_MODE_LABEL}
             </span>
             <span
-              className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap"
+              className="mt-0.5 block overflow-hidden text-ellipsis whitespace-normal sm:whitespace-nowrap"
               style={{
                 color: productSemanticColors.textSecondary,
                 fontSize: 10,
@@ -133,7 +133,7 @@ export function ServiceEventModeControl({
         <button
           type="button"
           onClick={selectDetailed}
-          className="flex min-h-[58px] min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left tracking-tight transition hover:opacity-95 sm:min-h-[60px] sm:gap-2.5 sm:px-3"
+          className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left tracking-tight transition hover:opacity-95 sm:min-h-[60px] sm:gap-2.5 sm:px-3"
           style={{ ...segmentStyle(!isBasic), ...detailedDisabledStyle }}
           aria-pressed={!isBasic}
           aria-disabled={!detailedAllowed}
@@ -169,7 +169,7 @@ export function ServiceEventModeControl({
               {DETAILED_MODE_LABEL}
             </span>
             <span
-              className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap"
+              className="mt-0.5 block overflow-hidden text-ellipsis whitespace-normal sm:whitespace-nowrap"
               style={{
                 color: productSemanticColors.textSecondary,
                 fontSize: 10,

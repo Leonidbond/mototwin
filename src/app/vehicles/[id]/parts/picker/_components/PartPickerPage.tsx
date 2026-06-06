@@ -145,6 +145,7 @@ export function PartPickerPage({
   const [catalogSearchWithoutNodeScope, setCatalogSearchWithoutNodeScope] = useState(false);
   const [catalogMaxPriceRub, setCatalogMaxPriceRub] = useState("");
   const [isNarrow, setIsNarrow] = useState(false);
+  const [dockOpen, setDockOpen] = useState(false);
   const kitsSectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -154,6 +155,12 @@ export function PartPickerPage({
     mq.addEventListener("change", u);
     return () => mq.removeEventListener("change", u);
   }, []);
+
+  useEffect(() => {
+    if (!isNarrow) {
+      setDockOpen(false);
+    }
+  }, [isNarrow]);
 
   useEffect(() => {
     setDraft(createEmptyDraftCart(vehicleId));
@@ -816,34 +823,68 @@ export function PartPickerPage({
                       <div
                         style={{
                           display: "flex",
-                          flexWrap: "wrap",
-                          gap: 10,
-                          alignItems: "stretch",
+                          flexDirection: "column",
+                          gap: isNarrow ? 8 : 10,
                           width: "100%",
                           minWidth: 0,
                         }}
                       >
-                        <div style={{ flex: "1 1 200px", minWidth: 0, display: "flex" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 10,
+                            alignItems: isNarrow ? "stretch" : "center",
+                            width: "100%",
+                            minWidth: 0,
+                          }}
+                        >
                           <NodeChip
+                            compact={isNarrow}
                             nodeName={nodeNameForUi}
                             nodePath={nodePathLabel}
                             nodeCode={selectedPathVm?.at(-1)?.code ?? null}
                             onClick={() => setNodePickerOpen(true)}
                           />
+                          {!isNarrow ? (
+                            <ResetSelectionChip
+                              onClick={handleResetSelection}
+                              disabled={!selectedNodeId && draft.items.length === 0}
+                            />
+                          ) : null}
+                          {!isNarrow ? (
+                            <button
+                              type="button"
+                              onClick={openCommunityAddPart}
+                              style={addOwnPartCommunityButtonStyle}
+                            >
+                              Добавить свою деталь
+                            </button>
+                          ) : null}
                         </div>
-                        <div style={{ flex: "0 1 auto", minWidth: 0, display: "flex" }}>
-                          <ResetSelectionChip
-                            onClick={handleResetSelection}
-                            disabled={!selectedNodeId && draft.items.length === 0}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={openCommunityAddPart}
-                          style={addOwnPartCommunityButtonStyle}
-                        >
-                          Добавить свою деталь
-                        </button>
+                        {isNarrow ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              width: "100%",
+                              minWidth: 0,
+                            }}
+                          >
+                            <ResetSelectionChip
+                              compact
+                              onClick={handleResetSelection}
+                              disabled={!selectedNodeId && draft.items.length === 0}
+                            />
+                            <button
+                              type="button"
+                              onClick={openCommunityAddPart}
+                              style={addOwnPartCommunityButtonStyleNarrow}
+                            >
+                              Добавить свою деталь
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
 
                       {recError ? (
@@ -908,6 +949,7 @@ export function PartPickerPage({
                         />
                       ) : (
                         <RecommendationsSection
+                          compact={isNarrow}
                           vehicleId={vehicleId}
                           nodeId={selectedNodeId}
                           nodeName={nodeNameForUi}
@@ -1003,19 +1045,43 @@ export function PartPickerPage({
                     boxShadow: "0 -8px 24px rgba(0,0,0,0.35)",
                   }}
                 >
-                  <PickerDraftCartPanel
-                    variant="dock"
-                    draft={draft}
-                    onRemove={(id) => setDraft((d) => removeFromDraft(d, id))}
-                    onChangeSkuQuantity={(draftId, nextQuantity) =>
-                      setDraft((d) => updateSkuDraftItemQuantity(d, draftId, nextQuantity))
-                    }
-                    onClear={() => setDraft((d) => clearDraft(d))}
-                    onCheckout={openCheckoutPreview}
-                    isSubmitting={isSubmitting}
-                    onSaveAsKit={() => setSaveUserKitOpen(true)}
-                    canSaveAsKit={canSaveDraftAsUserKit}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setDockOpen((v) => !v)}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: `1px solid ${pickerColors.border}`,
+                      backgroundColor: pickerColors.surfaceSubtle,
+                      color: pickerColors.text,
+                      fontSize: 13,
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span>Корзина: {draft.items.length}</span>
+                    <span aria-hidden>{dockOpen ? "Свернуть ▾" : "Развернуть ▴"}</span>
+                  </button>
+                  {dockOpen ? (
+                    <div style={{ marginTop: 8 }}>
+                      <PickerDraftCartPanel
+                        variant="dock"
+                        draft={draft}
+                        onRemove={(id) => setDraft((d) => removeFromDraft(d, id))}
+                        onChangeSkuQuantity={(draftId, nextQuantity) =>
+                          setDraft((d) => updateSkuDraftItemQuantity(d, draftId, nextQuantity))
+                        }
+                        onClear={() => setDraft((d) => clearDraft(d))}
+                        onCheckout={openCheckoutPreview}
+                        isSubmitting={isSubmitting}
+                        onSaveAsKit={() => setSaveUserKitOpen(true)}
+                        canSaveAsKit={canSaveDraftAsUserKit}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </>
@@ -1100,7 +1166,7 @@ function bannerVariantStyle(kind: PickerBannerState["kind"]): CSSProperties {
 }
 
 const addOwnPartCommunityButtonStyle: CSSProperties = {
-  flex: "0 1 auto",
+  flex: "0 0 auto",
   alignSelf: "stretch",
   display: "inline-flex",
   alignItems: "center",
@@ -1108,6 +1174,7 @@ const addOwnPartCommunityButtonStyle: CSSProperties = {
   gap: 6,
   borderRadius: 8,
   padding: "0 14px",
+  minHeight: 44,
   fontSize: 12,
   fontWeight: 700,
   lineHeight: 1,
@@ -1116,6 +1183,17 @@ const addOwnPartCommunityButtonStyle: CSSProperties = {
   backgroundColor: PARTS_CART_REF.orange,
   color: "#fff",
   cursor: "pointer",
+};
+
+const addOwnPartCommunityButtonStyleNarrow: CSSProperties = {
+  ...addOwnPartCommunityButtonStyle,
+  flex: "1 1 0",
+  minWidth: 0,
+  padding: "0 10px",
+  fontSize: 11,
+  whiteSpace: "normal",
+  textAlign: "center",
+  lineHeight: 1.2,
 };
 
 const mutedBoxStyle: CSSProperties = {

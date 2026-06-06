@@ -37,6 +37,7 @@ import type {
   VehicleStateViewModel,
 } from "@mototwin/types";
 import { Button, Card } from "@/components/ui";
+import { useIsNarrow } from "@/lib/use-is-narrow";
 import styles from "./VehicleDashboard.module.css";
 import adventureTouring from "../../../../../images/Motocycles/adventure_touring.png";
 import enduroDualSport from "../../../../../images/Motocycles/enduro_dual_sport.png";
@@ -214,6 +215,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
     wishlistInstalledOnlyCount,
     moveToTrashError,
   } = props;
+  const isNarrowViewport = useIsNarrow();
   const score = calculateGarageScore({
     totalCount: attentionSummary.totalCount,
     overdueCount: attentionSummary.overdueCount,
@@ -268,6 +270,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
     }
   }
   const wishlistPartsSummary = useMemo(() => buildPartsCartSummary(wishlistItems), [wishlistItems]);
+  const showAttentionCard = !isNarrowViewport || attentionItems.length > 0;
   const wishlistActiveTotal = wishlistPartsSummary.all.count;
   const hasWishlistRowsOrInstalled = wishlistActiveTotal > 0 || wishlistInstalledOnlyCount > 0;
   const wishlistDashboardStatusRows = useMemo(
@@ -428,6 +431,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
   return (
     <div className={styles.dashboardRoot}>
       <VehicleDashboardTopBar
+        compact={isNarrowViewport}
         onAddExpense={props.onAddExpense}
         onAddService={props.onAddService}
         onOpenParts={props.onOpenParts}
@@ -452,18 +456,26 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
           style={{
             minWidth: 0,
             overflow: "hidden",
-            padding: "22px 24px 16px",
+            padding: isNarrowViewport ? "16px 14px 12px" : "22px 24px 16px",
             boxShadow: `0 18px 40px rgba(0, 0, 0, 0.28)`,
           }}
         >
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: isNarrowViewport ? 10 : 12,
+            }}
+          >
             <div style={{ minWidth: 0 }}>
               <h1
                 style={{
                   margin: 0,
                   color: productSemanticColors.textPrimary,
-                  fontSize: 34,
-                  lineHeight: "40px",
+                  fontSize: isNarrowViewport ? 24 : 34,
+                  lineHeight: isNarrowViewport ? "30px" : "40px",
                   fontWeight: 700,
                   letterSpacing: -0.8,
                 }}
@@ -477,6 +489,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
                 style={{
                   marginTop: 8,
                   display: "flex",
+                  flexWrap: "wrap",
                   alignItems: "center",
                   gap: 8,
                   color: productSemanticColors.textMuted,
@@ -489,12 +502,26 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <MileageActionButton onClick={props.onUpdateMileage} />
-              <IconButton label="Редактировать" onClick={props.onEditProfile}>
+            <div
+              style={{
+                width: isNarrowViewport ? "100%" : undefined,
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: isNarrowViewport ? "flex-start" : "flex-end",
+                gap: 8,
+              }}
+            >
+              <MileageActionButton compact={isNarrowViewport} onClick={props.onUpdateMileage} />
+              <IconButton compact={isNarrowViewport} label="Редактировать" onClick={props.onEditProfile}>
                 <EditIcon />
               </IconButton>
-              <IconButton label="Переместить на свалку" onClick={props.onMoveToTrash} tone="danger">
+              <IconButton
+                compact={isNarrowViewport}
+                label="Переместить на свалку"
+                onClick={props.onMoveToTrash}
+                tone="danger"
+              >
                 <TrashIcon />
               </IconButton>
             </div>
@@ -530,7 +557,7 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
         </Card>
 
         <div className={styles.kpiStack}>
-          <ScoreCard score={score} attentionSummary={attentionSummary} />
+          <ScoreCard compact={isNarrowViewport} score={score} attentionSummary={attentionSummary} />
           <ProgressSummaryCard title={`Сезон ${new Date().getFullYear()}`} value={seasonProgress} />
           <ReadinessCard readiness={readiness} />
         </div>
@@ -540,41 +567,39 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
         ref={midGridRef}
         className={styles.midGrid}
         style={
-          midGridTwoColumn
+          !showAttentionCard
+            ? { gridTemplateColumns: "1fr" }
+            : midGridTwoColumn
             ? {
                 gridTemplateColumns: `minmax(0, ${midGridFr.left}fr) minmax(0, ${midGridFr.right}fr)`,
               }
             : undefined
         }
       >
-        <Card
-          className={styles.midGridCard}
-          padding="md"
-          style={{
-            display: "flex",
-            minHeight: 0,
-            alignSelf: "start",
-            flexDirection: "column",
-            overflow: "hidden",
-            ...(attentionPanelHeightPx != null
-              ? {
-                  height: attentionPanelHeightPx,
-                  maxHeight: attentionPanelHeightPx,
-                }
-              : { minHeight: 220 }),
-          }}
-        >
-          <SectionHeader title="Требует внимания" />
-          <div className={styles.attentionScrollShell}>
-            <div className={styles.attentionScrollList}>
-              {attentionItems.length === 0 ? (
-                <EmptyStateBlock
-                  title="Критичных замечаний нет"
-                  details="Все основные узлы сейчас в нормальном состоянии."
-                />
-              ) : (
-                attentionItems.map((item) => (
+        {showAttentionCard ? (
+          <Card
+            className={styles.midGridCard}
+            padding="md"
+            style={{
+              display: "flex",
+              minHeight: 0,
+              alignSelf: "start",
+              flexDirection: "column",
+              overflow: "hidden",
+              ...(attentionPanelHeightPx != null && !isNarrowViewport
+                ? {
+                    height: attentionPanelHeightPx,
+                    maxHeight: attentionPanelHeightPx,
+                  }
+                : { minHeight: isNarrowViewport ? 0 : 220 }),
+            }}
+          >
+            <SectionHeader title="Требует внимания" />
+            <div className={styles.attentionScrollShell}>
+              <div className={styles.attentionScrollList}>
+                {attentionItems.length === 0 ? null : attentionItems.map((item) => (
                   <AttentionRow
+                    compact={isNarrowViewport}
                     key={item.nodeId}
                     item={item}
                     wishlistItem={wishlistItemByNodeId.get(item.nodeId) ?? null}
@@ -586,11 +611,11 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
                     onOpenWishlistItem={(itemId) => props.onOpenPartItem(itemId)}
                     onOpenParts={() => props.onOpenAttentionItemParts(item)}
                   />
-                ))
-              )}
+                ))}
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        ) : null}
 
         <div
           ref={systemsPanelMeasureRef}
@@ -989,12 +1014,14 @@ export function VehicleDashboard(props: VehicleDashboardProps) {
 }
 
 function VehicleDashboardTopBar(props: {
+  compact?: boolean;
   onAddService: () => void;
   onAddExpense: () => void;
   onOpenParts: () => void;
 }) {
+  const compact = props.compact ?? false;
   return (
-    <Card variant="subtle" padding="none" style={{ padding: "8px 10px 8px 12px" }}>
+    <Card variant="subtle" padding="none" style={{ padding: compact ? "8px 8px 9px" : "8px 10px 8px 12px" }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Link
@@ -1026,7 +1053,7 @@ function VehicleDashboardTopBar(props: {
           </div>
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, width: compact ? "100%" : undefined }}>
           <Button variant="secondary" leadingIcon={<WrenchIcon />} onClick={props.onAddService}>
             Добавить ТО
           </Button>
@@ -1075,19 +1102,29 @@ function SectionHeader(props: { title: string; trailing?: ReactNode }) {
 }
 
 function ScoreCard(props: {
+  compact?: boolean;
   score: number | null;
   attentionSummary: AttentionSummaryViewModel;
 }) {
+  const compact = props.compact ?? false;
   const score = props.score ?? 0;
   return (
-        <Card padding="md">
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+    <Card padding="md">
+      <div
+        style={{
+          display: "flex",
+          flexWrap: compact ? "wrap" : "nowrap",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
         <div>
           <div style={{ color: productSemanticColors.textSecondary, fontSize: 12, fontWeight: 700 }}>
             Garage Score
           </div>
           <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 5 }}>
-            <span style={{ color: productSemanticColors.primaryAction, fontSize: 44, lineHeight: 1, fontWeight: 700 }}>
+            <span style={{ color: productSemanticColors.primaryAction, fontSize: compact ? 36 : 44, lineHeight: 1, fontWeight: 700 }}>
               {score}
             </span>
             <span style={{ color: productSemanticColors.textMuted, fontSize: 14 }}>/100</span>
@@ -1097,7 +1134,14 @@ function ScoreCard(props: {
         <Gauge score={score} />
       </div>
 
-      <div style={{ marginTop: 12, display: "grid", gap: 8, gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+      <div
+        style={{
+          marginTop: 12,
+          display: "grid",
+          gap: 8,
+          gridTemplateColumns: compact ? "repeat(3, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+        }}
+      >
         <KpiStat
           value={String(Math.max(0, 10 - props.attentionSummary.totalCount))}
           label="В норме"
@@ -1191,6 +1235,7 @@ function ReadinessCard(props: {
 }
 
 function AttentionRow(props: {
+  compact?: boolean;
   item: AttentionItemViewModel;
   wishlistItem: PartWishlistItemViewModel | null;
   onOpenLog: () => void;
@@ -1199,6 +1244,7 @@ function AttentionRow(props: {
   onOpenWishlistItem: (itemId: string) => void;
   onOpenParts: () => void;
 }) {
+  const compact = props.compact ?? false;
   const tokens = statusSemanticTokens[props.item.effectiveStatus];
   const iconAccent = tokens.accent === "transparent" ? tokens.foreground : tokens.accent;
   const iconGlow = `${iconAccent}38`;
@@ -1229,7 +1275,7 @@ function AttentionRow(props: {
       <div
         style={{
           display: "flex",
-          flexDirection: "row",
+          flexDirection: compact ? "column" : "row",
           alignItems: "flex-start",
           gap: 9,
           width: "100%",
@@ -1266,7 +1312,7 @@ function AttentionRow(props: {
           />
         </span>
         <div style={{ minWidth: 0, flex: "1 1 0%", minHeight: "min-content", overflow: "visible" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, minWidth: 0 }}>
             <div
               style={{
                 minWidth: 0,
@@ -1288,9 +1334,9 @@ function AttentionRow(props: {
               paddingBottom: 2,
               fontSize: 11,
               lineHeight: "14px",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              whiteSpace: compact ? "normal" : "nowrap",
+              overflow: compact ? "visible" : "hidden",
+              textOverflow: compact ? "clip" : "ellipsis",
             }}
           >
             {props.item.shortExplanation || props.item.topLevelParentName || "Требуется внимание по регламенту обслуживания."}
@@ -1301,7 +1347,7 @@ function AttentionRow(props: {
             display: "flex",
             flexDirection: "row",
             flexWrap: "wrap",
-            justifyContent: "flex-end",
+            justifyContent: compact ? "flex-start" : "flex-end",
             alignItems: "center",
             alignContent: "flex-start",
             gap: 6,
@@ -1886,11 +1932,13 @@ function Gauge({ score }: { score: number }) {
 }
 
 function IconButton(props: {
+  compact?: boolean;
   label: string;
   onClick: () => void;
   tone?: "default" | "danger";
   children: ReactNode;
 }) {
+  const compact = props.compact ?? false;
   const isDanger = props.tone === "danger";
   return (
     <button
@@ -1900,7 +1948,7 @@ function IconButton(props: {
       onClick={props.onClick}
       style={{
         display: "inline-flex",
-        width: 34,
+        width: compact ? 32 : 34,
         height: 34,
         alignItems: "center",
         justifyContent: "center",
@@ -1918,7 +1966,8 @@ function IconButton(props: {
   );
 }
 
-function MileageActionButton(props: { onClick: () => void }) {
+function MileageActionButton(props: { onClick: () => void; compact?: boolean }) {
+  const compact = props.compact ?? false;
   return (
     <button
       type="button"
@@ -1928,15 +1977,15 @@ function MileageActionButton(props: { onClick: () => void }) {
         height: 34,
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
-        padding: "0 13px",
+        gap: compact ? 6 : 8,
+        padding: compact ? "0 10px" : "0 13px",
         borderRadius: 10,
         border: "1px solid rgba(249, 115, 22, 0.55)",
         backgroundColor: productSemanticColors.primaryAction,
         color: productSemanticColors.onPrimaryAction,
         boxShadow: "0 10px 22px rgba(249, 115, 22, 0.22)",
         cursor: "pointer",
-        fontSize: 13,
+        fontSize: compact ? 12 : 13,
         fontWeight: 700,
         whiteSpace: "nowrap",
       }}

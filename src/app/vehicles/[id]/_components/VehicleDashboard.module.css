@@ -162,6 +162,16 @@
 }
 
 @media (max-width: 760px) {
+  .dashboardRoot {
+    gap: 10px;
+  }
+
+  .topGrid,
+  .midGrid,
+  .lowerGrid {
+    gap: 10px;
+  }
+
   .systemsGrid,
   .statsGrid {
     grid-template-columns: 1fr;

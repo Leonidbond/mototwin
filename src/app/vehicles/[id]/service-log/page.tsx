@@ -36,6 +36,7 @@ import {
 import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 import { Button } from "@/components/ui";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
+import { useIsNarrow } from "@/lib/use-is-narrow";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { NodePickerModal } from "@/app/vehicles/[id]/_components/node-picker/NodePickerModal";
@@ -632,7 +633,9 @@ export default function VehicleServiceLogPage() {
   const [visibleCount, setVisibleCount] = useState(LOAD_MORE_STEP);
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [periodPopoverOpen, setPeriodPopoverOpen] = useState(false);
+  const isNarrowViewport = useIsNarrow();
   const periodPopoverRef = useRef<HTMLDivElement | null>(null);
   /** Prevents URL highlight params from re-forcing selection on every `selectedEventId` change (e.g. after return from expenses). */
   const appliedServiceLogHighlightFromUrlRef = useRef<string | null>(null);
@@ -1100,13 +1103,19 @@ export default function VehicleServiceLogPage() {
         }}
       >
         <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
-        <section style={contentWrapStyle}>
+        <section
+          style={{
+            ...contentWrapStyle,
+            padding: isNarrowViewport ? "10px 10px 24px 8px" : contentWrapStyle.padding,
+          }}
+        >
           <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 4 }}>
             <InternalPageChrome
               variant="journalRef"
               onBack={navigateBack}
               breadcrumbs={serviceLogBreadcrumbs}
               title="Журнал обслуживания"
+              actionsPlacement={isNarrowViewport ? "belowTitleBand" : "besideTitle"}
               subtitle={
                 <>
                   {vehicleTitle}
@@ -1201,8 +1210,54 @@ export default function VehicleServiceLogPage() {
 `}
                   </style>
 
+                  {isNarrowViewport ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        padding: "6px 0 10px",
+                        borderBottom: SPEC.borderSubtle,
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: SPEC.textPrimary, fontSize: 12, fontWeight: 700 }}>
+                          Фильтры
+                        </div>
+                        <div style={{ marginTop: 3, color: SPEC.textMuted, fontSize: 11 }}>
+                          {activeFilterCount > 0
+                            ? `Активно: ${activeFilterCount}`
+                            : "Фильтры скрыты"}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMobileFiltersOpen((prev) => !prev)}
+                        style={{
+                          ...mutedBtnStyle,
+                          height: 34,
+                          borderRadius: 9,
+                          padding: "0 10px",
+                          fontSize: 12,
+                        }}
+                        aria-expanded={mobileFiltersOpen}
+                      >
+                        {mobileFiltersOpen ? "Скрыть" : "Показать"}
+                      </button>
+                    </div>
+                  ) : null}
+
                   {/* Поиск и фильтры: без общей карточки, минимальный gap, отдельные поля */}
-                  <div style={serviceLogFilterRowStyle}>
+                  {!isNarrowViewport || mobileFiltersOpen ? (
+                    <div
+                      style={{
+                        ...serviceLogFilterRowStyle,
+                        flexWrap: isNarrowViewport ? "wrap" : serviceLogFilterRowStyle.flexWrap,
+                        gap: isNarrowViewport ? 8 : serviceLogFilterRowStyle.gap,
+                        padding: isNarrowViewport ? "8px 0 10px" : serviceLogFilterRowStyle.padding,
+                      }}
+                    >
                     {/* 1 — поиск */}
                     <div
                       style={{
@@ -1562,27 +1617,28 @@ export default function VehicleServiceLogPage() {
                         ) : null}
                       </button>
                     </div>
-                  </div>
+                    </div>
+                  ) : null}
 
-                  {filtersExpanded ? (
+                  {(!isNarrowViewport || mobileFiltersOpen) && filtersExpanded ? (
                     <div
                       style={{
                         padding: "6px 0 12px",
                         borderBottom: SPEC.borderSubtle,
                         width: "100%",
                         boxSizing: "border-box",
-                        overflowX: "auto",
+                        overflowX: isNarrowViewport ? "visible" : "auto",
                       }}
                     >
                       <div
                         style={{
                           display: "flex",
                           flexDirection: "row",
-                          flexWrap: "nowrap",
+                          flexWrap: isNarrowViewport ? "wrap" : "nowrap",
                           alignItems: "center",
                           gap: 10,
                           width: "100%",
-                          minWidth: "min-content",
+                          minWidth: isNarrowViewport ? 0 : "min-content",
                           boxSizing: "border-box",
                         }}
                       >
@@ -2004,6 +2060,7 @@ export default function VehicleServiceLogPage() {
                                 style={{ scrollMarginTop: 80 }}
                               >
                                 <ServiceLogRow
+                                  compact={isNarrowViewport}
                                   entry={entry}
                                   event={rawEvent}
                                   isSelected={isSelected}
@@ -2244,6 +2301,7 @@ function TimelineMarkerGlyph({ kind, color }: { kind: ServiceRowActionKind; colo
 // ─── Timeline row (with rail column) ─────────────────────────────────────────
 
 function ServiceLogRow({
+  compact = false,
   entry,
   event,
   isSelected,
@@ -2252,6 +2310,7 @@ function ServiceLogRow({
   isLast,
   onSelect,
 }: {
+  compact?: boolean;
   entry: ServiceLogEntryViewModel;
   event: ServiceEventItem | null;
   isSelected: boolean;
@@ -2280,6 +2339,94 @@ function ServiceLogRow({
     ? `1px solid ${productSemanticColors.primaryAction}55`
     : "1px solid rgba(148,163,184,0.22)";
   const cardBg = isSelected ? "rgba(255,255,255,0.045)" : "rgba(255,255,255,0.032)";
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) auto",
+          gap: 8,
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "10px 10px",
+          textAlign: "left",
+          background: isSelected ? SPEC.rowSelectWash : "transparent",
+          border: "none",
+          cursor: "pointer",
+        }}
+        aria-expanded={isSelected}
+      >
+        <div
+          style={{
+            minWidth: 0,
+            display: "grid",
+            gap: 4,
+            padding: "9px 10px",
+            borderRadius: 10,
+            border: cardBorder,
+            backgroundColor: cardBg,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <ServiceLogLeadingEventIcon
+              event={event}
+              actionKind={actionKind}
+              iconCfg={iconCfg}
+              size={SERVICE_LOG_JOURNAL_LEADING_ICON_PX}
+            />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: SPEC.textPrimary,
+                  lineHeight: 1.25,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {entry.mainTitle}
+              </div>
+              <div
+                style={{
+                  marginTop: 2,
+                  fontSize: 11,
+                  color: SPEC.textSecondary,
+                  lineHeight: 1.3,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isStateUpdate
+                  ? (entry.stateUpdateSubtitle ?? entry.compactMetricsLine)
+                  : entry.secondaryTitle}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
+            <RowMetric icon={<HandCoinMetricSvg />} value={cost ?? "—"} label="Стоимость" compact />
+            <RowMetric icon={<ClockSvg size={14} />} value={intervalLabel} label="Интервал" compact />
+            <RowMetric icon={<PersonSvg size={14} />} value={performerLabel} label="Исполнитель" compact />
+          </div>
+        </div>
+        <span
+          aria-hidden
+          style={{
+            alignSelf: "center",
+            color: isSelected ? SPEC.accent : "rgba(148,163,184,0.55)",
+            fontSize: 16,
+          }}
+        >
+          ›
+        </span>
+      </button>
+    );
+  }
 
   return (
     <button
@@ -2479,7 +2626,17 @@ function ServiceLogRow({
   );
 }
 
-function RowMetric({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
+function RowMetric({
+  icon,
+  value,
+  label,
+  compact = false,
+}: {
+  icon: ReactNode;
+  value: string;
+  label: string;
+  compact?: boolean;
+}) {
   const metricIconColor = "rgba(248,250,252,0.78)";
   return (
     <span
@@ -2487,10 +2644,10 @@ function RowMetric({ icon, value, label }: { icon: ReactNode; value: string; lab
         display: "flex",
         flexDirection: "row",
         alignItems: "center",
-        gap: 12,
+        gap: compact ? 8 : 12,
         minWidth: 0,
         width: "100%",
-        justifyContent: "center",
+        justifyContent: compact ? "flex-start" : "center",
       }}
     >
       <span style={{ color: metricIconColor, display: "inline-flex", flexShrink: 0 }}>{icon}</span>
@@ -2498,7 +2655,7 @@ function RowMetric({ icon, value, label }: { icon: ReactNode; value: string; lab
         <span
           style={{
             fontWeight: 700,
-            fontSize: 12,
+            fontSize: compact ? 11 : 12,
             color: SPEC.textPrimary,
             whiteSpace: "nowrap",
             overflow: "hidden",

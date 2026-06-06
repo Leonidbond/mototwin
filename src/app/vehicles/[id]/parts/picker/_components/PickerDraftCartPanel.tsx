@@ -29,7 +29,7 @@ export function PickerDraftCartPanel(props: {
           position: "static" as const,
           top: undefined,
           alignSelf: "stretch",
-          maxHeight: "min(52vh, 420px)",
+          maxHeight: "min(44vh, 360px)",
         }
       : {}),
   };

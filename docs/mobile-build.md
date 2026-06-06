@@ -136,6 +136,40 @@ npx expo prebuild --platform android
 
 После prebuild проверьте, что есть `android/app/src/main/res/drawable/splashscreen_logo.xml` (splash). Если сборка ругается на отсутствие drawable — добавьте ресурс или перегенерируйте prebuild.
 
+**Важно:** `npx expo prebuild --clean` перегенерирует `android/` и может затереть правки в `app/build.gradle` (release signing). После clean prebuild восстановите блок `signingConfigs.release` из репозитория или не используйте `--clean` без необходимости.
+
+### Release keystore (prod подпись APK/AAB)
+
+Файлы **не в git** (см. `.gitignore`):
+
+| Файл | Назначение |
+|------|------------|
+| `android/keystores/mototwin-release.keystore` | Release keystore |
+| `android/keystore.properties` | пароли и alias для Gradle |
+
+Первичная генерация (или на новой машине, если есть backup keystore):
+
+```bash
+bash apps/app/scripts/generate-android-release-keystore.sh
+```
+
+Шаблон: `android/keystore.properties.example`. **Сохраните backup** keystore + `keystore.properties` (1Password / offline). Без keystore нельзя обновлять приложение в Google Play.
+
+SHA-1 для Google OAuth (Android client, package `ru.mototwin.app`):
+
+```bash
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+# пароли — из android/keystore.properties (локально, не коммитить)
+keytool -list -v \
+  -keystore apps/app/android/keystores/mototwin-release.keystore \
+  -alias mototwin-release \
+  -storepass 'YOUR_STORE_PASSWORD' | grep SHA1
+```
+
+Либо `./gradlew signingReport` в `apps/app/android` — секция `Variant: release`.
+
+Debug-сборки используют `debug.keystore` (**другой SHA-1**). В Google Console можно добавить оба fingerprint в один Android OAuth client.
+
 ### Debug на эмуляторе/устройстве
 
 ```bash

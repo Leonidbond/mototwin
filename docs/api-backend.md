@@ -345,9 +345,11 @@ See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md).
 |-------|------------|
 | `POST /api/auth/register` | Регистрация; в prod — allowlist `MOTOTWIN_BETA_ALLOWED_EMAILS` |
 | `POST /api/auth/login` | Web email/password → cookie `mototwin_session` |
-| `POST /api/auth/logout` | Revoke web session cookie |
+| `POST /api/auth/logout` | Revoke web session + Auth.js cookies |
 | `POST /api/auth/refresh` | Mobile refresh rotation |
-| `GET /api/auth/me` | Current user (Bearer или cookie) |
+| `GET /api/auth/me` | Current user (Bearer или cookie); `?mode=lite` без subscription |
+| `GET /api/auth/session-state` | Lightweight auth probe: `{ authenticated, userId }` |
+| `GET /api/auth/sync-web-session` | Bridge Auth.js session → `mototwin_session` cookie |
 | `POST /api/auth/oauth/mobile` | Mobile OAuth: verify provider token → issue access/refresh |
 | `POST /api/auth/forgot-password` | Anti-enumeration reset request |
 | `POST /api/auth/reset-password` | One-time token → new password + revoke all sessions |
@@ -361,7 +363,7 @@ Catch-all: `/api/auth/[...nextauth]` — Google / Apple / Yandex when env creden
 - After sign-in: `ensureUserBootstrap()` in `events.signIn` (garage, settings, subscription)
 - Requires `NEXTAUTH_URL` + `AUTH_BASE_URL` on production
 
-Подробнее: [auth-oauth-production.md](./auth-oauth-production.md), [auth-implementation-plan.md](./auth-implementation-plan.md).
+Подробнее: [auth-oauth-production.md](./auth-oauth-production.md), [auth-web-architecture.md](./auth-web-architecture.md), [auth-implementation-plan.md](./auth-implementation-plan.md).
 
 Resolution order in `resolveAuthenticatedUserId()`: Bearer access token → `mototwin_session` cookie → Auth.js database session.
 

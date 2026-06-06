@@ -56,6 +56,7 @@ export function NodePickerModal({
 }: NodePickerModalProps) {
   const [query, setQuery] = useState("");
   const [topNodesOnly, setTopNodesOnly] = useState(false);
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [localSelected, setLocalSelected] = useState<Set<string>>(() => {
     const next = new Set<string>();
     if (selectedIds) {
@@ -95,6 +96,14 @@ export function NodePickerModal({
     }
   }, [hasPlanLockedLeaves, open, showTopToggle]);
 
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const sync = () => setIsCompactViewport(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
   if (!open) return null;
 
   const resetAndClose = () => {
@@ -128,7 +137,10 @@ export function NodePickerModal({
 
   return (
     <div
-      style={overlayStyle}
+      style={{
+        ...overlayStyle,
+        padding: isCompactViewport ? 10 : 16,
+      }}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
@@ -137,14 +149,20 @@ export function NodePickerModal({
       }}
     >
       <div
-        style={dialogStyle}
+        style={{
+          ...dialogStyle,
+          maxWidth: isCompactViewport ? "calc(100vw - 20px)" : 520,
+          padding: isCompactViewport ? 12 : 16,
+          borderRadius: isCompactViewport ? 14 : 18,
+          gap: isCompactViewport ? 10 : 12,
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header style={headerStyle}>
-          <h2 style={titleStyle}>{title}</h2>
+          <h2 style={{ ...titleStyle, fontSize: isCompactViewport ? 15 : 16 }}>{title}</h2>
           <button type="button" onClick={resetAndClose} aria-label="Закрыть" style={closeButtonStyle}>
             ×
           </button>
@@ -156,14 +174,19 @@ export function NodePickerModal({
             placeholder={searchPlaceholder}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            style={searchInputFlexStyle}
+            style={{
+              ...searchInputFlexStyle,
+              padding: isCompactViewport ? "8px 10px" : "10px 12px",
+              fontSize: isCompactViewport ? 12 : 13,
+              borderRadius: isCompactViewport ? 10 : 12,
+            }}
           />
           {showTopToggle ? (
             <button
               type="button"
               aria-pressed={topNodesOnly}
               onClick={() => setTopNodesOnly((value) => !value)}
-              style={topToggleStyle(topNodesOnly)}
+              style={topToggleStyle(topNodesOnly, isCompactViewport)}
             >
               Топ-узлы
             </button>
@@ -182,7 +205,12 @@ export function NodePickerModal({
             requiredPlan="PRO"
           />
         ) : null}
-        <div style={listStyle}>
+        <div
+          style={{
+            ...listStyle,
+            maxHeight: isCompactViewport ? "min(52vh, 300px)" : 380,
+          }}
+        >
           {filtered.length === 0 ? (
             <div style={emptyStyle}>{emptyLabel}</div>
           ) : (
@@ -194,6 +222,8 @@ export function NodePickerModal({
                   const disabled = (disabledIds?.has(opt.id) ?? false) || planLocked;
                   const active = mode === "multi" ? localSelected.has(opt.id) : (selectedIds?.has(opt.id) ?? false);
                   const rowIconSrc = opt.code ? getNodeTreeIconWebSrc(opt.code, opt.name) : "";
+                  const iconSize = isCompactViewport ? 22 : 28;
+                  const imageSize = isCompactViewport ? 20 : 24;
                   return (
                     <button
                       key={opt.id}
@@ -208,7 +238,7 @@ export function NodePickerModal({
                         onSelect?.(opt.id);
                         resetAndClose();
                       }}
-                      style={listItemStyle(active, disabled, planLocked)}
+                      style={listItemStyle(active, disabled, planLocked, isCompactViewport)}
                     >
                       {mode === "multi" ? (
                         <span style={checkboxStyle(active)} aria-hidden>
@@ -219,8 +249,8 @@ export function NodePickerModal({
                         <span
                           style={{
                             flex: "0 0 auto",
-                            width: 28,
-                            height: 28,
+                            width: iconSize,
+                            height: iconSize,
                             display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -230,8 +260,8 @@ export function NodePickerModal({
                           <Image
                             src={rowIconSrc}
                             alt=""
-                            width={24}
-                            height={24}
+                            width={imageSize}
+                            height={imageSize}
                             className="object-contain"
                           />
                         </span>
@@ -239,7 +269,7 @@ export function NodePickerModal({
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div
                           style={{
-                            fontSize: 13,
+                            fontSize: isCompactViewport ? 12 : 13,
                             fontWeight: 600,
                             color: planLocked
                               ? productSemanticColors.textMuted
@@ -249,7 +279,16 @@ export function NodePickerModal({
                           {opt.name}
                         </div>
                         {opt.pathLabel ? (
-                          <div style={{ fontSize: 11, color: productSemanticColors.textMuted, marginTop: 2 }}>
+                          <div
+                            style={{
+                              fontSize: isCompactViewport ? 10 : 11,
+                              color: productSemanticColors.textMuted,
+                              marginTop: 2,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
                             {opt.pathLabel}
                           </div>
                         ) : null}
@@ -263,7 +302,11 @@ export function NodePickerModal({
         </div>
         {mode === "multi" ? (
           <footer style={footerStyle}>
-            <button type="button" onClick={resetAndClose} style={secondaryButtonStyle}>
+            <button
+              type="button"
+              onClick={resetAndClose}
+              style={secondaryButtonStyle(isCompactViewport)}
+            >
               Отмена
             </button>
             <button
@@ -271,7 +314,7 @@ export function NodePickerModal({
               onClick={submitMulti}
               disabled={localSelected.size === 0}
               style={{
-                ...primaryButtonStyle,
+                ...primaryButtonStyle(isCompactViewport),
                 opacity: localSelected.size === 0 ? 0.45 : 1,
                 cursor: localSelected.size === 0 ? "not-allowed" : "pointer",
               }}
@@ -298,7 +341,7 @@ const overlayStyle: CSSProperties = {
 
 const dialogStyle: CSSProperties = {
   width: "100%",
-  maxWidth: 520,
+  maxWidth: "min(520px, calc(100vw - 32px))",
   maxHeight: "calc(100vh - 32px)",
   borderRadius: 18,
   padding: 16,
@@ -309,6 +352,8 @@ const dialogStyle: CSSProperties = {
   gap: 12,
   color: productSemanticColors.textPrimary,
   boxShadow: "0 24px 80px rgba(0,0,0,0.35)",
+  overflowX: "hidden",
+  boxSizing: "border-box",
 };
 
 const headerStyle: CSSProperties = {
@@ -341,7 +386,7 @@ const searchRowStyle: CSSProperties = {
 };
 
 const searchInputFlexStyle: CSSProperties = {
-  flex: "1 1 200px",
+  flex: "1 1 0",
   minWidth: 0,
   padding: "10px 12px",
   borderRadius: 12,
@@ -352,12 +397,12 @@ const searchInputFlexStyle: CSSProperties = {
   outline: "none",
 };
 
-function topToggleStyle(active: boolean): CSSProperties {
+function topToggleStyle(active: boolean, compact = false): CSSProperties {
   return {
     flex: "0 0 auto",
-    padding: "8px 12px",
-    borderRadius: 12,
-    fontSize: 13,
+    padding: compact ? "6px 10px" : "8px 12px",
+    borderRadius: compact ? 10 : 12,
+    fontSize: compact ? 12 : 13,
     fontWeight: 600,
     cursor: "pointer",
     border: `1px solid ${active ? productSemanticColors.textPrimary : productSemanticColors.border}`,
@@ -388,13 +433,18 @@ const groupHeadingStyle: CSSProperties = {
   color: productSemanticColors.textMuted,
 };
 
-function listItemStyle(active: boolean, disabled: boolean, planLocked: boolean): CSSProperties {
+function listItemStyle(
+  active: boolean,
+  disabled: boolean,
+  planLocked: boolean,
+  compact = false
+): CSSProperties {
   return {
     display: "flex",
     alignItems: "center",
-    gap: 8,
-    padding: "10px 12px",
-    borderRadius: 10,
+    gap: compact ? 6 : 8,
+    padding: compact ? "8px 10px" : "10px 12px",
+    borderRadius: compact ? 8 : 10,
     backgroundColor: planLocked
       ? productSemanticColors.cardSubtle
       : active
@@ -406,6 +456,7 @@ function listItemStyle(active: boolean, disabled: boolean, planLocked: boolean):
     cursor: disabled ? "not-allowed" : "pointer",
     width: "100%",
     opacity: planLocked ? 0.38 : disabled ? 0.45 : 1,
+    boxSizing: "border-box",
   };
 }
 
@@ -434,30 +485,31 @@ const emptyStyle: CSSProperties = {
 
 const footerStyle: CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
   justifyContent: "flex-end",
   gap: 8,
   borderTop: `1px solid ${productSemanticColors.border}`,
   paddingTop: 12,
 };
 
-const secondaryButtonStyle: CSSProperties = {
-  height: 40,
-  borderRadius: 12,
+const secondaryButtonStyle = (compact = false): CSSProperties => ({
+  height: compact ? 36 : 40,
+  borderRadius: compact ? 10 : 12,
   border: `1px solid ${productSemanticColors.border}`,
   backgroundColor: productSemanticColors.cardMuted,
   color: productSemanticColors.textPrimary,
-  padding: "0 16px",
-  fontSize: 13,
+  padding: compact ? "0 12px" : "0 16px",
+  fontSize: compact ? 12 : 13,
   fontWeight: 700,
-};
+});
 
-const primaryButtonStyle: CSSProperties = {
-  height: 40,
-  borderRadius: 12,
+const primaryButtonStyle = (compact = false): CSSProperties => ({
+  height: compact ? 36 : 40,
+  borderRadius: compact ? 10 : 12,
   border: `1px solid ${productSemanticColors.primaryAction}`,
   backgroundColor: productSemanticColors.primaryAction,
   color: productSemanticColors.onPrimaryAction,
-  padding: "0 18px",
-  fontSize: 13,
+  padding: compact ? "0 14px" : "0 18px",
+  fontSize: compact ? 12 : 13,
   fontWeight: 700,
-};
+});

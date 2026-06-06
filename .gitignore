@@ -15,3 +15,5 @@ mototwin.dump
 *.tsbuildinfo
 .venv-icon/
 auth/client_secret_*.json
+apps/app/android/keystore.properties
+apps/app/android/keystores/

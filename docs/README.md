@@ -78,7 +78,7 @@
 
 ## 6. Auth, подписка и доступ
 
-[`auth-roadmap.md`](./auth-roadmap.md) · [`auth-data-ownership-architecture.md`](./auth-data-ownership-architecture.md) · [`auth-implementation-plan.md`](./auth-implementation-plan.md) · [`auth-oauth-production.md`](./auth-oauth-production.md) — **OAuth на prod: env, Google Console, callbacks, troubleshooting**
+[`auth-roadmap.md`](./auth-roadmap.md) · [`auth-data-ownership-architecture.md`](./auth-data-ownership-architecture.md) · [`auth-implementation-plan.md`](./auth-implementation-plan.md) · [`auth-web-architecture.md`](./auth-web-architecture.md) — **web-сессии, SSR guards, OAuth bridge, клиентский кеш** · [`auth-oauth-production.md`](./auth-oauth-production.md) — **OAuth на prod: env, Google Console, callbacks, troubleshooting**
 
 **Тарифы (реализовано):** [`subscription-access-mvp.md`](./subscription-access-mvp.md) — MVP FREE / RIDER / PRO, API, UI, QA. Полная спека: [`mototwin_subscription_access_spec.md`](./mototwin_subscription_access_spec.md).
 

@@ -127,6 +127,12 @@
   margin-top: 0;
 }
 
+@media (max-width: 1100px) {
+  .summaryGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .summaryCard {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
@@ -1089,7 +1095,7 @@
   }
 
   .summaryCard {
-    min-width: 150px;
+    min-width: 124px;
   }
 
   .row {
@@ -1097,6 +1103,10 @@
   }
 
   .filterGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .searchRow {
     grid-template-columns: minmax(0, 1fr);
   }
 

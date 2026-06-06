@@ -12,6 +12,7 @@ import { PickerFitmentReportLinkFromRecommendation } from "./PickerFitmentReport
 import { pickerColors, pickerSectionSubtitleStyle, pickerSectionTitleStyle } from "./picker-styles";
 
 export function RecommendationsSection(props: {
+  compact?: boolean;
   vehicleId: string;
   nodeId: string | null;
   nodeName: string | null;
@@ -24,6 +25,7 @@ export function RecommendationsSection(props: {
   alternativesVisible?: boolean;
   isLoading: boolean;
 }) {
+  const compact = props.compact ?? false;
   const { bestFit, bestValue, forYourRide, alternatives } = props.recommendations;
   const cards: Array<{ label: "BEST_FIT" | "BEST_VALUE" | "FOR_YOUR_RIDE"; rec: PartRecommendationViewModel }> = [];
   if (bestFit) cards.push({ label: "BEST_FIT", rec: bestFit });
@@ -32,16 +34,20 @@ export function RecommendationsSection(props: {
 
   return (
     <section style={sectionStyle}>
-      <header style={headerStyle}>
-        <div style={{ minWidth: 0, flex: 1 }}>
+      <header style={compact ? compactHeaderStyle : headerStyle}>
+        <div style={{ minWidth: 0, flex: compact ? undefined : 1, width: compact ? "100%" : undefined }}>
           <h2
             style={{
               ...pickerSectionTitleStyle,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
+              ...(compact
+                ? { fontSize: 16, lineHeight: 1.35, wordBreak: "normal" }
+                : {
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                  }),
             }}
           >
             {props.nodeName
@@ -55,7 +61,10 @@ export function RecommendationsSection(props: {
         <button
           type="button"
           onClick={props.onEditRideProfile}
-          style={rideStyleChipStyle}
+          style={{
+            ...rideStyleChipStyle,
+            ...(compact ? { alignSelf: "flex-start", marginTop: 2 } : null),
+          }}
           title="Изменить профиль езды"
         >
           <span style={{ fontSize: 12, color: pickerColors.textMuted }}>
@@ -149,9 +158,19 @@ const sectionStyle: CSSProperties = {
 
 const headerStyle: CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
   alignItems: "flex-start",
   justifyContent: "space-between",
   gap: 12,
+  minWidth: 0,
+  width: "100%",
+};
+
+const compactHeaderStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "stretch",
+  gap: 8,
   minWidth: 0,
   width: "100%",
 };
@@ -215,6 +234,7 @@ const alternativesListStyle: CSSProperties = {
 
 const altRowStyle: CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
   alignItems: "center",
   gap: 10,
   padding: "10px 12px",

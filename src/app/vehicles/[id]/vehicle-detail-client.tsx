@@ -5094,7 +5094,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
               display: pageView === "nodeTree" ? "flex" : "grid",
               flexDirection: pageView === "nodeTree" ? "column" : undefined,
               gap: pageView === "partsSelection" ? 0 : 12,
-              padding: pageView === "partsSelection" ? 0 : "10px 18px 24px 16px",
+              padding:
+                pageView === "partsSelection"
+                  ? 0
+                  : isNarrowViewport
+                    ? "8px 10px 18px 8px"
+                    : "10px 18px 24px 16px",
               maxWidth: pageView === "partsSelection" ? "none" : 1420,
               width: "100%",
               minWidth: 0,

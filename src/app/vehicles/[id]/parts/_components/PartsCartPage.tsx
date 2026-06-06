@@ -745,6 +745,7 @@ export function PartsCartPage(props: PartsCartPageProps) {
           breadcrumbs={cartBreadcrumbs}
           title="Корзина замен и расходников"
           subtitle="Список запчастей и расходников для вашего мотоцикла."
+          actionsPlacement="belowTitleBand"
           actions={
             <>
               <button

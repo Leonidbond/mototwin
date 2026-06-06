@@ -189,6 +189,7 @@ Deferred:
   - mobile token-based auth with refresh;
   - password recovery flow;
   - blocked account enforcement in auth/context resolver.
+- **Phase 3G (web resilience, 2026-06):** SSR route guards, OAuth→`mototwin_session` bridge, lightweight session probe, non-blocking client auth checks, garage split-load — [auth-web-architecture.md](./auth-web-architecture.md).
 - detailed sequence and status are tracked in [auth-implementation-plan.md](./auth-implementation-plan.md).
 
 ### Phase 4 — Account settings session integration
@@ -280,6 +281,7 @@ For every new `/api/vehicles/[id]/**` route:
 
 - [auth-roadmap.md](./auth-roadmap.md)
 - [auth-implementation-plan.md](./auth-implementation-plan.md)
+- [auth-web-architecture.md](./auth-web-architecture.md)
 - [garage-dashboard-mvp.md](./garage-dashboard-mvp.md)
 - [data-model.md](./data-model.md)
 - [cross-platform-parity.md](./parity/cross-platform-parity.md)

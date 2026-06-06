@@ -670,6 +670,7 @@ export function ExpensesPageClient(props: {
             onBack={navigateBack}
             breadcrumbs={expenseBreadcrumbs}
             title={props.title}
+            actionsPlacement={isNarrowViewport ? "belowTitleBand" : "besideTitle"}
             subtitle={props.subtitle}
             titleExtra={
               nodeIdFromQuery ? (
@@ -677,7 +678,16 @@ export function ExpensesPageClient(props: {
               ) : null
             }
             actions={
-              <>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: isNarrowViewport ? "flex-start" : "flex-end",
+                  gap: 8,
+                  width: "100%",
+                }}
+              >
                 {!props.vehicleId ? (
                   <select value={filters.vehicleId} onChange={(event) => setFilters((prev) => ({ ...prev, vehicleId: event.target.value }))} style={controlStyle}>
                     <option value="">Все мотоциклы</option>
@@ -696,7 +706,7 @@ export function ExpensesPageClient(props: {
                 <button type="button" onClick={() => setShowAddForm((prev) => !prev)} style={primaryButtonStyle}>
                   + Добавить расход
                 </button>
-              </>
+              </div>
             }
           />
 
@@ -856,13 +866,18 @@ export function ExpensesPageClient(props: {
                     <MonthlyChart rows={monthlySeries} currency={primaryCurrency} />
                   </Panel>
                   <Panel title="По узлам">
-                    <NodeBars rows={nodeRows} currency={primaryCurrency} />
+                    <NodeBars compact={isNarrowViewport} rows={nodeRows} currency={primaryCurrency} />
                   </Panel>
                 </div>
 
                 <div style={rightColumnStyle}>
                   <Panel title="Структура расходов">
-                    <CategoryDonut rows={categoryBreakdown} total={seasonTotalInPrimaryCurrency} currency={primaryCurrency} />
+                    <CategoryDonut
+                      compact={isNarrowViewport}
+                      rows={categoryBreakdown}
+                      total={seasonTotalInPrimaryCurrency}
+                      currency={primaryCurrency}
+                    />
                   </Panel>
                   <Panel
                     title="Куплено, не установлено"
@@ -1013,7 +1028,12 @@ function MonthlyChart(props: { rows: { key: string; label: string; amount: numbe
   );
 }
 
-function CategoryDonut(props: { rows: { category: ExpenseCategory; label: string; amount: number; percent: number; color: string }[]; total: number; currency: string }) {
+function CategoryDonut(props: {
+  compact?: boolean;
+  rows: { category: ExpenseCategory; label: string; amount: number; percent: number; color: string }[];
+  total: number;
+  currency: string;
+}) {
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
   const segments = props.rows.map((row, index) => {
@@ -1027,7 +1047,13 @@ function CategoryDonut(props: { rows: { category: ExpenseCategory; label: string
     };
   });
   return (
-    <div style={donutGridStyle}>
+    <div
+      style={
+        props.compact
+          ? { ...donutGridStyle, gridTemplateColumns: "1fr", justifyItems: "center", gap: 10 }
+          : donutGridStyle
+      }
+    >
       <div style={donutWrapStyle}>
         <svg viewBox="0 0 120 120" style={{ width: 150, height: 150, transform: "rotate(-90deg)" }}>
           <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(148,163,184,0.16)" strokeWidth="18" />
@@ -1065,14 +1091,25 @@ function CategoryDonut(props: { rows: { category: ExpenseCategory; label: string
   );
 }
 
-function NodeBars(props: { rows: { key: string; label: string; amount: number; totalsLabel: string; percent: number }[]; currency: string }) {
+function NodeBars(props: {
+  compact?: boolean;
+  rows: { key: string; label: string; amount: number; totalsLabel: string; percent: number }[];
+  currency: string;
+}) {
   if (props.rows.length === 0) {
     return <p style={emptyTextStyle}>Нет расходов по узлам за выбранный период.</p>;
   }
   return (
     <div style={nodeBarsStyle}>
       {props.rows.map((row) => (
-        <div key={row.key} style={nodeBarRowStyle}>
+        <div
+          key={row.key}
+          style={
+            props.compact
+              ? { ...nodeBarRowStyle, gridTemplateColumns: "minmax(0, 1fr)", gap: 6 }
+              : nodeBarRowStyle
+          }
+        >
           <span style={nodeBarLabelStyle}>{row.label}</span>
           <div style={nodeBarTrackStyle}><div style={{ ...nodeBarFillStyle, width: `${row.percent}%` }} /></div>
           <strong style={nodeBarAmountStyle}>{row.totalsLabel || formatCurrencyAmount(row.amount, props.currency)}</strong>
@@ -1228,7 +1265,7 @@ const pageShellStyle: CSSProperties = {
 const contentStyle: CSSProperties = {
   display: "grid",
   gap: 12,
-  padding: "12px 24px 24px",
+  padding: "12px 18px 24px 14px",
   maxWidth: 1600,
   width: "100%",
   minWidth: 0,
@@ -1278,6 +1315,7 @@ const panelStyle: CSSProperties = {
 
 const panelHeaderStyle: CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
   alignItems: "center",
   justifyContent: "space-between",
   gap: 12,
@@ -1287,6 +1325,7 @@ const panelTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: 16,
   fontWeight: 850,
+  minWidth: 0,
 };
 
 const metricGridStyle: CSSProperties = {
@@ -1666,10 +1705,10 @@ const filtersGridStyle: CSSProperties = {
 
 const filtersInlineRowStyle: CSSProperties = {
   display: "flex",
-  flexWrap: "nowrap",
+  flexWrap: "wrap",
   alignItems: "center",
   gap: 8,
-  overflowX: "auto",
+  overflowX: "visible",
   paddingBottom: 2,
 };
 

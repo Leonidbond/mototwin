@@ -2,7 +2,7 @@
 
 Канонический чеклист настройки Google / Apple / Yandex для `https://mototwin.online`.
 
-См. также: [auth-implementation-plan.md](./auth-implementation-plan.md), [deploy/vps.md](./deploy/vps.md), [mobile-build.md](./mobile-build.md).
+См. также: [auth-web-architecture.md](./auth-web-architecture.md), [auth-implementation-plan.md](./auth-implementation-plan.md), [deploy/vps.md](./deploy/vps.md), [mobile-build.md](./mobile-build.md).
 
 ---
 
@@ -25,11 +25,22 @@
 | Способ | Клиент | Сессия |
 |--------|--------|--------|
 | Email + пароль | `POST /api/auth/login` | cookie `mototwin_session` (кастомная) |
-| Google / Apple / Yandex | Auth.js `signIn("google" \| "apple" \| "yandex")` | таблица `authjs_sessions` (database strategy) |
+| Google / Apple / Yandex | Auth.js `signIn("google" \| "apple" \| "yandex")` | cookie Auth.js + таблица `authjs_sessions` (database strategy) |
 
 Оба пути резолвятся в `resolveAuthenticatedUserId()` — см. [src/lib/auth/request-auth.ts](../src/lib/auth/request-auth.ts).
 
 Auth.js route: `/api/auth/[...nextauth]` → [src/lib/auth/authjs.ts](../src/lib/auth/authjs.ts).
+
+### Мост OAuth → `mototwin_session`
+
+После OAuth Auth.js выставляет **свою** cookie. Web API ожидает **`mototwin_session`** (как при email/password).
+
+1. `AuthSessionProvider` монтирует `WebAuthReadyProvider` ([WebAuthReadyProvider.tsx](../src/components/auth/WebAuthReadyProvider.tsx)).
+2. При `useSession().status === "authenticated"` один раз вызывается `GET /api/auth/sync-web-session`.
+3. Ответ минтит `mototwin_session` через `attachMototwinSessionCookieIfNeeded`.
+4. `POST /api/auth/logout` очищает **обе** семьи cookies (Auth.js chunked + `mototwin_session`).
+
+Подробнее: [auth-web-architecture.md](./auth-web-architecture.md) §2–3.
 
 ---
 
@@ -158,4 +169,10 @@ curl -s https://mototwin.online/api/auth/providers
 BASE_URL=https://mototwin.online npx tsx scripts/qa-auth-smoke.ts
 ```
 
-Ручная проверка: [https://mototwin.online/login](https://mototwin.online/login) → «Войти через Google» → редирект на `/garage`.
+Ручная проверка: [https://mototwin.online/login](https://mototwin.online/login) → «Войти через Google» → редирект на `/garage` → в DevTools Application → Cookies есть `mototwin_session` (после sync).
+
+Проверка sync (должен вернуть `{ "ok": true }` при активной Auth.js-сессии):
+
+```bash
+curl -s -b cookies.txt -c cookies.txt https://mototwin.online/api/auth/sync-web-session
+```

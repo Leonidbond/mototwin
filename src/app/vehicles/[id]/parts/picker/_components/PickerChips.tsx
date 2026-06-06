@@ -24,6 +24,15 @@ const chipBaseStyle: CSSProperties = {
   minHeight: 60,
 };
 
+const chipCompactStyle: CSSProperties = {
+  gap: 8,
+  padding: "8px 12px",
+  borderRadius: 10,
+  minHeight: 44,
+  width: "auto",
+  maxWidth: "100%",
+};
+
 const chipBaseInteractiveStyle: CSSProperties = {
   ...chipBaseStyle,
   outline: "none",
@@ -75,55 +84,87 @@ export function NodeChip(props: {
   nodePath: string | null;
   /** Catalog node code — shows design tree icon when set */
   nodeCode?: string | null;
+  compact?: boolean;
   onClick?: () => void;
 }) {
   const placeholder = !props.nodeName;
+  const compact = props.compact ?? false;
   const iconSrc =
     props.nodeCode && props.nodeName ? getNodeTreeIconWebSrc(props.nodeCode, props.nodeName) : "";
   return (
-    <button type="button" style={chipBaseInteractiveStyle} onClick={props.onClick}>
+    <button
+      type="button"
+      style={{
+        ...chipBaseInteractiveStyle,
+        ...(compact ? chipCompactStyle : null),
+      }}
+      onClick={props.onClick}
+    >
       <div
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
+          width: compact ? 32 : 40,
+          height: compact ? 32 : 40,
+          borderRadius: compact ? 8 : 10,
           backgroundColor: pickerColors.surfaceSubtle,
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           color: pickerColors.textMuted,
-          fontSize: 18,
+          fontSize: compact ? 16 : 18,
           position: "relative",
           overflow: "hidden",
         }}
         aria-hidden
       >
         {iconSrc ? (
-          <Image src={iconSrc} alt="" width={30} height={30} className="object-contain" />
+          <Image
+            src={iconSrc}
+            alt=""
+            width={compact ? 24 : 30}
+            height={compact ? 24 : 30}
+            className="object-contain"
+          />
         ) : (
           "⚙"
         )}
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 11, color: pickerColors.textMuted, fontWeight: 600, letterSpacing: 0.4 }}>
-          УЗЕЛ
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: placeholder ? pickerColors.textMuted : pickerColors.text, marginTop: 2 }}>
+        {!compact ? (
+          <div style={{ fontSize: 11, color: pickerColors.textMuted, fontWeight: 600, letterSpacing: 0.4 }}>
+            УЗЕЛ
+          </div>
+        ) : null}
+        <div
+          style={{
+            fontSize: compact ? 13 : 14,
+            fontWeight: 700,
+            color: placeholder ? pickerColors.textMuted : pickerColors.text,
+            marginTop: compact ? 0 : 2,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
           {props.nodeName ?? "Выберите узел"}
         </div>
-        {props.nodePath ? (
+        {props.nodePath && !compact ? (
           <div style={{ fontSize: 11, color: pickerColors.textMuted, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {props.nodePath}
           </div>
         ) : null}
       </div>
-      <ChevronDown />
+      <ChevronDown size={compact ? 12 : 14} />
     </button>
   );
 }
 
-export function ResetSelectionChip(props: { onClick: () => void; disabled?: boolean }) {
+export function ResetSelectionChip(props: {
+  onClick: () => void;
+  disabled?: boolean;
+  compact?: boolean;
+}) {
+  const compact = props.compact ?? false;
   return (
     <button
       type="button"
@@ -131,23 +172,27 @@ export function ResetSelectionChip(props: { onClick: () => void; disabled?: bool
       disabled={props.disabled}
       style={{
         ...chipBaseInteractiveStyle,
+        ...(compact ? chipCompactStyle : null),
         justifyContent: "center",
         opacity: props.disabled ? 0.5 : 1,
         cursor: props.disabled ? "default" : "pointer",
-        gap: 8,
+        gap: compact ? 6 : 8,
+        flex: compact ? "1 1 0" : undefined,
       }}
     >
-      <ResetIcon />
-      <span style={{ fontSize: 13, fontWeight: 600, color: pickerColors.text }}>Сбросить выбор</span>
+      <ResetIcon size={compact ? 14 : 16} />
+      <span style={{ fontSize: compact ? 12 : 13, fontWeight: 600, color: pickerColors.text }}>
+        {compact ? "Сброс" : "Сбросить выбор"}
+      </span>
     </button>
   );
 }
 
-function ChevronDown() {
+function ChevronDown({ size = 14 }: { size?: number }) {
   return (
     <svg
-      width="14"
-      height="14"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke={pickerColors.textMuted}
@@ -161,11 +206,11 @@ function ChevronDown() {
   );
 }
 
-function ResetIcon() {
+function ResetIcon({ size = 16 }: { size?: number }) {
   return (
     <svg
-      width="16"
-      height="16"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke={pickerColors.textMuted}
