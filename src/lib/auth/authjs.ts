@@ -9,7 +9,11 @@ import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers/oauth";
 type Provider = NonNullable<NextAuthOptions["providers"]>[number];
 import { mototwinPrismaAdapter } from "./prisma-auth-adapter";
 import { ensureUserBootstrap } from "./user-bootstrap";
-import { assertUserNotBlocked, verifyUserCredentials } from "./session-service";
+import {
+  assertUserNotBlocked,
+  AuthServiceError,
+  verifyUserCredentials,
+} from "./session-service";
 
 function YandexProvider(config: OAuthUserConfig<Record<string, never>>): OAuthConfig<Record<string, never>> {
   return {
@@ -44,23 +48,40 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async signIn({ user }) {
-      if (user.id) {
-        await assertUserNotBlocked(user.id);
+      if (!user.id) {
+        return true;
       }
-      return true;
+      try {
+        await assertUserNotBlocked(user.id);
+        return true;
+      } catch (error) {
+        if (error instanceof AuthServiceError && error.code === "ACCOUNT_BLOCKED") {
+          return false;
+        }
+        throw error;
+      }
     },
   },
   events: {
     // OAuth signIn callback runs before PrismaAdapter persists a new user;
     // bootstrap here so garages_ownerUserId_fkey is satisfied.
     async signIn({ user }) {
-      if (user.id) {
+      if (!user.id) {
+        return;
+      }
+      try {
         await ensureUserBootstrap(user.id);
+      } catch (error) {
+        console.error("[auth] ensureUserBootstrap failed after OAuth signIn", {
+          userId: user.id,
+          error,
+        });
       }
     },
   },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
 };
 

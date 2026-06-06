@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import Script from "next/script";
 import { AppHelpFab } from "../components/app-help-fab";
+import { AuthSessionProvider } from "../components/auth/AuthSessionProvider";
 import { EXTENSION_DOM_SANITIZE_SCRIPT } from "../lib/extension-dom-sanitize-script";
 import "./globals.css";
 
@@ -50,7 +51,9 @@ export default function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: EXTENSION_DOM_SANITIZE_SCRIPT }}
         />
-        {children}
+        <AuthSessionProvider>
+          {children}
+        </AuthSessionProvider>
         <AppHelpFab />
       </body>
     </html>

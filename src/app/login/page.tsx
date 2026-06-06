@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { createWebApiClient } from "@/lib/create-web-api-client";
+import { clearWebSessionCache } from "@/lib/web-api-dedup";
 import { productSemanticColors } from "@mototwin/design-tokens";
 
 const api = createWebApiClient();
@@ -21,6 +22,10 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    clearWebSessionCache();
+  }, []);
+
+  useEffect(() => {
     if (!oauthErrorCode) return;
     const decoded = decodeURIComponent(oauthErrorCode);
     if (decoded === "OAuthCreateAccount") {
@@ -29,6 +34,20 @@ function LoginForm() {
     }
     if (decoded === "AccessDenied") {
       setError("Google отклонил вход. Проверьте, что ваш Gmail добавлен в Test users приложения.");
+      return;
+    }
+    if (decoded === "OAuthAccountNotLinked") {
+      setError(
+        "Этот Google-аккаунт не привязан. Войдите по email и паролю или используйте тот же Gmail, что при регистрации."
+      );
+      return;
+    }
+    if (decoded === "Callback") {
+      setError("Google вернул ошибку при входе. Попробуйте ещё раз через минуту.");
+      return;
+    }
+    if (decoded === "Configuration") {
+      setError("OAuth на сервере настроен некорректно. Напишите в поддержку.");
       return;
     }
     setError(decoded);
@@ -42,6 +61,7 @@ function LoginForm() {
       // Email/password uses mototwin_session (see POST /api/auth/login).
       // NextAuth credentials + database sessions are not supported together.
       await api.login({ email, password });
+      clearWebSessionCache();
       router.replace(nextPath.startsWith("/") ? nextPath : "/garage");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось войти.");

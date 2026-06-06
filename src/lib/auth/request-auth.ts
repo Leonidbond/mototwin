@@ -53,14 +53,7 @@ export async function resolveAuthenticatedUserId(): Promise<string | null> {
 async function resolveUserIdFromAuthJsSessionCookie(
   cookieStore: Awaited<ReturnType<typeof cookies>>
 ): Promise<string | null> {
-  let sessionToken: string | undefined;
-  for (const name of AUTHJS_SESSION_COOKIE_NAMES) {
-    const value = cookieStore.get(name)?.value?.trim();
-    if (value) {
-      sessionToken = value;
-      break;
-    }
-  }
+  const sessionToken = readAuthJsSessionToken(cookieStore);
   if (!sessionToken) {
     return null;
   }
@@ -77,6 +70,39 @@ async function resolveUserIdFromAuthJsSessionCookie(
     await assertUserNotBlocked(session.userId);
     return session.userId;
   });
+}
+
+function readAuthJsSessionToken(
+  cookieStore: Awaited<ReturnType<typeof cookies>>
+): string | null {
+  for (const baseName of AUTHJS_SESSION_COOKIE_NAMES) {
+    const direct = cookieStore.get(baseName)?.value?.trim();
+    if (direct) {
+      return direct;
+    }
+
+    const chunks: Array<{ index: number; value: string }> = [];
+    for (const cookie of cookieStore.getAll()) {
+      if (!cookie.name.startsWith(`${baseName}.`)) {
+        continue;
+      }
+      const suffix = cookie.name.slice(baseName.length + 1);
+      const index = Number.parseInt(suffix, 10);
+      if (!Number.isFinite(index)) {
+        continue;
+      }
+      chunks.push({ index, value: cookie.value });
+    }
+    if (chunks.length === 0) {
+      continue;
+    }
+    chunks.sort((a, b) => a.index - b.index);
+    const joined = chunks.map((chunk) => chunk.value).join("").trim();
+    if (joined) {
+      return joined;
+    }
+  }
+  return null;
 }
 
 async function resolveUserIdSafely(resolver: () => Promise<string | null>) {

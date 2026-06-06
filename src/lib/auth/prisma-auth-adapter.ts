@@ -27,6 +27,16 @@ export function mototwinPrismaAdapter(): Adapter {
   return {
     ...base,
     createUser: async (data: Omit<AdapterUser, "id">) => {
+      const normalizedEmail = data.email?.trim().toLowerCase() || null;
+      if (normalizedEmail) {
+        const existing = await prisma.user.findUnique({
+          where: { email: normalizedEmail },
+        });
+        if (existing) {
+          return toAdapterUser(existing);
+        }
+      }
+
       const user = await prisma.user.create({
         data: {
           email: data.email,
