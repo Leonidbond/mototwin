@@ -9,6 +9,7 @@ import {
   createInitialEditServiceEventValues,
   createInitialRepeatServiceEventValues,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
+  buildVehicleDetailViewModel,
   getNodePathById,
   getSelectedNodeFromPath,
   getTodayDateYmdLocal,
@@ -28,6 +29,7 @@ import type {
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../../src/mobile-auth-guard";
+import { readSearchParam } from "../../../../src/read-search-param";
 import { useMobileSubscription } from "../../../../src/use-mobile-subscription";
 import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
 import {
@@ -36,6 +38,46 @@ import {
 } from "../../../../components/expo-shell/internal-screen-chrome";
 import { BasicServiceEventBundleForm } from "../../../../components/vehicle-detail/basic-service-event-bundle-form";
 import { GarageVehicleContextPlaque } from "../../../../components/garage/GarageVehicleContextPlaque";
+
+function buildWishlistItemFromRouteParams(
+  vehicleId: string,
+  args: {
+    wlId: string;
+    initialNodeId: string;
+    wlTitle: string;
+    wlQty: string;
+    wlComment: string | null;
+    wlCostStr: string;
+    wlCurrency: string | null;
+  }
+): PartWishlistItem | null {
+  const nodeId = args.initialNodeId.trim();
+  const title = args.wlTitle.trim();
+  if (!nodeId || !title) {
+    return null;
+  }
+  const parsedWlCost =
+    args.wlCostStr !== "" ? parseExpenseAmountInputToNumberOrNull(args.wlCostStr) : null;
+  const wishlistCostAmount =
+    args.wlCostStr !== "" && parsedWlCost != null ? parsedWlCost : null;
+  const wishlistCurrency = wishlistCostAmount != null ? args.wlCurrency || "RUB" : null;
+  return {
+    id: args.wlId.trim() || "wishlist-query-prefill",
+    vehicleId,
+    skuId: null,
+    nodeId,
+    title,
+    quantity: args.wlQty ? Number.parseInt(args.wlQty, 10) || 1 : 1,
+    status: "BOUGHT",
+    comment: args.wlComment,
+    costAmount: wishlistCostAmount,
+    currency: wishlistCurrency,
+    createdAt: "",
+    updatedAt: "",
+    node: null,
+    sku: null,
+  };
+}
 
 export default function NewServiceEventScreen() {
   const router = useRouter();
@@ -54,29 +96,28 @@ export default function NewServiceEventScreen() {
     wlCost?: string;
     wlCurrency?: string;
   }>();
-  const vehicleId = typeof params.id === "string" ? params.id : "";
-  const initialNodeId = typeof params.nodeId === "string" ? params.nodeId : "";
-  const editingEventId = typeof params.eventId === "string" ? params.eventId : "";
-  const repeatFromId = typeof params.repeatFrom === "string" ? params.repeatFrom.trim() : "";
-  const source = typeof params.source === "string" ? params.source : "service-log";
-  const wlTitle = typeof params.wlTitle === "string" ? params.wlTitle.trim() : "";
-  const wlQty = typeof params.wlQty === "string" ? params.wlQty : "";
-  const wlIdFromQuery = typeof params.wlId === "string" ? params.wlId : "";
-  const wishlistItemIdParam =
-    typeof params.wishlistItemId === "string" ? params.wishlistItemId : "";
+  const vehicleId = readSearchParam(params.id) ?? "";
+  const initialNodeId = readSearchParam(params.nodeId) ?? "";
+  const editingEventId = readSearchParam(params.eventId) ?? "";
+  const repeatFromId = (readSearchParam(params.repeatFrom) ?? "").trim();
+  const source = readSearchParam(params.source) ?? "service-log";
+  const wlTitle = (readSearchParam(params.wlTitle) ?? "").trim();
+  const wlQty = readSearchParam(params.wlQty) ?? "";
+  const wlIdFromQuery = readSearchParam(params.wlId) ?? "";
+  const wishlistItemIdParam = readSearchParam(params.wishlistItemId) ?? "";
   const wlId = wishlistItemIdParam || wlIdFromQuery;
+  const wlCommentRaw = readSearchParam(params.wlComment);
   const wlComment =
-    typeof params.wlComment === "string" && params.wlComment.trim()
-      ? params.wlComment.trim()
-      : null;
-  const wlCostStr = typeof params.wlCost === "string" ? params.wlCost.trim() : "";
+    typeof wlCommentRaw === "string" && wlCommentRaw.trim() ? wlCommentRaw.trim() : null;
+  const wlCostStr = (readSearchParam(params.wlCost) ?? "").trim();
+  const wlCurrencyRaw = readSearchParam(params.wlCurrency);
   const wlCurrency =
-    typeof params.wlCurrency === "string" && params.wlCurrency.trim()
-      ? params.wlCurrency.trim()
-      : null;
-  const pendingInstallRaw = typeof params.pendingInstall === "string" ? params.pendingInstall : "";
+    typeof wlCurrencyRaw === "string" && wlCurrencyRaw.trim() ? wlCurrencyRaw.trim() : null;
+  const pendingInstallRaw = readSearchParam(params.pendingInstall) ?? "";
   const wishlistPendingInstall =
     pendingInstallRaw === "1" || pendingInstallRaw.toLowerCase() === "true";
+  const wishlistPrefillRequested =
+    source === "wishlist" || wishlistItemIdParam.trim().length > 0 || wlIdFromQuery.trim().length > 0;
   const apiBaseUrl = getApiBaseUrl();
   const { capabilities: subscriptionCapabilities } = useMobileSubscription();
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
@@ -101,7 +142,7 @@ export default function NewServiceEventScreen() {
   const headerCrumbs = useMemo((): InternalScreenCrumb[] => {
     const bike = vehicleDisplayName || "Мотоцикл";
     const crumbs: InternalScreenCrumb[] = [
-      { label: "Мой гараж", href: "/" },
+      { label: "Мой гараж", href: "/garage" },
       { label: bike, href: `/vehicles/${vehicleId}` },
     ];
     const fromWishlist =
@@ -161,11 +202,10 @@ export default function NewServiceEventScreen() {
         setNodeTree(nextTree);
 
         const v = vehicleData.vehicle;
-        setVehicleDisplayName(
-          v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelFamilyName}`.trim() : "") || "Мотоцикл"
-        );
         const rawV = v as VehicleDetailApiRecord | null | undefined;
-        setContextVehicleDetail(rawV ? vehicleDetailFromApiRecord(rawV) : null);
+        const detail = rawV ? vehicleDetailFromApiRecord(rawV) : null;
+        setContextVehicleDetail(detail);
+        setVehicleDisplayName(detail ? buildVehicleDetailViewModel(detail).displayName : "Мотоцикл");
         const vehicleOdometer = v?.odometer ?? null;
         const vehicleEngineHours = v?.engineHours ?? null;
         const todayYmd = getTodayDateYmdLocal();
@@ -204,49 +244,34 @@ export default function NewServiceEventScreen() {
             { odometer: v.odometer, engineHours: v.engineHours ?? null },
             { todayDateYmd: todayYmd }
           );
-        } else if (!isEditMode && !isRepeatMode && source === "wishlist" && wlId.trim() && v) {
-          const wish = await endpoints.getVehicleWishlist(vehicleId);
-          const item = (wish.items ?? []).find((w) => w.id === wlId.trim());
-          if (!item?.nodeId) {
+        } else if (!isEditMode && !isRepeatMode && wishlistPrefillRequested && v) {
+          const queryItem = buildWishlistItemFromRouteParams(vehicleId, {
+            wlId,
+            initialNodeId,
+            wlTitle,
+            wlQty,
+            wlComment,
+            wlCostStr,
+            wlCurrency,
+          });
+          let resolvedItem: PartWishlistItem | null = null;
+          if (wlId.trim()) {
+            const wish = await endpoints.getVehicleWishlist(vehicleId);
+            const apiItem = (wish.items ?? []).find((w) => w.id === wlId.trim());
+            if (apiItem?.nodeId?.trim()) {
+              resolvedItem = apiItem;
+            }
+          }
+          if (!resolvedItem) {
+            resolvedItem = queryItem;
+          }
+          if (!resolvedItem?.nodeId?.trim()) {
             setError("Позиция корзины не найдена или без узла.");
             setIsLoading(false);
             return;
           }
           nextForm = createInitialAddServiceEventFromWishlistItem(
-            item,
-            { odometer: v.odometer, engineHours: v.engineHours ?? null },
-            { todayDateYmd: todayYmd }
-          );
-        } else if (
-          !isEditMode &&
-          !isRepeatMode &&
-          source === "wishlist" &&
-          wlTitle.length > 0 &&
-          v
-        ) {
-          const parsedWlCost =
-            wlCostStr !== "" ? parseExpenseAmountInputToNumberOrNull(wlCostStr) : null;
-          const wishlistCostAmount =
-            wlCostStr !== "" && parsedWlCost != null ? parsedWlCost : null;
-          const wishlistCurrency = wishlistCostAmount != null ? wlCurrency || "RUB" : null;
-          const synthetic: PartWishlistItem = {
-            id: wlId,
-            vehicleId,
-            skuId: null,
-            nodeId: initialNodeId || null,
-            title: wlTitle,
-            quantity: wlQty ? Number.parseInt(wlQty, 10) || 1 : 1,
-            status: "INSTALLED",
-            comment: wlComment,
-            costAmount: wishlistCostAmount,
-            currency: wishlistCurrency,
-            createdAt: "",
-            updatedAt: "",
-            node: null,
-            sku: null,
-          };
-          nextForm = createInitialAddServiceEventFromWishlistItem(
-            synthetic,
+            resolvedItem,
             { odometer: v.odometer, engineHours: v.engineHours ?? null },
             { todayDateYmd: todayYmd }
           );
@@ -312,6 +337,8 @@ export default function NewServiceEventScreen() {
     wlComment,
     wlCostStr,
     wlCurrency,
+    wishlistPrefillRequested,
+    router,
   ]);
 
   const handleSubmit = async (form: AddServiceEventFormValues) => {

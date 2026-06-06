@@ -34,6 +34,7 @@ export function KeyboardAwareScrollScreen({
     >
       <ScrollView
         ref={scrollViewRef}
+        style={{ flex: 1 }}
         contentContainerStyle={contentContainerStyle}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"

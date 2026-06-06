@@ -87,12 +87,24 @@ export function FitmentReportScreen(props: {
 
   const missingParams = !props.nodeId.trim() || !props.partMasterId.trim();
 
-  const crumbs = [
-    { label: "Мой гараж", href: "/" },
-    { label: "Мотоцикл", href: `/vehicles/${props.vehicleId}` },
-    { label: "Корзина замен", href: `/vehicles/${props.vehicleId}/wishlist` },
-    { label: "Совместимость" },
-  ];
+  const vehicleCrumbLabel = useMemo(() => {
+    if (!data) return "Мотоцикл";
+    return (
+      data.vehicle.nickname?.trim() ||
+      `${data.vehicle.brandName} ${data.vehicle.modelFamilyName}`.trim() ||
+      "Мотоцикл"
+    );
+  }, [data]);
+
+  const crumbs = useMemo(
+    () => [
+      { label: "Мой гараж", href: "/" },
+      { label: vehicleCrumbLabel, href: `/vehicles/${props.vehicleId}` },
+      { label: "Корзина замен", href: `/vehicles/${props.vehicleId}/wishlist` },
+      { label: "Совместимость" },
+    ],
+    [props.vehicleId, vehicleCrumbLabel]
+  );
 
   useEffect(() => {
     if (missingParams) {

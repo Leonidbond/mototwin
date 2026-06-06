@@ -2,15 +2,22 @@
 
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  buildVehicleDetailViewModel,
   createInitialEditServiceEventValues,
   normalizeEditServiceEventPayload,
+  vehicleDetailFromApiRecord,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import { GarageSidebar } from "@/app/garage/_components/GarageSidebar";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AddServiceEventFormValues, NodeTreeItem, ServiceEventItem } from "@mototwin/types";
+import type {
+  AddServiceEventFormValues,
+  NodeTreeItem,
+  ServiceEventItem,
+  VehicleDetailApiRecord,
+} from "@mototwin/types";
 import { ServiceEventForm } from "../../../_components/service-event-form";
 
 const api = createMotoTwinEndpoints(createApiClient({ baseUrl: "" }));
@@ -49,16 +56,13 @@ export function ServiceEventEditClient() {
           api.getServiceEvents(vehicleId),
         ]);
         if (cancelled) return;
-        const vehicle = detail.vehicle;
-        if (vehicle) {
-          const nm =
-            vehicle.nickname?.trim() ||
-            `${vehicle.brandName} ${vehicle.modelFamilyName}`.trim() ||
-            "Мотоцикл";
-          setVehicleDisplayName(nm);
-        }
-        setVehicleOdometer(vehicle?.odometer ?? null);
-        setVehicleEngineHours(vehicle?.engineHours ?? null);
+        const rawVehicle = detail.vehicle as VehicleDetailApiRecord | null | undefined;
+        const vehicleDetail = rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null;
+        setVehicleDisplayName(
+          vehicleDetail ? buildVehicleDetailViewModel(vehicleDetail).displayName : "Мотоцикл"
+        );
+        setVehicleOdometer(vehicleDetail?.odometer ?? null);
+        setVehicleEngineHours(vehicleDetail?.engineHours ?? null);
         setNodeTree(tree.nodeTree ?? []);
         const events = serviceRes.serviceEvents ?? [];
         const ev = events.find((e: ServiceEventItem) => e.id === eventId);

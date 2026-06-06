@@ -9,6 +9,12 @@ const LEGEND_COLORS = {
   recently: "#45B6FF",
 } as const;
 
+type LegendItem = {
+  color: string;
+  value: number;
+  label: string;
+};
+
 export function GarageScore(props: {
   score: number | null;
   okCount: number;
@@ -17,33 +23,43 @@ export function GarageScore(props: {
   recentlyCount: number;
 }) {
   const scoreColor = getScoreColor(props.score);
+  const legendItems: LegendItem[] = [
+    { color: LEGEND_COLORS.ok, value: props.okCount, label: "В норме" },
+    { color: LEGEND_COLORS.soon, value: props.soonCount, label: "Скоро" },
+    { color: LEGEND_COLORS.overdue, value: props.overdueCount, label: "Просрочено" },
+  ];
+  if (props.recentlyCount > 0) {
+    legendItems.push({
+      color: LEGEND_COLORS.recently,
+      value: props.recentlyCount,
+      label: "Недавно",
+    });
+  }
+
   return (
     <Card variant="muted" padding="sm" style={styles.card}>
       <Text style={styles.label}>Garage Score</Text>
-      <View style={styles.scoreBlock}>
-        <Text style={[styles.value, { color: scoreColor }]}>{props.score ?? "—"}</Text>
-        <Text style={styles.unit}>/100</Text>
-      </View>
-      <View style={styles.legend}>
-        <LegendRow color={LEGEND_COLORS.ok} value={props.okCount} label="В норме" />
-        <LegendRow color={LEGEND_COLORS.soon} value={props.soonCount} label="Скоро" />
-        <LegendRow color={LEGEND_COLORS.overdue} value={props.overdueCount} label="Просрочено" />
-        <LegendRow
-          color={LEGEND_COLORS.recently}
-          value={props.recentlyCount}
-          label="Недавно"
-        />
+      <Text style={[styles.valueLine, { color: scoreColor }]}>
+        {props.score ?? "—"}
+        <Text style={styles.unit}> /100</Text>
+      </Text>
+      <View style={styles.legendGrid}>
+        {legendItems.map((item) => (
+          <LegendCell key={item.label} color={item.color} value={item.value} label={item.label} />
+        ))}
       </View>
     </Card>
   );
 }
 
-function LegendRow(props: { color: string; value: number; label: string }) {
+function LegendCell(props: { color: string; value: number; label: string }) {
   return (
-    <View style={styles.legendRow}>
+    <View style={styles.legendCell}>
       <View style={[styles.legendDot, { backgroundColor: props.color }]} />
       <Text style={[styles.legendValue, { color: props.color }]}>{props.value}</Text>
-      <Text style={styles.legendLabel}>{props.label}</Text>
+      <Text style={styles.legendLabel} numberOfLines={1}>
+        {props.label}
+      </Text>
     </View>
   );
 }
@@ -58,34 +74,46 @@ function getScoreColor(score: number | null): string {
 
 const styles = StyleSheet.create({
   card: {
-    width: 156,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    width: 118,
+    alignSelf: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   label: {
     color: c.textMuted,
-    fontSize: 12,
-    fontWeight: "500",
+    fontSize: 10,
+    fontWeight: "600",
     textAlign: "center",
+    letterSpacing: 0.2,
   },
-  scoreBlock: {
-    marginTop: 6,
-    alignItems: "center",
-  },
-  value: {
-    fontSize: 42,
-    lineHeight: 42,
+  valueLine: {
+    marginTop: 2,
+    fontSize: 28,
+    lineHeight: 30,
     fontWeight: "800",
+    textAlign: "center",
+    letterSpacing: -0.5,
   },
   unit: {
     color: c.textMuted,
-    fontSize: 12,
-    fontWeight: "500",
-    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "600",
   },
-  legend: { marginTop: 10, gap: 4 },
-  legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  legendDot: { width: 8, height: 8, borderRadius: 999 },
-  legendValue: { width: 20, fontSize: 14, fontWeight: "700" },
-  legendLabel: { color: c.textSecondary, fontSize: 12 },
+  legendGrid: {
+    marginTop: 6,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: 4,
+    rowGap: 3,
+  },
+  legendCell: {
+    width: "48%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minWidth: 0,
+  },
+  legendDot: { width: 6, height: 6, borderRadius: 999, flexShrink: 0 },
+  legendValue: { fontSize: 12, fontWeight: "700", minWidth: 14, flexShrink: 0 },
+  legendLabel: { color: c.textSecondary, fontSize: 10, flex: 1, minWidth: 0 },
 });

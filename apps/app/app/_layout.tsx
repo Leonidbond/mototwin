@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { AppHelpProvider } from "../src/components/app-help-fab";
 import { readAuthTokens } from "../src/auth-storage";
@@ -81,6 +82,9 @@ export default function RootLayout() {
       try {
         await warmMobileApiConnection();
         if (cancelled) return;
+        if (segments[0] === "index") {
+          router.replace("/garage");
+        }
         setAuthChecked(true);
       } catch (error) {
         if (cancelled) return;
@@ -147,17 +151,19 @@ export default function RootLayout() {
   }
 
   return (
-    <AppHelpProvider>
-      <View style={{ flex: 1, backgroundColor: c.canvas }}>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: c.canvas },
-          }}
-        />
-      </View>
-    </AppHelpProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <AppHelpProvider>
+        <View style={{ flex: 1, backgroundColor: c.canvas }}>
+          <StatusBar style="light" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: c.canvas },
+            }}
+          />
+        </View>
+      </AppHelpProvider>
+    </SafeAreaProvider>
   );
 }
 

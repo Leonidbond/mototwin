@@ -14,6 +14,7 @@ import Image from "next/image";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildRestrictedPlanVehicleLeafPickerSets,
+  buildVehicleDetailViewModel,
   formatRideStyleChipRu,
   getLeafNodeOptions,
   nodeAncestorPathLabelRu,
@@ -709,10 +710,7 @@ export function CommunityPartPageClient(props: {
   }, [category, categoryOptions, selectedNodeId]);
 
   const sidebarPlaqueTitle = useMemo(
-    () =>
-      vehicle
-        ? vehicle.nickname?.trim() || `${vehicle.brandName} ${vehicle.modelFamilyName}`.trim()
-        : "",
+    () => (vehicle ? buildVehicleDetailViewModel(vehicle).displayName : ""),
     [vehicle]
   );
 

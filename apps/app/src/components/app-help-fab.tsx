@@ -57,24 +57,8 @@ export function useAppHelp(): AppHelpContextValue {
   return ctx;
 }
 
-export function HelpTriggerButton(props: { size?: number; accessibilityLabel?: string }) {
-  const { open } = useAppHelp();
-  const size = props.size ?? 32;
-  return (
-    <Pressable
-      onPress={open}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel={props.accessibilityLabel ?? "Открыть подсказки"}
-      style={({ pressed }) => [
-        triggerStyles.button,
-        { width: size, height: size, borderRadius: size / 2 },
-        pressed && triggerStyles.buttonPressed,
-      ]}
-    >
-      <Text style={triggerStyles.text}>?</Text>
-    </Pressable>
-  );
+export function HelpTriggerButton(_props: { size?: number; accessibilityLabel?: string }) {
+  return null;
 }
 
 function HelpModal(props: { visible: boolean; onClose: () => void }) {

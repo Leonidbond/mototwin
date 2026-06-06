@@ -23,10 +23,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
+import { AppTextInput as TextInput } from "../../../components/ui/AppTextInput";
 import Svg, { Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -50,6 +50,7 @@ import {
   buildPartsCartSummary,
   buildVehicleDetailViewModel,
   buildVehicleStateViewModel,
+  buildServiceLogEntryViewModel,
   canOpenNodeStatusExplanationModal,
   calculateGarageScore,
   createServiceLogNodeFilter,
@@ -2089,18 +2090,12 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                 router.replace("/garage");
               }}
             />
-            {hasPlanLockedNodeTree ? (
+            {hasPlanLockedNodeTree && !nodeTreeTopOnly ? (
               <View style={{ marginBottom: 10, paddingHorizontal: 16 }}>
                 <SubscriptionLockBanner
                   variant="surface"
-                  title={nodeTreeTopOnly ? "ТОП-узлы" : "Полное дерево (просмотр)"}
-                  description={
-                    nodeTreeTopOnly
-                      ? nodesReadOnly
-                        ? "На тарифе Free видны статусы топ-узлов без добавления обслуживания из дерева. Снимите «ТОП-узлы», чтобы увидеть всё дерево в режиме просмотра."
-                        : "Показаны только ваши топ-узлы и путь к ним. Снимите «ТОП-узлы», чтобы увидеть полное дерево."
-                      : NODE_TREE_PLAN_LOCKED_HINT_RU
-                  }
+                  title="Полное дерево (просмотр)"
+                  description={NODE_TREE_PLAN_LOCKED_HINT_RU}
                   requiredPlan="PRO"
                 />
               </View>
@@ -3533,25 +3528,32 @@ function TopNodePngIcon({
 }
 
 function RecentDashboardEventRow({ event, onOpen }: { event: ServiceEventItem; onOpen: () => void }) {
-  const costLabel =
-    event.costAmount && event.currency ? `${formatExpenseAmountRu(event.costAmount)} ${event.currency}` : "—";
+  const vm = buildServiceLogEntryViewModel(event);
+  const costLabel = vm.totalCostLabel ?? "—";
+  const nodeLabel = vm.expoServiceNodeLabel ?? vm.secondaryTitle ?? "Без привязки к узлу";
+  const metaParts = [vm.compactMetricsLine, vm.modeBadgeRu].filter(Boolean);
   return (
     <Pressable
       onPress={onOpen}
       accessibilityRole="button"
-      accessibilityLabel={`Событие ${event.serviceType}, открыть в журнале`}
+      accessibilityLabel={`Событие ${vm.mainTitle}, открыть в журнале`}
       style={({ pressed }) => [styles.recentDashboardRow, pressed && styles.recentDashboardRowPressed]}
     >
       <View style={styles.recentDashboardTopRow}>
-        <Text style={styles.recentDashboardDate}>{formatIsoCalendarDateRu(event.eventDate)}</Text>
+        <Text style={styles.recentDashboardDate}>{vm.dateLabel}</Text>
         <Text style={styles.recentDashboardCost}>{costLabel}</Text>
       </View>
-      <Text style={styles.recentDashboardTitle} numberOfLines={1}>
-        {event.serviceType}
+      <Text style={styles.recentDashboardTitle} numberOfLines={2}>
+        {vm.mainTitle}
       </Text>
       <Text style={styles.recentDashboardMeta} numberOfLines={1}>
-        {event.node?.name || "Без привязки к узлу"}
+        {nodeLabel}
       </Text>
+      {metaParts.length > 0 ? (
+        <Text style={styles.recentDashboardSubMeta} numberOfLines={1}>
+          {metaParts.join(" · ")}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -4541,6 +4543,11 @@ const styles = StyleSheet.create({
   recentDashboardMeta: {
     fontSize: 12,
     color: c.textMuted,
+  },
+  recentDashboardSubMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    color: c.textMeta,
   },
   expenseDashboardPressable: {
     flexDirection: "column",

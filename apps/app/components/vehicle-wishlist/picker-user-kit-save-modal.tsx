@@ -8,9 +8,9 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { AppTextInput as TextInput } from "../ui/AppTextInput";
 import {
   advancedServiceKitSnapshotFromPickerLines,
   stripAddServiceEventFormValuesForUserTemplate,

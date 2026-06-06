@@ -9,9 +9,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { AppTextInput as TextInput } from "../ui/AppTextInput";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   PART_WISHLIST_STATUS_ORDER,

@@ -341,6 +341,13 @@ export function PartCompatibilityReportPageClient(props: {
   const partTitle =
     data != null ? `${data.partMaster.brandName} · ${data.partMaster.title}`.trim() : "Совместимость детали";
 
+  const vehicleCrumbLabel =
+    data != null
+      ? data.vehicle.nickname?.trim() ||
+        `${data.vehicle.brandName} ${data.vehicle.modelFamilyName}`.trim() ||
+        "Мотоцикл"
+      : "Мотоцикл";
+
   const verdictTitle =
     data?.confidence != null
       ? formatFitmentConfidenceStatusRu(data.confidence.status)
@@ -474,7 +481,7 @@ export function PartCompatibilityReportPageClient(props: {
         navRowEnd={headerActions}
         breadcrumbs={[
           { label: "Гараж", href: "/garage" },
-          { label: `${data.vehicle.brandName} ${data.vehicle.modelFamilyName}`.trim(), href: `/vehicles/${encodeURIComponent(props.vehicleId)}` },
+          { label: vehicleCrumbLabel, href: `/vehicles/${encodeURIComponent(props.vehicleId)}` },
           { label: "Подбор", href: pickerHref },
           { label: data.node.name, href: pickerHref },
           { label: data.partMaster.sku },

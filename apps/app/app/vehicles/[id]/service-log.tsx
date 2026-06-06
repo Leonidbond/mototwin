@@ -12,12 +12,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type ImageSourcePropType,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppTextInput as TextInput } from "../../../components/ui/AppTextInput";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { createMobileApiClient } from "../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../src/mobile-auth-guard";
@@ -41,6 +41,7 @@ import type {
 import {
   buildServiceLogTimelineProps,
   buildYandexMapsUrlForInstallLocation,
+  buildVehicleDetailViewModel,
   canOpenServiceInstallLocationOnMap,
   getServiceInstallLocationAddress,
   vehicleDetailFromApiRecord,
@@ -1067,6 +1068,7 @@ function DetailMetric({
 
 export default function ServiceLogScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     id?: string;
     nodeIds?: string;
@@ -1316,12 +1318,10 @@ export default function ServiceLogScreen() {
         setNodeTree(treeRes.nodeTree ?? []);
         setTopServiceNodes(topRes.nodes ?? []);
         setServiceCatalogNodes(catalogRes.nodes ?? []);
-        const v = vehicleRes.vehicle;
-        setVehicleDisplayName(
-          v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelFamilyName}`.trim() : "") || "Мотоцикл"
-        );
         const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
-        setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
+        const detail = rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null;
+        setContextVehicleDetail(detail);
+        setVehicleDisplayName(detail ? buildVehicleDetailViewModel(detail).displayName : "Мотоцикл");
       } catch (err) {
         setError("Не удалось загрузить журнал обслуживания.");
       } finally {
@@ -1563,6 +1563,8 @@ export default function ServiceLogScreen() {
     );
   }
 
+  const scrollBottomPad = 32 + Math.max(insets.bottom, 8);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <InternalScreenChrome
@@ -1612,9 +1614,10 @@ export default function ServiceLogScreen() {
         }}
       />
       <KeyboardAwareScrollScreen
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
         scrollViewRef={scrollRef}
         scrollViewProps={{
+          style: { flex: 1 },
           onScroll: (event) => setHeaderScrollY(event.nativeEvent.contentOffset.y),
           scrollEventThrottle: 16,
         }}
@@ -2116,7 +2119,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 24,
   },
   stateContainer: {
     flex: 1,

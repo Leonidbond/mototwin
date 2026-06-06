@@ -9,6 +9,7 @@ import {
   canOpenNodeStatusExplanationModal,
   buildRideProfileViewModel,
   buildVehicleHeaderProps,
+  buildVehicleDetailViewModel,
   buildVehicleStateViewModel,
   buildVehicleTechnicalInfoViewModel,
   vehicleDetailFromApiRecord,
@@ -2592,7 +2593,7 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     return [
       { label: "Гараж", href: "/garage" },
       {
-        label: vehicle.nickname || `${vehicle.brandName} ${vehicle.modelFamilyName}`,
+        label: buildVehicleDetailViewModel(vehicle).displayName,
         href: `/vehicles/${vehicleId}`,
       },
       { label: "Дерево узлов" },
@@ -4240,18 +4241,12 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
                   : "Краткая сводка по основным узлам. Детальная структура доступна в полном дереве."}
               </p>
 
-              {pageView === "nodeTree" && hasPlanLockedNodeTree ? (
+              {pageView === "nodeTree" && hasPlanLockedNodeTree && !nodeTreeTopOnly ? (
                 <div className="mt-3">
                   <SubscriptionLock
                     variant="surface"
-                    title={nodeTreeTopOnly ? "ТОП-узлы" : "Полное дерево (просмотр)"}
-                    description={
-                      nodeTreeTopOnly
-                        ? nodesReadOnly
-                          ? "На тарифе Free видны статусы топ-узлов без добавления обслуживания из дерева. Снимите «ТОП-узлы», чтобы увидеть всё дерево в режиме просмотра."
-                          : "Показаны только ваши топ-узлы и путь к ним. Снимите «ТОП-узлы», чтобы увидеть полное дерево."
-                        : NODE_TREE_PLAN_LOCKED_HINT_RU
-                    }
+                    title="Полное дерево (просмотр)"
+                    description={NODE_TREE_PLAN_LOCKED_HINT_RU}
                     requiredPlan="PRO"
                   />
                 </div>

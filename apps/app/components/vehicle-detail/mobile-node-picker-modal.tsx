@@ -16,9 +16,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { AppTextInput as TextInput } from "../ui/AppTextInput";
 import { getNodeTreeIconAsset } from "../../../../src/node-tree-icons";
 
 export type MobileNodePickerOption = {

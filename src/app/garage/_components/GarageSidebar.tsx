@@ -5,7 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { createMotoTwinEndpoints } from "@mototwin/api-client";
 import { createWebApiClient } from "@/lib/create-web-api-client";
-import { formatRideStyleChipRu, vehicleDetailFromApiRecord } from "@mototwin/domain";
+import {
+  buildVehicleDetailViewModel,
+  formatRideStyleChipRu,
+  vehicleDetailFromApiRecord,
+} from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type { GarageVehicleItem, VehicleDetail, VehicleDetailApiRecord } from "@mototwin/types";
 import { Button } from "@/components/ui";
@@ -204,11 +208,7 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const sidebarVehicleLabel = useMemo(
-    () =>
-      sidebarVehicle
-        ? sidebarVehicle.nickname?.trim() ||
-          `${sidebarVehicle.brandName} ${sidebarVehicle.modelFamilyName}`.trim()
-        : "",
+    () => (sidebarVehicle ? buildVehicleDetailViewModel(sidebarVehicle).displayName : ""),
     [sidebarVehicle]
   );
 

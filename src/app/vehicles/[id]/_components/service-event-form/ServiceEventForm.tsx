@@ -142,10 +142,40 @@ function switchFormToAdvanced(prev: AddServiceEventFormValues): AddServiceEventF
 
 function switchFormToBasic(prev: AddServiceEventFormValues): AddServiceEventFormValues {
   const ct = prev.items[0]?.actionType ?? prev.commonActionType;
+  let partsCost = prev.partsCost;
+  let laborCost = prev.laborCost;
+  if (prev.mode === "ADVANCED") {
+    if (!partsCost.trim()) {
+      let rowPartsSum = 0;
+      for (const it of prev.items) {
+        const v = parseExpenseAmountInputToNumberOrNull(it.partCost.trim());
+        if (v != null) {
+          rowPartsSum += v;
+        }
+      }
+      if (rowPartsSum > 0) {
+        partsCost = formatExpenseAmountRu(rowPartsSum);
+      }
+    }
+    if (!laborCost.trim()) {
+      let rowLaborSum = 0;
+      for (const it of prev.items) {
+        const v = parseExpenseAmountInputToNumberOrNull(it.laborCost.trim());
+        if (v != null) {
+          rowLaborSum += v;
+        }
+      }
+      if (rowLaborSum > 0) {
+        laborCost = formatExpenseAmountRu(rowLaborSum);
+      }
+    }
+  }
   return {
     ...prev,
     mode: "BASIC",
     commonActionType: ct,
+    partsCost,
+    laborCost,
     items: prev.items.map((it) => ({ ...it, actionType: ct })),
   };
 }

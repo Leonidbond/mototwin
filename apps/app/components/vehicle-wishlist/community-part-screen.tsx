@@ -9,10 +9,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type ImageSourcePropType,
 } from "react-native";
+import { AppTextInput as TextInput } from "../ui/AppTextInput";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -22,6 +22,7 @@ import {
   RIDE_USAGE_INTENSITY_OPTIONS,
   RIDE_USAGE_TYPE_OPTIONS,
   buildRestrictedPlanVehicleLeafPickerSets,
+  buildVehicleDetailViewModel,
   getLeafNodeOptions,
   vehicleDetailFromApiRecord,
 } from "@mototwin/domain";
@@ -642,10 +643,14 @@ export function CommunityPartScreen(props: {
     { key: "OEM_REPLACEMENT", label: "OEM-замена", icon: "verified" },
   ];
 
+  const vehicleCrumbLabel = vehicle
+    ? buildVehicleDetailViewModel(vehicle).displayName
+    : "Мотоцикл";
+
   const crumbs = [
     { label: "Мой гараж", href: "/" },
     {
-      label: vehicle?.nickname?.trim() || "Мотоцикл",
+      label: vehicleCrumbLabel,
       href: `/vehicles/${props.vehicleId}`,
     },
     { label: "Корзина замен", href: `/vehicles/${props.vehicleId}/wishlist` },

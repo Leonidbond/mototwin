@@ -1,9 +1,15 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { writeLastViewedVehicleId } from "../../src/ui-last-viewed-vehicle";
+
+/** Нижний safe area: системная навигация Android / home indicator iOS. */
+function garageBottomNavInset(bottom: number): number {
+  const min = Platform.OS === "android" ? 20 : 8;
+  return Math.max(bottom, min);
+}
 
 type BottomNavKey = "garage" | "nodes" | "journal" | "picker" | "expenses" | "profile";
 
@@ -76,7 +82,7 @@ export function GarageBottomNav(props: {
   ];
 
   return (
-    <View style={[styles.shell, { paddingBottom: Math.max(insets.bottom - 6, 2) }]}>
+    <View style={[styles.shell, { paddingBottom: garageBottomNavInset(insets.bottom) }]}>
       <View style={styles.bar}>
         {items.map((item) => {
           const active = props.activeKey ? props.activeKey === item.key : !!item.active;

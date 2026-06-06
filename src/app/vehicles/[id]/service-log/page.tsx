@@ -14,6 +14,7 @@ import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildServiceLogTimelineProps,
   buildYandexMapsUrlForInstallLocation,
+  buildVehicleDetailViewModel,
   canOpenServiceInstallLocationOnMap,
   expenseCategoryLabelsRu,
   getServiceInstallLocationAddress,
@@ -30,6 +31,7 @@ import {
   SERVICE_LOG_JOURNAL_LEADING_ICON_PX,
   isServiceLogTimelineQueryActive,
   SERVICE_ACTION_TYPE_OPTIONS,
+  vehicleDetailFromApiRecord,
 } from "@mototwin/domain";
 import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 import { Button } from "@/components/ui";
@@ -51,6 +53,7 @@ import type {
   ServiceLogNodeFilter,
   ServiceNodeItem,
   TopServiceNodeItem,
+  VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 
@@ -751,13 +754,10 @@ export default function VehicleServiceLogPage() {
         api.getTopServiceNodes(),
         api.getServiceNodes(),
       ]);
-      const vehicle = detail.vehicle;
-      const title =
-        vehicle?.nickname ||
-        `${vehicle?.brandName || ""} ${vehicle?.modelFamilyName || ""}`.trim() ||
-        "Мотоцикл";
-      setVehicleTitle(title);
-      setVehicleVin(vehicle?.vin ?? null);
+      const rawVehicle = detail.vehicle as VehicleDetailApiRecord | null | undefined;
+      const vehicleDetail = rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null;
+      setVehicleTitle(vehicleDetail ? buildVehicleDetailViewModel(vehicleDetail).displayName : "Мотоцикл");
+      setVehicleVin(vehicleDetail?.vin ?? null);
       setEvents(service.serviceEvents ?? []);
       setServiceMeta(service.meta ?? null);
       setNodeTree(treeRes.nodeTree ?? []);

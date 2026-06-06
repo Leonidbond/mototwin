@@ -10,15 +10,16 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
+import { AppTextInput as TextInput } from "../../../components/ui/AppTextInput";
 import { MaterialIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   buildExpenseAnalyticsFromItems,
   buildRestrictedPlanVehicleLeafPickerSets,
+  buildVehicleDetailViewModel,
   vehicleDetailFromApiRecord,
   expenseCategoryLabelsRu,
   expenseInstallStatusLabelsRu,
@@ -250,12 +251,10 @@ export default function VehicleExpensesScreen() {
       setNodeTree(treeData.nodeTree ?? []);
       setTopServiceNodes(topNodesData.nodes ?? []);
       setServiceCatalogNodes(catalogData.nodes ?? []);
-      const v = vehicleRes.vehicle;
-      setVehicleDisplayName(
-        v?.nickname?.trim() || (v ? `${v.brandName} ${v.modelFamilyName}`.trim() : "") || "Мотоцикл"
-      );
       const rawVehicle = vehicleRes.vehicle as VehicleDetailApiRecord | null | undefined;
-      setContextVehicleDetail(rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null);
+      const detail = rawVehicle ? vehicleDetailFromApiRecord(rawVehicle) : null;
+      setContextVehicleDetail(detail);
+      setVehicleDisplayName(detail ? buildVehicleDetailViewModel(detail).displayName : "Мотоцикл");
       setExpenses(result.expenses);
       setYears(result.years ?? []);
       setWishlistStatusByItemId(
@@ -762,7 +761,7 @@ export default function VehicleExpensesScreen() {
           </StateCard>
         ) : (
           <>
-            <View style={[styles.metricsGrid, isMobileLayout && styles.metricsGridCompact]}>
+            <View style={styles.metricsGrid}>
               <MetricCard tone="blue" label="Всего расходов" value={formatTotals(analytics.totalsByCurrency)} hint="за выбранный период" />
               <MetricCard tone="green" label={`За сезон ${selectedYear}`} value={formatTotals(analytics.selectedYearTotalsByCurrency)} hint="с начала сезона" />
               <MetricCard tone="violet" label="Событий" value={String(analytics.selectedYearExpenseCount)} hint="всего расходов" />
@@ -1270,9 +1269,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-  },
-  metricsGridCompact: {
-    gap: 8,
+    justifyContent: "space-between",
   },
   metricCard: {
     flexDirection: "row",
@@ -1284,8 +1281,11 @@ const styles = StyleSheet.create({
     backgroundColor: c.card,
     paddingHorizontal: 10,
     paddingVertical: 9,
-    width: "48.8%",
-    minWidth: 156,
+    width: "48%",
+    maxWidth: "48%",
+    flexGrow: 0,
+    flexShrink: 0,
+    minWidth: 0,
   },
   metricIcon: {
     width: 24,

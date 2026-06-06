@@ -9,9 +9,9 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { AppTextInput as TextInput } from "../ui/AppTextInput";
 import { MaterialIcons } from "@expo/vector-icons";
 import { createMobileApiClientForBaseUrl } from "../../src/create-mobile-api-client";
 import {
@@ -56,6 +56,7 @@ import type {
 } from "@mototwin/types";
 import { SubscriptionLockBanner } from "../subscription/subscription-lock-banner";
 import { MobileNodePickerModal } from "./mobile-node-picker-modal";
+import { MobileYmdDateField } from "../expo-shell/mobile-ymd-date-field";
 
 /** Палитра панели узлов — как `SERVICE_EVENT_PARTS_UI` на web (`service-event-form/styles.ts`). */
 const SE = {
@@ -163,10 +164,40 @@ function switchFormToAdvanced(prev: AddServiceEventFormValues): AddServiceEventF
 
 function switchFormToBasic(prev: AddServiceEventFormValues): AddServiceEventFormValues {
   const ct = prev.items[0]?.actionType ?? prev.commonActionType;
+  let partsCost = prev.partsCost;
+  let laborCost = prev.laborCost;
+  if (prev.mode === "ADVANCED") {
+    if (!partsCost.trim()) {
+      let rowPartsSum = 0;
+      for (const it of prev.items) {
+        const v = parseExpenseAmountInputToNumberOrNull(it.partCost.trim());
+        if (v != null) {
+          rowPartsSum += v;
+        }
+      }
+      if (rowPartsSum > 0) {
+        partsCost = formatExpenseAmountRu(rowPartsSum);
+      }
+    }
+    if (!laborCost.trim()) {
+      let rowLaborSum = 0;
+      for (const it of prev.items) {
+        const v = parseExpenseAmountInputToNumberOrNull(it.laborCost.trim());
+        if (v != null) {
+          rowLaborSum += v;
+        }
+      }
+      if (rowLaborSum > 0) {
+        laborCost = formatExpenseAmountRu(rowLaborSum);
+      }
+    }
+  }
   return {
     ...prev,
     mode: "BASIC",
     commonActionType: ct,
+    partsCost,
+    laborCost,
     items: prev.items.map((it) => ({ ...it, actionType: ct })),
   };
 }
@@ -1076,15 +1107,6 @@ export function BasicServiceEventBundleForm({
           />
         </View>
       ) : null}
-      {!subscriptionCapabilities?.canSelectChildNode && subscriptionCapabilities ? (
-        <View style={{ marginBottom: 10 }}>
-          <SubscriptionLockBanner
-            title="Выбор подузлов — Pro"
-            description="На вашем тарифе в форме доступны только ТОП-узлы. Полное дерево — на тарифе Pro."
-            requiredPlan="PRO"
-          />
-        </View>
-      ) : null}
 
       {contextHint ? (
         <View style={styles.contextHintBox}>
@@ -1097,7 +1119,7 @@ export function BasicServiceEventBundleForm({
         <View style={{ marginBottom: 8, gap: 8 }}>
           {bundleTemplatesErr ? <Text style={styles.err}>{bundleTemplatesErr}</Text> : null}
           {userTemplatesErr ? <Text style={styles.err}>{userTemplatesErr}</Text> : null}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <View style={styles.templateActionsRow}>
             <Pressable
               onPress={() => {
                 setSaveUserTemplateErr("");
@@ -1105,15 +1127,19 @@ export function BasicServiceEventBundleForm({
                 setSaveIncludeInPartPicker(true);
                 setSaveUserTemplateOpen(true);
               }}
-              style={({ pressed }) => [styles.templatePickBtn, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.templatePickBtn, styles.templatePickBtnHalf, pressed && styles.pressed]}
             >
-              <Text style={styles.templatePickBtnTxt}>Сохранить шаблон</Text>
+              <Text style={styles.templatePickBtnTxt} numberOfLines={1}>
+                Сохранить шаблон
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => setTemplateModalOpen(true)}
-              style={({ pressed }) => [styles.templatePickBtn, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.templatePickBtn, styles.templatePickBtnHalf, pressed && styles.pressed]}
             >
-              <Text style={styles.templatePickBtnTxt}>Шаблон комплекса…</Text>
+              <Text style={styles.templatePickBtnTxt} numberOfLines={1}>
+                Шаблон комплекса…
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -1121,6 +1147,7 @@ export function BasicServiceEventBundleForm({
 
       <Field label="Название события">
         <TextInput
+          placeholderTextColor={c.textMuted}
           value={form.title}
           onChangeText={(t) => updateForm((p) => ({ ...p, title: t }))}
           style={styles.input}
@@ -1131,6 +1158,7 @@ export function BasicServiceEventBundleForm({
         <View style={{ flex: 1 }}>
           <Field label="Дата">
             <TextInput
+          placeholderTextColor={c.textMuted}
               value={form.eventDate}
               onChangeText={(t) => updateForm((p) => ({ ...p, eventDate: t }))}
               onBlur={normalizeEventDateOnBlur}
@@ -1145,6 +1173,7 @@ export function BasicServiceEventBundleForm({
         <View style={{ flex: 1 }}>
           <Field label="Пробег">
             <TextInput
+          placeholderTextColor={c.textMuted}
               value={form.odometer}
               onChangeText={(t) => updateForm((p) => ({ ...p, odometer: t }))}
               onBlur={maybePromptVehicleStateFromEventMetrics}
@@ -1157,6 +1186,7 @@ export function BasicServiceEventBundleForm({
         <View style={{ flex: 1 }}>
           <Field label="Моточасы">
             <TextInput
+          placeholderTextColor={c.textMuted}
               value={form.engineHours}
               onChangeText={(t) => updateForm((p) => ({ ...p, engineHours: t }))}
               onBlur={maybePromptVehicleStateFromEventMetrics}
@@ -1193,6 +1223,7 @@ export function BasicServiceEventBundleForm({
       {form.performedBy === "SERVICE" ? (
         <Field label="Сервис (необязательно)">
           <TextInput
+          placeholderTextColor={c.textMuted}
             value={form.serviceProviderNote}
             onChangeText={(t) => updateForm((p) => ({ ...p, serviceProviderNote: t }))}
             style={styles.input}
@@ -1206,6 +1237,7 @@ export function BasicServiceEventBundleForm({
         <View style={{ gap: 8 }}>
           <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
             <TextInput
+          placeholderTextColor={c.textMuted}
               value={form.installLocationAddress}
               onChangeText={(t) =>
                 updateForm((p) => ({
@@ -1248,6 +1280,7 @@ export function BasicServiceEventBundleForm({
       </Field>
       <Field label="Комментарий">
         <TextInput
+          placeholderTextColor={c.textMuted}
           value={form.comment}
           onChangeText={(t) => updateForm((p) => ({ ...p, comment: t }))}
           style={[styles.input, styles.multiline]}
@@ -1421,6 +1454,7 @@ export function BasicServiceEventBundleForm({
             >
               <Field label="Наименование запчасти">
                 <TextInput
+          placeholderTextColor={c.textMuted}
                   value={row.partName}
                   onChangeText={(t) => updateForm((p) => patchItemAt(p, rowIndex, { partName: t }))}
                   style={styles.input}
@@ -1430,6 +1464,7 @@ export function BasicServiceEventBundleForm({
               </Field>
               <Field label="Артикул (SKU)">
                 <TextInput
+          placeholderTextColor={c.textMuted}
                   value={row.sku}
                   onFocus={() => setSkuSearchRowIndex(rowIndex)}
                   onChangeText={(t) => updateForm((p) => patchItemAt(p, rowIndex, { sku: t }))}
@@ -1482,6 +1517,7 @@ export function BasicServiceEventBundleForm({
                 <View style={{ flex: 1 }}>
                   <Field label="Кол-во">
                     <TextInput
+          placeholderTextColor={c.textMuted}
                       value={row.quantity}
                       onChangeText={(t) => updateForm((p) => patchItemAt(p, rowIndex, { quantity: t }))}
                       style={styles.input}
@@ -1493,6 +1529,7 @@ export function BasicServiceEventBundleForm({
                 <View style={{ flex: 1 }}>
                   <Field label={`Детали, ${costCurrencySuffix}`}>
                     <TextInput
+          placeholderTextColor={c.textMuted}
                       value={row.partCost}
                       onChangeText={(t) => updateForm((p) => patchItemAt(p, rowIndex, { partCost: t }))}
                       style={styles.input}
@@ -1504,6 +1541,7 @@ export function BasicServiceEventBundleForm({
                 <View style={{ flex: 1 }}>
                   <Field label={`Работа, ${costCurrencySuffix}`}>
                     <TextInput
+          placeholderTextColor={c.textMuted}
                       value={row.laborCost}
                       onChangeText={(t) => updateForm((p) => patchItemAt(p, rowIndex, { laborCost: t }))}
                       style={styles.input}
@@ -1515,6 +1553,7 @@ export function BasicServiceEventBundleForm({
               </View>
               <Field label="Комментарий к строке">
                 <TextInput
+          placeholderTextColor={c.textMuted}
                   value={row.comment}
                   onChangeText={(t) => updateForm((p) => patchItemAt(p, rowIndex, { comment: t }))}
                   style={styles.input}
@@ -1561,6 +1600,7 @@ export function BasicServiceEventBundleForm({
         <View style={{ flex: 1 }}>
           <Field label={`Детали, ${costCurrencySuffix}`}>
             <TextInput
+          placeholderTextColor={c.textMuted}
               value={form.partsCost}
               onChangeText={(t) => updateForm((p) => ({ ...p, partsCost: t }))}
               style={styles.input}
@@ -1572,6 +1612,7 @@ export function BasicServiceEventBundleForm({
         <View style={{ flex: 1 }}>
           <Field label={`Работа, ${costCurrencySuffix}`}>
             <TextInput
+          placeholderTextColor={c.textMuted}
               value={form.laborCost}
               onChangeText={(t) => updateForm((p) => ({ ...p, laborCost: t }))}
               style={styles.input}
@@ -1617,18 +1658,17 @@ export function BasicServiceEventBundleForm({
       />
       {form.nextReminderEnabled ? (
         <View style={{ marginTop: 10 }}>
-          <Field label="Дата следующего ТО (YYYY-MM-DD)">
-            <TextInput
-              value={form.nextReminderDate}
-              onChangeText={(t) => updateForm((p) => ({ ...p, nextReminderDate: t }))}
-              style={styles.input}
-              placeholder="2026-10-03"
-            />
-          </Field>
+          <MobileYmdDateField
+            label="Дата следующего ТО"
+            value={form.nextReminderDate}
+            onChange={(nextReminderDate) => updateForm((p) => ({ ...p, nextReminderDate }))}
+            placeholder="Выберите дату"
+          />
           <View style={styles.row2}>
             <View style={{ flex: 1 }}>
               <Field label="Пробег">
                 <TextInput
+          placeholderTextColor={c.textMuted}
                   value={form.nextReminderOdometer}
                   onChangeText={(t) => updateForm((p) => ({ ...p, nextReminderOdometer: t }))}
                   style={styles.input}
@@ -1640,6 +1680,7 @@ export function BasicServiceEventBundleForm({
             <View style={{ flex: 1 }}>
               <Field label="Моточасы">
                 <TextInput
+          placeholderTextColor={c.textMuted}
                   value={form.nextReminderEngineHours}
                   onChangeText={(t) =>
                     updateForm((p) => ({ ...p, nextReminderEngineHours: t }))
@@ -1837,6 +1878,7 @@ export function BasicServiceEventBundleForm({
             </Text>
             <Text style={styles.label}>Название (необязательно)</Text>
             <TextInput
+          placeholderTextColor={c.textMuted}
               value={saveUserTemplateName}
               onChangeText={setSaveUserTemplateName}
               style={styles.input}
@@ -2056,6 +2098,7 @@ export function BasicServiceEventBundleForm({
               </View>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <TextInput
+          placeholderTextColor={c.textMuted}
                   value={servicePlaceQuery}
                   onChangeText={setServicePlaceQuery}
                   style={[styles.input, { flex: 1 }]}
@@ -2109,12 +2152,14 @@ export function BasicServiceEventBundleForm({
               <View style={styles.customCurrencyBox}>
                 <Text style={styles.label}>Вручную</Text>
                 <TextInput
+          placeholderTextColor={c.textMuted}
                   value={manualServicePlaceTitle}
                   onChangeText={setManualServicePlaceTitle}
                   style={styles.input}
                   placeholder="Название"
                 />
                 <TextInput
+          placeholderTextColor={c.textMuted}
                   value={manualServicePlaceAddress}
                   onChangeText={setManualServicePlaceAddress}
                   style={styles.input}
@@ -2203,6 +2248,7 @@ export function BasicServiceEventBundleForm({
             <View style={styles.customCurrencyBox}>
               <Text style={styles.label}>Другая валюта</Text>
               <TextInput
+          placeholderTextColor={c.textMuted}
                 value={customCurrencyDraft}
                 onChangeText={(text) => {
                   setCustomCurrencyDraft(text.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 8));
@@ -2791,13 +2837,24 @@ const styles = StyleSheet.create({
   },
   templateInspectItemTitle: { fontSize: 14, fontWeight: "700", color: c.textPrimary },
   templatePickBtn: {
-    alignSelf: "flex-start",
     borderWidth: 1,
     borderColor: c.borderStrong,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: c.cardSubtle,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  templateActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  templatePickBtnHalf: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: "stretch",
   },
   templatePickBtnTxt: { color: c.textPrimary, fontWeight: "700", fontSize: 13 },
   row2: { flexDirection: "row", gap: 10 },

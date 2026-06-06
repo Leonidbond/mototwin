@@ -27,6 +27,7 @@ import {
   buildRestrictedPlanVehicleLeafPickerSets,
   getLeafNodeOptions,
   getNodePathItemViewModelsByNodeId,
+  buildVehicleDetailViewModel,
   removeFromDraft,
   updateSkuDraftItemQuantity,
   vehicleDetailFromApiRecord,
@@ -686,7 +687,7 @@ export function PartPickerPage({
   }, [submitPreview, quantityResolutionByDraftId, draft, vehicleId, router]);
 
   const vehicleLabelForCrumbs = vehicle
-    ? vehicle.nickname || `${vehicle.brandName} ${vehicle.modelFamilyName}`
+    ? buildVehicleDetailViewModel(vehicle).displayName
     : "Мотоцикл";
 
   const pickerBreadcrumbs = useMemo(

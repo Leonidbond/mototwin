@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -35,13 +35,31 @@ export function InternalScreenChrome(props: {
     onBack,
     actions,
     belowNavRow,
-    showHelp = true,
+    showHelp = false,
     declutterMobile = false,
     scrollOffsetY = 0,
     collapseThreshold = 52,
   } = props;
-  const isCollapsed = declutterMobile && scrollOffsetY >= collapseThreshold;
   const crumbsScrollRef = useRef<ScrollView>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const isCollapsed = declutterMobile && collapsed;
+
+  useEffect(() => {
+    if (!declutterMobile) {
+      setCollapsed(false);
+      return;
+    }
+    const y = Math.max(0, scrollOffsetY);
+    setCollapsed((prev) => {
+      if (y <= 12) {
+        return false;
+      }
+      if (y >= collapseThreshold) {
+        return true;
+      }
+      return prev;
+    });
+  }, [collapseThreshold, declutterMobile, scrollOffsetY]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -11,9 +11,9 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { AppTextInput as TextInput } from "../../../../components/ui/AppTextInput";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -30,6 +30,7 @@ import {
   createEmptyDraftCart,
   filterActiveWishlistItems,
   buildRestrictedPlanVehicleLeafPickerSets,
+  buildVehicleDetailViewModel,
   getLeafNodeOptions,
   getNodePathItemViewModelsByNodeId,
   removeFromDraft,
@@ -163,11 +164,7 @@ function formatSubmitResultMessage(result: PickerSubmitResult): string {
 
 function vehicleDisplayName(vehicle: VehicleDetail | null): string {
   if (!vehicle) return "";
-  return (
-    vehicle.nickname?.trim() ||
-    `${vehicle.brandName} ${vehicle.modelFamilyName}`.trim() ||
-    "Мотоцикл"
-  );
+  return buildVehicleDetailViewModel(vehicle).displayName;
 }
 
 export default function WishlistPickerScreen() {

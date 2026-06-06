@@ -5,9 +5,9 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { AppTextInput as TextInput } from "../../../components/ui/AppTextInput";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { normalizeVehicleStatePayload, validateVehicleStateFormValues } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
