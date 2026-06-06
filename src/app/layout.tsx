@@ -3,6 +3,7 @@ import { Geist_Mono, Inter } from "next/font/google";
 import Script from "next/script";
 import { AppHelpFab } from "../components/app-help-fab";
 import { AuthSessionProvider } from "../components/auth/AuthSessionProvider";
+import { WebAuthReadyProvider } from "../components/auth/WebAuthReadyProvider";
 import { EXTENSION_DOM_SANITIZE_SCRIPT } from "../lib/extension-dom-sanitize-script";
 import "./globals.css";
 
@@ -52,7 +53,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: EXTENSION_DOM_SANITIZE_SCRIPT }}
         />
         <AuthSessionProvider>
-          {children}
+          <WebAuthReadyProvider>{children}</WebAuthReadyProvider>
         </AuthSessionProvider>
         <AppHelpFab />
       </body>

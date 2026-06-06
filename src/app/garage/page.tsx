@@ -22,6 +22,14 @@ const garageApi = createWebApiClient();
 const SIDEBAR_COLLAPSED_KEY = "garage.sidebar.collapsed";
 
 export default function GaragePage() {
+  return (
+    <AuthGate>
+      <GaragePageContent />
+    </AuthGate>
+  );
+}
+
+function GaragePageContent() {
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -87,7 +95,6 @@ export default function GaragePage() {
   const showVehicleList = !isLoading && !error && hasVehicles;
 
   return (
-    <AuthGate>
     <main
       style={{
         width: "100%",
@@ -163,7 +170,6 @@ export default function GaragePage() {
         </section>
       </div>
     </main>
-    </AuthGate>
   );
 }
 

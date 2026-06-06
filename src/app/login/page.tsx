@@ -128,7 +128,12 @@ function LoginForm() {
         <div className="mt-4 grid grid-cols-1 gap-2">
           <button
             type="button"
-            onClick={() => void signIn("google", { callbackUrl: nextPath })}
+            onClick={() => {
+              const callbackUrl = encodeURIComponent(
+                nextPath.startsWith("/") ? nextPath : "/garage"
+              );
+              window.location.href = `/api/auth/signin/google?callbackUrl=${callbackUrl}`;
+            }}
             className="rounded-lg border py-2 text-sm"
             style={{ borderColor: "rgba(255,255,255,0.15)" }}
           >

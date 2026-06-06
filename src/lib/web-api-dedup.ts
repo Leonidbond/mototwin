@@ -10,7 +10,8 @@ import type {
 } from "@mototwin/types";
 import { createWebApiClient } from "@/lib/create-web-api-client";
 
-const api = createWebApiClient();
+const api = createWebApiClient({ redirectOn401: false });
+const garageApi = createWebApiClient();
 
 let sessionCache: AuthMeResponse | null = null;
 let sessionInflight: Promise<AuthMeResponse> | null = null;

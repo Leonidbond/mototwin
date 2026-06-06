@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { attachMototwinSessionCookieIfNeeded } from "@/lib/auth/attach-web-session-cookie";
 import { getCapabilities } from "@/lib/subscription/capabilities";
 import { isTrialActive } from "@/lib/subscription/resolve-plan";
 import {
@@ -30,7 +31,7 @@ export async function GET() {
     }
 
     const planType = subscription?.planType ?? "FREE";
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: {
         id: user.id,
         email: user.email ?? "",
@@ -43,6 +44,7 @@ export async function GET() {
       isTrialActive: isTrialActive(subscription?.trialEndsAt ?? null),
       capabilities: getCapabilities(planType),
     });
+    return attachMototwinSessionCookieIfNeeded(response, user.id);
   } catch (error) {
     const ctxError = toCurrentUserContextErrorResponse(error);
     if (ctxError) return ctxError;
