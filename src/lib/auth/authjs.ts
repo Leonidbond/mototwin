@@ -1,7 +1,6 @@
 import NextAuth, { type NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import type { DefaultSession } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import Apple from "next-auth/providers/apple";
 import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers/oauth";
@@ -12,7 +11,6 @@ import { ensureUserBootstrap } from "./user-bootstrap";
 import {
   assertUserNotBlocked,
   AuthServiceError,
-  verifyUserCredentials,
 } from "./session-service";
 
 function YandexProvider(config: OAuthUserConfig<Record<string, never>>): OAuthConfig<Record<string, never>> {
@@ -97,29 +95,7 @@ export async function auth() {
 }
 
 function buildProviders(): Provider[] {
-  const providers: Provider[] = [
-    Credentials({
-      name: "Email/password",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        const email = typeof credentials?.email === "string" ? credentials.email : "";
-        const password = typeof credentials?.password === "string" ? credentials.password : "";
-        if (!email || !password) {
-          return null;
-        }
-        const user = await verifyUserCredentials(email, password);
-        await ensureUserBootstrap(user.userId);
-        return {
-          id: user.userId,
-          email: user.email,
-          name: user.displayName,
-        };
-      },
-    }),
-  ];
+  const providers: Provider[] = [];
 
   if (process.env.AUTH_GOOGLE_CLIENT_ID && process.env.AUTH_GOOGLE_CLIENT_SECRET) {
     providers.push(

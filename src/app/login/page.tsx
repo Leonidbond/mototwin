@@ -26,6 +26,12 @@ function LoginForm() {
   }, []);
 
   useEffect(() => {
+    // #region agent log
+    fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run3",hypothesisId:"H7",location:"src/app/login/page.tsx:30",message:"LoginForm mounted",data:{path:typeof window!=="undefined"?window.location.pathname:"server",search:typeof window!=="undefined"?window.location.search:"",hasOauthError:Boolean(oauthErrorCode)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, [oauthErrorCode]);
+
+  useEffect(() => {
     if (!oauthErrorCode) return;
     const decoded = decodeURIComponent(oauthErrorCode);
     if (decoded === "OAuthCreateAccount") {
@@ -129,10 +135,11 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => {
-              const callbackUrl = encodeURIComponent(
-                nextPath.startsWith("/") ? nextPath : "/garage"
-              );
-              window.location.href = `/api/auth/signin/google?callbackUrl=${callbackUrl}`;
+              const callbackPath = nextPath.startsWith("/") ? nextPath : "/garage";
+              // #region agent log
+              fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run4",hypothesisId:"H19",location:"src/app/login/page.tsx:145",message:"Google login button clicked",data:{nextPath,callbackPath},timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
+              void signIn("google", { callbackUrl: callbackPath });
             }}
             className="rounded-lg border py-2 text-sm"
             style={{ borderColor: "rgba(255,255,255,0.15)" }}

@@ -34,9 +34,15 @@ export function AuthGate({ children }: AuthGateProps) {
         fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H1",location:"src/components/auth/AuthGate.tsx:33",message:"AuthGate getWebSession failed",data:{message},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
         if (message.toLowerCase().includes("требуется вход")) {
+          // #region agent log
+          fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run3",hypothesisId:"H6",location:"src/components/auth/AuthGate.tsx:37",message:"AuthGate redirecting to login (unauthorized)",data:{path:typeof window!=="undefined"?window.location.pathname:"server"},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           router.replace("/login");
           return;
         }
+        // #region agent log
+        fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run3",hypothesisId:"H6",location:"src/components/auth/AuthGate.tsx:43",message:"AuthGate redirecting to login (error query)",data:{message,path:typeof window!=="undefined"?window.location.pathname:"server"},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         router.replace(
           `/login?next=${encodeURIComponent(
             typeof window !== "undefined"
