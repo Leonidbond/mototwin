@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { attachMototwinSessionCookieIfNeeded } from "@/lib/auth/attach-web-session-cookie";
 import { getCapabilities } from "@/lib/subscription/capabilities";
@@ -11,19 +10,6 @@ import {
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const cookieNames = cookieStore
-      .getAll()
-      .map((cookie) => cookie.name)
-      .filter((name) => name.includes("next-auth") || name.includes("authjs") || name.includes("mototwin"));
-    // #region agent log
-    console.log(
-      "[debug][auth-me] route-called",
-      JSON.stringify({
-        cookieNames,
-      })
-    );
-    // #endregion
     const currentUser = await getCurrentUserContext();
     const [user, garage, subscription] = await Promise.all([
       prisma.user.findUnique({
@@ -62,14 +48,6 @@ export async function GET() {
   } catch (error) {
     const ctxError = toCurrentUserContextErrorResponse(error);
     if (ctxError) {
-      // #region agent log
-      console.log(
-        "[debug][auth-me] ctx-error",
-        JSON.stringify({
-          status: ctxError.status,
-        })
-      );
-      // #endregion
       return ctxError;
     }
     console.error("Auth me failed:", error);

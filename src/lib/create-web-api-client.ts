@@ -11,6 +11,8 @@ export function createWebApiClient(options?: CreateWebApiClientOptions) {
   const client = createApiClient({
     baseUrl: "",
     credentials: "include",
+    requestTimeoutMs: 15_000,
+    requestMaxAttempts: 3,
     onUnauthorized: redirectOn401
       ? () => {
           if (typeof window !== "undefined") {

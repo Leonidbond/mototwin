@@ -21,24 +21,6 @@ const garageApi = createWebApiClient();
 
 const SIDEBAR_COLLAPSED_KEY = "garage.sidebar.collapsed";
 
-if (typeof window !== "undefined") {
-  // #region agent log
-  fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run2",hypothesisId:"H5",location:"src/app/garage/page.tsx:28",message:"garage module evaluated",data:{href:window.location.href},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-  void fetch("/api/debug/client-log", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      runId: "run2",
-      hypothesisId: "H5",
-      location: "src/app/garage/page.tsx:34",
-      message: "garage module evaluated",
-      href: window.location.href,
-      ts: Date.now(),
-    }),
-  }).catch(() => {});
-}
-
 export default function GaragePage() {
   return (
     <AuthGate>
@@ -55,41 +37,11 @@ function GaragePageContent() {
   const [notificationCount, setNotificationCount] = useState(0);
   const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
 
-  useEffect(() => {
-    const onError = (event: ErrorEvent) => {
-      void fetch("/api/debug/client-log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          runId: "run2",
-          hypothesisId: "H5",
-          location: "src/app/garage/page.tsx:58",
-          message: "window error",
-          data: {
-            message: event.message,
-            filename: event.filename,
-            lineno: event.lineno,
-            colno: event.colno,
-          },
-          ts: Date.now(),
-        }),
-      }).catch(() => {});
-    };
-    window.addEventListener("error", onError);
-    return () => window.removeEventListener("error", onError);
-  }, []);
-
   const loadGarage = useCallback(async () => {
-    // #region agent log
-    fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H2",location:"src/app/garage/page.tsx:44",message:"loadGarage start",data:{visibility:typeof document!=="undefined"?document.visibilityState:"n/a"},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     try {
       setIsLoading(true);
       setError("");
       const garageResult = await getGarageVehiclesDeduped();
-      // #region agent log
-      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H2",location:"src/app/garage/page.tsx:51",message:"loadGarage got vehicles",data:{vehicles:(garageResult.vehicles??[]).length},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setVehicles(garageResult.vehicles ?? []);
 
       void Promise.allSettled([
@@ -111,9 +63,6 @@ function GaragePageContent() {
       });
     } catch (err) {
       console.error(err);
-      // #region agent log
-      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H2",location:"src/app/garage/page.tsx:76",message:"loadGarage failed",data:{error:err instanceof Error?err.message:String(err)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setError(
         err instanceof Error ? err.message : "Произошла ошибка при загрузке гаража."
       );

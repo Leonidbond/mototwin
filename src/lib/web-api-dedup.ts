@@ -30,9 +30,6 @@ let serviceCatalogInflight: Promise<ServiceCatalogBundle> | null = null;
 
 /** Single in-flight / cached GET /api/auth/me for the browser tab. */
 export function getWebSession(): Promise<AuthMeResponse> {
-  // #region agent log
-  fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H3",location:"src/lib/web-api-dedup.ts:31",message:"getWebSession called",data:{hasCache:Boolean(sessionCache),hasInflight:Boolean(sessionInflight)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (sessionCache) {
     return Promise.resolve(sessionCache);
   }
@@ -40,17 +37,8 @@ export function getWebSession(): Promise<AuthMeResponse> {
     sessionInflight = api
       .getAuthMe()
       .then((me) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H3",location:"src/lib/web-api-dedup.ts:41",message:"getWebSession api success",data:{userId:me.user?.id??null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         sessionCache = me;
         return me;
-      })
-      .catch((error) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H3",location:"src/lib/web-api-dedup.ts:46",message:"getWebSession api failed",data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        throw error;
       })
       .finally(() => {
         sessionInflight = null;
@@ -68,27 +56,10 @@ export function clearWebSessionCache(): void {
 
 /** Dedupes concurrent GET /api/garage (expensive attention computation on server). */
 export function getGarageVehiclesDeduped(): Promise<GarageVehiclesResponse> {
-  // #region agent log
-  fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H4",location:"src/lib/web-api-dedup.ts:62",message:"getGarageVehiclesDeduped called",data:{hasInflight:Boolean(garageInflight)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!garageInflight) {
-    garageInflight = api
-      .getGarageVehicles()
-      .then((result) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H4",location:"src/lib/web-api-dedup.ts:69",message:"getGarageVehiclesDeduped success",data:{vehicles:(result.vehicles??[]).length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        return result;
-      })
-      .catch((error) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H4",location:"src/lib/web-api-dedup.ts:74",message:"getGarageVehiclesDeduped failed",data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        throw error;
-      })
-      .finally(() => {
-        garageInflight = null;
-      });
+    garageInflight = api.getGarageVehicles().finally(() => {
+      garageInflight = null;
+    });
   }
   return garageInflight;
 }
