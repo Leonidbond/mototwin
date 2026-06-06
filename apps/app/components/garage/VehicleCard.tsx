@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  heroRow: { flexDirection: "row", gap: 10, alignItems: "center" },
+  heroRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
   silhouetteBlock: { flex: 1, minWidth: 0 },
   caption: { marginTop: 2, color: c.textMuted, fontSize: 12, textAlign: "center" },
   attentionBlock: { marginTop: 2 },
