@@ -7,12 +7,16 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://mototwin.online"
+        "EXPO_PUBLIC_API_BASE_URL": "https://mototwin.online",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "869160369331-k8vv2l9s0ht3sqfe4919rcu4qejc9169.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "869160369331-ibjr18u4df49abtnubccrbok415rnimi.apps.googleusercontent.com"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://mototwin.online"
+        "EXPO_PUBLIC_API_BASE_URL": "https://mototwin.online",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "869160369331-k8vv2l9s0ht3sqfe4919rcu4qejc9169.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "869160369331-ibjr18u4df49abtnubccrbok415rnimi.apps.googleusercontent.com"
       }
     }
   },

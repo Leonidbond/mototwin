@@ -83,6 +83,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...(baseConfig.plugins ?? []),
       "@react-native-community/datetimepicker",
       "expo-notifications",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          iosUrlScheme:
+            "com.googleusercontent.apps.869160369331-t0tb16c5fd2o14fp202j30jkt72hg3hs",
+        },
+      ],
     ],
     extra: {
       ...baseConfig.extra,

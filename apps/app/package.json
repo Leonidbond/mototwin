@@ -21,6 +21,7 @@
     "@mototwin/icons": "file:../../packages/icons",
     "@mototwin/types": "file:../../packages/types",
     "@react-native-community/datetimepicker": "8.4.4",
+    "@react-native-google-signin/google-signin": "^16.1.2",
     "expo": "~54.0.35",
     "expo-apple-authentication": "~8.0.8",
     "expo-auth-session": "~7.0.11",

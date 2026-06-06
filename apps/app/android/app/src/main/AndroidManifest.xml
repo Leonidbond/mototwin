@@ -26,6 +26,12 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="mototwin"/>
       </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="com.googleusercontent.apps.869160369331-k8vv2l9s0ht3sqfe4919rcu4qejc9169" android:path="/oauth2redirect"/>
+      </intent-filter>
     </activity>
   </application>
 </manifest>

@@ -99,18 +99,59 @@ Client ID / Secret → `AUTH_GOOGLE_CLIENT_ID`, `AUTH_GOOGLE_CLIENT_SECRET`, `GO
 
 ## 5. Google Cloud — mobile clients
 
-Expo: [apps/app/app/login.tsx](../apps/app/app/login.tsx), `scheme: mototwin`, `android.package` / `ios.bundleIdentifier`: `ru.mototwin.app`.
-
-| Client type | Поле в Google Console | Env в mobile / EAS |
-|-------------|----------------------|-------------------|
-| **Web** (idToken audience) | redirect как в §4 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` |
-| **iOS** | Bundle ID `ru.mototwin.app` | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` |
-| **Android** | Package `ru.mototwin.app` + SHA-1 release keystore | `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` |
-| **Expo Go** (dev) | + redirect `https://auth.expo.io/@USER/mototwin-app` | `EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID` |
+Код: [apps/app/app/login.tsx](../apps/app/app/login.tsx), `scheme: mototwin`, `android.package` / `ios.bundleIdentifier`: `ru.mototwin.app`.
 
 Mobile flow **не** использует `/api/auth/callback/google`. Клиент получает `idToken` → `POST /api/auth/oauth/mobile` → access/refresh tokens MotoTwin.
 
 `EXPO_PUBLIC_API_BASE_URL=https://mototwin.online` (без `/` в конце).
+
+### Платформы
+
+| Платформа | Реализация | Env в mobile / EAS | Google Console |
+|-----------|------------|-------------------|----------------|
+| **Android** | `@react-native-google-signin/google-signin` ([google-native-sign-in.ts](../apps/app/src/google-native-sign-in.ts)) | **`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`** (Web client ID — audience idToken на сервере) | Android client: package `ru.mototwin.app` + **SHA-1** keystore, которым подписан APK |
+| **iOS** | Expo AuthSession ([google-oauth-redirect.ts](../apps/app/src/google-oauth-redirect.ts)) | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | iOS client: Bundle ID `ru.mototwin.app` |
+| **Expo Go** (dev) | AuthSession | `EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID` + redirect `https://auth.expo.io/@USER/mototwin-app` | Web client (Expo proxy) |
+| **Apple Sign-In** | `expo-apple-authentication` | — (нативный SDK) | только **iOS**; на Android кнопка скрыта |
+
+**Web client** (§4): redirect только `https://mototwin.online/api/auth/callback/google`. **Не добавляйте** `com.googleusercontent.apps.…:/oauth2redirect` в Web client — для Android native redirect не нужен.
+
+### Android: SHA-1 release keystore
+
+Release SHA-1 (`mototwin-release.keystore`, prod APK):
+
+```text
+4E:6C:7C:70:18:59:AB:89:66:92:DE:49:47:7D:1A:17:13:E2:B9:31
+```
+
+Проверить на машине:
+
+```bash
+bash apps/app/scripts/print-android-oauth-sha1.sh
+```
+
+Без этого SHA-1 в **Android OAuth client** → `DEVELOPER_ERROR`. Debug APK использует **другой** SHA-1 (`debug.keystore`) — можно добавить оба fingerprint в один Android client.
+
+После добавления плагина `@react-native-google-signin/google-signin` в `app.config.ts`:
+
+```bash
+cd apps/app
+npx expo prebuild --platform android   # без --clean, чтобы не затереть release signing
+```
+
+### iOS: native redirect (AuthSession)
+
+Redirect для iOS OAuth client (не регистрировать в Web client):
+
+```text
+com.googleusercontent.apps.<IOS_CLIENT_ID_PREFIX>:/oauth2redirect
+```
+
+Пример для client `869160369331-t0tb16c5fd2o14fp202j30jkt72hg3hs.apps.googleusercontent.com`:
+
+```text
+com.googleusercontent.apps.869160369331-t0tb16c5fd2o14fp202j30jkt72hg3hs:/oauth2redirect
+```
 
 ---
 
@@ -150,12 +191,14 @@ Yandex mobile redirect (не web): `mototwin://oauth/yandex` — в кабине
 | Симптом | Причина | Действие |
 |---------|---------|----------|
 | Google: Access blocked / 403 | OAuth app в Testing, Gmail не в Test users | Google Console → Test users |
-| `redirect_uri_mismatch` | URI в Google ≠ фактический callback | Сверить §4 байт-в-байт |
+| `DEVELOPER_ERROR` (Android Google) | SHA-1/package ≠ подпись APK | Android OAuth client: package `ru.mototwin.app` + **release SHA-1** (§5); `bash apps/app/scripts/print-android-oauth-sha1.sh` |
+| `redirect_uri_mismatch` (iOS Google) | неверный iOS redirect | iOS client + `com.googleusercontent.apps.…:/oauth2redirect` (§5), **не** Web client |
+| `redirect_uri_mismatch` (web) | URI в Google ≠ callback | Web client: `https://mototwin.online/api/auth/callback/google` |
+| `400 invalid_request` (Android, browser OAuth) | устаревший AuthSession flow | Android использует native SDK — см. §5 |
 | Callback на `localhost` | нет `NEXTAUTH_URL` / `AUTH_BASE_URL` | Задать на сервере, restart |
 | `OAuthCreateAccount` | старый код без `mototwinPrismaAdapter` | деплой ≥ `bf09f6a` |
 | FK `garages_ownerUserId_fkey` | bootstrap до persist User | деплой ≥ `0311d80` |
 | `?error=OAuthCreateAccount` после фикса | частично созданный user без garage | повторить вход — `events.signIn` догонит bootstrap |
-| Android Google Sign-In fail (release) | нет SHA-1 release в Android OAuth client | `keytool -list -v -keystore ...` |
 
 ---
 

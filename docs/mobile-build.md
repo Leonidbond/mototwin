@@ -55,8 +55,12 @@ cp apps/app/.env.example apps/app/.env
 | Переменная | Назначение |
 |------------|------------|
 | `EXPO_PUBLIC_API_BASE_URL` | Базовый URL Next.js API (без завершающего `/`). Для prod: `https://mototwin.online` |
-| `EXPO_PUBLIC_GOOGLE_*` | OAuth Google — см. [auth-oauth-production.md](../auth-oauth-production.md) и `.env.example` |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | **Android release:** native Google Sign-In (`webClientId` + audience idToken на сервере) |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | **iOS:** Expo AuthSession |
+| `EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID` | **Expo Go** (dev) |
 | `EXPO_PUBLIC_YANDEX_CLIENT_ID` | OAuth Yandex |
+
+Подробнее: [auth-oauth-production.md](../auth-oauth-production.md) §5, шаблон `apps/app/.env.example`.
 
 Файл `apps/app/.env` в `.gitignore` — не коммитить.
 
@@ -158,15 +162,12 @@ bash apps/app/scripts/generate-android-release-keystore.sh
 SHA-1 для Google OAuth (Android client, package `ru.mototwin.app`):
 
 ```bash
-export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-# пароли — из android/keystore.properties (локально, не коммитить)
-keytool -list -v \
-  -keystore apps/app/android/keystores/mototwin-release.keystore \
-  -alias mototwin-release \
-  -storepass 'YOUR_STORE_PASSWORD' | grep SHA1
+bash apps/app/scripts/print-android-oauth-sha1.sh
 ```
 
-Либо `./gradlew signingReport` в `apps/app/android` — секция `Variant: release`.
+Либо вручную (`keytool -list -v -keystore …`) или `./gradlew signingReport` в `apps/app/android` — секция `Variant: release`.
+
+Без **release SHA-1** в Google Console Android OAuth client native Google Sign-In вернёт `DEVELOPER_ERROR` (не `redirect_uri_mismatch`).
 
 Debug-сборки используют `debug.keystore` (**другой SHA-1**). В Google Console можно добавить оба fingerprint в один Android OAuth client.
 
@@ -205,6 +206,7 @@ cd apps/app/android
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 export NODE_ENV=production
 export EXPO_PUBLIC_API_BASE_URL=https://mototwin.online
+export EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID="....apps.googleusercontent.com"
 
 ./gradlew assembleRelease
 ```
@@ -276,7 +278,7 @@ Release / TestFlight — через EAS (`eas build -p ios`).
 
 ## 9. Проверка после сборки
 
-1. Экран логина: email/пароль или OAuth (в release нужны настроенные client id).
+1. Экран логина: email/пароль или OAuth (Android: `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`; iOS: `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`; Apple — только iOS).
 2. Гараж загружается (`GET /api/garage`).
 3. Карточка мотоцикла, журнал, обновление пробега.
 4. Logout → последующие запросы без токена → 401.
@@ -296,7 +298,8 @@ Release / TestFlight — через EAS (`eas build -p ios`).
 | Release APK — белый экран / нет данных | Собирали **release**, не debug; задан `EXPO_PUBLIC_API_BASE_URL` при сборке |
 | Debug APK без UI после установки | Debug ждёт Metro — используйте `assembleRelease` или `expo run:android` с Metro |
 | Native crash при старте (Expo modules) | `npx expo install --fix` в `apps/app`, пересборка |
-| OAuth Google падает на Android | Нужен `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` + SHA-1 в Google Cloud |
+| `DEVELOPER_ERROR` / OAuth Google на Android | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` при сборке + **release SHA-1** в Android OAuth client (§5 [auth-oauth-production.md](../auth-oauth-production.md)) |
+| OAuth Google на iOS | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` + native redirect в iOS client |
 | Gradle: JAVA_HOME | `export JAVA_HOME="…/Android Studio.app/Contents/jbr/Contents/Home"` |
 | Splash drawable missing | `npx expo prebuild` или `res/drawable/splashscreen_logo.xml` |
 | Старый prod без `/api/subscription/current` | 404 на subscription не должен ломать весь профиль — см. отдельные try/catch в клиенте |
@@ -311,7 +314,9 @@ Release / TestFlight — через EAS (`eas build -p ios`).
 | `apps/app/app/**` | Expo Router — экраны |
 | `apps/app/components/expo-shell/` | `InternalScreenChrome`, хедеры |
 | `apps/app/src/api-base-url.ts` | Резолв URL API |
-| `apps/app/app.config.ts` | Плагины, dev LAN IP для tunnel |
+| `apps/app/app.config.ts` | Плагины (Google Sign-In), dev LAN IP для tunnel |
+| `apps/app/src/google-native-sign-in.ts` | Android native Google OAuth |
+| `apps/app/scripts/print-android-oauth-sha1.sh` | SHA-1 для Google Console |
 | `apps/app/eas.json` | Профили EAS и env для облачных сборок |
 | `package.json` (корень) | `mobile:dev`, `mobile:android`, … |
 

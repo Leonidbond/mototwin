@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useEffect } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -19,6 +20,11 @@ import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { createMobileApiClient } from "../src/create-mobile-api-client";
 import { writeAuthTokens } from "../src/auth-storage";
 import { writeCachedAccessToken } from "../src/mobile-access-token-cache";
+import { getGoogleNativeRedirectUri } from "../src/google-oauth-redirect";
+import {
+  resolveNativeGoogleSignInError,
+  signInWithNativeGoogle,
+} from "../src/google-native-sign-in";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -55,7 +61,10 @@ const yandexDiscovery: AuthSession.DiscoveryDocument = {
   tokenEndpoint: "https://oauth.yandex.ru/token",
 };
 
-const googleOAuthEnabled = Boolean(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID);
+const googleOAuthEnabled =
+  Platform.OS === "android"
+    ? Boolean(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
+    : Boolean(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
 const yandexOAuthEnabled = Boolean(process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID);
 
 type OAuthSuccessInput = {
@@ -65,7 +74,7 @@ type OAuthSuccessInput = {
   rawNonce?: string;
 };
 
-function GoogleSignInButton(props: {
+function GoogleSignInButtonAuthSession(props: {
   disabled: boolean;
   loading: boolean;
   onPressStart: () => void;
@@ -73,12 +82,18 @@ function GoogleSignInButton(props: {
   onError: (message: string) => void;
   onFinish: () => void;
 }) {
+  const googleRedirectUri =
+    Platform.OS === "ios"
+      ? getGoogleNativeRedirectUri(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID)
+      : undefined;
+
   const [request, response, promptAsync] = Google.useAuthRequest({
     scopes: ["openid", "email", "profile"],
     clientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID,
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    redirectUri: googleRedirectUri,
   });
 
   useEffect(() => {
@@ -127,6 +142,52 @@ function GoogleSignInButton(props: {
       </Text>
     </Pressable>
   );
+}
+
+function GoogleSignInButtonNative(props: {
+  disabled: boolean;
+  loading: boolean;
+  onPressStart: () => void;
+  onSuccess: (input: OAuthSuccessInput) => Promise<void>;
+  onError: (message: string) => void;
+  onFinish: () => void;
+}) {
+  return (
+    <Pressable
+      style={styles.oauthButton}
+      disabled={props.disabled}
+      onPress={() => {
+        props.onPressStart();
+        void signInWithNativeGoogle()
+          .then((idToken) => props.onSuccess({ provider: "google", idToken }))
+          .catch((err) => {
+            const message = resolveNativeGoogleSignInError(err);
+            if (message) {
+              props.onError(message);
+            }
+          })
+          .finally(props.onFinish);
+      }}
+    >
+      <Text style={styles.oauthButtonText}>
+        {props.loading ? "Google..." : "Войти через Google"}
+      </Text>
+    </Pressable>
+  );
+}
+
+function GoogleSignInButton(props: {
+  disabled: boolean;
+  loading: boolean;
+  onPressStart: () => void;
+  onSuccess: (input: OAuthSuccessInput) => Promise<void>;
+  onError: (message: string) => void;
+  onFinish: () => void;
+}) {
+  if (Platform.OS === "android") {
+    return <GoogleSignInButtonNative {...props} />;
+  }
+  return <GoogleSignInButtonAuthSession {...props} />;
 }
 
 function YandexSignInButton(props: {
@@ -285,32 +346,34 @@ export default function LoginScreen() {
             {mode === "login" ? "Нет аккаунта? Регистрация" : "Уже есть аккаунт? Войти"}
           </Text>
         </Pressable>
-        <Pressable
-          style={styles.oauthButton}
-          disabled={oauthLoading != null}
-          onPress={() => {
-            setError("");
-            setOauthLoading("apple");
-            void startAppleSignIn()
-              .then(({ rawNonce, identityToken }) =>
-                onOAuthSuccess({ provider: "apple", idToken: identityToken, rawNonce })
-              )
-              .catch((err) => {
-                if (
-                  err instanceof Error &&
-                  err.message.includes("ERR_REQUEST_CANCELED")
-                ) {
-                  return;
-                }
-                setError(err instanceof Error ? err.message : "Ошибка входа через Apple.");
-              })
-              .finally(() => setOauthLoading(null));
-          }}
-        >
-          <Text style={styles.oauthButtonText}>
-            {oauthLoading === "apple" ? "Apple..." : "Войти через Apple"}
-          </Text>
-        </Pressable>
+        {Platform.OS === "ios" ? (
+          <Pressable
+            style={styles.oauthButton}
+            disabled={oauthLoading != null}
+            onPress={() => {
+              setError("");
+              setOauthLoading("apple");
+              void startAppleSignIn()
+                .then(({ rawNonce, identityToken }) =>
+                  onOAuthSuccess({ provider: "apple", idToken: identityToken, rawNonce })
+                )
+                .catch((err) => {
+                  if (
+                    err instanceof Error &&
+                    err.message.includes("ERR_REQUEST_CANCELED")
+                  ) {
+                    return;
+                  }
+                  setError(err instanceof Error ? err.message : "Ошибка входа через Apple.");
+                })
+                .finally(() => setOauthLoading(null));
+            }}
+          >
+            <Text style={styles.oauthButtonText}>
+              {oauthLoading === "apple" ? "Apple..." : "Войти через Apple"}
+            </Text>
+          </Pressable>
+        ) : null}
         {googleOAuthEnabled ? (
           <GoogleSignInButton
             disabled={oauthLoading != null}
