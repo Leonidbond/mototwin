@@ -122,13 +122,83 @@ export function LoginForm({ nextPath, oauthErrorCode }: LoginFormProps) {
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
+    // #region agent log
+    fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+      body: JSON.stringify({
+        sessionId: "6800ea",
+        runId: "run-local-login-1",
+        hypothesisId: "H4",
+        location: "src/app/login/login-form.tsx:129",
+        message: "Email login submit",
+        data: {
+          hasEmail: Boolean(email),
+          hasPassword: Boolean(password),
+          nextPath,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     setError("");
     setLoading(true);
     try {
+      // #region agent log
+      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+        body: JSON.stringify({
+          sessionId: "6800ea",
+          runId: "run-local-login-1",
+          hypothesisId: "H5",
+          location: "src/app/login/login-form.tsx:146",
+          message: "Calling api.login",
+          data: {
+            nextPath,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       await api.login({ email, password });
+      // #region agent log
+      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+        body: JSON.stringify({
+          sessionId: "6800ea",
+          runId: "run-local-login-1",
+          hypothesisId: "H5",
+          location: "src/app/login/login-form.tsx:162",
+          message: "api.login resolved",
+          data: {
+            nextPath,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       clearWebSessionCache();
       router.replace(nextPath.startsWith("/") ? nextPath : "/garage");
     } catch (err) {
+      // #region agent log
+      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+        body: JSON.stringify({
+          sessionId: "6800ea",
+          runId: "run-local-login-1",
+          hypothesisId: "H5",
+          location: "src/app/login/login-form.tsx:178",
+          message: "api.login failed",
+          data: {
+            error: err instanceof Error ? err.message : String(err),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       setError(err instanceof Error ? err.message : "Не удалось войти.");
     } finally {
       setLoading(false);
