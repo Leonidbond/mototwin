@@ -11,9 +11,6 @@ export function createWebApiClient(options?: CreateWebApiClientOptions) {
   const client = createApiClient({
     baseUrl: "",
     credentials: "include",
-    // Prevent infinite "Loading..." when the browser stalls requests.
-    requestTimeoutMs: 20_000,
-    requestMaxAttempts: 2,
     onUnauthorized: redirectOn401
       ? () => {
           if (typeof window !== "undefined") {
