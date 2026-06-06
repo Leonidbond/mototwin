@@ -78,6 +78,10 @@ import { InternalPageChrome } from "@/components/navigation/InternalPageChrome";
 import { getNodeTreeIconWebSrc } from "@/node-tree-icons";
 import { useIsNarrow } from "@/lib/use-is-narrow";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
+import {
+  getServiceCatalogCached,
+  loadVehicleDashboardBootstrap,
+} from "@/lib/web-api-dedup";
 import { VehicleDashboard } from "./_components/VehicleDashboard";
 import { PartsCartPage, type PartsAdvancedFilterState } from "./parts/_components/PartsCartPage";
 import { WishlistItemEditModal } from "./parts/_components/WishlistItemEditModal";
@@ -2128,17 +2132,41 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   };
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadVehicle = async () => {
       try {
         const resolvedParams = await params;
-        setVehicleId(resolvedParams.id);
+        const id = resolvedParams.id;
+        if (cancelled) {
+          return;
+        }
+        setVehicleId(id);
         setIsLoading(true);
         setError("");
 
-        const data = await vehicleDetailApi.getVehicleDetail(resolvedParams.id);
-        const raw = data.vehicle as unknown as VehicleDetailApiRecord | null;
+        const bootstrap = await loadVehicleDashboardBootstrap(id);
+        if (cancelled) {
+          return;
+        }
+
+        const raw = bootstrap.detail.vehicle as unknown as VehicleDetailApiRecord | null;
         setVehicle(raw ? vehicleDetailFromApiRecord(raw) : null);
+        setServiceEvents(bootstrap.serviceEvents.serviceEvents ?? []);
+        setServiceEventsError("");
+        setDashboardExpenses(bootstrap.expenses.expenses ?? []);
+        setDashboardExpensesError("");
+        setNodeTree(bootstrap.nodeTree.nodeTree ?? []);
+        setNodeTreeError("");
+        setWishlistItems(bootstrap.wishlist.items ?? []);
+        setWishlistError("");
+        setTopServiceNodes(bootstrap.catalog.top.nodes ?? []);
+        setServiceCatalogNodes(bootstrap.catalog.catalog.nodes ?? []);
+        setTopServiceNodesError("");
       } catch (requestError) {
+        if (cancelled) {
+          return;
+        }
         console.error(requestError);
         setError(
           requestError instanceof Error
@@ -2146,11 +2174,16 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
             : "Произошла ошибка при загрузке мотоцикла."
         );
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
-    loadVehicle();
+    void loadVehicle();
+    return () => {
+      cancelled = true;
+    };
   }, [params]);
 
   useEffect(() => {
@@ -2421,13 +2454,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     }
   }, [vehicleId]);
 
-  useEffect(() => {
-    if (!vehicleId) {
-      return;
-    }
-    void loadServiceEvents();
-  }, [vehicleId, loadServiceEvents]);
-
   const loadDashboardExpenses = useCallback(async () => {
     if (!vehicleId) {
       return;
@@ -2452,13 +2478,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
       setIsDashboardExpensesLoading(false);
     }
   }, [vehicleId]);
-
-  useEffect(() => {
-    if (!vehicleId) {
-      return;
-    }
-    void loadDashboardExpenses();
-  }, [vehicleId, loadDashboardExpenses]);
 
   const loadNodeTree = useCallback(async () => {
     if (!vehicleId) {
@@ -2514,12 +2533,9 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
     try {
       setIsTopServiceNodesLoading(true);
       setTopServiceNodesError("");
-      const [topData, catalogData] = await Promise.all([
-        vehicleDetailApi.getTopServiceNodes(),
-        vehicleDetailApi.getServiceNodes(),
-      ]);
-      setTopServiceNodes(topData.nodes ?? []);
-      setServiceCatalogNodes(catalogData.nodes ?? []);
+      const { top, catalog } = await getServiceCatalogCached();
+      setTopServiceNodes(top.nodes ?? []);
+      setServiceCatalogNodes(catalog.nodes ?? []);
     } catch (topNodesLoadError) {
       console.error(topNodesLoadError);
       setTopServiceNodesError(
@@ -3973,16 +3989,6 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
   };
 
   useEffect(() => {
-    if (!vehicleId) {
-      return;
-    }
-
-    void loadNodeTree();
-    void loadTopServiceNodes();
-    void loadWishlist();
-  }, [vehicleId, loadNodeTree, loadTopServiceNodes, loadWishlist]);
-
-  useEffect(() => {
     if (!vehicleId || (pageView !== "nodeTree" && !isFullNodeTreeOpen)) {
       return;
     }
@@ -5078,7 +5084,11 @@ export function VehicleDetailClient({ params, pageView = "dashboard" }: VehicleP
             transition: "grid-template-columns 0.18s ease",
           }}
         >
-          <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+          <GarageSidebar
+            collapsed={sidebarCollapsed}
+            onToggle={toggleSidebar}
+            prefetchedVehicleDetail={vehicle}
+          />
           <section
             style={{
               display: pageView === "nodeTree" ? "flex" : "grid",

@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { createMotoTwinEndpoints } from "@mototwin/api-client";
-import { createWebApiClient } from "@/lib/create-web-api-client";
 import {
   buildVehicleDetailViewModel,
   formatRideStyleChipRu,
@@ -13,6 +11,11 @@ import {
 import { productSemanticColors } from "@mototwin/design-tokens";
 import type { GarageVehicleItem, VehicleDetail, VehicleDetailApiRecord } from "@mototwin/types";
 import { Button } from "@/components/ui";
+import {
+  getGarageVehiclesDeduped,
+  getVehicleDetailDeduped,
+  getWebSession,
+} from "@/lib/web-api-dedup";
 import { SidebarVehiclePlaque } from "./SidebarVehiclePlaque";
 
 type NavIconKind =
@@ -33,8 +36,6 @@ const LAST_VIEWED_VEHICLE_ID_STORAGE_KEY = "mototwin.lastViewedVehicleId";
 
 /** Если мотоцикл ещё не выбран — ведём в гараж (страниц `/vehicles`, `/service-log`, `/details` нет). */
 const NAV_FALLBACK_HREF = "/garage";
-
-const sidebarVehicleApi = createWebApiClient();
 
 function formatSidebarUserLabel(displayName: string | null | undefined, email: string): string {
   const trimmed = displayName?.trim();
@@ -87,7 +88,17 @@ function getVehicleRelativePath(pathname: string): string {
   return m[1] ?? "";
 }
 
-export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+export function GarageSidebar({
+  collapsed,
+  onToggle,
+  prefetchedGarageVehicles,
+  prefetchedVehicleDetail,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+  prefetchedGarageVehicles?: GarageVehicleItem[];
+  prefetchedVehicleDetail?: VehicleDetail | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const pathVehicleId = useMemo(() => getVehicleIdFromPathname(pathname), [pathname]);
@@ -124,8 +135,7 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
 
   useEffect(() => {
     let cancelled = false;
-    void sidebarVehicleApi
-      .getAuthMe()
+    void getWebSession()
       .then((me) => {
         if (cancelled) {
           return;
@@ -147,10 +157,16 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
     };
   }, []);
 
-  const [garageVehicles, setGarageVehicles] = useState<GarageVehicleItem[]>([]);
+  const [garageVehicles, setGarageVehicles] = useState<GarageVehicleItem[]>(
+    prefetchedGarageVehicles ?? []
+  );
   useEffect(() => {
+    if (prefetchedGarageVehicles !== undefined) {
+      setGarageVehicles(prefetchedGarageVehicles);
+      return;
+    }
     let cancelled = false;
-    void sidebarVehicleApi.getGarageVehicles().then((res) => {
+    void getGarageVehiclesDeduped().then((res) => {
       if (!cancelled) {
         setGarageVehicles(res.vehicles ?? []);
       }
@@ -162,7 +178,7 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [prefetchedGarageVehicles]);
 
   const handleSelectVehicle = useCallback(
     (newId: string) => {
@@ -181,7 +197,9 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
     [contextVehicleId, pathname, router]
   );
 
-  const [sidebarVehicle, setSidebarVehicle] = useState<VehicleDetail | null>(null);
+  const [sidebarVehicle, setSidebarVehicle] = useState<VehicleDetail | null>(
+    prefetchedVehicleDetail ?? null
+  );
 
   /* eslint-disable react-hooks/set-state-in-effect -- загрузка карточки ТС для плашки сайдбара */
   useEffect(() => {
@@ -189,8 +207,12 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
       setSidebarVehicle(null);
       return;
     }
+    if (prefetchedVehicleDetail && prefetchedVehicleDetail.id === contextVehicleId) {
+      setSidebarVehicle(prefetchedVehicleDetail);
+      return;
+    }
     let cancelled = false;
-    void sidebarVehicleApi.getVehicleDetail(contextVehicleId).then((data) => {
+    void getVehicleDetailDeduped(contextVehicleId).then((data) => {
       if (cancelled) {
         return;
       }
@@ -204,7 +226,7 @@ export function GarageSidebar({ collapsed, onToggle }: { collapsed: boolean; onT
     return () => {
       cancelled = true;
     };
-  }, [contextVehicleId]);
+  }, [contextVehicleId, prefetchedVehicleDetail]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const sidebarVehicleLabel = useMemo(

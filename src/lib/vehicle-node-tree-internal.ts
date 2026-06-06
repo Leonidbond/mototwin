@@ -90,9 +90,12 @@ function getNodeMaintenanceRuleModel(prisma: PrismaClient) {
   }).nodeMaintenanceRule;
 }
 
-export async function loadCatalogNodeContext(
-  prisma: PrismaClient
-): Promise<CatalogNodeContext> {
+const CATALOG_NODE_CONTEXT_TTL_MS = 5 * 60 * 1000;
+let catalogNodeContextCache:
+  | { expiresAt: number; value: CatalogNodeContext }
+  | null = null;
+
+async function fetchCatalogNodeContext(prisma: PrismaClient): Promise<CatalogNodeContext> {
   const nodes = await prisma.node.findMany({
     where: {
       isActive: true,
@@ -203,6 +206,21 @@ export async function loadCatalogNodeContext(
     childrenByParentId,
     topLevelNodes,
   };
+}
+
+export async function loadCatalogNodeContext(
+  prisma: PrismaClient
+): Promise<CatalogNodeContext> {
+  const now = Date.now();
+  if (catalogNodeContextCache && catalogNodeContextCache.expiresAt > now) {
+    return catalogNodeContextCache.value;
+  }
+  const value = await fetchCatalogNodeContext(prisma);
+  catalogNodeContextCache = {
+    value,
+    expiresAt: now + CATALOG_NODE_CONTEXT_TTL_MS,
+  };
+  return value;
 }
 
 function buildChildrenSkeleton(

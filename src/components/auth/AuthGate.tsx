@@ -2,9 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { createWebApiClient } from "@/lib/create-web-api-client";
-
-const api = createWebApiClient();
+import { getWebSession } from "@/lib/web-api-dedup";
 
 type AuthGateProps = {
   children: ReactNode;
@@ -21,7 +19,7 @@ export function AuthGate({ children }: AuthGateProps) {
     let cancelled = false;
     (async () => {
       try {
-        await api.getAuthMe();
+        await getWebSession();
         if (!cancelled) setReady(true);
       } catch (error) {
         if (cancelled) return;

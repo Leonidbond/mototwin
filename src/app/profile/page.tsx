@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
+import { clearWebSessionCache } from "@/lib/web-api-dedup";
 import { createWebApiClient } from "@/lib/create-web-api-client";
 import { AuthGate } from "@/components/auth/AuthGate";
 import {
@@ -255,6 +256,7 @@ export default function ProfilePage() {
     } catch {
       // Continue redirect even if API fails.
     }
+    clearWebSessionCache();
     await signOut({ redirect: false });
     router.replace("/login");
   };

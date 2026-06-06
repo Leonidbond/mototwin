@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createWebApiClient } from "@/lib/create-web-api-client";
+import { getGarageVehiclesDeduped } from "@/lib/web-api-dedup";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { Card } from "@/components/ui";
@@ -32,30 +33,26 @@ export default function GaragePage() {
     try {
       setIsLoading(true);
       setError("");
-      const [garageResult, trashResult, notificationsResult] = await Promise.allSettled([
-        garageApi.getGarageVehicles(),
+      const garageResult = await getGarageVehiclesDeduped();
+      setVehicles(garageResult.vehicles ?? []);
+
+      void Promise.allSettled([
         garageApi.getTrashedVehicles(),
         garageApi.getNotifications({ limit: 1 }),
-      ]);
-
-      if (garageResult.status === "rejected") {
-        throw garageResult.reason;
-      }
-
-      setVehicles(garageResult.value.vehicles ?? []);
-
-      if (trashResult.status === "fulfilled") {
-        setTrashCount(trashResult.value.vehicles?.length ?? 0);
-      } else {
-        console.warn("Failed to fetch trashed vehicles count:", trashResult.reason);
-        setTrashCount(0);
-      }
-      if (notificationsResult.status === "fulfilled") {
-        setNotificationCount(notificationsResult.value.unreadCount ?? 0);
-      } else {
-        console.warn("Failed to fetch notifications count:", notificationsResult.reason);
-        setNotificationCount(0);
-      }
+      ]).then(([trashResult, notificationsResult]) => {
+        if (trashResult.status === "fulfilled") {
+          setTrashCount(trashResult.value.vehicles?.length ?? 0);
+        } else {
+          console.warn("Failed to fetch trashed vehicles count:", trashResult.reason);
+          setTrashCount(0);
+        }
+        if (notificationsResult.status === "fulfilled") {
+          setNotificationCount(notificationsResult.value.unreadCount ?? 0);
+        } else {
+          console.warn("Failed to fetch notifications count:", notificationsResult.reason);
+          setNotificationCount(0);
+        }
+      });
     } catch (err) {
       console.error(err);
       setError(
@@ -108,7 +105,11 @@ export default function GaragePage() {
           transition: "grid-template-columns 0.18s ease",
         }}
       >
-        <GarageSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <GarageSidebar
+          collapsed={sidebarCollapsed}
+          onToggle={toggleSidebar}
+          prefetchedGarageVehicles={isLoading ? undefined : vehicles}
+        />
         <section
           style={{
             display: "grid",
