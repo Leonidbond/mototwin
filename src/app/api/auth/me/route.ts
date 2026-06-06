@@ -8,9 +8,11 @@ import {
   toCurrentUserContextErrorResponse,
 } from "../../_shared/current-user-context";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const currentUser = await getCurrentUserContext();
+    const url = new URL(request.url);
+    const lightweight = url.searchParams.get("mode") === "lite";
     const [user, garage, subscription] = await Promise.all([
       prisma.user.findUnique({
         where: { id: currentUser.userId },
@@ -20,10 +22,12 @@ export async function GET() {
         where: { id: currentUser.garageId },
         select: { id: true, title: true },
       }),
-      prisma.subscription.findUnique({
-        where: { userId: currentUser.userId },
-        select: { planType: true, trialEndsAt: true },
-      }),
+      lightweight
+        ? Promise.resolve(null)
+        : prisma.subscription.findUnique({
+            where: { userId: currentUser.userId },
+            select: { planType: true, trialEndsAt: true },
+          }),
     ]);
 
     if (!user || !garage) {

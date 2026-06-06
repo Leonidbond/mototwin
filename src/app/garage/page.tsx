@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createWebApiClient } from "@/lib/create-web-api-client";
 import { getGarageVehiclesDeduped } from "@/lib/web-api-dedup";
-import { AuthGate } from "@/components/auth/AuthGate";
 import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { Card } from "@/components/ui";
 import { productSemanticColors, typeScale } from "@mototwin/design-tokens";
@@ -22,11 +21,7 @@ const garageApi = createWebApiClient();
 const SIDEBAR_COLLAPSED_KEY = "garage.sidebar.collapsed";
 
 export default function GaragePage() {
-  return (
-    <AuthGate>
-      <GaragePageContent />
-    </AuthGate>
-  );
+  return <GaragePageContent />;
 }
 
 function GaragePageContent() {
@@ -41,8 +36,16 @@ function GaragePageContent() {
     try {
       setIsLoading(true);
       setError("");
-      const garageResult = await getGarageVehiclesDeduped();
-      setVehicles(garageResult.vehicles ?? []);
+      const fastGarageResult = await getGarageVehiclesDeduped({ includeAttention: false });
+      setVehicles(fastGarageResult.vehicles ?? []);
+
+      void getGarageVehiclesDeduped({ includeAttention: true })
+        .then((fullGarageResult) => {
+          setVehicles(fullGarageResult.vehicles ?? []);
+        })
+        .catch((backgroundError) => {
+          console.warn("Garage attention refresh failed:", backgroundError);
+        });
 
       void Promise.allSettled([
         garageApi.getTrashedVehicles(),

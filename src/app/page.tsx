@@ -55,11 +55,7 @@ export default function Home() {
       <section className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8 lg:py-28">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600">
-              MotoTwin | Цифровой гараж для владельца мотоцикла
-            </div>
-
-            <h1 className="mt-6 text-4xl font-semibold tracking-tight text-gray-950 sm:text-5xl lg:text-6xl">
+            <h1 className="text-4xl font-semibold tracking-tight text-gray-950 sm:text-5xl lg:text-6xl">
               MotoTwin | цифровой гараж для вашего мотоцикла
             </h1>
 

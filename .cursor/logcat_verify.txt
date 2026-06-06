@@ -1,0 +1,1093 @@
+--------- beginning of main
+06-06 01:13:34.106 W/ReactNativeJS(11173): '[AUDIT][H8][auth_gate_start]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:49","message":"auth_gate_start","data":{"segments":[]},"timestamp":1780697614106}'
+06-06 01:13:34.113 W/ReactNativeJS(11173): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780697614113}'
+06-06 01:13:34.119 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697614119
+06-06 01:13:34.206 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697614206
+06-06 01:13:34.218 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:13:34.312 W/ReactNativeJS(11173): '[AUDIT][H8][auth_gate_done]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:108","message":"auth_gate_done","data":{"hasTokens":true,"ok":true,"onLogin":false,"isPublic":true,"durationMs":206,"mode":"tokens_unblocked","segments":[]},"timestamp":1780697614312}'
+06-06 01:13:34.312 W/ReactNativeJS(11173): '[AUDIT][H9][refresh_if_needed_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:81","message":"refresh_if_needed_enter","data":{"hasRefreshInFlight":false},"timestamp":1780697614312}'
+06-06 01:13:34.312 W/ReactNativeJS(11173): '[AUDIT][H9][refresh_enter]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:106","message":"refresh_enter","data":{},"timestamp":1780697614312}'
+06-06 01:13:34.313 W/ReactNativeJS(11173): '[AUDIT][H9][refresh_tokens_read]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:120","message":"refresh_tokens_read","data":{"hasTokens":true,"durationMs":1},"timestamp":1780697614313}'
+06-06 01:13:34.313 W/ReactNativeJS(11173): '[AUDIT][H9][refresh_skipped_not_expiring]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:123","message":"refresh_skipped_not_expiring","data":{"expiresInMs":496705},"timestamp":1780697614313}'
+06-06 01:13:34.313 W/ReactNativeJS(11173): '[AUDIT][H8][auth_gate_refresh_result]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:134","message":"auth_gate_refresh_result","data":{"ok":true,"isPublic":true,"segments":[]},"timestamp":1780697614313}'
+06-06 01:13:34.443 W/ReactNativeJS(11173): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780697614442}'
+06-06 01:13:34.444 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697614444
+06-06 01:13:34.446 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697614446
+06-06 01:13:34.593 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:13:36.124 W/ReactNativeJS(11173): '[AUDIT][H8][garage_focus_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:174","message":"garage_focus_enter","data":{"seq":0,"hasLoadedOnce":false},"timestamp":1780697616124}'
+06-06 01:13:36.125 W/ReactNativeJS(11173): '[AUDIT][H7][garage_load_start]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:68","message":"garage_load_start","data":{"seq":1,"showBlockingSpinner":true,"hasLoadedOnce":false},"timestamp":1780697616125}'
+06-06 01:13:36.127 W/ReactNativeJS(11173): '[AUDIT][H1][scheduler_cancel_low_priority]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:118","message":"scheduler_cancel_low_priority","data":{"runningLowPriority":0,"lowQueuedCount":0,"queueLength":0,"running":0},"timestamp":1780697616127}'
+06-06 01:13:36.128 W/MototwinNet(11173): phase=callStart url=https://mototwin.online/ t=1780697616128
+06-06 01:13:36.128 W/ReactNativeJS(11173): '[AUDIT][H12][mobile_api_client_created]', '{"sessionId":"577880","runId":"audit-v9","hypothesisId":"H12","location":"apps/app/src/create-mobile-api-client.ts:39","message":"mobile_api_client_created","data":{"baseUrl":"https://mototwin.online"},"timestamp":1780697616128}'
+06-06 01:13:36.129 W/ReactNativeJS(11173): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/garage","queueLength":1,"running":0},"timestamp":1780697616129}'
+06-06 01:13:36.130 W/MototwinNet(11173): phase=dnsStart url=https://mototwin.online/ t=1780697616130
+06-06 01:13:36.130 W/MototwinNet(11173): phase=callStart url=https://ya.ru/ t=1780697616130
+06-06 01:13:36.131 W/ReactNativeJS(11173): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/garage","queueLength":0,"running":1},"timestamp":1780697616131}'
+06-06 01:13:36.134 W/MototwinNet(11173): phase=callStart url=https://www.gstatic.com/generate_204 t=1780697616134
+06-06 01:13:36.137 W/ReactNativeJS(11173): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":["garage"]},"timestamp":1780697616136}'
+06-06 01:13:36.139 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616137
+06-06 01:13:36.140 W/MototwinNet(11173): phase=dnsStart url=https://ya.ru/ t=1780697616139
+06-06 01:13:36.141 W/MototwinNet(11173): phase=dnsStart url=https://www.gstatic.com/generate_204 t=1780697616139
+06-06 01:13:36.142 W/MototwinNet(11173): phase=dnsEnd url=https://mototwin.online/ t=1780697616140
+06-06 01:13:36.142 W/ReactNativeJS(11173): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/garage","fullUrl":"https://mototwin.online/api/garage","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780697616142}'
+06-06 01:13:36.143 W/MototwinNet(11173): phase=connectStart url=https://mototwin.online/ t=1780697616143
+06-06 01:13:36.144 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616144
+06-06 01:13:36.148 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616148
+06-06 01:13:36.149 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/garage","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780697616148}'
+06-06 01:13:36.151 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616151
+06-06 01:13:36.151 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616151
+06-06 01:13:36.152 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616152
+06-06 01:13:36.153 W/ReactNativeJS(11173): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"active"},"timestamp":1780697616152}'
+06-06 01:13:36.157 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616157
+06-06 01:13:36.157 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616157
+06-06 01:13:36.159 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616159
+06-06 01:13:36.159 W/MototwinNet(11173): phase=dnsEnd url=https://ya.ru/ t=1780697616159
+06-06 01:13:36.160 W/MototwinNet(11173): phase=connectStart url=https://ya.ru/ t=1780697616160
+06-06 01:13:36.160 W/MototwinNet(11173): phase=callStart url=https://mototwin.online/api/garage t=1780697616160
+06-06 01:13:36.161 W/MototwinNet(11173): phase=secureConnectStart url=https://mototwin.online/ t=1780697616161
+06-06 01:13:36.161 W/MototwinNet(11173): phase=dnsEnd url=https://www.gstatic.com/generate_204 t=1780697616161
+06-06 01:13:36.162 W/MototwinNet(11173): phase=connectStart url=https://www.gstatic.com/generate_204 t=1780697616162
+06-06 01:13:36.168 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616168
+06-06 01:13:36.170 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616170
+06-06 01:13:36.171 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697616171
+06-06 01:13:36.172 W/MototwinNet(11173): phase=dnsStart url=https://mototwin.online/api/garage t=1780697616172
+06-06 01:13:36.172 W/MototwinNet(11173): phase=dnsEnd url=https://mototwin.online/api/garage t=1780697616172
+06-06 01:13:36.172 W/MototwinNet(11173): phase=connectStart url=https://mototwin.online/api/garage t=1780697616172
+06-06 01:13:36.177 W/MototwinNet(11173): phase=secureConnectStart url=https://ya.ru/ t=1780697616176
+06-06 01:13:36.180 W/MototwinNet(11173): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780697616180
+06-06 01:13:36.185 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H1][scheduler_cancel_low_priority]', 'Network request failed'
+06-06 01:13:36.185 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:13:36.185 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:13:36.186 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:13:36.186 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:13:36.186 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:13:36.187 W/MototwinNet(11173): phase=secureConnectStart url=https://www.gstatic.com/generate_204 t=1780697616187
+06-06 01:13:36.221 W/MototwinNet(11173): phase=secureConnectEnd url=https://mototwin.online/ t=1780697616221
+06-06 01:13:36.221 W/MototwinNet(11173): phase=connectEnd url=https://mototwin.online/ t=1780697616221
+06-06 01:13:36.222 W/MototwinNet(11173): phase=connectionAcquired url=https://mototwin.online/ t=1780697616222
+06-06 01:13:36.223 W/MototwinNet(11173): phase=secureConnectEnd url=https://ya.ru/ t=1780697616223
+06-06 01:13:36.223 W/MototwinNet(11173): phase=requestHeadersStart url=https://mototwin.online/ t=1780697616223
+06-06 01:13:36.224 W/MototwinNet(11173): phase=requestHeadersEnd url=https://mototwin.online/ t=1780697616224
+06-06 01:13:36.225 W/MototwinNet(11173): phase=connectEnd url=https://ya.ru/ t=1780697616225
+06-06 01:13:36.226 W/MototwinNet(11173): phase=connectionAcquired url=https://ya.ru/ t=1780697616226
+06-06 01:13:36.226 W/MototwinNet(11173): phase=requestHeadersStart url=https://ya.ru/ t=1780697616226
+06-06 01:13:36.229 W/MototwinNet(11173): phase=requestHeadersEnd url=https://ya.ru/ t=1780697616229
+06-06 01:13:36.234 W/MototwinNet(11173): phase=responseHeadersStart url=https://mototwin.online/ t=1780697616234
+06-06 01:13:36.234 W/MototwinNet(11173): phase=responseHeadersEnd url=https://mototwin.online/ t=1780697616234
+06-06 01:13:36.237 W/MototwinNet(11173): phase=callEnd url=https://mototwin.online/ t=1780697616237
+06-06 01:13:36.240 W/MototwinNet(11173): phase=secureConnectEnd url=https://www.gstatic.com/generate_204 t=1780697616240
+06-06 01:13:36.240 W/MototwinNet(11173): phase=connectEnd url=https://www.gstatic.com/generate_204 t=1780697616240
+06-06 01:13:36.241 W/MototwinNet(11173): phase=connectionAcquired url=https://www.gstatic.com/generate_204 t=1780697616241
+06-06 01:13:36.241 W/MototwinNet(11173): phase=requestHeadersStart url=https://www.gstatic.com/generate_204 t=1780697616241
+06-06 01:13:36.242 W/MototwinNet(11173): phase=requestHeadersEnd url=https://www.gstatic.com/generate_204 t=1780697616242
+06-06 01:13:36.250 W/ReactNativeJS(11173): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"ours","ok":true,"status":200,"durationMs":124},"timestamp":1780697616249}'
+06-06 01:13:36.287 W/MototwinNet(11173): phase=responseHeadersStart url=https://www.gstatic.com/generate_204 t=1780697616287
+06-06 01:13:36.287 W/MototwinNet(11173): phase=responseHeadersEnd url=https://www.gstatic.com/generate_204 t=1780697616287
+06-06 01:13:36.288 W/MototwinNet(11173): phase=callEnd url=https://www.gstatic.com/generate_204 t=1780697616287
+06-06 01:13:36.300 W/ReactNativeJS(11173): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"gstatic","ok":true,"status":204,"durationMs":172},"timestamp":1780697616299}'
+06-06 01:13:36.375 W/MototwinNet(11173): phase=responseHeadersStart url=https://ya.ru/ t=1780697616375
+06-06 01:13:36.375 W/MototwinNet(11173): phase=responseHeadersEnd url=https://ya.ru/ t=1780697616375
+06-06 01:13:36.392 W/MototwinNet(11173): phase=callEnd url=https://ya.ru/ t=1780697616392
+06-06 01:13:36.416 W/ReactNativeJS(11173): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"yandex","ok":true,"status":200,"durationMs":290},"timestamp":1780697616416}'
+06-06 01:13:43.163 W/MototwinNet(11173): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780697623163
+06-06 01:13:43.164 W/MototwinNet(11173): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780697623164
+06-06 01:13:43.177 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":1,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697623176}'
+06-06 01:13:43.178 W/ReactNativeJS(11173): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":1,"timeoutAborted":true,"durationMs":7029},"timestamp":1780697623178}'
+06-06 01:13:43.180 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623180
+06-06 01:13:43.182 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623182
+06-06 01:13:43.190 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623190
+06-06 01:13:43.192 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623191
+06-06 01:13:43.193 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:13:43.210 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:13:43.596 W/MototwinNet(11173): phase=callStart url=https://mototwin.online/api/garage t=1780697623596
+06-06 01:13:43.597 W/MototwinNet(11173): phase=connectionAcquired url=https://mototwin.online/api/garage t=1780697623597
+06-06 01:13:43.598 W/MototwinNet(11173): phase=requestHeadersStart url=https://mototwin.online/api/garage t=1780697623598
+06-06 01:13:43.598 W/MototwinNet(11173): phase=requestHeadersEnd url=https://mototwin.online/api/garage t=1780697623598
+06-06 01:13:43.653 W/MototwinNet(11173): phase=responseHeadersStart url=https://mototwin.online/api/garage t=1780697623653
+06-06 01:13:43.654 W/MototwinNet(11173): phase=responseHeadersEnd url=https://mototwin.online/api/garage t=1780697623654
+06-06 01:13:43.655 W/MototwinNet(11173): phase=callEnd url=https://mototwin.online/api/garage t=1780697623655
+06-06 01:13:43.676 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/garage","method":"GET","status":200,"durationMs":7541},"timestamp":1780697623676}'
+06-06 01:13:43.679 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623679
+06-06 01:13:43.683 W/ReactNativeJS(11173): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/vehicles/trash","queueLength":1,"running":1},"timestamp":1780697623683}'
+06-06 01:13:43.687 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623687
+06-06 01:13:43.687 W/ReactNativeJS(11173): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/vehicles/trash","queueLength":0,"running":2},"timestamp":1780697623687}'
+06-06 01:13:43.690 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623690
+06-06 01:13:43.690 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623690
+06-06 01:13:43.691 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623691
+06-06 01:13:43.692 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623692
+06-06 01:13:43.693 W/ReactNativeJS(11173): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"normal","pathHint":"/api/notifications?limit=1","queueLength":1,"running":2},"timestamp":1780697623693}'
+06-06 01:13:43.695 W/ReactNativeJS(11173): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"normal","pathHint":"/api/subscription/current","queueLength":2,"running":2},"timestamp":1780697623695}'
+06-06 01:13:43.696 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623696
+06-06 01:13:43.699 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623699
+06-06 01:13:43.700 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623700
+06-06 01:13:43.700 W/ReactNativeJS(11173): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"normal","pathHint":"/api/notifications?limit=1","queueLength":1,"running":2},"timestamp":1780697623696}'
+06-06 01:13:43.703 W/ReactNativeJS(11173): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/vehicles/trash","fullUrl":"https://mototwin.online/api/vehicles/trash","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780697623703}'
+06-06 01:13:43.704 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623704
+06-06 01:13:43.705 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/vehicles/trash","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780697623704}'
+06-06 01:13:43.706 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623706
+06-06 01:13:43.707 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623707
+06-06 01:13:43.708 W/MototwinNet(11173): phase=callStart url=https://mototwin.online/api/vehicles/trash t=1780697623708
+06-06 01:13:43.709 W/ReactNativeJS(11173): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/notifications?limit=1","fullUrl":"https://mototwin.online/api/notifications?limit=1","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780697623706}'
+06-06 01:13:43.710 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623710
+06-06 01:13:43.710 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623710
+06-06 01:13:43.710 W/MototwinNet(11173): phase=connectionAcquired url=https://mototwin.online/api/vehicles/trash t=1780697623710
+06-06 01:13:43.710 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623710
+06-06 01:13:43.710 W/MototwinNet(11173): phase=requestHeadersStart url=https://mototwin.online/api/vehicles/trash t=1780697623710
+06-06 01:13:43.710 W/MototwinNet(11173): phase=requestHeadersEnd url=https://mototwin.online/api/vehicles/trash t=1780697623710
+06-06 01:13:43.712 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/notifications?limit=1","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780697623711}'
+06-06 01:13:43.712 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623712
+06-06 01:13:43.712 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623712
+06-06 01:13:43.714 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623714
+06-06 01:13:43.716 W/MototwinNet(11173): phase=callStart url=https://mototwin.online/api/notifications?limit=1 t=1780697623716
+06-06 01:13:43.717 W/MototwinNet(11173): phase=dnsStart url=https://mototwin.online/api/notifications?limit=1 t=1780697623717
+06-06 01:13:43.719 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623719
+06-06 01:13:43.720 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623720
+06-06 01:13:43.721 W/MototwinNet(11173): phase=dnsEnd url=https://mototwin.online/api/notifications?limit=1 t=1780697623721
+06-06 01:13:43.721 W/MototwinNet(11173): phase=connectStart url=https://mototwin.online/api/notifications?limit=1 t=1780697623721
+06-06 01:13:43.728 W/MototwinNet(11173): phase=secureConnectStart url=https://mototwin.online/api/notifications?limit=1 t=1780697623728
+06-06 01:13:43.729 W/MototwinNet(11173): phase=responseHeadersStart url=https://mototwin.online/api/vehicles/trash t=1780697623729
+06-06 01:13:43.730 W/MototwinNet(11173): phase=responseHeadersEnd url=https://mototwin.online/api/vehicles/trash t=1780697623730
+06-06 01:13:43.731 W/MototwinNet(11173): phase=callEnd url=https://mototwin.online/api/vehicles/trash t=1780697623731
+06-06 01:13:43.824 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:13:43.824 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:13:43.824 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:13:43.824 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:13:43.824 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:13:43.824 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:13:43.824 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:13:43.824 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:13:43.927 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:13:43.991 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:13:43.991 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/vehicles/trash","method":"GET","status":200,"durationMs":299},"timestamp":1780697623991}'
+06-06 01:13:43.997 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697623997
+06-06 01:13:43.998 W/ReactNativeJS(11173): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"normal","pathHint":"/api/subscription/current","queueLength":0,"running":2},"timestamp":1780697623998}'
+06-06 01:13:44.000 W/ReactNativeJS(11173): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/subscription/current","fullUrl":"https://mototwin.online/api/subscription/current","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780697624000}'
+06-06 01:13:44.001 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/subscription/current","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780697624001}'
+06-06 01:13:44.002 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697624002
+06-06 01:13:44.003 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697624003
+06-06 01:13:44.005 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697624005
+06-06 01:13:44.005 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697624005
+06-06 01:13:44.005 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697624005
+06-06 01:13:44.006 W/MototwinNet(11173): phase=callStart url=https://mototwin.online/api/subscription/current t=1780697624006
+06-06 01:13:44.008 W/MototwinNet(11173): phase=connectionAcquired url=https://mototwin.online/api/subscription/current t=1780697624007
+06-06 01:13:44.008 W/MototwinNet(11173): phase=requestHeadersStart url=https://mototwin.online/api/subscription/current t=1780697624008
+06-06 01:13:44.008 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697624008
+06-06 01:13:44.008 W/MototwinNet(11173): phase=requestHeadersEnd url=https://mototwin.online/api/subscription/current t=1780697624008
+06-06 01:13:44.008 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697624008
+06-06 01:13:44.013 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:13:44.014 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:13:44.022 W/MototwinNet(11173): phase=responseHeadersStart url=https://mototwin.online/api/subscription/current t=1780697624022
+06-06 01:13:44.022 W/MototwinNet(11173): phase=responseHeadersEnd url=https://mototwin.online/api/subscription/current t=1780697624022
+06-06 01:13:44.023 W/MototwinNet(11173): phase=callEnd url=https://mototwin.online/api/subscription/current t=1780697624023
+06-06 01:13:44.025 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:13:44.026 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:13:44.042 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/subscription/current","method":"GET","status":200,"durationMs":42},"timestamp":1780697624042}'
+06-06 01:13:44.044 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697624044
+06-06 01:13:44.049 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697624049
+06-06 01:13:44.058 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:13:50.723 W/MototwinNet(11173): phase=connectFailed:Socket closed url=https://mototwin.online/api/notifications?limit=1 t=1780697630723
+06-06 01:13:50.723 W/MototwinNet(11173): phase=callFailed:Socket closed url=https://mototwin.online/api/notifications?limit=1 t=1780697630723
+06-06 01:13:50.737 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/notifications?limit=1","method":"GET","attempt":1,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7024,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697630737}'
+06-06 01:13:50.739 W/ReactNativeJS(11173): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/notifications?limit=1","method":"GET","attempt":1,"timeoutAborted":true,"durationMs":7025},"timestamp":1780697630738}'
+06-06 01:13:50.740 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697630740
+06-06 01:13:50.741 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697630741
+06-06 01:13:50.743 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697630743
+06-06 01:13:50.744 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697630744
+06-06 01:13:50.754 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:13:50.754 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:13:51.156 W/MototwinNet(11173): phase=callStart url=https://mototwin.online/api/notifications?limit=1 t=1780697631156
+06-06 01:13:51.157 W/MototwinNet(11173): phase=connectionAcquired url=https://mototwin.online/api/notifications?limit=1 t=1780697631157
+06-06 01:13:51.157 W/MototwinNet(11173): phase=requestHeadersStart url=https://mototwin.online/api/notifications?limit=1 t=1780697631157
+06-06 01:13:51.158 W/MototwinNet(11173): phase=requestHeadersEnd url=https://mototwin.online/api/notifications?limit=1 t=1780697631157
+06-06 01:13:51.177 W/MototwinNet(11173): phase=responseHeadersStart url=https://mototwin.online/api/notifications?limit=1 t=1780697631177
+06-06 01:13:51.177 W/MototwinNet(11173): phase=responseHeadersEnd url=https://mototwin.online/api/notifications?limit=1 t=1780697631177
+06-06 01:13:51.178 W/MototwinNet(11173): phase=callEnd url=https://mototwin.online/api/notifications?limit=1 t=1780697631178
+06-06 01:13:51.204 W/ReactNativeJS(11173): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/notifications?limit=1","method":"GET","status":200,"durationMs":7500},"timestamp":1780697631203}'
+06-06 01:13:51.206 W/MototwinNet(11173): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697631206
+06-06 01:13:51.212 W/MototwinNet(11173): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697631212
+06-06 01:13:51.259 W/ReactNativeJS(11173): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:13:57.461 W/ReactNativeJS(11173): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"background"},"timestamp":1780697637461}'
+06-06 01:14:01.592 W/ReactNativeJS(11423): '[AUDIT][H8][auth_gate_start]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:49","message":"auth_gate_start","data":{"segments":[]},"timestamp":1780697641592}'
+06-06 01:14:01.599 W/ReactNativeJS(11423): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780697641598}'
+06-06 01:14:01.605 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697641605
+06-06 01:14:01.670 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697641670
+06-06 01:14:01.687 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:14:01.738 W/ReactNativeJS(11423): '[AUDIT][H8][auth_gate_done]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:108","message":"auth_gate_done","data":{"hasTokens":true,"ok":true,"onLogin":false,"isPublic":true,"durationMs":145,"mode":"tokens_unblocked","segments":[]},"timestamp":1780697641737}'
+06-06 01:14:01.738 W/ReactNativeJS(11423): '[AUDIT][H9][refresh_if_needed_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:81","message":"refresh_if_needed_enter","data":{"hasRefreshInFlight":false},"timestamp":1780697641738}'
+06-06 01:14:01.738 W/ReactNativeJS(11423): '[AUDIT][H9][refresh_enter]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:106","message":"refresh_enter","data":{},"timestamp":1780697641738}'
+06-06 01:14:01.738 W/ReactNativeJS(11423): '[AUDIT][H9][refresh_tokens_read]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:120","message":"refresh_tokens_read","data":{"hasTokens":true,"durationMs":0},"timestamp":1780697641738}'
+06-06 01:14:01.738 W/ReactNativeJS(11423): '[AUDIT][H9][refresh_skipped_not_expiring]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:123","message":"refresh_skipped_not_expiring","data":{"expiresInMs":469280},"timestamp":1780697641738}'
+06-06 01:14:01.739 W/ReactNativeJS(11423): '[AUDIT][H8][auth_gate_refresh_result]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:134","message":"auth_gate_refresh_result","data":{"ok":true,"isPublic":true,"segments":[]},"timestamp":1780697641738}'
+06-06 01:14:01.865 W/ReactNativeJS(11423): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780697641865}'
+06-06 01:14:01.867 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697641867
+06-06 01:14:01.869 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697641869
+06-06 01:14:02.011 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:14:03.492 W/ReactNativeJS(11423): '[AUDIT][H8][garage_focus_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:174","message":"garage_focus_enter","data":{"seq":0,"hasLoadedOnce":false},"timestamp":1780697643491}'
+06-06 01:14:03.492 W/ReactNativeJS(11423): '[AUDIT][H7][garage_load_start]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:68","message":"garage_load_start","data":{"seq":1,"showBlockingSpinner":true,"hasLoadedOnce":false},"timestamp":1780697643492}'
+06-06 01:14:03.494 W/ReactNativeJS(11423): '[AUDIT][H1][scheduler_cancel_low_priority]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:118","message":"scheduler_cancel_low_priority","data":{"runningLowPriority":0,"lowQueuedCount":0,"queueLength":0,"running":0},"timestamp":1780697643494}'
+06-06 01:14:03.495 W/MototwinNet(11423): phase=callStart url=https://mototwin.online/ t=1780697643495
+06-06 01:14:03.495 W/ReactNativeJS(11423): '[AUDIT][H12][mobile_api_client_created]', '{"sessionId":"577880","runId":"audit-v9","hypothesisId":"H12","location":"apps/app/src/create-mobile-api-client.ts:39","message":"mobile_api_client_created","data":{"baseUrl":"https://mototwin.online"},"timestamp":1780697643495}'
+06-06 01:14:03.495 W/ReactNativeJS(11423): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/garage","queueLength":1,"running":0},"timestamp":1780697643495}'
+06-06 01:14:03.496 W/MototwinNet(11423): phase=callStart url=https://ya.ru/ t=1780697643495
+06-06 01:14:03.496 W/ReactNativeJS(11423): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/garage","queueLength":0,"running":1},"timestamp":1780697643496}'
+06-06 01:14:03.497 W/MototwinNet(11423): phase=callStart url=https://www.gstatic.com/generate_204 t=1780697643497
+06-06 01:14:03.498 W/MototwinNet(11423): phase=dnsStart url=https://mototwin.online/ t=1780697643498
+06-06 01:14:03.498 W/ReactNativeJS(11423): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":["garage"]},"timestamp":1780697643498}'
+06-06 01:14:03.499 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643499
+06-06 01:14:03.500 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643500
+06-06 01:14:03.501 W/ReactNativeJS(11423): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/garage","fullUrl":"https://mototwin.online/api/garage","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780697643500}'
+06-06 01:14:03.502 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643502
+06-06 01:14:03.503 W/MototwinNet(11423): phase=dnsEnd url=https://mototwin.online/ t=1780697643503
+06-06 01:14:03.503 W/ReactNativeJS(11423): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/garage","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780697643502}'
+06-06 01:14:03.504 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643504
+06-06 01:14:03.506 W/MototwinNet(11423): phase=connectStart url=https://mototwin.online/ t=1780697643505
+06-06 01:14:03.507 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643507
+06-06 01:14:03.508 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643508
+06-06 01:14:03.508 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643508
+06-06 01:14:03.508 W/MototwinNet(11423): phase=dnsStart url=https://www.gstatic.com/generate_204 t=1780697643508
+06-06 01:14:03.509 W/MototwinNet(11423): phase=dnsStart url=https://ya.ru/ t=1780697643508
+06-06 01:14:03.509 W/ReactNativeJS(11423): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"active"},"timestamp":1780697643508}'
+06-06 01:14:03.510 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643510
+06-06 01:14:03.511 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643511
+06-06 01:14:03.511 W/MototwinNet(11423): phase=callStart url=https://mototwin.online/api/garage t=1780697643511
+06-06 01:14:03.513 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643513
+06-06 01:14:03.513 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643513
+06-06 01:14:03.514 W/MototwinNet(11423): phase=dnsEnd url=https://ya.ru/ t=1780697643514
+06-06 01:14:03.514 W/MototwinNet(11423): phase=connectStart url=https://ya.ru/ t=1780697643514
+06-06 01:14:03.514 W/MototwinNet(11423): phase=dnsStart url=https://mototwin.online/api/garage t=1780697643514
+06-06 01:14:03.514 W/MototwinNet(11423): phase=dnsEnd url=https://mototwin.online/api/garage t=1780697643514
+06-06 01:14:03.514 W/MototwinNet(11423): phase=connectStart url=https://mototwin.online/api/garage t=1780697643514
+06-06 01:14:03.517 W/MototwinNet(11423): phase=secureConnectStart url=https://mototwin.online/ t=1780697643517
+06-06 01:14:03.518 W/MototwinNet(11423): phase=dnsEnd url=https://www.gstatic.com/generate_204 t=1780697643517
+06-06 01:14:03.518 W/MototwinNet(11423): phase=connectStart url=https://www.gstatic.com/generate_204 t=1780697643518
+06-06 01:14:03.518 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697643518
+06-06 01:14:03.520 W/MototwinNet(11423): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780697643520
+06-06 01:14:03.525 W/MototwinNet(11423): phase=secureConnectStart url=https://ya.ru/ t=1780697643525
+06-06 01:14:03.532 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:14:03.532 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H1][scheduler_cancel_low_priority]', 'Network request failed'
+06-06 01:14:03.532 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:14:03.532 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:14:03.532 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:14:03.542 W/MototwinNet(11423): phase=secureConnectStart url=https://www.gstatic.com/generate_204 t=1780697643542
+06-06 01:14:03.542 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:14:03.567 W/MototwinNet(11423): phase=secureConnectEnd url=https://ya.ru/ t=1780697643567
+06-06 01:14:03.570 W/MototwinNet(11423): phase=connectEnd url=https://ya.ru/ t=1780697643570
+06-06 01:14:03.571 W/MototwinNet(11423): phase=connectionAcquired url=https://ya.ru/ t=1780697643571
+06-06 01:14:03.571 W/MototwinNet(11423): phase=requestHeadersStart url=https://ya.ru/ t=1780697643571
+06-06 01:14:03.575 W/MototwinNet(11423): phase=requestHeadersEnd url=https://ya.ru/ t=1780697643574
+06-06 01:14:03.591 W/MototwinNet(11423): phase=secureConnectEnd url=https://www.gstatic.com/generate_204 t=1780697643591
+06-06 01:14:03.593 W/MototwinNet(11423): phase=connectEnd url=https://www.gstatic.com/generate_204 t=1780697643593
+06-06 01:14:03.593 W/MototwinNet(11423): phase=connectionAcquired url=https://www.gstatic.com/generate_204 t=1780697643593
+06-06 01:14:03.593 W/MototwinNet(11423): phase=requestHeadersStart url=https://www.gstatic.com/generate_204 t=1780697643593
+06-06 01:14:03.594 W/MototwinNet(11423): phase=requestHeadersEnd url=https://www.gstatic.com/generate_204 t=1780697643594
+06-06 01:14:03.638 W/MototwinNet(11423): phase=responseHeadersStart url=https://www.gstatic.com/generate_204 t=1780697643638
+06-06 01:14:03.638 W/MototwinNet(11423): phase=responseHeadersEnd url=https://www.gstatic.com/generate_204 t=1780697643638
+06-06 01:14:03.639 W/MototwinNet(11423): phase=callEnd url=https://www.gstatic.com/generate_204 t=1780697643639
+06-06 01:14:03.652 W/ReactNativeJS(11423): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"gstatic","ok":true,"status":204,"durationMs":158},"timestamp":1780697643652}'
+06-06 01:14:03.706 W/MototwinNet(11423): phase=responseHeadersStart url=https://ya.ru/ t=1780697643706
+06-06 01:14:03.706 W/MototwinNet(11423): phase=responseHeadersEnd url=https://ya.ru/ t=1780697643706
+06-06 01:14:03.725 W/MototwinNet(11423): phase=callEnd url=https://ya.ru/ t=1780697643725
+06-06 01:14:03.736 W/ReactNativeJS(11423): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"yandex","ok":true,"status":200,"durationMs":242},"timestamp":1780697643735}'
+06-06 01:14:10.516 W/MototwinNet(11423): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780697650516
+06-06 01:14:10.516 W/MototwinNet(11423): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780697650516
+06-06 01:14:10.530 W/ReactNativeJS(11423): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":1,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7025,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697650529}'
+06-06 01:14:10.533 W/ReactNativeJS(11423): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":1,"timeoutAborted":true,"durationMs":7029},"timestamp":1780697650533}'
+06-06 01:14:10.533 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697650533
+06-06 01:14:10.536 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697650536
+06-06 01:14:10.538 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697650538
+06-06 01:14:10.539 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697650539
+06-06 01:14:10.546 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:14:10.546 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:14:10.948 W/MototwinNet(11423): phase=callStart url=https://mototwin.online/api/garage t=1780697650948
+06-06 01:14:10.949 W/MototwinNet(11423): phase=dnsStart url=https://mototwin.online/api/garage t=1780697650949
+06-06 01:14:10.954 W/MototwinNet(11423): phase=dnsEnd url=https://mototwin.online/api/garage t=1780697650954
+06-06 01:14:10.955 W/MototwinNet(11423): phase=connectStart url=https://mototwin.online/api/garage t=1780697650955
+06-06 01:14:10.963 W/MototwinNet(11423): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780697650963
+06-06 01:14:17.958 W/MototwinNet(11423): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780697657958
+06-06 01:14:17.958 W/MototwinNet(11423): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780697657958
+06-06 01:14:17.973 W/ReactNativeJS(11423): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":2,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697657972}'
+06-06 01:14:17.974 W/ReactNativeJS(11423): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":2,"timeoutAborted":true,"durationMs":7029},"timestamp":1780697657974}'
+06-06 01:14:17.976 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697657976
+06-06 01:14:17.978 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697657978
+06-06 01:14:17.981 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697657981
+06-06 01:14:17.983 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697657983
+06-06 01:14:17.989 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:14:17.989 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:14:18.391 W/MototwinNet(11423): phase=callStart url=https://mototwin.online/api/garage t=1780697658391
+06-06 01:14:18.393 W/MototwinNet(11423): phase=dnsStart url=https://mototwin.online/api/garage t=1780697658393
+06-06 01:14:18.397 W/MototwinNet(11423): phase=dnsEnd url=https://mototwin.online/api/garage t=1780697658397
+06-06 01:14:18.398 W/MototwinNet(11423): phase=connectStart url=https://mototwin.online/api/garage t=1780697658398
+06-06 01:14:18.409 W/MototwinNet(11423): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780697658409
+06-06 01:14:23.547 W/MototwinNet(11423): phase=connectFailed:Read timed out url=https://mototwin.online/ t=1780697663547
+06-06 01:14:23.547 W/MototwinNet(11423): phase=callFailed:Read timed out url=https://mototwin.online/ t=1780697663547
+06-06 01:14:23.568 W/ReactNativeJS(11423): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"ours","ok":false,"durationMs":20075,"error":"Network request timed out"},"timestamp":1780697663567}'
+06-06 01:14:25.401 W/MototwinNet(11423): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780697665401
+06-06 01:14:25.401 W/MototwinNet(11423): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780697665401
+06-06 01:14:25.416 W/ReactNativeJS(11423): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":3,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697665415}'
+06-06 01:14:25.417 W/ReactNativeJS(11423): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":3,"timeoutAborted":true,"durationMs":7029},"timestamp":1780697665417}'
+06-06 01:14:25.419 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697665419
+06-06 01:14:25.421 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697665421
+06-06 01:14:25.425 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697665425
+06-06 01:14:25.425 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697665425
+06-06 01:14:25.432 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:14:25.432 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:14:25.834 W/MototwinNet(11423): phase=callStart url=https://mototwin.online/api/garage t=1780697665834
+06-06 01:14:25.836 W/MototwinNet(11423): phase=dnsStart url=https://mototwin.online/api/garage t=1780697665836
+06-06 01:14:25.840 W/MototwinNet(11423): phase=dnsEnd url=https://mototwin.online/api/garage t=1780697665840
+06-06 01:14:25.840 W/MototwinNet(11423): phase=connectStart url=https://mototwin.online/api/garage t=1780697665840
+06-06 01:14:25.847 W/MototwinNet(11423): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780697665847
+06-06 01:14:32.844 W/MototwinNet(11423): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780697672844
+06-06 01:14:32.844 W/MototwinNet(11423): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780697672844
+06-06 01:14:32.859 W/ReactNativeJS(11423): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":4,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697672859}'
+06-06 01:14:32.861 W/ReactNativeJS(11423): '[AUDIT][H7][garage_load_first_error]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:96","message":"garage_load_first_error","data":{"seq":1,"isTimeout":true,"message":"Превышено время ожидания ответа сервера (7 с)."},"timestamp":1780697672861}'
+06-06 01:14:32.861 W/ReactNativeJS(11423): '[AUDIT][H11][garage_timeout_no_retry]', '{"sessionId":"577880","runId":"audit-v8","hypothesisId":"H11","location":"apps/app/app/garage.tsx:116","message":"garage_timeout_no_retry","data":{"seq":1},"timestamp":1780697672861}'
+06-06 01:14:32.862 W/ReactNativeJS(11423): '[AUDIT][H7][garage_load_error]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:141","message":"garage_load_error","data":{"seq":1,"message":"Превышено время ожидания ответа сервера (7 с).","isTimeout":true},"timestamp":1780697672861}'
+06-06 01:14:32.862 E/ReactNativeJS(11423): [Error: Превышено время ожидания ответа сервера (7 с).]
+06-06 01:14:32.864 W/MototwinNet(11423): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697672864
+06-06 01:14:32.871 W/MototwinNet(11423): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697672871
+06-06 01:14:32.903 W/ReactNativeJS(11423): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:14:37.256 W/ReactNativeJS(11423): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"background"},"timestamp":1780697677256}'
+06-06 01:14:41.262 W/ReactNativeJS(11543): '[AUDIT][H8][auth_gate_start]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:49","message":"auth_gate_start","data":{"segments":[]},"timestamp":1780697681261}'
+06-06 01:14:41.268 W/ReactNativeJS(11543): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780697681268}'
+06-06 01:14:41.277 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697681277
+06-06 01:14:41.345 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697681345
+06-06 01:14:41.356 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:14:41.406 W/ReactNativeJS(11543): '[AUDIT][H8][auth_gate_done]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:108","message":"auth_gate_done","data":{"hasTokens":true,"ok":true,"onLogin":false,"isPublic":true,"durationMs":145,"mode":"tokens_unblocked","segments":[]},"timestamp":1780697681406}'
+06-06 01:14:41.406 W/ReactNativeJS(11543): '[AUDIT][H9][refresh_if_needed_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:81","message":"refresh_if_needed_enter","data":{"hasRefreshInFlight":false},"timestamp":1780697681406}'
+06-06 01:14:41.406 W/ReactNativeJS(11543): '[AUDIT][H9][refresh_enter]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:106","message":"refresh_enter","data":{},"timestamp":1780697681406}'
+06-06 01:14:41.406 W/ReactNativeJS(11543): '[AUDIT][H9][refresh_tokens_read]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:120","message":"refresh_tokens_read","data":{"hasTokens":true,"durationMs":0},"timestamp":1780697681406}'
+06-06 01:14:41.407 W/ReactNativeJS(11543): '[AUDIT][H9][refresh_skipped_not_expiring]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:123","message":"refresh_skipped_not_expiring","data":{"expiresInMs":429611},"timestamp":1780697681407}'
+06-06 01:14:41.407 W/ReactNativeJS(11543): '[AUDIT][H8][auth_gate_refresh_result]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:134","message":"auth_gate_refresh_result","data":{"ok":true,"isPublic":true,"segments":[]},"timestamp":1780697681407}'
+06-06 01:14:41.532 W/ReactNativeJS(11543): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780697681532}'
+06-06 01:14:41.535 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697681535
+06-06 01:14:41.537 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697681537
+06-06 01:14:41.679 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:14:43.716 W/ReactNativeJS(11543): '[AUDIT][H8][garage_focus_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:174","message":"garage_focus_enter","data":{"seq":0,"hasLoadedOnce":false},"timestamp":1780697683716}'
+06-06 01:14:43.716 W/ReactNativeJS(11543): '[AUDIT][H7][garage_load_start]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:68","message":"garage_load_start","data":{"seq":1,"showBlockingSpinner":true,"hasLoadedOnce":false},"timestamp":1780697683716}'
+06-06 01:14:43.719 W/ReactNativeJS(11543): '[AUDIT][H1][scheduler_cancel_low_priority]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:118","message":"scheduler_cancel_low_priority","data":{"runningLowPriority":0,"lowQueuedCount":0,"queueLength":0,"running":0},"timestamp":1780697683718}'
+06-06 01:14:43.720 W/ReactNativeJS(11543): '[AUDIT][H12][mobile_api_client_created]', '{"sessionId":"577880","runId":"audit-v9","hypothesisId":"H12","location":"apps/app/src/create-mobile-api-client.ts:39","message":"mobile_api_client_created","data":{"baseUrl":"https://mototwin.online"},"timestamp":1780697683719}'
+06-06 01:14:43.720 W/MototwinNet(11543): phase=callStart url=https://mototwin.online/ t=1780697683720
+06-06 01:14:43.720 W/ReactNativeJS(11543): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/garage","queueLength":1,"running":0},"timestamp":1780697683720}'
+06-06 01:14:43.721 W/ReactNativeJS(11543): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/garage","queueLength":0,"running":1},"timestamp":1780697683721}'
+06-06 01:14:43.721 W/MototwinNet(11543): phase=callStart url=https://ya.ru/ t=1780697683721
+06-06 01:14:43.722 W/ReactNativeJS(11543): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":["garage"]},"timestamp":1780697683722}'
+06-06 01:14:43.723 W/MototwinNet(11543): phase=dnsStart url=https://mototwin.online/ t=1780697683723
+06-06 01:14:43.723 W/MototwinNet(11543): phase=callStart url=https://www.gstatic.com/generate_204 t=1780697683723
+06-06 01:14:43.724 W/ReactNativeJS(11543): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/garage","fullUrl":"https://mototwin.online/api/garage","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780697683723}'
+06-06 01:14:43.725 W/ReactNativeJS(11543): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/garage","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780697683724}'
+06-06 01:14:43.727 W/ReactNativeJS(11543): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"active"},"timestamp":1780697683727}'
+06-06 01:14:43.728 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683728
+06-06 01:14:43.729 W/MototwinNet(11543): phase=dnsEnd url=https://mototwin.online/ t=1780697683729
+06-06 01:14:43.729 W/MototwinNet(11543): phase=dnsStart url=https://www.gstatic.com/generate_204 t=1780697683729
+06-06 01:14:43.729 W/MototwinNet(11543): phase=connectStart url=https://mototwin.online/ t=1780697683729
+06-06 01:14:43.730 W/MototwinNet(11543): phase=dnsStart url=https://ya.ru/ t=1780697683730
+06-06 01:14:43.733 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683732
+06-06 01:14:43.734 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683734
+06-06 01:14:43.735 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683735
+06-06 01:14:43.735 W/MototwinNet(11543): phase=dnsEnd url=https://ya.ru/ t=1780697683735
+06-06 01:14:43.736 W/MototwinNet(11543): phase=connectStart url=https://ya.ru/ t=1780697683736
+06-06 01:14:43.737 W/MototwinNet(11543): phase=secureConnectStart url=https://mototwin.online/ t=1780697683737
+06-06 01:14:43.739 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683739
+06-06 01:14:43.739 W/MototwinNet(11543): phase=dnsEnd url=https://www.gstatic.com/generate_204 t=1780697683739
+06-06 01:14:43.739 W/MototwinNet(11543): phase=connectStart url=https://www.gstatic.com/generate_204 t=1780697683739
+06-06 01:14:43.740 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683740
+06-06 01:14:43.741 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683741
+06-06 01:14:43.742 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683742
+06-06 01:14:43.743 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683743
+06-06 01:14:43.744 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683744
+06-06 01:14:43.746 W/MototwinNet(11543): phase=callStart url=https://mototwin.online/api/garage t=1780697683746
+06-06 01:14:43.747 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683746
+06-06 01:14:43.748 W/MototwinNet(11543): phase=secureConnectStart url=https://ya.ru/ t=1780697683748
+06-06 01:14:43.748 W/MototwinNet(11543): phase=dnsStart url=https://mototwin.online/api/garage t=1780697683748
+06-06 01:14:43.748 W/MototwinNet(11543): phase=dnsEnd url=https://mototwin.online/api/garage t=1780697683748
+06-06 01:14:43.748 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697683748
+06-06 01:14:43.749 W/MototwinNet(11543): phase=connectStart url=https://mototwin.online/api/garage t=1780697683748
+06-06 01:14:43.755 W/MototwinNet(11543): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780697683755
+06-06 01:14:43.755 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H1][scheduler_cancel_low_priority]', 'Network request failed'
+06-06 01:14:43.756 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:14:43.756 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:14:43.756 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:14:43.756 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:14:43.756 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:14:43.760 W/MototwinNet(11543): phase=secureConnectStart url=https://www.gstatic.com/generate_204 t=1780697683760
+06-06 01:14:43.787 W/MototwinNet(11543): phase=secureConnectEnd url=https://ya.ru/ t=1780697683787
+06-06 01:14:43.790 W/MototwinNet(11543): phase=connectEnd url=https://ya.ru/ t=1780697683790
+06-06 01:14:43.792 W/MototwinNet(11543): phase=connectionAcquired url=https://ya.ru/ t=1780697683792
+06-06 01:14:43.792 W/MototwinNet(11543): phase=requestHeadersStart url=https://ya.ru/ t=1780697683792
+06-06 01:14:43.795 W/MototwinNet(11543): phase=requestHeadersEnd url=https://ya.ru/ t=1780697683795
+06-06 01:14:43.807 W/MototwinNet(11543): phase=secureConnectEnd url=https://www.gstatic.com/generate_204 t=1780697683807
+06-06 01:14:43.807 W/MototwinNet(11543): phase=connectEnd url=https://www.gstatic.com/generate_204 t=1780697683807
+06-06 01:14:43.808 W/MototwinNet(11543): phase=connectionAcquired url=https://www.gstatic.com/generate_204 t=1780697683808
+06-06 01:14:43.808 W/MototwinNet(11543): phase=requestHeadersStart url=https://www.gstatic.com/generate_204 t=1780697683808
+06-06 01:14:43.809 W/MototwinNet(11543): phase=requestHeadersEnd url=https://www.gstatic.com/generate_204 t=1780697683808
+06-06 01:14:43.848 W/MototwinNet(11543): phase=responseHeadersStart url=https://www.gstatic.com/generate_204 t=1780697683847
+06-06 01:14:43.848 W/MototwinNet(11543): phase=responseHeadersEnd url=https://www.gstatic.com/generate_204 t=1780697683848
+06-06 01:14:43.848 W/MototwinNet(11543): phase=callEnd url=https://www.gstatic.com/generate_204 t=1780697683848
+06-06 01:14:43.854 W/ReactNativeJS(11543): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"gstatic","ok":true,"status":204,"durationMs":135},"timestamp":1780697683853}'
+06-06 01:14:43.934 W/MototwinNet(11543): phase=responseHeadersStart url=https://ya.ru/ t=1780697683933
+06-06 01:14:43.934 W/MototwinNet(11543): phase=responseHeadersEnd url=https://ya.ru/ t=1780697683934
+06-06 01:14:43.957 W/MototwinNet(11543): phase=callEnd url=https://ya.ru/ t=1780697683957
+06-06 01:14:43.972 W/ReactNativeJS(11543): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"yandex","ok":true,"status":200,"durationMs":254},"timestamp":1780697683972}'
+06-06 01:14:50.734 W/MototwinNet(11543): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780697690734
+06-06 01:14:50.734 W/MototwinNet(11543): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780697690734
+06-06 01:14:50.748 W/ReactNativeJS(11543): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":1,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7023,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697690748}'
+06-06 01:14:50.750 W/ReactNativeJS(11543): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":1,"timeoutAborted":true,"durationMs":7024},"timestamp":1780697690749}'
+06-06 01:14:50.751 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697690751
+06-06 01:14:50.752 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697690752
+06-06 01:14:50.754 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697690754
+06-06 01:14:50.754 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697690754
+06-06 01:14:50.764 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:14:50.764 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:14:51.167 W/MototwinNet(11543): phase=callStart url=https://mototwin.online/api/garage t=1780697691167
+06-06 01:14:51.168 W/MototwinNet(11543): phase=dnsStart url=https://mototwin.online/api/garage t=1780697691168
+06-06 01:14:51.173 W/MototwinNet(11543): phase=dnsEnd url=https://mototwin.online/api/garage t=1780697691173
+06-06 01:14:51.173 W/MototwinNet(11543): phase=connectStart url=https://mototwin.online/api/garage t=1780697691173
+06-06 01:14:51.205 W/MototwinNet(11543): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780697691205
+06-06 01:14:58.176 W/MototwinNet(11543): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780697698176
+06-06 01:14:58.176 W/MototwinNet(11543): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780697698176
+06-06 01:14:58.191 W/ReactNativeJS(11543): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":2,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697698191}'
+06-06 01:14:58.192 W/ReactNativeJS(11543): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":2,"timeoutAborted":true,"durationMs":7028},"timestamp":1780697698192}'
+06-06 01:14:58.194 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697698194
+06-06 01:14:58.196 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697698196
+06-06 01:14:58.200 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697698200
+06-06 01:14:58.203 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697698203
+06-06 01:14:58.207 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:14:58.208 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:14:58.609 W/MototwinNet(11543): phase=callStart url=https://mototwin.online/api/garage t=1780697698609
+06-06 01:14:58.611 W/MototwinNet(11543): phase=dnsStart url=https://mototwin.online/api/garage t=1780697698611
+06-06 01:14:58.615 W/MototwinNet(11543): phase=dnsEnd url=https://mototwin.online/api/garage t=1780697698614
+06-06 01:14:58.615 W/MototwinNet(11543): phase=connectStart url=https://mototwin.online/api/garage t=1780697698615
+06-06 01:14:58.622 W/MototwinNet(11543): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780697698622
+06-06 01:15:03.761 W/MototwinNet(11543): phase=connectFailed:Read timed out url=https://mototwin.online/ t=1780697703761
+06-06 01:15:03.761 W/MototwinNet(11543): phase=callFailed:Read timed out url=https://mototwin.online/ t=1780697703761
+06-06 01:15:03.769 W/ReactNativeJS(11543): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"ours","ok":false,"durationMs":20052,"error":"Network request timed out"},"timestamp":1780697703769}'
+06-06 01:15:05.619 W/MototwinNet(11543): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780697705619
+06-06 01:15:05.620 W/MototwinNet(11543): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780697705620
+06-06 01:15:05.635 W/ReactNativeJS(11543): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":3,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697705634}'
+06-06 01:15:05.636 W/ReactNativeJS(11543): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":3,"timeoutAborted":true,"durationMs":7029},"timestamp":1780697705636}'
+06-06 01:15:05.638 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697705638
+06-06 01:15:05.640 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697705640
+06-06 01:15:05.642 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697705642
+06-06 01:15:05.645 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697705645
+06-06 01:15:05.651 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:15:05.651 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:15:06.053 W/MototwinNet(11543): phase=callStart url=https://mototwin.online/api/garage t=1780697706053
+06-06 01:15:06.055 W/MototwinNet(11543): phase=dnsStart url=https://mototwin.online/api/garage t=1780697706054
+06-06 01:15:06.058 W/MototwinNet(11543): phase=dnsEnd url=https://mototwin.online/api/garage t=1780697706058
+06-06 01:15:06.058 W/MototwinNet(11543): phase=connectStart url=https://mototwin.online/api/garage t=1780697706058
+06-06 01:15:06.067 W/MototwinNet(11543): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780697706067
+06-06 01:15:13.063 W/MototwinNet(11543): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780697713063
+06-06 01:15:13.063 W/MototwinNet(11543): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780697713063
+06-06 01:15:13.078 W/ReactNativeJS(11543): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":4,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780697713077}'
+06-06 01:15:13.079 W/ReactNativeJS(11543): '[AUDIT][H7][garage_load_first_error]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:96","message":"garage_load_first_error","data":{"seq":1,"isTimeout":true,"message":"Превышено время ожидания ответа сервера (7 с)."},"timestamp":1780697713079}'
+06-06 01:15:13.080 W/ReactNativeJS(11543): '[AUDIT][H11][garage_timeout_no_retry]', '{"sessionId":"577880","runId":"audit-v8","hypothesisId":"H11","location":"apps/app/app/garage.tsx:116","message":"garage_timeout_no_retry","data":{"seq":1},"timestamp":1780697713079}'
+06-06 01:15:13.080 W/ReactNativeJS(11543): '[AUDIT][H7][garage_load_error]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:141","message":"garage_load_error","data":{"seq":1,"message":"Превышено время ожидания ответа сервера (7 с).","isTimeout":true},"timestamp":1780697713080}'
+06-06 01:15:13.080 E/ReactNativeJS(11543): [Error: Превышено время ожидания ответа сервера (7 с).]
+06-06 01:15:13.083 W/MototwinNet(11543): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697713083
+06-06 01:15:13.090 W/MototwinNet(11543): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780697713089
+06-06 01:15:13.110 W/ReactNativeJS(11543): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:15:23.410 W/ReactNativeJS(11543): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"background"},"timestamp":1780697723410}'
+06-06 01:20:40.435 W/ReactNativeJS(12561): '[AUDIT][H8][auth_gate_start]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:49","message":"auth_gate_start","data":{"segments":[]},"timestamp":1780698040435}'
+06-06 01:20:40.442 W/ReactNativeJS(12561): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780698040442}'
+06-06 01:20:40.450 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698040449
+06-06 01:20:40.520 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698040520
+06-06 01:20:40.530 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:20:40.577 W/ReactNativeJS(12561): '[AUDIT][H8][auth_gate_done]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:108","message":"auth_gate_done","data":{"hasTokens":true,"ok":true,"onLogin":false,"isPublic":true,"durationMs":142,"mode":"tokens_unblocked","segments":[]},"timestamp":1780698040577}'
+06-06 01:20:40.577 W/ReactNativeJS(12561): '[AUDIT][H9][refresh_if_needed_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:81","message":"refresh_if_needed_enter","data":{"hasRefreshInFlight":false},"timestamp":1780698040577}'
+06-06 01:20:40.577 W/ReactNativeJS(12561): '[AUDIT][H9][refresh_enter]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:106","message":"refresh_enter","data":{},"timestamp":1780698040577}'
+06-06 01:20:40.577 W/ReactNativeJS(12561): '[AUDIT][H9][refresh_tokens_read]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:120","message":"refresh_tokens_read","data":{"hasTokens":true,"durationMs":0},"timestamp":1780698040577}'
+06-06 01:20:40.578 W/ReactNativeJS(12561): '[AUDIT][H9][refresh_skipped_not_expiring]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:123","message":"refresh_skipped_not_expiring","data":{"expiresInMs":70441},"timestamp":1780698040577}'
+06-06 01:20:40.578 W/ReactNativeJS(12561): '[AUDIT][H8][auth_gate_refresh_result]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:134","message":"auth_gate_refresh_result","data":{"ok":true,"isPublic":true,"segments":[]},"timestamp":1780698040578}'
+06-06 01:20:40.718 W/ReactNativeJS(12561): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780698040718}'
+06-06 01:20:40.720 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698040720
+06-06 01:20:40.722 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698040722
+06-06 01:20:40.865 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:20:48.973 W/ReactNativeJS(12561): '[AUDIT][H8][garage_focus_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:174","message":"garage_focus_enter","data":{"seq":0,"hasLoadedOnce":false},"timestamp":1780698048973}'
+06-06 01:20:48.974 W/ReactNativeJS(12561): '[AUDIT][H7][garage_load_start]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:68","message":"garage_load_start","data":{"seq":1,"showBlockingSpinner":true,"hasLoadedOnce":false},"timestamp":1780698048974}'
+06-06 01:20:48.976 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_cancel_low_priority]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:118","message":"scheduler_cancel_low_priority","data":{"runningLowPriority":0,"lowQueuedCount":0,"queueLength":0,"running":0},"timestamp":1780698048976}'
+06-06 01:20:48.976 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/ t=1780698048976
+06-06 01:20:48.977 W/ReactNativeJS(12561): '[AUDIT][H12][mobile_api_client_created]', '{"sessionId":"577880","runId":"audit-v9","hypothesisId":"H12","location":"apps/app/src/create-mobile-api-client.ts:39","message":"mobile_api_client_created","data":{"baseUrl":"https://mototwin.online"},"timestamp":1780698048976}'
+06-06 01:20:48.977 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/garage","queueLength":1,"running":0},"timestamp":1780698048977}'
+06-06 01:20:48.978 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/garage","queueLength":0,"running":1},"timestamp":1780698048978}'
+06-06 01:20:48.978 W/MototwinNet(12561): phase=callStart url=https://ya.ru/ t=1780698048978
+06-06 01:20:48.979 W/ReactNativeJS(12561): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":["garage"]},"timestamp":1780698048979}'
+06-06 01:20:48.979 W/MototwinNet(12561): phase=callStart url=https://www.gstatic.com/generate_204 t=1780698048979
+06-06 01:20:48.980 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/garage","fullUrl":"https://mototwin.online/api/garage","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698048980}'
+06-06 01:20:48.980 W/MototwinNet(12561): phase=dnsStart url=https://mototwin.online/ t=1780698048980
+06-06 01:20:48.981 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048981
+06-06 01:20:48.982 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/garage","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698048982}'
+06-06 01:20:48.982 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048982
+06-06 01:20:48.983 W/MototwinNet(12561): phase=dnsStart url=https://www.gstatic.com/generate_204 t=1780698048982
+06-06 01:20:48.984 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048984
+06-06 01:20:48.985 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048985
+06-06 01:20:48.986 W/MototwinNet(12561): phase=dnsEnd url=https://mototwin.online/ t=1780698048986
+06-06 01:20:48.986 W/MototwinNet(12561): phase=dnsStart url=https://ya.ru/ t=1780698048986
+06-06 01:20:48.987 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048987
+06-06 01:20:48.987 W/ReactNativeJS(12561): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"active"},"timestamp":1780698048986}'
+06-06 01:20:48.987 W/MototwinNet(12561): phase=connectStart url=https://mototwin.online/ t=1780698048986
+06-06 01:20:48.987 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048987
+06-06 01:20:48.988 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048988
+06-06 01:20:48.988 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048988
+06-06 01:20:48.989 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/garage t=1780698048989
+06-06 01:20:48.990 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048990
+06-06 01:20:48.992 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048992
+06-06 01:20:48.993 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048992
+06-06 01:20:48.993 W/MototwinNet(12561): phase=dnsStart url=https://mototwin.online/api/garage t=1780698048993
+06-06 01:20:48.993 W/MototwinNet(12561): phase=dnsEnd url=https://mototwin.online/api/garage t=1780698048993
+06-06 01:20:48.993 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698048993
+06-06 01:20:48.993 W/MototwinNet(12561): phase=connectStart url=https://mototwin.online/api/garage t=1780698048993
+06-06 01:20:48.996 W/MototwinNet(12561): phase=dnsEnd url=https://www.gstatic.com/generate_204 t=1780698048996
+06-06 01:20:48.996 W/MototwinNet(12561): phase=connectStart url=https://www.gstatic.com/generate_204 t=1780698048996
+06-06 01:20:48.999 W/MototwinNet(12561): phase=secureConnectStart url=https://mototwin.online/ t=1780698048999
+06-06 01:20:48.999 W/MototwinNet(12561): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780698048999
+06-06 01:20:49.000 W/MototwinNet(12561): phase=dnsEnd url=https://ya.ru/ t=1780698048999
+06-06 01:20:49.000 W/MototwinNet(12561): phase=connectStart url=https://ya.ru/ t=1780698049000
+06-06 01:20:49.012 W/MototwinNet(12561): phase=secureConnectStart url=https://ya.ru/ t=1780698049012
+06-06 01:20:49.013 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:49.013 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:49.013 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:49.013 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_cancel_low_priority]', 'Network request failed'
+06-06 01:20:49.014 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:49.014 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:20:49.018 W/MototwinNet(12561): phase=secureConnectStart url=https://www.gstatic.com/generate_204 t=1780698049018
+06-06 01:20:49.050 W/MototwinNet(12561): phase=secureConnectEnd url=https://mototwin.online/api/garage t=1780698049050
+06-06 01:20:49.050 W/MototwinNet(12561): phase=connectEnd url=https://mototwin.online/api/garage t=1780698049050
+06-06 01:20:49.051 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/garage t=1780698049051
+06-06 01:20:49.051 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/garage t=1780698049051
+06-06 01:20:49.051 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/garage t=1780698049051
+06-06 01:20:49.058 W/MototwinNet(12561): phase=secureConnectEnd url=https://ya.ru/ t=1780698049058
+06-06 01:20:49.060 W/MototwinNet(12561): phase=connectEnd url=https://ya.ru/ t=1780698049060
+06-06 01:20:49.062 W/MototwinNet(12561): phase=connectionAcquired url=https://ya.ru/ t=1780698049062
+06-06 01:20:49.063 W/MototwinNet(12561): phase=requestHeadersStart url=https://ya.ru/ t=1780698049063
+06-06 01:20:49.067 W/MototwinNet(12561): phase=secureConnectEnd url=https://www.gstatic.com/generate_204 t=1780698049067
+06-06 01:20:49.068 W/MototwinNet(12561): phase=connectEnd url=https://www.gstatic.com/generate_204 t=1780698049068
+06-06 01:20:49.069 W/MototwinNet(12561): phase=requestHeadersEnd url=https://ya.ru/ t=1780698049069
+06-06 01:20:49.070 W/MototwinNet(12561): phase=connectionAcquired url=https://www.gstatic.com/generate_204 t=1780698049070
+06-06 01:20:49.070 W/MototwinNet(12561): phase=requestHeadersStart url=https://www.gstatic.com/generate_204 t=1780698049070
+06-06 01:20:49.071 W/MototwinNet(12561): phase=requestHeadersEnd url=https://www.gstatic.com/generate_204 t=1780698049071
+06-06 01:20:49.107 W/MototwinNet(12561): phase=responseHeadersStart url=https://www.gstatic.com/generate_204 t=1780698049107
+06-06 01:20:49.107 W/MototwinNet(12561): phase=responseHeadersEnd url=https://www.gstatic.com/generate_204 t=1780698049107
+06-06 01:20:49.110 W/MototwinNet(12561): phase=callEnd url=https://www.gstatic.com/generate_204 t=1780698049110
+06-06 01:20:49.114 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/garage t=1780698049114
+06-06 01:20:49.114 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/garage t=1780698049114
+06-06 01:20:49.115 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/garage t=1780698049115
+06-06 01:20:49.123 W/ReactNativeJS(12561): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"gstatic","ok":true,"status":204,"durationMs":147},"timestamp":1780698049122}'
+06-06 01:20:49.124 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/garage","method":"GET","status":200,"durationMs":144},"timestamp":1780698049123}'
+06-06 01:20:49.128 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049128
+06-06 01:20:49.131 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049131
+06-06 01:20:49.131 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/vehicles/trash","queueLength":1,"running":1},"timestamp":1780698049131}'
+06-06 01:20:49.133 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/vehicles/trash","queueLength":0,"running":2},"timestamp":1780698049133}'
+06-06 01:20:49.134 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"normal","pathHint":"/api/notifications?limit=1","queueLength":1,"running":2},"timestamp":1780698049134}'
+06-06 01:20:49.135 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049135
+06-06 01:20:49.135 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"normal","pathHint":"/api/subscription/current","queueLength":2,"running":2},"timestamp":1780698049135}'
+06-06 01:20:49.136 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"normal","pathHint":"/api/notifications?limit=1","queueLength":1,"running":2},"timestamp":1780698049136}'
+06-06 01:20:49.136 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049136
+06-06 01:20:49.137 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/vehicles/trash","fullUrl":"https://mototwin.online/api/vehicles/trash","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698049137}'
+06-06 01:20:49.138 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049138
+06-06 01:20:49.138 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049138
+06-06 01:20:49.140 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/vehicles/trash","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698049138}'
+06-06 01:20:49.140 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049140
+06-06 01:20:49.140 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049140
+06-06 01:20:49.141 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049141
+06-06 01:20:49.142 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/notifications?limit=1","fullUrl":"https://mototwin.online/api/notifications?limit=1","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698049142}'
+06-06 01:20:49.142 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049142
+06-06 01:20:49.143 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/notifications?limit=1","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698049142}'
+06-06 01:20:49.144 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049144
+06-06 01:20:49.146 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049146
+06-06 01:20:49.147 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049147
+06-06 01:20:49.150 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049150
+06-06 01:20:49.151 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049151
+06-06 01:20:49.151 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/vehicles/trash t=1780698049151
+06-06 01:20:49.152 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/vehicles/trash t=1780698049152
+06-06 01:20:49.153 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049153
+06-06 01:20:49.153 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049153
+06-06 01:20:49.153 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/vehicles/trash t=1780698049153
+06-06 01:20:49.154 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/vehicles/trash t=1780698049154
+06-06 01:20:49.154 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049154
+06-06 01:20:49.156 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/notifications?limit=1 t=1780698049156
+06-06 01:20:49.157 W/MototwinNet(12561): phase=dnsStart url=https://mototwin.online/api/notifications?limit=1 t=1780698049157
+06-06 01:20:49.158 W/MototwinNet(12561): phase=dnsEnd url=https://mototwin.online/api/notifications?limit=1 t=1780698049158
+06-06 01:20:49.158 W/MototwinNet(12561): phase=connectStart url=https://mototwin.online/api/notifications?limit=1 t=1780698049158
+06-06 01:20:49.159 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049159
+06-06 01:20:49.160 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049159
+06-06 01:20:49.165 W/MototwinNet(12561): phase=secureConnectStart url=https://mototwin.online/api/notifications?limit=1 t=1780698049165
+06-06 01:20:49.171 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/vehicles/trash t=1780698049171
+06-06 01:20:49.171 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/vehicles/trash t=1780698049171
+06-06 01:20:49.174 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/vehicles/trash t=1780698049174
+06-06 01:20:49.210 W/MototwinNet(12561): phase=responseHeadersStart url=https://ya.ru/ t=1780698049210
+06-06 01:20:49.210 W/MototwinNet(12561): phase=responseHeadersEnd url=https://ya.ru/ t=1780698049210
+06-06 01:20:49.242 W/MototwinNet(12561): phase=callEnd url=https://ya.ru/ t=1780698049242
+06-06 01:20:49.273 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:49.274 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:49.274 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:49.274 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:49.448 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:49.448 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:49.448 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:49.449 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:49.449 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:49.449 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:49.450 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/vehicles/trash","method":"GET","status":200,"durationMs":316},"timestamp":1780698049450}'
+06-06 01:20:49.453 W/ReactNativeJS(12561): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"yandex","ok":true,"status":200,"durationMs":478},"timestamp":1780698049453}'
+06-06 01:20:49.454 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049454
+06-06 01:20:49.457 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049457
+06-06 01:20:49.458 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"normal","pathHint":"/api/subscription/current","queueLength":0,"running":2},"timestamp":1780698049458}'
+06-06 01:20:49.460 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/subscription/current","fullUrl":"https://mototwin.online/api/subscription/current","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698049460}'
+06-06 01:20:49.461 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/subscription/current","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698049461}'
+06-06 01:20:49.462 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049462
+06-06 01:20:49.464 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049464
+06-06 01:20:49.466 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049466
+06-06 01:20:49.466 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049466
+06-06 01:20:49.468 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049468
+06-06 01:20:49.469 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/subscription/current t=1780698049469
+06-06 01:20:49.469 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049469
+06-06 01:20:49.471 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/subscription/current t=1780698049471
+06-06 01:20:49.472 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/subscription/current t=1780698049472
+06-06 01:20:49.472 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:49.472 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/subscription/current t=1780698049472
+06-06 01:20:49.487 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/subscription/current t=1780698049487
+06-06 01:20:49.487 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/subscription/current t=1780698049487
+06-06 01:20:49.490 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/subscription/current t=1780698049490
+06-06 01:20:49.490 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:49.490 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:49.490 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:49.506 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/subscription/current","method":"GET","status":200,"durationMs":46},"timestamp":1780698049506}'
+06-06 01:20:49.511 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049511
+06-06 01:20:49.516 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698049516
+06-06 01:20:49.522 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:53.285 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_cancel_low_priority]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:118","message":"scheduler_cancel_low_priority","data":{"runningLowPriority":0,"lowQueuedCount":0,"queueLength":0,"running":1},"timestamp":1780698053285}'
+06-06 01:20:53.287 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053287
+06-06 01:20:53.289 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053289
+06-06 01:20:53.380 W/ReactNativeJS(12561): '[AUDIT][H12][mobile_api_client_created]', '{"sessionId":"577880","runId":"audit-v9","hypothesisId":"H12","location":"apps/app/src/create-mobile-api-client.ts:39","message":"mobile_api_client_created","data":{"baseUrl":"https://mototwin.online"},"timestamp":1780698053380}'
+06-06 01:20:53.380 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"normal","pathHint":"/api/subscription/current","queueLength":1,"running":1},"timestamp":1780698053380}'
+06-06 01:20:53.381 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"normal","pathHint":"/api/subscription/current","queueLength":0,"running":2},"timestamp":1780698053381}'
+06-06 01:20:53.382 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053382
+06-06 01:20:53.382 W/ReactNativeJS(12561): '[AUDIT][H8][garage_focus_leave]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:189","message":"garage_focus_leave","data":{"seq":1},"timestamp":1780698053382}'
+06-06 01:20:53.383 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053383
+06-06 01:20:53.390 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053390
+06-06 01:20:53.390 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053390
+06-06 01:20:53.401 W/ReactNativeJS(12561): '[AUDIT][H10][vehicle_load_start]', '{"sessionId":"577880","runId":"audit-v6","hypothesisId":"H10","location":"apps/app/app/vehicles/[id]/index.tsx:884","message":"vehicle_load_start","data":{"vehicleId":"cmpmggmg900001g9k874bic25","seq":1,"isInitialLoad":true},"timestamp":1780698053401}'
+06-06 01:20:53.402 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_cancel_low_priority]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:118","message":"scheduler_cancel_low_priority","data":{"runningLowPriority":0,"lowQueuedCount":0,"queueLength":0,"running":2},"timestamp":1780698053401}'
+06-06 01:20:53.402 W/ReactNativeJS(12561): '[AUDIT][H12][mobile_api_client_created]', '{"sessionId":"577880","runId":"audit-v9","hypothesisId":"H12","location":"apps/app/src/create-mobile-api-client.ts:39","message":"mobile_api_client_created","data":{"baseUrl":"https://mototwin.online"},"timestamp":1780698053402}'
+06-06 01:20:53.403 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/vehicles/cmpmggmg900001g9k874bic25","queueLength":1,"running":2},"timestamp":1780698053403}'
+06-06 01:20:53.404 W/ReactNativeJS(12561): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":["vehicles","[id]"]},"timestamp":1780698053404}'
+06-06 01:20:53.404 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053404
+06-06 01:20:53.405 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/subscription/current","fullUrl":"https://mototwin.online/api/subscription/current","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698053405}'
+06-06 01:20:53.405 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053405
+06-06 01:20:53.406 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/subscription/current","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698053406}'
+06-06 01:20:53.406 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053406
+06-06 01:20:53.408 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053408
+06-06 01:20:53.409 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053409
+06-06 01:20:53.409 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053409
+06-06 01:20:53.410 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053410
+06-06 01:20:53.410 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/subscription/current t=1780698053410
+06-06 01:20:53.411 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053411
+06-06 01:20:53.411 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053411
+06-06 01:20:53.412 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/subscription/current t=1780698053412
+06-06 01:20:53.412 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/subscription/current t=1780698053412
+06-06 01:20:53.412 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/subscription/current t=1780698053412
+06-06 01:20:53.412 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053412
+06-06 01:20:53.424 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_cancel_low_priority]', 'Network request failed'
+06-06 01:20:53.425 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:53.425 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:53.429 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/subscription/current t=1780698053429
+06-06 01:20:53.429 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/subscription/current t=1780698053429
+06-06 01:20:53.430 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/subscription/current t=1780698053430
+06-06 01:20:53.439 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:20:53.439 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:53.439 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:53.439 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:53.440 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_cancel_low_priority]', 'Network request failed'
+06-06 01:20:53.441 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/subscription/current","method":"GET","status":200,"durationMs":58},"timestamp":1780698053440}'
+06-06 01:20:53.445 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053445
+06-06 01:20:53.450 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/vehicles/cmpmggmg900001g9k874bic25","queueLength":0,"running":2},"timestamp":1780698053449}'
+06-06 01:20:53.450 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053450
+06-06 01:20:53.452 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25","fullUrl":"https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698053452}'
+06-06 01:20:53.453 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053453
+06-06 01:20:53.454 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698053454}'
+06-06 01:20:53.456 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053456
+06-06 01:20:53.458 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053458
+06-06 01:20:53.460 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053460
+06-06 01:20:53.461 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053461
+06-06 01:20:53.461 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053461
+06-06 01:20:53.462 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25 t=1780698053462
+06-06 01:20:53.463 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25 t=1780698053463
+06-06 01:20:53.464 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25 t=1780698053464
+06-06 01:20:53.464 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25 t=1780698053464
+06-06 01:20:53.474 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:53.484 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25 t=1780698053484
+06-06 01:20:53.484 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25 t=1780698053484
+06-06 01:20:53.486 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:53.486 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:53.486 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25 t=1780698053486
+06-06 01:20:53.486 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:53.502 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25","method":"GET","status":200,"durationMs":51},"timestamp":1780698053502}'
+06-06 01:20:53.506 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053506
+06-06 01:20:53.509 W/ReactNativeJS(12561): '[AUDIT][H10][vehicle_load_ok]', '{"sessionId":"577880","runId":"audit-v6","hypothesisId":"H10","location":"apps/app/app/vehicles/[id]/index.tsx:980","message":"vehicle_load_ok","data":{"vehicleId":"cmpmggmg900001g9k874bic25","seq":1,"isInitialLoad":true,"hasVehicle":true},"timestamp":1780698053508}'
+06-06 01:20:53.509 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"low","pathHint":"/api/vehicles/cmpmggmg900001g9k874bic25/node-tree","queueLength":1,"running":1},"timestamp":1780698053509}'
+06-06 01:20:53.510 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053510
+06-06 01:20:53.510 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"low","pathHint":"/api/vehicles/cmpmggmg900001g9k874bic25/node-tree","queueLength":0,"running":2},"timestamp":1780698053510}'
+06-06 01:20:53.511 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"normal","pathHint":"/api/vehicles/cmpmggmg900001g9k874bic25/service-events","queueLength":1,"running":2},"timestamp":1780698053511}'
+06-06 01:20:53.511 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053511
+06-06 01:20:53.512 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25/node-tree","fullUrl":"https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/node-tree","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698053512}'
+06-06 01:20:53.512 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053512
+06-06 01:20:53.513 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25/node-tree","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698053513}'
+06-06 01:20:53.513 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053513
+06-06 01:20:53.514 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053514
+06-06 01:20:53.515 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053515
+06-06 01:20:53.515 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053515
+06-06 01:20:53.517 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053516
+06-06 01:20:53.517 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/node-tree t=1780698053517
+06-06 01:20:53.517 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053517
+06-06 01:20:53.518 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053518
+06-06 01:20:53.518 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/node-tree t=1780698053518
+06-06 01:20:53.519 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/node-tree t=1780698053519
+06-06 01:20:53.519 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/node-tree t=1780698053519
+06-06 01:20:53.519 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053519
+06-06 01:20:53.560 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/node-tree t=1780698053560
+06-06 01:20:53.561 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/node-tree t=1780698053561
+06-06 01:20:53.568 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/node-tree t=1780698053568
+06-06 01:20:53.627 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:53.666 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:53.667 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:53.667 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:53.667 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:53.667 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:53.667 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25/node-tree","method":"GET","status":200,"durationMs":156},"timestamp":1780698053667}'
+06-06 01:20:53.670 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053670
+06-06 01:20:53.674 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053674
+06-06 01:20:53.680 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"normal","pathHint":"/api/vehicles/cmpmggmg900001g9k874bic25/service-events","queueLength":0,"running":2},"timestamp":1780698053679}'
+06-06 01:20:53.682 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25/service-events","fullUrl":"https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/service-events","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698053681}'
+06-06 01:20:53.682 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25/service-events","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698053682}'
+06-06 01:20:53.684 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053684
+06-06 01:20:53.685 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053685
+06-06 01:20:53.685 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053685
+06-06 01:20:53.686 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/service-events t=1780698053686
+06-06 01:20:53.688 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/service-events t=1780698053688
+06-06 01:20:53.688 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/service-events t=1780698053688
+06-06 01:20:53.689 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053689
+06-06 01:20:53.689 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/service-events t=1780698053689
+06-06 01:20:53.689 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053688
+06-06 01:20:53.689 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053688
+06-06 01:20:53.701 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:53.702 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:53.702 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:53.702 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:53.715 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/service-events t=1780698053715
+06-06 01:20:53.715 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/service-events t=1780698053715
+06-06 01:20:53.716 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/service-events t=1780698053716
+06-06 01:20:53.735 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25/service-events","method":"GET","status":200,"durationMs":54},"timestamp":1780698053735}'
+06-06 01:20:53.738 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053737
+06-06 01:20:53.740 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"normal","pathHint":"/api/nodes/top","queueLength":1,"running":1},"timestamp":1780698053739}'
+06-06 01:20:53.741 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053740
+06-06 01:20:53.741 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"normal","pathHint":"/api/nodes/top","queueLength":0,"running":2},"timestamp":1780698053741}'
+06-06 01:20:53.742 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053742
+06-06 01:20:53.744 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"normal","pathHint":"/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25","queueLength":1,"running":2},"timestamp":1780698053744}'
+06-06 01:20:53.744 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053744
+06-06 01:20:53.746 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053745
+06-06 01:20:53.746 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/vehicles/cmpmggmg900001g9k874bic25/wishlist","queueLength":2,"running":2},"timestamp":1780698053746}'
+06-06 01:20:53.747 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053747
+06-06 01:20:53.748 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/nodes/top","fullUrl":"https://mototwin.online/api/nodes/top","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698053748}'
+06-06 01:20:53.749 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053749
+06-06 01:20:53.749 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053749
+06-06 01:20:53.750 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/nodes/top","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698053750}'
+06-06 01:20:53.751 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053750
+06-06 01:20:53.753 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053753
+06-06 01:20:53.753 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053753
+06-06 01:20:53.753 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053753
+06-06 01:20:53.754 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/nodes/top t=1780698053754
+06-06 01:20:53.755 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/nodes/top t=1780698053755
+06-06 01:20:53.755 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/nodes/top t=1780698053755
+06-06 01:20:53.755 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/nodes/top t=1780698053755
+06-06 01:20:53.756 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053755
+06-06 01:20:53.756 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053753
+06-06 01:20:53.768 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:53.769 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:53.769 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:53.769 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:20:53.769 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:53.769 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:53.769 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:53.772 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/nodes/top t=1780698053772
+06-06 01:20:53.772 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/nodes/top t=1780698053772
+06-06 01:20:53.774 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/nodes/top t=1780698053774
+06-06 01:20:53.785 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/nodes/top","method":"GET","status":200,"durationMs":42},"timestamp":1780698053785}'
+06-06 01:20:53.787 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053787
+06-06 01:20:53.789 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/vehicles/cmpmggmg900001g9k874bic25/wishlist","queueLength":1,"running":2},"timestamp":1780698053788}'
+06-06 01:20:53.790 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053790
+06-06 01:20:53.790 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053790
+06-06 01:20:53.791 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25/wishlist","fullUrl":"https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/wishlist","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698053791}'
+06-06 01:20:53.792 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25/wishlist","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698053792}'
+06-06 01:20:53.793 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053793
+06-06 01:20:53.794 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053794
+06-06 01:20:53.795 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053795
+06-06 01:20:53.796 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/wishlist t=1780698053796
+06-06 01:20:53.796 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053796
+06-06 01:20:53.796 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/wishlist t=1780698053796
+06-06 01:20:53.796 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/wishlist t=1780698053796
+06-06 01:20:53.797 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/wishlist t=1780698053797
+06-06 01:20:53.798 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053798
+06-06 01:20:53.801 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:53.801 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:53.801 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:53.802 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:53.818 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/wishlist t=1780698053818
+06-06 01:20:53.818 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/wishlist t=1780698053818
+06-06 01:20:53.819 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/vehicles/cmpmggmg900001g9k874bic25/wishlist t=1780698053819
+06-06 01:20:53.835 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/vehicles/cmpmggmg900001g9k874bic25/wishlist","method":"GET","status":200,"durationMs":44},"timestamp":1780698053835}'
+06-06 01:20:53.837 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053837
+06-06 01:20:53.839 W/ReactNativeJS(12561): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"normal","pathHint":"/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25","queueLength":0,"running":2},"timestamp":1780698053839}'
+06-06 01:20:53.840 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053840
+06-06 01:20:53.841 W/ReactNativeJS(12561): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25","fullUrl":"https://mototwin.online/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698053840}'
+06-06 01:20:53.841 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053841
+06-06 01:20:53.843 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698053842}'
+06-06 01:20:53.843 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053843
+06-06 01:20:53.845 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053845
+06-06 01:20:53.847 W/MototwinNet(12561): phase=callStart url=https://mototwin.online/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25 t=1780698053847
+06-06 01:20:53.848 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053848
+06-06 01:20:53.849 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053848
+06-06 01:20:53.849 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053848
+06-06 01:20:53.849 W/MototwinNet(12561): phase=connectionAcquired url=https://mototwin.online/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25 t=1780698053849
+06-06 01:20:53.849 W/MototwinNet(12561): phase=requestHeadersStart url=https://mototwin.online/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25 t=1780698053849
+06-06 01:20:53.849 W/MototwinNet(12561): phase=requestHeadersEnd url=https://mototwin.online/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25 t=1780698053849
+06-06 01:20:53.851 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:53.868 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:20:53.868 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:53.868 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:53.871 W/MototwinNet(12561): phase=responseHeadersStart url=https://mototwin.online/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25 t=1780698053871
+06-06 01:20:53.872 W/MototwinNet(12561): phase=responseHeadersEnd url=https://mototwin.online/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25 t=1780698053872
+06-06 01:20:53.873 W/MototwinNet(12561): phase=callEnd url=https://mototwin.online/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25 t=1780698053873
+06-06 01:20:53.885 W/ReactNativeJS(12561): '[AUDIT][H2][api_request_ok]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:257","message":"api_request_ok","data":{"path":"/api/expenses?year=2026&vehicleId=cmpmggmg900001g9k874bic25","method":"GET","status":200,"durationMs":45},"timestamp":1780698053885}'
+06-06 01:20:53.887 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053887
+06-06 01:20:53.890 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698053890
+06-06 01:20:54.259 W/ReactNativeJS(12561): '[DBGLOG_FAIL][H2][api_request_ok]', 'Network request failed'
+06-06 01:20:55.959 W/ReactNativeJS(12561): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"background"},"timestamp":1780698055959}'
+06-06 01:20:55.959 W/ReactNativeJS(12561): '[AUDIT][H13][api_scheduler_signal_aborted]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H13","location":"packages/api-client/src/fetcher.ts:226","message":"api_scheduler_signal_aborted","data":{"path":"/api/notifications?limit=1","durationMs":6822},"timestamp":1780698055959}'
+06-06 01:20:55.961 W/MototwinNet(12561): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698055961
+06-06 01:20:55.963 W/MototwinNet(12561): phase=connectFailed:Socket closed url=https://mototwin.online/api/notifications?limit=1 t=1780698055963
+06-06 01:20:55.963 W/MototwinNet(12561): phase=callFailed:Socket closed url=https://mototwin.online/api/notifications?limit=1 t=1780698055963
+06-06 01:20:55.963 W/MototwinNet(12561): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698055963
+06-06 01:20:59.130 W/ReactNativeJS(12751): '[AUDIT][H8][auth_gate_start]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:49","message":"auth_gate_start","data":{"segments":[]},"timestamp":1780698059129}'
+06-06 01:20:59.136 W/ReactNativeJS(12751): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780698059136}'
+06-06 01:20:59.141 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698059141
+06-06 01:20:59.206 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698059206
+06-06 01:20:59.224 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:20:59.275 W/ReactNativeJS(12751): '[AUDIT][H8][auth_gate_done]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:108","message":"auth_gate_done","data":{"hasTokens":true,"ok":true,"onLogin":false,"isPublic":true,"durationMs":146,"mode":"tokens_unblocked","segments":[]},"timestamp":1780698059275}'
+06-06 01:20:59.275 W/ReactNativeJS(12751): '[AUDIT][H9][refresh_if_needed_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:81","message":"refresh_if_needed_enter","data":{"hasRefreshInFlight":false},"timestamp":1780698059275}'
+06-06 01:20:59.275 W/ReactNativeJS(12751): '[AUDIT][H9][refresh_enter]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:106","message":"refresh_enter","data":{},"timestamp":1780698059275}'
+06-06 01:20:59.276 W/ReactNativeJS(12751): '[AUDIT][H9][refresh_tokens_read]', '{"sessionId":"577880","runId":"audit-v5","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:120","message":"refresh_tokens_read","data":{"hasTokens":true,"durationMs":1},"timestamp":1780698059276}'
+06-06 01:20:59.276 W/ReactNativeJS(12751): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/auth/refresh","fullUrl":"https://mototwin.online/api/auth/refresh","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":false,"isMobileClient":false,"maxAttempts":1},"timestamp":1780698059276}'
+06-06 01:20:59.277 W/ReactNativeJS(12751): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/auth/refresh","method":"POST","timeoutMs":60000,"hasSchedulerSignal":false},"timestamp":1780698059277}'
+06-06 01:20:59.278 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698059278
+06-06 01:20:59.279 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698059279
+06-06 01:20:59.281 W/MototwinNet(12751): phase=callStart url=https://mototwin.online/api/auth/refresh t=1780698059281
+06-06 01:20:59.282 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698059282
+06-06 01:20:59.283 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698059283
+06-06 01:20:59.283 W/MototwinNet(12751): phase=dnsStart url=https://mototwin.online/api/auth/refresh t=1780698059283
+06-06 01:20:59.286 W/MototwinNet(12751): phase=dnsEnd url=https://mototwin.online/api/auth/refresh t=1780698059286
+06-06 01:20:59.286 W/MototwinNet(12751): phase=connectStart url=https://mototwin.online/api/auth/refresh t=1780698059286
+06-06 01:20:59.290 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:20:59.291 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:20:59.292 W/MototwinNet(12751): phase=secureConnectStart url=https://mototwin.online/api/auth/refresh t=1780698059292
+06-06 01:20:59.408 W/ReactNativeJS(12751): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":[]},"timestamp":1780698059408}'
+06-06 01:20:59.410 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698059410
+06-06 01:20:59.413 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698059413
+06-06 01:20:59.555 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:21:00.990 W/ReactNativeJS(12751): '[AUDIT][H8][garage_focus_enter]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:174","message":"garage_focus_enter","data":{"seq":0,"hasLoadedOnce":false},"timestamp":1780698060990}'
+06-06 01:21:00.990 W/ReactNativeJS(12751): '[AUDIT][H7][garage_load_start]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:68","message":"garage_load_start","data":{"seq":1,"showBlockingSpinner":true,"hasLoadedOnce":false},"timestamp":1780698060990}'
+06-06 01:21:00.992 W/MototwinNet(12751): phase=callStart url=https://mototwin.online/ t=1780698060992
+06-06 01:21:00.993 W/ReactNativeJS(12751): '[AUDIT][H1][scheduler_cancel_low_priority]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:118","message":"scheduler_cancel_low_priority","data":{"runningLowPriority":0,"lowQueuedCount":0,"queueLength":0,"running":0},"timestamp":1780698060992}'
+06-06 01:21:00.993 W/MototwinNet(12751): phase=callStart url=https://ya.ru/ t=1780698060993
+06-06 01:21:00.993 W/ReactNativeJS(12751): '[AUDIT][H12][mobile_api_client_created]', '{"sessionId":"577880","runId":"audit-v9","hypothesisId":"H12","location":"apps/app/src/create-mobile-api-client.ts:39","message":"mobile_api_client_created","data":{"baseUrl":"https://mototwin.online"},"timestamp":1780698060993}'
+06-06 01:21:00.994 W/ReactNativeJS(12751): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/garage","queueLength":1,"running":0},"timestamp":1780698060993}'
+06-06 01:21:00.994 W/ReactNativeJS(12751): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/garage","queueLength":0,"running":1},"timestamp":1780698060994}'
+06-06 01:21:00.995 W/MototwinNet(12751): phase=callStart url=https://www.gstatic.com/generate_204 t=1780698060995
+06-06 01:21:00.995 W/ReactNativeJS(12751): '[AUDIT][H3][route_segments_changed]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H3","location":"apps/app/app/_layout.tsx:90","message":"route_segments_changed","data":{"segments":["garage"]},"timestamp":1780698060995}'
+06-06 01:21:00.996 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698060996
+06-06 01:21:00.996 W/MototwinNet(12751): phase=dnsStart url=https://mototwin.online/ t=1780698060996
+06-06 01:21:00.996 W/MototwinNet(12751): phase=dnsEnd url=https://mototwin.online/ t=1780698060996
+06-06 01:21:00.997 W/ReactNativeJS(12751): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/garage","fullUrl":"https://mototwin.online/api/garage","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":true,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698060996}'
+06-06 01:21:00.997 W/MototwinNet(12751): phase=connectStart url=https://mototwin.online/ t=1780698060997
+06-06 01:21:00.997 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698060997
+06-06 01:21:00.998 W/MototwinNet(12751): phase=dnsStart url=https://www.gstatic.com/generate_204 t=1780698060998
+06-06 01:21:00.998 W/ReactNativeJS(12751): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/garage","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698060998}'
+06-06 01:21:00.998 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698060998
+06-06 01:21:00.999 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698060999
+06-06 01:21:00.999 W/MototwinNet(12751): phase=dnsStart url=https://ya.ru/ t=1780698060999
+06-06 01:21:01.000 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698061000
+06-06 01:21:01.001 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698061001
+06-06 01:21:01.001 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698061001
+06-06 01:21:01.002 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698061002
+06-06 01:21:01.002 W/ReactNativeJS(12751): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"active"},"timestamp":1780698061001}'
+06-06 01:21:01.002 W/MototwinNet(12751): phase=callStart url=https://mototwin.online/api/garage t=1780698061002
+06-06 01:21:01.003 W/MototwinNet(12751): phase=dnsEnd url=https://www.gstatic.com/generate_204 t=1780698061003
+06-06 01:21:01.003 W/MototwinNet(12751): phase=connectStart url=https://www.gstatic.com/generate_204 t=1780698061003
+06-06 01:21:01.003 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698061003
+06-06 01:21:01.003 W/MototwinNet(12751): phase=dnsEnd url=https://ya.ru/ t=1780698061003
+06-06 01:21:01.003 W/MototwinNet(12751): phase=connectStart url=https://ya.ru/ t=1780698061003
+06-06 01:21:01.003 W/MototwinNet(12751): phase=dnsStart url=https://mototwin.online/api/garage t=1780698061003
+06-06 01:21:01.004 W/MototwinNet(12751): phase=dnsEnd url=https://mototwin.online/api/garage t=1780698061004
+06-06 01:21:01.004 W/MototwinNet(12751): phase=connectStart url=https://mototwin.online/api/garage t=1780698061004
+06-06 01:21:01.004 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698061004
+06-06 01:21:01.004 W/MototwinNet(12751): phase=secureConnectStart url=https://mototwin.online/ t=1780698061004
+06-06 01:21:01.007 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698061007
+06-06 01:21:01.007 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698061007
+06-06 01:21:01.008 W/MototwinNet(12751): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780698061008
+06-06 01:21:01.009 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H1][scheduler_cancel_low_priority]', 'Network request failed'
+06-06 01:21:01.014 W/MototwinNet(12751): phase=secureConnectStart url=https://ya.ru/ t=1780698061014
+06-06 01:21:01.023 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H1][scheduler_enqueue]', 'Network request failed'
+06-06 01:21:01.023 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H12][api_request_target]', 'Network request failed'
+06-06 01:21:01.023 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H1][scheduler_start_task]', 'Network request failed'
+06-06 01:21:01.023 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H2][api_request_start]', 'Network request failed'
+06-06 01:21:01.024 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H3][route_segments_changed]', 'Network request failed'
+06-06 01:21:01.028 W/MototwinNet(12751): phase=secureConnectStart url=https://www.gstatic.com/generate_204 t=1780698061028
+06-06 01:21:01.056 W/MototwinNet(12751): phase=secureConnectEnd url=https://ya.ru/ t=1780698061056
+06-06 01:21:01.058 W/MototwinNet(12751): phase=connectEnd url=https://ya.ru/ t=1780698061058
+06-06 01:21:01.059 W/MototwinNet(12751): phase=connectionAcquired url=https://ya.ru/ t=1780698061059
+06-06 01:21:01.059 W/MototwinNet(12751): phase=requestHeadersStart url=https://ya.ru/ t=1780698061059
+06-06 01:21:01.061 W/MototwinNet(12751): phase=requestHeadersEnd url=https://ya.ru/ t=1780698061061
+06-06 01:21:01.075 W/MototwinNet(12751): phase=secureConnectEnd url=https://www.gstatic.com/generate_204 t=1780698061075
+06-06 01:21:01.076 W/MototwinNet(12751): phase=connectEnd url=https://www.gstatic.com/generate_204 t=1780698061076
+06-06 01:21:01.076 W/MototwinNet(12751): phase=connectionAcquired url=https://www.gstatic.com/generate_204 t=1780698061076
+06-06 01:21:01.076 W/MototwinNet(12751): phase=requestHeadersStart url=https://www.gstatic.com/generate_204 t=1780698061076
+06-06 01:21:01.077 W/MototwinNet(12751): phase=requestHeadersEnd url=https://www.gstatic.com/generate_204 t=1780698061077
+06-06 01:21:01.123 W/MototwinNet(12751): phase=responseHeadersStart url=https://www.gstatic.com/generate_204 t=1780698061123
+06-06 01:21:01.123 W/MototwinNet(12751): phase=responseHeadersEnd url=https://www.gstatic.com/generate_204 t=1780698061123
+06-06 01:21:01.124 W/MototwinNet(12751): phase=callEnd url=https://www.gstatic.com/generate_204 t=1780698061124
+06-06 01:21:01.140 W/ReactNativeJS(12751): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"gstatic","ok":true,"status":204,"durationMs":147},"timestamp":1780698061139}'
+06-06 01:21:01.220 W/MototwinNet(12751): phase=responseHeadersStart url=https://ya.ru/ t=1780698061220
+06-06 01:21:01.220 W/MototwinNet(12751): phase=responseHeadersEnd url=https://ya.ru/ t=1780698061220
+06-06 01:21:01.234 W/MototwinNet(12751): phase=callEnd url=https://ya.ru/ t=1780698061234
+06-06 01:21:01.256 W/ReactNativeJS(12751): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"yandex","ok":true,"status":200,"durationMs":264},"timestamp":1780698061256}'
+06-06 01:21:08.019 W/MototwinNet(12751): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780698068019
+06-06 01:21:08.020 W/MototwinNet(12751): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780698068020
+06-06 01:21:08.033 W/ReactNativeJS(12751): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":1,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7034,"error":"Aborted","errorName":"AbortError"},"timestamp":1780698068033}'
+06-06 01:21:08.036 W/ReactNativeJS(12751): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":1,"timeoutAborted":true,"durationMs":7037},"timestamp":1780698068036}'
+06-06 01:21:08.036 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698068036
+06-06 01:21:08.039 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698068039
+06-06 01:21:08.042 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698068042
+06-06 01:21:08.043 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698068042
+06-06 01:21:08.050 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:21:08.050 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:21:08.451 W/MototwinNet(12751): phase=callStart url=https://mototwin.online/api/garage t=1780698068451
+06-06 01:21:08.453 W/MototwinNet(12751): phase=dnsStart url=https://mototwin.online/api/garage t=1780698068453
+06-06 01:21:08.457 W/MototwinNet(12751): phase=dnsEnd url=https://mototwin.online/api/garage t=1780698068457
+06-06 01:21:08.458 W/MototwinNet(12751): phase=connectStart url=https://mototwin.online/api/garage t=1780698068458
+06-06 01:21:08.467 W/MototwinNet(12751): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780698068467
+06-06 01:21:15.462 W/MototwinNet(12751): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780698075462
+06-06 01:21:15.463 W/MototwinNet(12751): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780698075463
+06-06 01:21:15.477 W/ReactNativeJS(12751): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":2,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780698075476}'
+06-06 01:21:15.478 W/ReactNativeJS(12751): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":2,"timeoutAborted":true,"durationMs":7029},"timestamp":1780698075478}'
+06-06 01:21:15.480 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698075480
+06-06 01:21:15.482 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698075481
+06-06 01:21:15.485 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698075485
+06-06 01:21:15.487 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698075487
+06-06 01:21:15.493 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:21:15.493 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:21:15.895 W/MototwinNet(12751): phase=callStart url=https://mototwin.online/api/garage t=1780698075895
+06-06 01:21:15.897 W/MototwinNet(12751): phase=dnsStart url=https://mototwin.online/api/garage t=1780698075897
+06-06 01:21:15.902 W/MototwinNet(12751): phase=dnsEnd url=https://mototwin.online/api/garage t=1780698075902
+06-06 01:21:15.903 W/MototwinNet(12751): phase=connectStart url=https://mototwin.online/api/garage t=1780698075903
+06-06 01:21:15.910 W/MototwinNet(12751): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780698075910
+06-06 01:21:19.323 W/MototwinNet(12751): phase=connectFailed:Read timed out url=https://mototwin.online/api/auth/refresh t=1780698079323
+06-06 01:21:19.323 W/MototwinNet(12751): phase=callFailed:Read timed out url=https://mototwin.online/api/auth/refresh t=1780698079323
+06-06 01:21:19.340 W/ReactNativeJS(12751): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/auth/refresh","method":"POST","attempt":1,"maxAttempts":1,"schedulerAborted":false,"timeoutAborted":false,"durationMs":20061,"error":"Network request timed out","errorName":"TypeError"},"timestamp":1780698079339}'
+06-06 01:21:19.342 W/ReactNativeJS(12751): '[AUDIT][H9][refresh_error]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H9","location":"apps/app/src/create-mobile-api-client.ts:170","message":"refresh_error","data":{"durationMs":20066,"message":"Network request timed out"},"timestamp":1780698079341}'
+06-06 01:21:19.343 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698079343
+06-06 01:21:19.345 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698079345
+06-06 01:21:19.353 W/ReactNativeJS(12751): '[AUDIT][H8][auth_gate_refresh_result]', '{"sessionId":"577880","runId":"audit-v7","hypothesisId":"H8","location":"apps/app/app/_layout.tsx:134","message":"auth_gate_refresh_result","data":{"ok":false,"isPublic":true,"segments":[]},"timestamp":1780698079352}'
+06-06 01:21:19.356 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:21:21.027 W/MototwinNet(12751): phase=connectFailed:Read timed out url=https://mototwin.online/ t=1780698081027
+06-06 01:21:21.028 W/MototwinNet(12751): phase=callFailed:Read timed out url=https://mototwin.online/ t=1780698081028
+06-06 01:21:21.038 W/ReactNativeJS(12751): '[AUDIT][H13][canary_result]', '{"sessionId":"577880","runId":"audit-v10","hypothesisId":"H13","location":"apps/app/app/garage.tsx:canary","message":"canary_result","data":{"seq":1,"label":"ours","ok":false,"durationMs":20047,"error":"Network request timed out"},"timestamp":1780698081038}'
+06-06 01:21:22.905 W/MototwinNet(12751): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780698082905
+06-06 01:21:22.905 W/MototwinNet(12751): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780698082905
+06-06 01:21:22.920 W/ReactNativeJS(12751): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":3,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780698082919}'
+06-06 01:21:22.921 W/ReactNativeJS(12751): '[AUDIT][H16][api_request_retry]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H16","location":"packages/api-client/src/fetcher.ts:250","message":"api_request_retry","data":{"path":"/api/garage","method":"GET","attempt":3,"timeoutAborted":true,"durationMs":7029},"timestamp":1780698082921}'
+06-06 01:21:22.925 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698082924
+06-06 01:21:22.926 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698082926
+06-06 01:21:22.931 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698082931
+06-06 01:21:22.932 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698082932
+06-06 01:21:22.936 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:21:22.936 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H16][api_request_retry]', 'Network request failed'
+06-06 01:21:23.338 W/MototwinNet(12751): phase=callStart url=https://mototwin.online/api/garage t=1780698083338
+06-06 01:21:23.340 W/MototwinNet(12751): phase=dnsStart url=https://mototwin.online/api/garage t=1780698083340
+06-06 01:21:23.345 W/MototwinNet(12751): phase=dnsEnd url=https://mototwin.online/api/garage t=1780698083345
+06-06 01:21:23.346 W/MototwinNet(12751): phase=connectStart url=https://mototwin.online/api/garage t=1780698083346
+06-06 01:21:23.352 W/MototwinNet(12751): phase=secureConnectStart url=https://mototwin.online/api/garage t=1780698083352
+06-06 01:21:30.348 W/MototwinNet(12751): phase=connectFailed:Socket closed url=https://mototwin.online/api/garage t=1780698090348
+06-06 01:21:30.348 W/MototwinNet(12751): phase=callFailed:Socket closed url=https://mototwin.online/api/garage t=1780698090348
+06-06 01:21:30.363 W/ReactNativeJS(12751): '[AUDIT][H2][api_request_error]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:237","message":"api_request_error","data":{"path":"/api/garage","method":"GET","attempt":4,"maxAttempts":4,"schedulerAborted":false,"timeoutAborted":true,"durationMs":7027,"error":"Aborted","errorName":"AbortError"},"timestamp":1780698090363}'
+06-06 01:21:30.365 W/ReactNativeJS(12751): '[AUDIT][H7][garage_load_first_error]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:96","message":"garage_load_first_error","data":{"seq":1,"isTimeout":true,"message":"Превышено время ожидания ответа сервера (7 с)."},"timestamp":1780698090364}'
+06-06 01:21:30.365 W/ReactNativeJS(12751): '[AUDIT][H11][garage_timeout_no_retry]', '{"sessionId":"577880","runId":"audit-v8","hypothesisId":"H11","location":"apps/app/app/garage.tsx:116","message":"garage_timeout_no_retry","data":{"seq":1},"timestamp":1780698090365}'
+06-06 01:21:30.365 W/ReactNativeJS(12751): '[AUDIT][H7][garage_load_error]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:141","message":"garage_load_error","data":{"seq":1,"message":"Превышено время ожидания ответа сервера (7 с).","isTimeout":true},"timestamp":1780698090365}'
+06-06 01:21:30.366 E/ReactNativeJS(12751): [Error: Превышено время ожидания ответа сервера (7 с).]
+06-06 01:21:30.368 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698090368
+06-06 01:21:30.375 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698090375
+06-06 01:21:30.402 W/ReactNativeJS(12751): '[DBGLOG_FAIL][H2][api_request_error]', 'Network request failed'
+06-06 01:22:35.783 W/ReactNativeJS(12751): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"background"},"timestamp":1780698155782}'
+06-06 01:31:15.036 W/ReactNativeJS(12751): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"active"},"timestamp":1780698675036}'
+06-06 01:31:15.037 W/ReactNativeJS(12751): '[AUDIT][H7][garage_load_start]', '{"sessionId":"577880","runId":"audit-v3","hypothesisId":"H7","location":"apps/app/app/garage.tsx:68","message":"garage_load_start","data":{"seq":2,"showBlockingSpinner":true,"hasLoadedOnce":false},"timestamp":1780698675036}'
+06-06 01:31:15.045 W/MototwinNet(12751): phase=callStart url=https://mototwin.online/ t=1780698675045
+06-06 01:31:15.048 W/ReactNativeJS(12751): '[AUDIT][H1][scheduler_cancel_low_priority]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:118","message":"scheduler_cancel_low_priority","data":{"runningLowPriority":0,"lowQueuedCount":0,"queueLength":0,"running":0},"timestamp":1780698675047}'
+06-06 01:31:15.049 W/ReactNativeJS(12751): '[AUDIT][H12][mobile_api_client_created]', '{"sessionId":"577880","runId":"audit-v9","hypothesisId":"H12","location":"apps/app/src/create-mobile-api-client.ts:39","message":"mobile_api_client_created","data":{"baseUrl":"https://mototwin.online"},"timestamp":1780698675048}'
+06-06 01:31:15.049 W/ReactNativeJS(12751): '[AUDIT][H1][scheduler_enqueue]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:78","message":"scheduler_enqueue","data":{"priority":"high","pathHint":"/api/garage","queueLength":1,"running":0},"timestamp":1780698675049}'
+06-06 01:31:15.050 W/ReactNativeJS(12751): '[AUDIT][H1][scheduler_start_task]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H1","location":"apps/app/src/mobile-api-scheduler.ts:40","message":"scheduler_start_task","data":{"priority":"high","pathHint":"/api/garage","queueLength":0,"running":1},"timestamp":1780698675050}'
+06-06 01:31:15.051 W/MototwinNet(12751): phase=callStart url=https://ya.ru/ t=1780698675051
+06-06 01:31:15.052 W/MototwinNet(12751): phase=callStart url=https://www.gstatic.com/generate_204 t=1780698675052
+06-06 01:31:15.062 W/ReactNativeJS(12751): '[AUDIT][H12][api_request_target]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H12","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_target","data":{"path":"/api/garage","fullUrl":"https://mototwin.online/api/garage","baseUrl":"https://mototwin.online","credentials":"omit","hasAuthHeader":false,"isMobileClient":true,"maxAttempts":4},"timestamp":1780698675061}'
+06-06 01:31:15.062 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675062
+06-06 01:31:15.062 W/ReactNativeJS(12751): '[AUDIT][H2][api_request_start]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H2","location":"packages/api-client/src/fetcher.ts:221","message":"api_request_start","data":{"path":"/api/garage","method":"GET","timeoutMs":7000,"hasSchedulerSignal":true},"timestamp":1780698675062}'
+06-06 01:31:15.068 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675068
+06-06 01:31:15.073 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675073
+06-06 01:31:15.075 W/MototwinNet(12751): phase=dnsStart url=https://mototwin.online/ t=1780698675075
+06-06 01:31:15.075 W/MototwinNet(12751): phase=dnsStart url=https://www.gstatic.com/generate_204 t=1780698675075
+06-06 01:31:15.076 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675075
+06-06 01:31:15.077 W/MototwinNet(12751): phase=dnsStart url=https://ya.ru/ t=1780698675077
+06-06 01:31:15.078 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675078
+06-06 01:31:15.079 W/MototwinNet(12751): phase=callStart url=https://mototwin.online/api/garage t=1780698675079
+06-06 01:31:15.083 W/MototwinNet(12751): phase=dnsStart url=https://mototwin.online/api/garage t=1780698675083
+06-06 01:31:15.084 W/ReactNativeJS(12751): '[AUDIT][H8][garage_app_state]', '{"sessionId":"577880","runId":"audit-v4","hypothesisId":"H8","location":"apps/app/app/garage.tsx:205","message":"garage_app_state","data":{"nextState":"background"},"timestamp":1780698675084}'
+06-06 01:31:15.085 W/ReactNativeJS(12751): '[AUDIT][H13][api_scheduler_signal_aborted]', '{"sessionId":"577880","runId":"audit-v2","hypothesisId":"H13","location":"packages/api-client/src/fetcher.ts:226","message":"api_scheduler_signal_aborted","data":{"path":"/api/garage","durationMs":32},"timestamp":1780698675084}'
+06-06 01:31:15.088 W/MototwinNet(12751): phase=dnsEnd url=https://mototwin.online/ t=1780698675088
+06-06 01:31:15.089 W/MototwinNet(12751): phase=connectStart url=https://mototwin.online/ t=1780698675089
+06-06 01:31:15.095 W/MototwinNet(12751): phase=dnsEnd url=https://ya.ru/ t=1780698675092
+06-06 01:31:15.095 W/MototwinNet(12751): phase=connectStart url=https://ya.ru/ t=1780698675095
+06-06 01:31:15.095 W/MototwinNet(12751): phase=dnsEnd url=https://www.gstatic.com/generate_204 t=1780698675095
+06-06 01:31:15.095 W/MototwinNet(12751): phase=connectStart url=https://www.gstatic.com/generate_204 t=1780698675095
+06-06 01:31:15.099 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675099
+06-06 01:31:15.099 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675099
+06-06 01:31:15.099 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675099
+06-06 01:31:15.101 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675101
+06-06 01:31:15.103 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675103
+06-06 01:31:15.106 W/MototwinNet(12751): phase=callStart url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675106
+06-06 01:31:15.107 W/MototwinNet(12751): phase=dnsEnd url=https://mototwin.online/api/garage t=1780698675107
+06-06 01:31:15.108 W/MototwinNet(12751): phase=callFailed:Canceled url=https://mototwin.online/api/garage t=1780698675108
+06-06 01:31:15.109 W/MototwinNet(12751): phase=callFailed:CLEARTEXT communication to 127.0.0.1 not permitted by network security policy url=http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd t=1780698675109
+06-06 01:31:15.111 W/MototwinNet(12751): phase=secureConnectStart url=https://mototwin.online/ t=1780698675111
+06-06 01:31:15.112 W/MototwinNet(12751): phase=secureConnectStart url=https://ya.ru/ t=1780698675112
+06-06 01:31:15.118 W/MototwinNet(12751): phase=secureConnectStart url=https://www.gstatic.com/generate_204 t=1780698675118
+06-06 01:31:15.132 W/MototwinNet(12751): phase=secureConnectEnd url=https://ya.ru/ t=1780698675132
+06-06 01:31:15.134 W/MototwinNet(12751): phase=connectEnd url=https://ya.ru/ t=1780698675134
+06-06 01:31:15.135 W/MototwinNet(12751): phase=connectionAcquired url=https://ya.ru/ t=1780698675135
+06-06 01:31:15.136 W/MototwinNet(12751): phase=requestHeadersStart url=https://ya.ru/ t=1780698675136
+06-06 01:31:15.141 W/MototwinNet(12751): phase=requestHeadersEnd url=https://ya.ru/ t=1780698675141
+06-06 01:31:15.150 W/MototwinNet(12751): phase=secureConnectEnd url=https://mototwin.online/ t=1780698675150
+06-06 01:31:15.150 W/MototwinNet(12751): phase=connectEnd url=https://mototwin.online/ t=1780698675150
+06-06 01:31:15.150 W/MototwinNet(12751): phase=connectionAcquired url=https://mototwin.online/ t=1780698675150
+06-06 01:31:15.150 W/MototwinNet(12751): phase=requestHeadersStart url=https://mototwin.online/ t=1780698675150
+06-06 01:31:15.151 W/MototwinNet(12751): phase=requestHeadersEnd url=https://mototwin.online/ t=1780698675151
+06-06 01:31:15.154 W/MototwinNet(12751): phase=secureConnectEnd url=https://www.gstatic.com/generate_204 t=1780698675154
+06-06 01:31:15.155 W/MototwinNet(12751): phase=connectEnd url=https://www.gstatic.com/generate_204 t=1780698675155
+06-06 01:31:15.156 W/MototwinNet(12751): phase=connectionAcquired url=https://www.gstatic.com/generate_204 t=1780698675156
+06-06 01:31:15.156 W/MototwinNet(12751): phase=requestHeadersStart url=https://www.gstatic.com/generate_204 t=1780698675156
+06-06 01:31:15.157 W/MototwinNet(12751): phase=requestHeadersEnd url=https://www.gstatic.com/generate_204 t=1780698675157
+06-06 01:31:15.164 W/MototwinNet(12751): phase=responseHeadersStart url=https://mototwin.online/ t=1780698675164
+06-06 01:31:15.164 W/MototwinNet(12751): phase=responseHeadersEnd url=https://mototwin.online/ t=1780698675164
+06-06 01:31:15.166 W/MototwinNet(12751): phase=callEnd url=https://mototwin.online/ t=1780698675166
+06-06 01:31:15.195 W/MototwinNet(12751): phase=responseHeadersStart url=https://www.gstatic.com/generate_204 t=1780698675195
+06-06 01:31:15.195 W/MototwinNet(12751): phase=responseHeadersEnd url=https://www.gstatic.com/generate_204 t=1780698675195
+06-06 01:31:15.196 W/MototwinNet(12751): phase=callEnd url=https://www.gstatic.com/generate_204 t=1780698675196
+06-06 01:31:15.279 W/MototwinNet(12751): phase=responseHeadersStart url=https://ya.ru/ t=1780698675279
+06-06 01:31:15.279 W/MototwinNet(12751): phase=responseHeadersEnd url=https://ya.ru/ t=1780698675279
+06-06 01:31:15.309 W/MototwinNet(12751): phase=callEnd url=https://ya.ru/ t=1780698675309

@@ -19,6 +19,11 @@ export type AuthMeResponse = {
   capabilities?: SubscriptionCapabilities;
 };
 
+export type AuthSessionStateResponse = {
+  authenticated: boolean;
+  userId: string | null;
+};
+
 export type AuthLoginResponse = {
   user: AuthUser;
   garageId: string;

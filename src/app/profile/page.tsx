@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import { clearWebSessionCache } from "@/lib/web-api-dedup";
 import { createWebApiClient } from "@/lib/create-web-api-client";
-import { AuthGate } from "@/components/auth/AuthGate";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
   buildTopNodeProfileGroups,
@@ -456,7 +455,6 @@ export default function ProfilePage() {
   }, [replaceTargetCode, serviceNodes]);
 
   return (
-    <AuthGate>
     <main
       className="mt-internal-page min-h-screen text-gray-950"
       style={{ backgroundColor: productSemanticColors.canvas }}
@@ -862,7 +860,6 @@ export default function ProfilePage() {
       </section>
       </div>
     </main>
-    </AuthGate>
   );
 }
 

@@ -13,6 +13,7 @@ import type { GarageVehicleItem, VehicleDetail, VehicleDetailApiRecord } from "@
 import { Button } from "@/components/ui";
 import {
   getGarageVehiclesDeduped,
+  invalidateWebSessionCache,
   getVehicleDetailDeduped,
   getWebSession,
 } from "@/lib/web-api-dedup";
@@ -132,6 +133,7 @@ export function GarageSidebar({
     planLabel: string;
     avatarInitial: string;
   } | null>(null);
+  const [sessionWarning, setSessionWarning] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -146,10 +148,14 @@ export function GarageSidebar({
           planLabel: formatPlanLabelRu(me.planType),
           avatarInitial: userAvatarInitial(me.user.displayName, email),
         });
+        setSessionWarning("");
       })
-      .catch(() => {
+      .catch((error) => {
+        console.warn("GarageSidebar: failed to load session", error);
+        invalidateWebSessionCache();
         if (!cancelled) {
           setSessionUser(null);
+          setSessionWarning("Профиль временно недоступен.");
         }
       });
     return () => {
@@ -160,19 +166,24 @@ export function GarageSidebar({
   const [garageVehicles, setGarageVehicles] = useState<GarageVehicleItem[]>(
     prefetchedGarageVehicles ?? []
   );
+  const [garageWarning, setGarageWarning] = useState("");
   useEffect(() => {
     if (prefetchedGarageVehicles !== undefined) {
       setGarageVehicles(prefetchedGarageVehicles);
+      setGarageWarning("");
       return;
     }
     let cancelled = false;
     void getGarageVehiclesDeduped().then((res) => {
       if (!cancelled) {
         setGarageVehicles(res.vehicles ?? []);
+        setGarageWarning("");
       }
-    }).catch(() => {
+    }).catch((error) => {
+      console.warn("GarageSidebar: failed to load garage vehicles", error);
       if (!cancelled) {
         setGarageVehicles([]);
+        setGarageWarning("Список мотоциклов временно недоступен.");
       }
     });
     return () => {
@@ -363,6 +374,21 @@ export function GarageSidebar({
                 </Button>
               </Link>
             </div>
+          </div>
+        ) : null}
+        {!collapsed && (sessionWarning || garageWarning) ? (
+          <div
+            style={{
+              borderRadius: 10,
+              border: "1px solid rgba(245, 158, 11, 0.35)",
+              backgroundColor: "rgba(245, 158, 11, 0.08)",
+              color: "#fbbf24",
+              fontSize: 11,
+              lineHeight: "14px",
+              padding: "8px 10px",
+            }}
+          >
+            {sessionWarning || garageWarning}
           </div>
         ) : null}
 

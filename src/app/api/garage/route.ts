@@ -8,9 +8,20 @@ import {
   toCurrentUserContextErrorResponse,
 } from "../_shared/current-user-context";
 
-export async function GET() {
+const attentionCacheByGarageId = new Map<
+  string,
+  {
+    expiresAt: number;
+    value: Map<string, { totalCount: number; overdueCount: number; soonCount: number }>;
+  }
+>();
+
+const ATTENTION_CACHE_TTL_MS = 20_000;
+
+export async function GET(request: Request) {
   try {
     const currentUser = await getCurrentUserContext();
+    const includeAttention = new URL(request.url).searchParams.get("includeAttention") !== "0";
 
     const vehicles = await prisma.vehicle.findMany({
       where: {
@@ -26,14 +37,26 @@ export async function GET() {
       include: vehicleWireInclude,
     });
 
-    const attentionById = await computeGarageAttentionByVehicleId(
-      prisma,
-      vehicles.map((v) => ({
-        id: v.id,
-        odometer: v.odometer,
-        engineHours: v.engineHours,
-      }))
-    );
+    let attentionById = new Map<string, { totalCount: number; overdueCount: number; soonCount: number }>();
+    if (includeAttention) {
+      const cached = attentionCacheByGarageId.get(currentUser.garageId);
+      if (cached && cached.expiresAt > Date.now()) {
+        attentionById = cached.value;
+      } else {
+        attentionById = await computeGarageAttentionByVehicleId(
+          prisma,
+          vehicles.map((v) => ({
+            id: v.id,
+            odometer: v.odometer,
+            engineHours: v.engineHours,
+          }))
+        );
+        attentionCacheByGarageId.set(currentUser.garageId, {
+          value: attentionById,
+          expiresAt: Date.now() + ATTENTION_CACHE_TTL_MS,
+        });
+      }
+    }
 
     const vehiclesPayload: GarageVehiclesResponse = {
       vehicles: vehicles.map((row) => ({

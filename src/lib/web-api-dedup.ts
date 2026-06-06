@@ -1,5 +1,6 @@
 import type {
   AuthMeResponse,
+  AuthSessionStateResponse,
   GarageVehiclesResponse,
   ServiceEventsResponse,
   ServiceNodesResponse,
@@ -10,13 +11,29 @@ import type {
 } from "@mototwin/types";
 import { createWebApiClient } from "@/lib/create-web-api-client";
 
-const api = createWebApiClient({ redirectOn401: false });
-const garageApi = createWebApiClient();
+const authProbeApi = createWebApiClient({ redirectOn401: false, profile: "authProbe" });
+const api = createWebApiClient({ redirectOn401: false, profile: "default" });
+const garageApi = createWebApiClient({ profile: "heavyRead" });
 
-let sessionCache: AuthMeResponse | null = null;
+const SESSION_CACHE_TTL_MS = 60_000;
+const SESSION_STATE_CACHE_TTL_MS = 15_000;
+
+let sessionCache:
+  | {
+      value: AuthMeResponse;
+      expiresAt: number;
+    }
+  | null = null;
 let sessionInflight: Promise<AuthMeResponse> | null = null;
+let sessionStateCache:
+  | {
+      value: AuthSessionStateResponse;
+      expiresAt: number;
+    }
+  | null = null;
+let sessionStateInflight: Promise<AuthSessionStateResponse> | null = null;
 
-let garageInflight: Promise<GarageVehiclesResponse> | null = null;
+const garageInflightByKey = new Map<string, Promise<GarageVehiclesResponse>>();
 
 const vehicleDetailInflight = new Map<string, Promise<VehicleDetailResponse>>();
 
@@ -30,14 +47,17 @@ let serviceCatalogInflight: Promise<ServiceCatalogBundle> | null = null;
 
 /** Single in-flight / cached GET /api/auth/me for the browser tab. */
 export function getWebSession(): Promise<AuthMeResponse> {
-  if (sessionCache) {
-    return Promise.resolve(sessionCache);
+  if (sessionCache && sessionCache.expiresAt > Date.now()) {
+    return Promise.resolve(sessionCache.value);
   }
   if (!sessionInflight) {
     sessionInflight = api
       .getAuthMe()
       .then((me) => {
-        sessionCache = me;
+        sessionCache = {
+          value: me,
+          expiresAt: Date.now() + SESSION_CACHE_TTL_MS,
+        };
         return me;
       })
       .finally(() => {
@@ -47,21 +67,59 @@ export function getWebSession(): Promise<AuthMeResponse> {
   return sessionInflight;
 }
 
+/** Fast auth check for guards and non-blocking route transitions. */
+export function getWebSessionState(): Promise<AuthSessionStateResponse> {
+  if (sessionStateCache && sessionStateCache.expiresAt > Date.now()) {
+    return Promise.resolve(sessionStateCache.value);
+  }
+  if (!sessionStateInflight) {
+    sessionStateInflight = authProbeApi
+      .getAuthSessionState()
+      .then((state) => {
+        sessionStateCache = {
+          value: state,
+          expiresAt: Date.now() + SESSION_STATE_CACHE_TTL_MS,
+        };
+        return state;
+      })
+      .finally(() => {
+        sessionStateInflight = null;
+      });
+  }
+  return sessionStateInflight;
+}
+
 export function clearWebSessionCache(): void {
   sessionCache = null;
+  sessionStateCache = null;
   sessionInflight = null;
-  garageInflight = null;
+  sessionStateInflight = null;
+  garageInflightByKey.clear();
   vehicleDetailInflight.clear();
 }
 
+export function invalidateWebSessionCache(): void {
+  sessionCache = null;
+  sessionStateCache = null;
+}
+
 /** Dedupes concurrent GET /api/garage (expensive attention computation on server). */
-export function getGarageVehiclesDeduped(): Promise<GarageVehiclesResponse> {
-  if (!garageInflight) {
-    garageInflight = api.getGarageVehicles().finally(() => {
-      garageInflight = null;
-    });
+export function getGarageVehiclesDeduped(options?: {
+  includeAttention?: boolean;
+}): Promise<GarageVehiclesResponse> {
+  const includeAttention = options?.includeAttention !== false;
+  const key = includeAttention ? "with-attention" : "without-attention";
+  const existing = garageInflightByKey.get(key);
+  if (existing) {
+    return existing;
   }
-  return garageInflight;
+  const request = garageApi
+    .getGarageVehicles({ includeAttention })
+    .finally(() => {
+      garageInflightByKey.delete(key);
+    });
+  garageInflightByKey.set(key, request);
+  return request;
 }
 
 export function getVehicleDetailDeduped(vehicleId: string): Promise<VehicleDetailResponse> {

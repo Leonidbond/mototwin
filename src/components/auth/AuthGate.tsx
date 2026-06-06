@@ -2,39 +2,42 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { getWebSession } from "@/lib/web-api-dedup";
+import { getWebSessionState } from "@/lib/web-api-dedup";
 
 type AuthGateProps = {
   children: ReactNode;
 };
 
 /**
- * Redirects to /login when session is missing (production and dev without dev switcher).
+ * Non-blocking auth probe: pages stay interactive while auth state is verified.
+ * Redirects only on confirmed unauthenticated state.
  */
 export function AuthGate({ children }: AuthGateProps) {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const [authProbeError, setAuthProbeError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        await getWebSession();
-        if (!cancelled) setReady(true);
-      } catch (error) {
-        if (cancelled) return;
-        const message = error instanceof Error ? error.message : "";
-        if (message.toLowerCase().includes("требуется вход")) {
-          router.replace("/login");
+        const sessionState = await getWebSessionState();
+        if (cancelled) {
           return;
         }
-        router.replace(
-          `/login?next=${encodeURIComponent(
+        if (!sessionState.authenticated) {
+          const next = encodeURIComponent(
             typeof window !== "undefined"
               ? window.location.pathname + window.location.search
               : "/garage"
-          )}&error=${encodeURIComponent(message || "Не удалось проверить сессию.")}`
-        );
+          );
+          router.replace(`/login?next=${next}`);
+          return;
+        }
+        setAuthProbeError("");
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "";
+        setAuthProbeError(message || "Не удалось проверить сессию.");
       }
     })();
     return () => {
@@ -42,16 +45,21 @@ export function AuthGate({ children }: AuthGateProps) {
     };
   }, [router]);
 
-  if (!ready) {
-    return (
+  return (
+    <>
+      {authProbeError ? (
       <div
-        className="min-h-full flex items-center justify-center"
-        style={{ backgroundColor: "#080d12", color: "#8b9aab" }}
+        className="mx-4 mt-4 rounded-lg border px-3 py-2 text-sm"
+        style={{
+          borderColor: "rgba(245, 158, 11, 0.4)",
+          backgroundColor: "rgba(245, 158, 11, 0.08)",
+          color: "#fbbf24",
+        }}
       >
-        Загрузка…
+        {authProbeError}
       </div>
-    );
-  }
-
-  return <>{children}</>;
+      ) : null}
+      {children}
+    </>
+  );
 }

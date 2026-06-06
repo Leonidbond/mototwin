@@ -13,3 +13,5 @@ apps/app/.expo
 .venv-tools
 mototwin.dump
 *.tsbuildinfo
+.venv-icon/
+auth/client_secret_*.json

@@ -450,6 +450,7 @@ export type {
 export type {
   AuthUser,
   AuthMeResponse,
+  AuthSessionStateResponse,
   AuthLoginResponse,
   AuthRegisterInput,
   AuthLoginInput,

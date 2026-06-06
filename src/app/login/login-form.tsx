@@ -8,7 +8,7 @@ import { createWebApiClient } from "@/lib/create-web-api-client";
 import { clearWebSessionCache } from "@/lib/web-api-dedup";
 import { productSemanticColors } from "@mototwin/design-tokens";
 
-const api = createWebApiClient();
+const api = createWebApiClient({ redirectOn401: false });
 
 function resolveOauthErrorMessage(oauthErrorCode: string | null): string {
   if (!oauthErrorCode) return "";
@@ -42,6 +42,9 @@ export function LoginForm({ nextPath, oauthErrorCode }: LoginFormProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(() => resolveOauthErrorMessage(oauthErrorCode));
   const [loading, setLoading] = useState(false);
+  const [oauthLoadingProvider, setOauthLoadingProvider] = useState<"google" | "apple" | "yandex" | null>(null);
+  const callbackPath = nextPath.startsWith("/") ? nextPath : "/garage";
+  const isBusy = loading || oauthLoadingProvider !== null;
 
   useEffect(() => {
     clearWebSessionCache();
@@ -64,6 +67,14 @@ export function LoginForm({ nextPath, oauthErrorCode }: LoginFormProps) {
     } finally {
       setLoading(false);
     }
+  }
+
+  function beginOauthSignIn(provider: "google" | "apple" | "yandex") {
+    setError("");
+    setOauthLoadingProvider(provider);
+    void signIn(provider, { callbackUrl: callbackPath }).finally(() => {
+      setOauthLoadingProvider(null);
+    });
   }
 
   return (
@@ -114,8 +125,8 @@ export function LoginForm({ nextPath, oauthErrorCode }: LoginFormProps) {
           ) : null}
           <button
             type="submit"
-            disabled={loading}
-            className="rounded-lg py-2.5 font-medium disabled:opacity-50"
+            disabled={isBusy}
+            className="rounded-lg py-2.5 font-medium transition-all duration-150 active:scale-[0.99] active:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
             style={{ backgroundColor: productSemanticColors.primaryAction, color: "#fff" }}
           >
             {loading ? "Вход…" : "Войти"}
@@ -124,30 +135,42 @@ export function LoginForm({ nextPath, oauthErrorCode }: LoginFormProps) {
         <div className="mt-4 grid grid-cols-1 gap-2">
           <button
             type="button"
-            onClick={() => {
-              const callbackPath = nextPath.startsWith("/") ? nextPath : "/garage";
-              void signIn("google", { callbackUrl: callbackPath });
+            onClick={() => beginOauthSignIn("google")}
+            disabled={isBusy}
+            className="rounded-lg border py-2 text-sm transition-all duration-150 active:scale-[0.99] active:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              borderColor: oauthLoadingProvider === "google" ? productSemanticColors.primaryAction : "rgba(255,255,255,0.15)",
+              backgroundColor: oauthLoadingProvider === "google" ? productSemanticColors.primaryAction : "transparent",
+              color: oauthLoadingProvider === "google" ? "#fff" : undefined,
             }}
-            className="rounded-lg border py-2 text-sm"
-            style={{ borderColor: "rgba(255,255,255,0.15)" }}
           >
-            Войти через Google
+            {oauthLoadingProvider === "google" ? "Переход к Google…" : "Войти через Google"}
           </button>
           <button
             type="button"
-            onClick={() => void signIn("apple", { callbackUrl: nextPath })}
-            className="rounded-lg border py-2 text-sm"
-            style={{ borderColor: "rgba(255,255,255,0.15)" }}
+            onClick={() => beginOauthSignIn("apple")}
+            disabled={isBusy}
+            className="rounded-lg border py-2 text-sm transition-all duration-150 active:scale-[0.99] active:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              borderColor: oauthLoadingProvider === "apple" ? productSemanticColors.primaryAction : "rgba(255,255,255,0.15)",
+              backgroundColor: oauthLoadingProvider === "apple" ? productSemanticColors.primaryAction : "transparent",
+              color: oauthLoadingProvider === "apple" ? "#fff" : undefined,
+            }}
           >
-            Войти через Apple
+            {oauthLoadingProvider === "apple" ? "Переход к Apple…" : "Войти через Apple"}
           </button>
           <button
             type="button"
-            onClick={() => void signIn("yandex", { callbackUrl: nextPath })}
-            className="rounded-lg border py-2 text-sm"
-            style={{ borderColor: "rgba(255,255,255,0.15)" }}
+            onClick={() => beginOauthSignIn("yandex")}
+            disabled={isBusy}
+            className="rounded-lg border py-2 text-sm transition-all duration-150 active:scale-[0.99] active:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              borderColor: oauthLoadingProvider === "yandex" ? productSemanticColors.primaryAction : "rgba(255,255,255,0.15)",
+              backgroundColor: oauthLoadingProvider === "yandex" ? productSemanticColors.primaryAction : "transparent",
+              color: oauthLoadingProvider === "yandex" ? "#fff" : undefined,
+            }}
           >
-            Войти через Yandex
+            {oauthLoadingProvider === "yandex" ? "Переход к Yandex…" : "Войти через Yandex"}
           </button>
         </div>
         <p className="text-sm mt-4" style={{ color: productSemanticColors.textMuted }}>

@@ -254,7 +254,9 @@ export class ApiClient {
           continue;
         }
         if (timeoutAborted) {
-          throw new Error(`Превышено время ожидания ответа сервера (${Math.round((timeoutMs ?? 0) / 1000)} с).`);
+          throw new Error(
+            `Превышено время ожидания ответа сервера (${Math.round((timeoutMs ?? 0) / 1000)} с). Проверьте соединение и повторите попытку.`
+          );
         }
         throw error;
       } finally {
@@ -265,7 +267,9 @@ export class ApiClient {
     }
 
     if (response == null) {
-      throw new Error(`Превышено время ожидания ответа сервера (${Math.round((timeoutMs ?? 0) / 1000)} с).`);
+      throw new Error(
+        `Превышено время ожидания ответа сервера (${Math.round((timeoutMs ?? 0) / 1000)} с). Проверьте соединение и повторите попытку.`
+      );
     }
 
     if (response.status === 401 && this.onUnauthorized) {

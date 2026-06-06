@@ -87,6 +87,7 @@ import type {
   PartCompatibilityReportResponse,
   PartMasterPrefillResponse,
   AuthMeResponse,
+  AuthSessionStateResponse,
   AuthLoginResponse,
   AuthLoginInput,
   AuthRegisterInput,
@@ -108,6 +109,10 @@ export function createMotoTwinEndpoints(client: ApiClient) {
   return {
     getAuthMe() {
       return client.request<AuthMeResponse>("/api/auth/me");
+    },
+
+    getAuthSessionState() {
+      return client.request<AuthSessionStateResponse>("/api/auth/session-state");
     },
 
     getSubscriptionCurrent() {
@@ -291,8 +296,13 @@ export function createMotoTwinEndpoints(client: ApiClient) {
       });
     },
 
-    getGarageVehicles() {
-      return client.request<GarageVehiclesResponse>("/api/garage");
+    getGarageVehicles(params?: { includeAttention?: boolean }) {
+      const query = new URLSearchParams();
+      if (params?.includeAttention === false) {
+        query.set("includeAttention", "0");
+      }
+      const qs = query.toString();
+      return client.request<GarageVehiclesResponse>(`/api/garage${qs ? `?${qs}` : ""}`);
     },
 
     getTrashedVehicles() {

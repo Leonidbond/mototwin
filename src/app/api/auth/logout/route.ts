@@ -9,6 +9,36 @@ import {
 import { parseJsonBody } from "@/lib/http/parse-json-body";
 import { logAuthEvent } from "@/lib/auth-audit";
 
+const NEXT_AUTH_SESSION_COOKIE_BASE_NAMES = [
+  "next-auth.session-token",
+  "__Secure-next-auth.session-token",
+  "__Host-next-auth.session-token",
+  "authjs.session-token",
+  "__Secure-authjs.session-token",
+  "__Host-authjs.session-token",
+] as const;
+
+function clearAuthJsSessionCookies(response: NextResponse) {
+  for (const baseName of NEXT_AUTH_SESSION_COOKIE_BASE_NAMES) {
+    response.cookies.set(baseName, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    for (let idx = 0; idx < 6; idx += 1) {
+      response.cookies.set(`${baseName}.${idx}`, "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 0,
+      });
+    }
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
@@ -48,6 +78,7 @@ export async function POST(request: Request) {
       path: "/",
       maxAge: 0,
     });
+    clearAuthJsSessionCookies(response);
     return response;
   } catch (error) {
     console.error("Logout failed:", error);
