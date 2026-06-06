@@ -38,10 +38,16 @@ function GaragePageContent() {
   const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed(SIDEBAR_COLLAPSED_KEY);
 
   const loadGarage = useCallback(async () => {
+    // #region agent log
+    fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H2",location:"src/app/garage/page.tsx:44",message:"loadGarage start",data:{visibility:typeof document!=="undefined"?document.visibilityState:"n/a"},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     try {
       setIsLoading(true);
       setError("");
       const garageResult = await getGarageVehiclesDeduped();
+      // #region agent log
+      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H2",location:"src/app/garage/page.tsx:51",message:"loadGarage got vehicles",data:{vehicles:(garageResult.vehicles??[]).length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setVehicles(garageResult.vehicles ?? []);
 
       void Promise.allSettled([
@@ -63,6 +69,9 @@ function GaragePageContent() {
       });
     } catch (err) {
       console.error(err);
+      // #region agent log
+      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H2",location:"src/app/garage/page.tsx:76",message:"loadGarage failed",data:{error:err instanceof Error?err.message:String(err)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setError(
         err instanceof Error ? err.message : "Произошла ошибка при загрузке гаража."
       );

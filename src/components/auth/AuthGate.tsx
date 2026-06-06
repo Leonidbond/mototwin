@@ -16,14 +16,23 @@ export function AuthGate({ children }: AuthGateProps) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    // #region agent log
+    fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H1",location:"src/components/auth/AuthGate.tsx:20",message:"AuthGate effect start",data:{path:typeof window!=="undefined"?window.location.pathname:"server"},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     let cancelled = false;
     (async () => {
       try {
         await getWebSession();
+        // #region agent log
+        fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H1",location:"src/components/auth/AuthGate.tsx:26",message:"AuthGate getWebSession success",data:{cancelled},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         if (!cancelled) setReady(true);
       } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : "";
+        // #region agent log
+        fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd",{method:"POST",headers:{"Content-Type":"application/json","X-Debug-Session-Id":"6800ea"},body:JSON.stringify({sessionId:"6800ea",runId:"run1",hypothesisId:"H1",location:"src/components/auth/AuthGate.tsx:33",message:"AuthGate getWebSession failed",data:{message},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         if (message.toLowerCase().includes("требуется вход")) {
           router.replace("/login");
           return;
