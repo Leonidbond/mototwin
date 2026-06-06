@@ -290,9 +290,6 @@ export function chooseBestSkuForKitItem(
   }
   let candidates = recommendations.filter((rec) => rec.partType === item.partType);
   if (candidates.length === 0) {
-    candidates = [...recommendations];
-  }
-  if (candidates.length === 0) {
     return null;
   }
   return [...candidates].sort((a, b) => {

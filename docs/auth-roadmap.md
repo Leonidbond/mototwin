@@ -10,6 +10,8 @@ Detailed ownership architecture and migration strategy:
 - Authorization is **implemented for local accounts** on web + Expo:
   - `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me`.
 - Web now supports Auth.js sessions and OAuth providers (Google/Apple/Yandex) when env credentials are configured.
+- Web `/login`: email/password → custom `/api/auth/login`; OAuth → Auth.js (see [auth-oauth-production.md](./auth-oauth-production.md)).
+- OAuth user creation uses `mototwinPrismaAdapter()` (`displayName` mapping) + post-sign-in bootstrap via `events.signIn`.
 - Expo keeps token-based auth (access + refresh), and can sign in through provider tokens via `POST /api/auth/oauth/mobile`.
 - Password recovery flow is implemented:
   - `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`;

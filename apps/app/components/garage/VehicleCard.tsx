@@ -119,9 +119,8 @@ export function VehicleCard(props: {
           size="sm"
           onPress={() => props.onAddServiceEvent(props.vehicle.id)}
           style={styles.secondaryButton}
-          leadingIcon={<MaterialIcons name="description" size={16} color={c.textPrimary} />}
         >
-          Добавить ТО
+          <Text style={styles.centeredButtonLabel}>Новое ТО</Text>
         </Button>
         <Button
           variant="ghost"
@@ -248,5 +247,13 @@ const styles = StyleSheet.create({
     height: 32,
     paddingHorizontal: 8,
     borderRadius: 12,
+  },
+  centeredButtonLabel: {
+    flex: 1,
+    textAlign: "center",
+    color: c.textPrimary,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 15,
   },
 });

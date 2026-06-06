@@ -1126,6 +1126,8 @@ export default function ServiceLogScreen() {
   } | null>(null);
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
+  const [serviceCatalogNodes, setServiceCatalogNodes] = useState<ServiceNodeItem[]>([]);
+  const { capabilities: subscriptionCapabilities } = useMobileSubscription();
   const [vehicleDisplayName, setVehicleDisplayName] = useState("");
   const [contextVehicleDetail, setContextVehicleDetail] = useState<VehicleDetail | null>(null);
   const [nodePickerOpen, setNodePickerOpen] = useState(false);

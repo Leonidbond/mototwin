@@ -29,7 +29,11 @@ import {
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createMobileApiClient } from "../../../src/create-mobile-api-client";
+import {
+  createMobileApiClient,
+  prioritizeMobileApiForNavigation,
+} from "../../../src/create-mobile-api-client";
+import { buildVehicleStateRoute } from "../../../src/vehicle-state-route";
 import { withAuthGuard } from "../../../src/mobile-auth-guard";
 import { useMobileSubscription } from "../../../src/use-mobile-subscription";
 import { SubscriptionLockBanner } from "../../../components/subscription/subscription-lock-banner";
@@ -728,11 +732,16 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   useEffect(() => {
-    if (!vehicleId || openVehicleStateParam !== "1" || isLoading) {
+    if (!vehicleId || openVehicleStateParam !== "1" || isLoading || !vehicle) {
       return;
     }
-    router.replace(`/vehicles/${vehicleId}/state`);
-  }, [isLoading, openVehicleStateParam, router, vehicleId]);
+    router.replace(
+      buildVehicleStateRoute(vehicleId, {
+        odometer: vehicle.odometer,
+        engineHours: vehicle.engineHours,
+      })
+    );
+  }, [isLoading, openVehicleStateParam, router, vehicle, vehicleId]);
   const [error, setError] = useState("");
   const [nodeTreeError, setNodeTreeError] = useState("");
   const [isNodeTreeLoading, setIsNodeTreeLoading] = useState(false);
@@ -772,6 +781,95 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
   const [yearExpenses, setYearExpenses] = useState<ExpenseItem[]>([]);
   const [nodeSnoozeByNodeId, setNodeSnoozeByNodeId] = useState<Record<string, string | null>>({});
   const [isMovingToTrash, setIsMovingToTrash] = useState(false);
+  const loadSeqRef = useRef(0);
+  const loadedVehicleIdRef = useRef<string | null>(null);
+
+  const applyVehicleExtras = useCallback(
+    (results: {
+      nodesResult: PromiseSettledResult<{ nodeTree?: NodeTreeItem[] }>;
+      eventsResult: PromiseSettledResult<{ serviceEvents?: ServiceEventItem[] }>;
+      topNodesResult: PromiseSettledResult<{ nodes?: TopServiceNodeItem[] }>;
+      yearExpensesResult: PromiseSettledResult<{ expenses?: ExpenseItem[] }>;
+      wishlistResult: PromiseSettledResult<{ items?: PartWishlistItem[] }>;
+    }) => {
+      const { nodesResult, eventsResult, topNodesResult, yearExpensesResult, wishlistResult } = results;
+
+      if (nodesResult.status === "fulfilled") {
+        setNodeTree(nodesResult.value.nodeTree ?? []);
+        setNodeTreeError("");
+      } else {
+        console.error(nodesResult.reason);
+        setNodeTreeError("Не удалось загрузить дерево узлов.");
+        setNodeTree([]);
+      }
+
+      if (eventsResult.status === "fulfilled") {
+        setServiceEvents(eventsResult.value.serviceEvents ?? []);
+      } else {
+        console.error(eventsResult.reason);
+        setServiceEvents([]);
+      }
+
+      if (yearExpensesResult.status === "fulfilled") {
+        setYearExpenses(yearExpensesResult.value.expenses ?? []);
+      } else {
+        console.error(yearExpensesResult.reason);
+        setYearExpenses([]);
+      }
+
+      if (wishlistResult.status === "fulfilled") {
+        setWishlistItems(wishlistResult.value.items ?? []);
+      } else {
+        console.error(wishlistResult.reason);
+        setWishlistItems([]);
+      }
+
+      if (topNodesResult.status === "fulfilled") {
+        setTopServiceNodes(topNodesResult.value.nodes ?? []);
+        setTopServiceNodesError("");
+      } else {
+        console.error(topNodesResult.reason);
+        setTopServiceNodes([]);
+        setTopServiceNodesError("Не удалось загрузить основные узлы.");
+      }
+    },
+    []
+  );
+
+  const loadVehicleExtras = useCallback(
+    async (seq: number, endpoints: ReturnType<typeof createMobileApiClient>) => {
+      setIsNodeTreeLoading(true);
+      setIsTopServiceNodesLoading(true);
+
+      const [nodesResult, eventsResult] = await Promise.allSettled([
+        endpoints.getNodeTree(vehicleId),
+        endpoints.getServiceEvents(vehicleId),
+      ]);
+      if (seq !== loadSeqRef.current) {
+        return;
+      }
+
+      const [topNodesResult, yearExpensesResult, wishlistResult] = await Promise.allSettled([
+        endpoints.getTopServiceNodes(),
+        endpoints.getExpenses({ vehicleId, year: currentExpenseYear }),
+        endpoints.getVehicleWishlist(vehicleId),
+      ]);
+      if (seq !== loadSeqRef.current) {
+        return;
+      }
+
+      applyVehicleExtras({
+        nodesResult,
+        eventsResult,
+        topNodesResult,
+        yearExpensesResult,
+        wishlistResult,
+      });
+      setIsNodeTreeLoading(false);
+      setIsTopServiceNodesLoading(false);
+    },
+    [applyVehicleExtras, currentExpenseYear, vehicleId]
+  );
 
   const load = useCallback(async () => {
     if (!vehicleId) {
@@ -780,105 +878,103 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       return;
     }
 
+    const seq = ++loadSeqRef.current;
+    const isInitialLoad = loadedVehicleIdRef.current !== vehicleId;
+    prioritizeMobileApiForNavigation();
     const endpoints = createMobileApiClient();
 
-    setIsLoading(true);
-    setError("");
-    setNodeTreeError("");
-    setTopServiceNodesError("");
-    setServiceEvents([]);
-    setWishlistItems([]);
-    setYearExpenses([]);
-
-    try {
-      const detailData = await withAuthGuard(
-        () => endpoints.getVehicleDetail(vehicleId),
-        () => router.replace("/login")
-      );
-      if (!detailData) {
-        return;
-      }
-      setVehicle(
-        detailData.vehicle
-          ? vehicleDetailFromApiRecord(detailData.vehicle as unknown as VehicleDetailApiRecord)
-          : null
-      );
-    } catch (err) {
-      setError("Не удалось загрузить данные мотоцикла.");
+    if (isInitialLoad) {
+      setIsLoading(true);
+      setError("");
       setVehicle(null);
       setNodeTree([]);
       setTopServiceNodes([]);
       setServiceEvents([]);
       setWishlistItems([]);
       setYearExpenses([]);
+    }
+    setNodeTreeError("");
+    setTopServiceNodesError("");
+
+    try {
+      const fetchDetail = () =>
+        withAuthGuard(() => endpoints.getVehicleDetail(vehicleId), () => router.replace("/login"));
+
+      let detailData: Awaited<ReturnType<typeof fetchDetail>> | null = null;
+      try {
+        detailData = await fetchDetail();
+      } catch (firstError) {
+        const isTimeout =
+          firstError instanceof Error &&
+          firstError.message.includes("Превышено время ожидания");
+        if (!isTimeout || seq !== loadSeqRef.current) {
+          throw firstError;
+        }
+        prioritizeMobileApiForNavigation();
+        detailData = await fetchDetail();
+      }
+      if (seq !== loadSeqRef.current) {
+        return;
+      }
+      if (!detailData) {
+        setIsLoading(false);
+        return;
+      }
+
+      let parsedVehicle: VehicleDetail | null = null;
+      try {
+        parsedVehicle = detailData.vehicle
+          ? vehicleDetailFromApiRecord(detailData.vehicle as unknown as VehicleDetailApiRecord)
+          : null;
+      } catch (parseError) {
+        console.error(parseError);
+        setError("Сервер вернул некорректные данные мотоцикла.");
+        setVehicle(null);
+        setIsLoading(false);
+        return;
+      }
+
+      loadedVehicleIdRef.current = vehicleId;
+      setVehicle(parsedVehicle);
+      setError("");
+    } catch (err) {
+      if (seq !== loadSeqRef.current) {
+        return;
+      }
+      console.error(err);
+      setError(
+        err instanceof Error ? err.message : "Не удалось загрузить данные мотоцикла."
+      );
+      if (isInitialLoad) {
+        setVehicle(null);
+        setNodeTree([]);
+        setTopServiceNodes([]);
+        setServiceEvents([]);
+        setWishlistItems([]);
+        setYearExpenses([]);
+      }
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(false);
-
-    setIsNodeTreeLoading(true);
-    setIsTopServiceNodesLoading(true);
-    const [
-      nodesResult,
-      eventsResult,
-      topNodesResult,
-      yearExpensesResult,
-      wishlistResult,
-    ] = await Promise.allSettled([
-      endpoints.getNodeTree(vehicleId),
-      endpoints.getServiceEvents(vehicleId),
-      endpoints.getTopServiceNodes(),
-      endpoints.getExpenses({ vehicleId, year: currentExpenseYear }),
-      endpoints.getVehicleWishlist(vehicleId),
-    ]);
-
-    if (nodesResult.status === "fulfilled") {
-      setNodeTree(nodesResult.value.nodeTree ?? []);
-      setNodeTreeError("");
-    } else {
-      console.error(nodesResult.reason);
-      setNodeTreeError("Не удалось загрузить дерево узлов.");
-      setNodeTree([]);
+    if (seq === loadSeqRef.current) {
+      setIsLoading(false);
     }
 
-    if (eventsResult.status === "fulfilled") {
-      setServiceEvents(eventsResult.value.serviceEvents ?? []);
-    } else {
-      console.error(eventsResult.reason);
-      setServiceEvents([]);
-    }
+    void loadVehicleExtras(seq, endpoints);
+  }, [loadVehicleExtras, router, vehicleId]);
 
-    if (yearExpensesResult.status === "fulfilled") {
-      setYearExpenses(yearExpensesResult.value.expenses ?? []);
-    } else {
-      console.error(yearExpensesResult.reason);
-      setYearExpenses([]);
-    }
-
-    if (wishlistResult.status === "fulfilled") {
-      setWishlistItems(wishlistResult.value.items ?? []);
-    } else {
-      console.error(wishlistResult.reason);
-      setWishlistItems([]);
-    }
-
-    if (topNodesResult.status === "fulfilled") {
-      setTopServiceNodes(topNodesResult.value.nodes ?? []);
-      setTopServiceNodesError("");
-    } else {
-      console.error(topNodesResult.reason);
-      setTopServiceNodes([]);
-      setTopServiceNodesError("Не удалось загрузить основные узлы.");
-    }
-
-    setIsNodeTreeLoading(false);
-    setIsTopServiceNodesLoading(false);
-  }, [currentExpenseYear, router, vehicleId]);
+  useEffect(() => {
+    loadedVehicleIdRef.current = null;
+  }, [vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      void load();
+      return () => {
+        loadSeqRef.current += 1;
+        prioritizeMobileApiForNavigation();
+      };
     }, [load])
   );
 
@@ -1872,6 +1968,8 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
               if (!moved) {
                 return;
               }
+              loadSeqRef.current += 1;
+              prioritizeMobileApiForNavigation();
               router.replace("/garage");
             } catch (requestError) {
               setError("Не удалось переместить мотоцикл на Свалку.");
@@ -1983,9 +2081,11 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
               }
               onBack={() => {
                 if (router.canGoBack()) {
+                  prioritizeMobileApiForNavigation();
                   router.back();
                   return;
                 }
+                prioritizeMobileApiForNavigation();
                 router.replace("/garage");
               }}
             />
@@ -2283,7 +2383,15 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
               </View>
               <View style={styles.titleActionsRow}>
                 <Pressable
-                  onPress={() => router.push(`/vehicles/${vehicleId}/state`)}
+                  onPress={() => {
+                    prioritizeMobileApiForNavigation();
+                    router.push(
+                      buildVehicleStateRoute(vehicleId, {
+                        odometer: vehicle.odometer,
+                        engineHours: vehicle.engineHours,
+                      })
+                    );
+                  }}
                   style={({ pressed }) => [
                     styles.primaryMileageButton,
                     pressed && styles.primaryMileageButtonPressed,

@@ -26,6 +26,8 @@ systemctl show mototwin -p WorkingDirectory -p EnvironmentFile
 - `AUTH_SECRET` (≥ 32 chars)
 - `MOTOTWIN_BETA_ALLOWED_EMAILS`
 - `AUTH_BASE_URL` (public URL)
+- `NEXTAUTH_URL` (same as public URL for NextAuth v4)
+- OAuth: `AUTH_GOOGLE_*`, `GOOGLE_OAUTH_CLIENT_ID` — see [docs/auth-oauth-production.md](../../docs/auth-oauth-production.md)
 - `MOTOTWIN_ENABLE_DEV_USER_SWITCHER` must be **unset or false**
 
 ## Post-deploy smoke (with session)

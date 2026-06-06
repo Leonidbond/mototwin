@@ -93,6 +93,45 @@ describe("user-template-service-kit", () => {
     assert.equal(picked?.skuId, "sku-b");
   });
 
+  it("chooseBestSkuForKitItem returns null without partType match", () => {
+    const recs: PartRecommendationViewModel[] = [
+      {
+        skuId: "sku-oil",
+        partMasterId: null,
+        canonicalName: "Масло 10W-40",
+        brandName: "Motul",
+        partType: "ENGINE_OIL",
+        partNumbers: [],
+        priceAmount: 1200,
+        currency: "RUB",
+        primaryNode: null,
+        relationType: "x",
+        confidence: 90,
+        recommendationType: "EXACT_FIT",
+        recommendationLabel: "",
+        whyRecommended: "",
+        fitmentNote: null,
+        compatibilityWarning: null,
+        trustBadge: null,
+        communityReportCount: 0,
+        communityScore: 0,
+        communityStatus: null,
+        communityLineRu: null,
+        communitySortBoost: 0,
+      },
+    ];
+    const picked = chooseBestSkuForKitItem(recs, {
+      key: "washer",
+      title: "Прокладка/шайба сливной пробки",
+      nodeCode: "ENGINE.LUBE.OIL",
+      partType: "DRAIN_PLUG_WASHER",
+      quantity: 1,
+      role: "RELATED_CONSUMABLE",
+      required: false,
+    });
+    assert.equal(picked, null);
+  });
+
   it("advancedServiceKitSnapshotFromPickerLines builds ADVANCED snapshot", () => {
     const now = new Date().toISOString();
     const sku: PartSkuViewModel = {

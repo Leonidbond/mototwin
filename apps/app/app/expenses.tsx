@@ -59,17 +59,17 @@ export default function GarageExpensesScreen() {
     [expenses, selectedYear]
   );
   const primaryCurrency = analytics.selectedYearTotalsByCurrency[0]?.currency ?? "RUB";
-  const totalLabel = formatExpenseAmountRu(
+  const totalLabel = `${formatExpenseAmountRu(
     analytics.selectedYearTotalsByCurrency.find((row) => row.currency === primaryCurrency)
-      ?.totalAmount ?? 0,
-    primaryCurrency
-  );
+      ?.totalAmount ?? 0
+  )} ${primaryCurrency}`;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.screen}>
         <AppScreenHelpBar />
         <InternalScreenChrome
+          crumbs={[{ label: "Мой гараж", href: "/garage" }, { label: "Расходы" }]}
           title="Расходы гаража"
           subtitle="Технические расходы по всем мотоциклам"
           onBack={() => router.back()}
@@ -115,7 +115,7 @@ export default function GarageExpensesScreen() {
                     {expense.title}
                   </Text>
                   <Text style={styles.rowMeta}>
-                    {formatExpenseAmountRu(expense.amount, expense.currency)} · {expense.expenseDate.slice(0, 10)}
+                    {formatExpenseAmountRu(expense.amount)} {expense.currency} · {expense.expenseDate.slice(0, 10)}
                   </Text>
                 </Pressable>
               ))

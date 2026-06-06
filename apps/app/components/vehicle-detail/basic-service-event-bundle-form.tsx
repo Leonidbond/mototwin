@@ -1323,7 +1323,7 @@ export function BasicServiceEventBundleForm({
 
           {form.items.map((row, rowIndex) => {
             const nodeIdTrim = row.nodeId.trim();
-            const nodeOpt = leafOptions.find((o) => o.id === nodeIdTrim);
+            const nodeOpt = leafPickerRows.find((o) => o.id === nodeIdTrim);
             const nodeTitle = nodeOpt?.name ?? `Узел ${rowIndex + 1}`;
             const crumb = nodeIdTrim
               ? leafPickerRows.find((o) => o.id === row.nodeId)?.pathLabel ?? ""

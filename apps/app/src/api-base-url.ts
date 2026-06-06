@@ -1,5 +1,8 @@
 import Constants from "expo-constants";
 
+/** Production Next.js API (see docs/mobile-build.md). */
+export const PRODUCTION_API_BASE_URL = "https://mototwin.online";
+
 /** Hostnames that Expo/ngrok use for the Metro tunnel — they are not your Next.js server. */
 const TUNNEL_PACKAGER_MARKERS = ["exp.direct", "ngrok-free.app", "ngrok.io", "ngrok.app"];
 
@@ -8,9 +11,11 @@ function isTunnelPackagerHost(host: string): boolean {
   return TUNNEL_PACKAGER_MARKERS.some((m) => h.includes(m));
 }
 
-function devApiBaseFromExpoExtra(): string | undefined {
-  const extra = Constants.expoConfig?.extra as { devApiBaseUrl?: string } | undefined;
-  const u = extra?.devApiBaseUrl?.trim();
+function apiBaseFromExpoExtra(): string | undefined {
+  const extra = Constants.expoConfig?.extra as
+    | { devApiBaseUrl?: string; apiBaseUrl?: string }
+    | undefined;
+  const u = extra?.apiBaseUrl?.trim() ?? extra?.devApiBaseUrl?.trim();
   return u ? u.replace(/\/$/, "") : undefined;
 }
 
@@ -20,8 +25,9 @@ function devApiBaseFromExpoExtra(): string | undefined {
  * Priority:
  * 1. `EXPO_PUBLIC_API_BASE_URL` in `apps/app/.env` (optional override)
  * 2. Metro `hostUri` when not a tunnel (LAN — same host as bundler, port 3000)
- * 3. `expo.extra.devApiBaseUrl` from `app.config.ts` (LAN IP from dev machine interfaces at Metro start; used for tunnel)
- * 4. `http://localhost:3000` (simulator / web)
+ * 3. `expo.extra.apiBaseUrl` / `devApiBaseUrl` from `app.config.ts`
+ * 4. `https://mototwin.online` in release builds (`!__DEV__`)
+ * 5. `http://localhost:3000` (simulator / web dev)
  */
 export function getApiBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
@@ -29,12 +35,15 @@ export function getApiBaseUrl(): string {
     return fromEnv.replace(/\/$/, "");
   }
 
+  const fromExtra = apiBaseFromExpoExtra();
+  if (fromExtra) {
+    return fromExtra;
+  }
+
   // e.g. "192.168.1.5:8081" (LAN) or "abc-123.exp.direct:8081" (tunnel)
   const hostUri =
     Constants.expoConfig?.hostUri ??
     (Constants.manifest as { debuggerHost?: string } | null)?.debuggerHost;
-
-  const fromExtra = devApiBaseFromExpoExtra();
 
   if (hostUri) {
     const host = hostUri.split(":")[0] ?? "";
@@ -52,7 +61,9 @@ export function getApiBaseUrl(): string {
     return `http://${host}:3000`;
   }
 
-  if (fromExtra) return fromExtra;
+  if (!__DEV__) {
+    return PRODUCTION_API_BASE_URL;
+  }
 
   return "http://localhost:3000";
 }

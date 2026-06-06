@@ -52,11 +52,15 @@ import type {
   PickerSubmitPreview,
   PickerSubmitResult,
   ServiceKitViewModel,
+  ServiceNodeItem,
   TopServiceNodeItem,
   VehicleDetail,
   VehicleDetailApiRecord,
 } from "@mototwin/types";
-import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
+import {
+  createMobileApiClient,
+  prioritizeMobileApiForNavigation,
+} from "../../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../../src/mobile-auth-guard";
 import { InternalScreenChrome } from "../../../../components/expo-shell/internal-screen-chrome";
 import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
@@ -273,27 +277,36 @@ export default function WishlistPickerScreen() {
         return;
       }
       setTreeLoading(true);
+      prioritizeMobileApiForNavigation();
+      const endpoints = createMobileApiClient();
       try {
-        const endpoints = createMobileApiClient();
-        const [treeRes, wishRes, detailRes] = await Promise.all([
-          endpoints.getNodeTree(vehicleId),
+        const [wishRes, detailRes] = await Promise.all([
           endpoints.getVehicleWishlist(vehicleId),
           endpoints.getVehicleDetail(vehicleId),
         ]);
         if (cancelled) return;
-        setNodeTree(treeRes.nodeTree ?? []);
         setWishlistItems(wishRes.items ?? []);
         const raw = detailRes.vehicle as unknown as VehicleDetailApiRecord | null;
-        const detail = raw ? vehicleDetailFromApiRecord(raw) : null;
-        setVehicle(detail);
+        setVehicle(raw ? vehicleDetailFromApiRecord(raw) : null);
+        setTreeLoading(false);
+      } catch {
+        if (!cancelled) {
+          setWishlistItems([]);
+          setVehicle(null);
+          setNodeTree([]);
+          setTreeLoading(false);
+        }
+        return;
+      }
+      try {
+        const treeRes = await endpoints.getNodeTree(vehicleId);
+        if (!cancelled) {
+          setNodeTree(treeRes.nodeTree ?? []);
+        }
       } catch {
         if (!cancelled) {
           setNodeTree([]);
-          setWishlistItems([]);
-          setVehicle(null);
         }
-      } finally {
-        if (!cancelled) setTreeLoading(false);
       }
     };
     void run();
@@ -628,6 +641,7 @@ export default function WishlistPickerScreen() {
       return;
     }
     setSubmitting(true);
+    prioritizeMobileApiForNavigation();
     const draftSnapshot = draft;
     const previewSnapshot = submitPreview;
     const resSnapshot = { ...quantityResolutionByDraftId };
@@ -673,8 +687,17 @@ export default function WishlistPickerScreen() {
       const detail = formatSubmitResultMessage(result);
       const needsSummary = result.skipped.length > 0 || result.warnings.length > 0;
       const title = ok && result.skipped.length > 0 ? "Частично готово" : "Готово";
+      prioritizeMobileApiForNavigation();
       if (needsSummary && detail.trim()) {
-        Alert.alert(title, detail, [{ text: "К списку покупок", onPress: () => router.replace(target) }]);
+        Alert.alert(title, detail, [
+          {
+            text: "К списку покупок",
+            onPress: () => {
+              prioritizeMobileApiForNavigation();
+              router.replace(target);
+            },
+          },
+        ]);
       } else {
         router.replace(target);
       }
@@ -743,7 +766,9 @@ export default function WishlistPickerScreen() {
     (submitPreview.quantityUpgradeCount === 0 ||
       arePickerQuantityResolutionsComplete(submitPreview, quantityResolutionByDraftId));
 
-  const scrollBottomPad = 24 + 72 + insets.bottom;
+  const cartBarHeight = 64;
+  const bottomNavHeight = 72;
+  const scrollBottomPad = 24 + cartBarHeight + bottomNavHeight + insets.bottom;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
@@ -764,14 +789,6 @@ export default function WishlistPickerScreen() {
             <GarageVehicleContextPlaque vehicle={vehicle} currentVehicleId={vehicleId} compactByDefault />
           ) : null
         }
-      />
-      <PickerDraftCartBar
-        draft={draft}
-        isSubmitting={submitting}
-        bottomInset={0}
-        placement="inline"
-        onCheckout={openSubmit}
-        onOpenSheet={() => setDraftSheetOpen(true)}
       />
       <View style={styles.flex}>
         <KeyboardAwareScrollScreen
@@ -947,6 +964,15 @@ export default function WishlistPickerScreen() {
             </>
           )}
         </KeyboardAwareScrollScreen>
+
+        <PickerDraftCartBar
+          draft={draft}
+          isSubmitting={submitting}
+          bottomInset={0}
+          placement="footer"
+          onCheckout={openSubmit}
+          onOpenSheet={() => setDraftSheetOpen(true)}
+        />
 
         <GarageBottomNav
           activeKey="picker"

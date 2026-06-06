@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -12,7 +14,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { buildGarageDashboardSummary } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { GarageVehicleItem, SubscriptionCurrentResponse } from "@mototwin/types";
-import { createMobileApiClient } from "../src/create-mobile-api-client";
+import {
+  cancelInFlightMobileApiRequests,
+  createMobileApiClient,
+  prioritizeMobileApiForNavigation,
+} from "../src/create-mobile-api-client";
 import { readLastViewedVehicleId } from "../src/ui-last-viewed-vehicle";
 import { AppScreenHelpBar } from "../components/expo-shell/app-screen-help-bar";
 import { GarageBottomNav } from "../components/garage/GarageBottomNav";
@@ -20,6 +26,16 @@ import { GarageEmptyState } from "../components/garage/GarageEmptyState";
 import { GarageHeader } from "../components/garage/GarageHeader";
 import { GarageSummary } from "../components/garage/GarageSummary";
 import { VehicleCard } from "../components/garage/VehicleCard";
+
+function formatGarageLoadError(message: string): string {
+  if (message.includes("Превышено время ожидания")) {
+    return "Не удалось соединиться с сервером. Это может быть временная проблема сети — нажмите «Повторить».";
+  }
+  if (message.toLowerCase().includes("требуется вход")) {
+    return "Сессия истекла. Войдите в аккаунт снова.";
+  }
+  return message;
+}
 
 export default function GarageScreen() {
   const router = useRouter();
@@ -30,40 +46,76 @@ export default function GarageScreen() {
   const [notificationCount, setNotificationCount] = useState(0);
   const [subscription, setSubscription] = useState<SubscriptionCurrentResponse | null>(null);
   const [lastViewedVehicleId, setLastViewedVehicleId] = useState<string | null>(null);
+  const loadSeqRef = useRef(0);
+  const hasLoadedOnceRef = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
+
+  const loadGarageExtras = useCallback(async (endpoints: ReturnType<typeof createMobileApiClient>) => {
+    const [trashResult, notificationsResult, subscriptionResult] = await Promise.allSettled([
+      endpoints.getTrashedVehicles(),
+      endpoints.getNotifications({ limit: 1 }),
+      endpoints.getSubscriptionCurrent(),
+    ]);
+
+    if (trashResult.status === "fulfilled") {
+      setTrashCount(trashResult.value.vehicles?.length ?? 0);
+    } else {
+      setTrashCount(0);
+    }
+    if (notificationsResult.status === "fulfilled") {
+      setNotificationCount(notificationsResult.value.unreadCount ?? 0);
+    } else {
+      setNotificationCount(0);
+    }
+    if (subscriptionResult.status === "fulfilled") {
+      setSubscription(subscriptionResult.value);
+    } else {
+      setSubscription(null);
+    }
+  }, []);
 
   const loadGarage = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
+    const showBlockingSpinner = !hasLoadedOnceRef.current;
+    prioritizeMobileApiForNavigation();
     try {
-      setIsLoading(true);
-      setError("");
+      if (showBlockingSpinner) {
+        setIsLoading(true);
+        setError("");
+      }
       const endpoints = createMobileApiClient();
-      const [garageResult, trashResult, notificationsResult, subscriptionResult] = await Promise.allSettled([
-        endpoints.getGarageVehicles(),
-        endpoints.getTrashedVehicles(),
-        endpoints.getNotifications({ limit: 1 }),
-        endpoints.getSubscriptionCurrent(),
-      ]);
+      const fetchGarage = () => endpoints.getGarageVehicles();
 
-      if (garageResult.status === "rejected") {
-        throw garageResult.reason;
+      let garageResult: Awaited<ReturnType<typeof fetchGarage>>;
+      try {
+        garageResult = await fetchGarage();
+      } catch (firstError) {
+        const isTimeout =
+          firstError instanceof Error &&
+          firstError.message.includes("Превышено время ожидания");
+        if (isTimeout) {
+          // no-op: timeout is handled by user-facing error state below
+        }
+        throw firstError;
       }
 
-      setVehicles(garageResult.value.vehicles ?? []);
-      if (trashResult.status === "fulfilled") {
-        setTrashCount(trashResult.value.vehicles?.length ?? 0);
-      } else {
-        setTrashCount(0);
+      if (seq !== loadSeqRef.current) {
+        return;
       }
-      if (notificationsResult.status === "fulfilled") {
-        setNotificationCount(notificationsResult.value.unreadCount ?? 0);
-      } else {
-        setNotificationCount(0);
-      }
-      if (subscriptionResult && subscriptionResult.status === "fulfilled") {
-        setSubscription(subscriptionResult.value);
-      } else {
-        setSubscription(null);
-      }
+      setVehicles(garageResult.vehicles ?? []);
+      hasLoadedOnceRef.current = true;
+      setError("");
+      void loadGarageExtras(endpoints);
     } catch (requestError) {
+      if (seq !== loadSeqRef.current) {
+        return;
+      }
+      if (
+        requestError instanceof Error &&
+        requestError.message === "Запрос отменён."
+      ) {
+        return;
+      }
       console.error(requestError);
       if (
         requestError instanceof Error &&
@@ -72,17 +124,41 @@ export default function GarageScreen() {
         router.replace("/login");
         return;
       }
-      setError("Не удалось загрузить гараж. Проверьте подключение к backend.");
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Не удалось загрузить гараж. Проверьте подключение к backend."
+      );
     } finally {
-      setIsLoading(false);
+      if (seq === loadSeqRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [router]);
+  }, [loadGarageExtras, router]);
 
   useFocusEffect(
     useCallback(() => {
       void loadGarage();
+      return () => undefined;
     }, [loadGarage])
   );
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      const prevState = appStateRef.current;
+      appStateRef.current = nextState;
+      const becameBackground = prevState === "active" && nextState === "background";
+      const becameActive = prevState !== "active" && nextState === "active";
+      if (becameBackground) {
+        cancelInFlightMobileApiRequests("Запрос отменён: приложение свёрнуто.");
+        return;
+      }
+      if (becameActive) {
+        void loadGarage();
+      }
+    });
+    return () => sub.remove();
+  }, [loadGarage]);
 
   useEffect(() => {
     setLastViewedVehicleId(readLastViewedVehicleId());
@@ -101,7 +177,10 @@ export default function GarageScreen() {
     router.push("/vehicles/new");
   }, [router, subscription?.capabilities.maxVehicles, vehicles.length]);
   const reloadGarage = useCallback(() => void loadGarage(), [loadGarage]);
-  const openVehicle = useCallback((id: string) => router.push(`/vehicles/${id}`), [router]);
+  const openVehicle = useCallback((id: string) => {
+    prioritizeMobileApiForNavigation();
+    router.push(`/vehicles/${id}`);
+  }, [router]);
   const openServiceEvent = useCallback(
     (id: string) => router.push(`/vehicles/${id}/service-events/new`),
     [router]
@@ -142,7 +221,10 @@ export default function GarageScreen() {
     return (
       <GarageScreenState>
         <Text style={styles.errorTitle}>Не удалось загрузить гараж</Text>
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorText}>{formatGarageLoadError(error)}</Text>
+        <Pressable style={styles.retryButton} onPress={reloadGarage}>
+          <Text style={styles.retryButtonText}>Повторить</Text>
+        </Pressable>
       </GarageScreenState>
     );
   }
@@ -259,6 +341,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     maxWidth: 320,
+  },
+  retryButton: {
+    marginTop: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: c.primaryAction,
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+  },
+  retryButtonText: {
+    color: c.canvas,
+    fontSize: 15,
+    fontWeight: "700",
   },
 });
 

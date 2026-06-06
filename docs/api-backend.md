@@ -337,6 +337,34 @@ See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md).
 - Response `400`: validation/self-block errors
 - Response `404`: target user not found
 
+## 3.10 Auth
+
+### Custom session API (email/password, mobile tokens)
+
+| Route | Назначение |
+|-------|------------|
+| `POST /api/auth/register` | Регистрация; в prod — allowlist `MOTOTWIN_BETA_ALLOWED_EMAILS` |
+| `POST /api/auth/login` | Web email/password → cookie `mototwin_session` |
+| `POST /api/auth/logout` | Revoke web session cookie |
+| `POST /api/auth/refresh` | Mobile refresh rotation |
+| `GET /api/auth/me` | Current user (Bearer или cookie) |
+| `POST /api/auth/oauth/mobile` | Mobile OAuth: verify provider token → issue access/refresh |
+| `POST /api/auth/forgot-password` | Anti-enumeration reset request |
+| `POST /api/auth/reset-password` | One-time token → new password + revoke all sessions |
+
+### Auth.js (web OAuth)
+
+Catch-all: `/api/auth/[...nextauth]` — Google / Apple / Yandex when env credentials set.
+
+- Callback URLs: `https://<public-host>/api/auth/callback/{google|apple|yandex}`
+- User persistence: `mototwinPrismaAdapter()` maps Auth.js `name` → `User.displayName`
+- After sign-in: `ensureUserBootstrap()` in `events.signIn` (garage, settings, subscription)
+- Requires `NEXTAUTH_URL` + `AUTH_BASE_URL` on production
+
+Подробнее: [auth-oauth-production.md](./auth-oauth-production.md), [auth-implementation-plan.md](./auth-implementation-plan.md).
+
+Resolution order in `resolveAuthenticatedUserId()`: Bearer access token → `mototwin_session` cookie → Auth.js database session.
+
 ## 4. Core backend business rules
 
 1. Service events can be created only for leaf nodes.

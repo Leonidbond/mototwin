@@ -316,7 +316,7 @@ export default function ProfileScreen() {
             pathLabel: catalogNodeAncestorPathLabelRu(serviceNodes, catalogNode.id),
           };
         })
-        .filter((option): option is MobileNodePickerOption => option !== null),
+        .filter((option) => option !== null) as MobileNodePickerOption[],
     [leafServiceNodes, serviceNodes, topServiceNodes]
   );
 

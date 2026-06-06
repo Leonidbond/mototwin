@@ -2,6 +2,8 @@ import os from "node:os";
 
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
+const PRODUCTION_API_BASE_URL = "https://mototwin.online";
+
 /** Interface name substrings to skip (VPN, tunnels, bridges). Do not use plain "lo" — it matches `wlo1`. */
 const SKIP_IFACE_SUBSTR = [
   "utun",
@@ -71,6 +73,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const devApiBaseUrl = shouldEmbedDevApiBaseUrl()
     ? `http://${host}:3000`.replace(/\/$/, "")
     : undefined;
+  const apiBaseUrl =
+    process.env.EXPO_PUBLIC_API_BASE_URL?.trim().replace(/\/$/, "") ||
+    (process.env.NODE_ENV === "production" ? PRODUCTION_API_BASE_URL : undefined);
 
   return {
     ...baseConfig,
@@ -81,6 +86,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ],
     extra: {
       ...baseConfig.extra,
+      ...(apiBaseUrl ? { apiBaseUrl } : {}),
       ...(devApiBaseUrl ? { devApiBaseUrl } : {}),
     },
   };

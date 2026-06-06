@@ -184,6 +184,8 @@ Deferred:
 - implemented:
   - login/register/logout/session for web + mobile;
   - Auth.js integration for web sessions and OAuth providers;
+  - custom Prisma adapter mapping Auth.js `name` → `User.displayName` ([`prisma-auth-adapter.ts`](../src/lib/auth/prisma-auth-adapter.ts));
+  - first OAuth sign-in bootstrap (garage/settings/subscription) in Auth.js `events.signIn` ([`user-bootstrap.ts`](../src/lib/auth/user-bootstrap.ts));
   - mobile token-based auth with refresh;
   - password recovery flow;
   - blocked account enforcement in auth/context resolver.

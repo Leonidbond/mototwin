@@ -92,7 +92,8 @@ Practical direction:
 
 ## 7. Current constraints
 
-- Production auth/session flows are implemented (web Auth.js sessions + mobile token/refresh flow), while dev/demo switcher modes remain for QA/local workflows.
+- Production auth/session flows are implemented (web: custom cookie + Auth.js OAuth sessions; mobile: token/refresh), while dev/demo switcher modes remain for QA/local workflows.
+- OAuth production setup and troubleshooting: [auth-oauth-production.md](./auth-oauth-production.md).
 - Admin user management now includes account blocking; blocked users lose active sessions and cannot re-authenticate until unblocked.
 - Status calculation is read-time in `node-tree` route; no background recalculation worker.
 - `TopNodeState` and `NodeState` coexist during migration.

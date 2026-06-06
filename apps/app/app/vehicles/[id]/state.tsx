@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
@@ -11,15 +11,27 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { normalizeVehicleStatePayload, validateVehicleStateFormValues } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import { createMobileApiClient } from "../../../src/create-mobile-api-client";
+import {
+  createMobileApiClient,
+  prioritizeMobileApiForNavigation,
+} from "../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../src/mobile-auth-guard";
+import { parseVehicleStateRouteSeed } from "../../../src/vehicle-state-route";
 import { KeyboardAwareScrollScreen } from "../../../components/expo-shell/keyboard-aware-scroll-screen";
 import { ScreenHeader } from "../../../components/expo-shell/screen-header";
 
 export default function UpdateVehicleStateScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    odometer?: string;
+    engineHours?: string;
+  }>();
   const vehicleId = typeof params.id === "string" ? params.id : "";
+  const routeSeed = useMemo(
+    () => parseVehicleStateRouteSeed(params),
+    [params.engineHours, params.odometer]
+  );
 
   const [odometer, setOdometer] = useState("");
   const [engineHours, setEngineHours] = useState("");
@@ -28,6 +40,14 @@ export default function UpdateVehicleStateScreen() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (routeSeed) {
+      setOdometer(routeSeed.odometer);
+      setEngineHours(routeSeed.engineHours);
+      setError("");
+      setIsLoading(false);
+      return;
+    }
+
     const load = async () => {
       if (!vehicleId) {
         setError("Не удалось определить ID мотоцикла.");
@@ -38,11 +58,25 @@ export default function UpdateVehicleStateScreen() {
       try {
         setIsLoading(true);
         setError("");
+        prioritizeMobileApiForNavigation();
         const endpoints = createMobileApiClient();
-        const data = await withAuthGuard(
-          () => endpoints.getVehicleDetail(vehicleId),
-          () => router.replace("/login")
-        );
+        const fetchDetail = () =>
+          withAuthGuard(() => endpoints.getVehicleDetail(vehicleId), () => router.replace("/login"));
+
+        let data: Awaited<ReturnType<typeof fetchDetail>> | null = null;
+        try {
+          data = await fetchDetail();
+        } catch (firstError) {
+          const isTimeout =
+            firstError instanceof Error &&
+            firstError.message.includes("Превышено время ожидания");
+          if (!isTimeout) {
+            throw firstError;
+          }
+          prioritizeMobileApiForNavigation();
+          data = await fetchDetail();
+        }
+
         if (!data) {
           return;
         }
@@ -55,14 +89,18 @@ export default function UpdateVehicleStateScreen() {
           data.vehicle.engineHours != null ? String(data.vehicle.engineHours) : ""
         );
       } catch (requestError) {
-        setError("Не удалось загрузить текущее состояние.");
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Не удалось загрузить текущее состояние."
+        );
       } finally {
         setIsLoading(false);
       }
     };
 
     void load();
-  }, [router, vehicleId]);
+  }, [routeSeed, router, vehicleId]);
 
   async function save() {
     if (!vehicleId) {
@@ -80,6 +118,7 @@ export default function UpdateVehicleStateScreen() {
     try {
       setIsSaving(true);
       setError("");
+      prioritizeMobileApiForNavigation();
       const endpoints = createMobileApiClient();
       const updated = await withAuthGuard(
         () =>

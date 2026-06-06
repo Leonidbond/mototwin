@@ -6,6 +6,11 @@ import {
   MOBILE_CLIENT_HEADER,
 } from "@mototwin/types";
 
+export type ApiRequestExecutor = <T>(
+  path: string,
+  fn: (abortSignal?: AbortSignal) => Promise<T>
+) => Promise<T>;
+
 export type ApiClientConfig = {
   baseUrl: string;
   /** Send cookies (web same-origin). Default: include when baseUrl is empty. */
@@ -14,6 +19,12 @@ export type ApiClientConfig = {
   getAccessToken?: () => string | null | Promise<string | null>;
   /** Called on HTTP 401 in browser environments. */
   onUnauthorized?: () => void;
+  /** Abort the request after this many ms (mobile / flaky networks). */
+  requestTimeoutMs?: number;
+  /** Override retry attempts for idempotent requests. */
+  requestMaxAttempts?: number;
+  /** Optional queue / throttle (Expo). */
+  requestExecutor?: ApiRequestExecutor;
 };
 
 function responseBodyLooksLikeHtml(body: string): boolean {
@@ -119,6 +130,21 @@ export async function readHttpErrorMessage(response: Response): Promise<string> 
   return trimmed.length > maxPlain ? `${trimmed.slice(0, maxPlain)}…` : trimmed;
 }
 
+function linkAbortSignals(...signals: Array<AbortSignal | undefined | null>): AbortSignal {
+  const controller = new AbortController();
+  for (const signal of signals) {
+    if (!signal) {
+      continue;
+    }
+    if (signal.aborted) {
+      controller.abort();
+      return controller.signal;
+    }
+    signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+  return controller.signal;
+}
+
 function defaultCredentials(baseUrl: string): RequestCredentials {
   const trimmed = baseUrl.replace(/\/+$/, "");
   if (trimmed === "" || trimmed.startsWith("/")) {
@@ -132,6 +158,9 @@ export class ApiClient {
   private readonly credentials: RequestCredentials;
   private readonly getAccessToken?: ApiClientConfig["getAccessToken"];
   private readonly onUnauthorized?: ApiClientConfig["onUnauthorized"];
+  private readonly requestTimeoutMs?: number;
+  private readonly requestMaxAttempts?: number;
+  private readonly requestExecutor?: ApiRequestExecutor;
   private readonly isMobileClient: boolean;
 
   constructor(config: ApiClientConfig) {
@@ -139,10 +168,26 @@ export class ApiClient {
     this.credentials = config.credentials ?? defaultCredentials(config.baseUrl);
     this.getAccessToken = config.getAccessToken;
     this.onUnauthorized = config.onUnauthorized;
+    this.requestTimeoutMs = config.requestTimeoutMs;
+    this.requestMaxAttempts = config.requestMaxAttempts;
+    this.requestExecutor = config.requestExecutor;
     this.isMobileClient = Boolean(config.getAccessToken);
   }
 
   async request<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
+    const execute = (abortSignal?: AbortSignal): Promise<TResponse> =>
+      this.requestInternal(path, init, abortSignal);
+    if (this.requestExecutor) {
+      return this.requestExecutor(path, execute);
+    }
+    return execute();
+  }
+
+  private async requestInternal<TResponse>(
+    path: string,
+    init?: RequestInit,
+    schedulerSignal?: AbortSignal
+  ): Promise<TResponse> {
     const devUserHeader = this.getDevUserHeaderValue();
     const accessToken = this.getAccessToken ? await this.getAccessToken() : null;
 
@@ -153,14 +198,75 @@ export class ApiClient {
       ...(this.isMobileClient ? { [MOBILE_CLIENT_HEADER]: MOBILE_CLIENT_EXPO } : {}),
     };
 
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      credentials: init?.credentials ?? this.credentials,
-      headers: {
-        ...headers,
-        ...(init?.headers as Record<string, string> | undefined),
-      },
-    });
+    const timeoutMs = this.requestTimeoutMs;
+    const ownsTimeout = timeoutMs != null && timeoutMs > 0 && init?.signal == null;
+    const fullUrl = `${this.baseUrl}${path}`;
+    const method = (init?.method ?? "GET").toUpperCase();
+    // Idempotent reads can safely re-attempt with a fresh connection when the
+    // first attempt stalls before reaching the server (stuck TCP/TLS connect).
+    // Several short attempts recover from an intermittent handshake stall far
+    // faster than one long timeout.
+    const maxAttempts =
+      ownsTimeout && (method === "GET" || method === "HEAD")
+        ? (this.requestMaxAttempts ?? 5)
+        : 1;
+    let response: Response | null = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const attemptStartedAt = Date.now();
+      const timeoutController = ownsTimeout ? new AbortController() : null;
+      const timeoutId =
+        timeoutController != null
+          ? setTimeout(() => {
+              timeoutController.abort();
+            }, timeoutMs)
+          : null;
+      const requestSignal = linkAbortSignals(
+        schedulerSignal,
+        init?.signal,
+        timeoutController?.signal
+      );
+      try {
+        response = await fetch(fullUrl, {
+          ...init,
+          credentials: init?.credentials ?? this.credentials,
+          signal: requestSignal,
+          headers: {
+            ...headers,
+            ...(init?.headers as Record<string, string> | undefined),
+          },
+        });
+        break;
+      } catch (error) {
+        const schedulerAborted = Boolean(schedulerSignal?.aborted);
+        const timeoutAborted = Boolean(timeoutController?.signal.aborted);
+        if (schedulerAborted) {
+          throw new Error("Запрос отменён.");
+        }
+        const canRetry = attempt < maxAttempts;
+        if (canRetry) {
+          // After a TLS/connect timeout, space retries out so we do not hammer
+          // the server during a sustained packet-loss window; later attempts
+          // often succeed once the path clears (proven in logcat).
+          const retryBackoffMs = timeoutAborted
+            ? Math.min(8000, 1500 * 2 ** (attempt - 1))
+            : 400;
+          await new Promise((resolve) => setTimeout(resolve, retryBackoffMs));
+          continue;
+        }
+        if (timeoutAborted) {
+          throw new Error(`Превышено время ожидания ответа сервера (${Math.round((timeoutMs ?? 0) / 1000)} с).`);
+        }
+        throw error;
+      } finally {
+        if (timeoutId != null) {
+          clearTimeout(timeoutId);
+        }
+      }
+    }
+
+    if (response == null) {
+      throw new Error(`Превышено время ожидания ответа сервера (${Math.round((timeoutMs ?? 0) / 1000)} с).`);
+    }
 
     if (response.status === 401 && this.onUnauthorized) {
       this.onUnauthorized();

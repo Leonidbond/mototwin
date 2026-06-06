@@ -36,7 +36,6 @@ import {
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
 } from "@mototwin/domain";
 import type {
-  FlattenedNodeSelectOption,
   NodeTreeItem,
   PartRecommendationGroup,
   ServiceNodeItem,
@@ -64,9 +63,9 @@ type WishlistItemEditorProps = {
 };
 
 function findOptionById(
-  options: FlattenedNodeSelectOption[],
+  options: Array<{ id: string; name?: string }>,
   nodeId: string
-): FlattenedNodeSelectOption | undefined {
+): { id: string; name?: string } | undefined {
   return options.find((o) => o.id === nodeId);
 }
 

@@ -55,7 +55,7 @@ cp apps/app/.env.example apps/app/.env
 | Переменная | Назначение |
 |------------|------------|
 | `EXPO_PUBLIC_API_BASE_URL` | Базовый URL Next.js API (без завершающего `/`). Для prod: `https://mototwin.online` |
-| `EXPO_PUBLIC_GOOGLE_*` | OAuth Google (см. `.env.example`) |
+| `EXPO_PUBLIC_GOOGLE_*` | OAuth Google — см. [auth-oauth-production.md](../auth-oauth-production.md) и `.env.example` |
 | `EXPO_PUBLIC_YANDEX_CLIENT_ID` | OAuth Yandex |
 
 Файл `apps/app/.env` в `.gitignore` — не коммитить.
@@ -266,6 +266,7 @@ Release / TestFlight — через EAS (`eas build -p ios`).
 | Gradle: JAVA_HOME | `export JAVA_HOME="…/Android Studio.app/Contents/jbr/Contents/Home"` |
 | Splash drawable missing | `npx expo prebuild` или `res/drawable/splashscreen_logo.xml` |
 | Старый prod без `/api/subscription/current` | 404 на subscription не должен ломать весь профиль — см. отдельные try/catch в клиенте |
+| На Android cold start периодически таймаутится `auth/me`, а в браузере всё ок | Известный кейс TLS 1.3 handshake на некоторых сетях. В `apps/app/android/app/src/main/java/ru/mototwin/app/MainApplication.kt` клиент принудительно использует TLS 1.2 (`connectionSpecs`) — это рабочий обходной путь до серверного фикса |
 
 ---
 

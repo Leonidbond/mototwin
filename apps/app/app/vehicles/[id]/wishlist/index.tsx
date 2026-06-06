@@ -42,7 +42,10 @@ import type {
   VehicleDetailApiRecord,
 } from "@mototwin/types";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
+import {
+  createMobileApiClient,
+  prioritizeMobileApiForNavigation,
+} from "../../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../../src/mobile-auth-guard";
 import {
   buildServiceEventNewFromWishlistHref,
@@ -281,41 +284,13 @@ export default function VehicleWishlistScreen() {
   const [headerScrollY, setHeaderScrollY] = useState(0);
   const scrollRef = useRef<ScrollView | null>(null);
   const itemYByIdRef = useRef<Record<string, number>>({});
+  const loadSeqRef = useRef(0);
+  const hasLoadedOnceRef = useRef(false);
 
-  const load = useCallback(async (): Promise<PartWishlistItemViewModel[] | null> => {
-    if (!vehicleId) {
-      setError("Не удалось определить ID мотоцикла.");
-      setIsLoading(false);
-      return null;
-    }
-    try {
-      setIsLoading(true);
-      setError("");
-      const endpoints = createMobileApiClient();
-      const payload = await withAuthGuard(
-        () =>
-          Promise.all([
-            endpoints.getVehicleWishlist(vehicleId),
-            endpoints.getVehicleDetail(vehicleId),
-            endpoints.getServiceEvents(vehicleId),
-            endpoints.getNodeTree(vehicleId),
-          ]),
-        () => router.replace("/login")
-      );
-      if (!payload) {
-        return null;
-      }
-      const [wishlistData, vehicleData, serviceData, nodeTreeData] = payload;
-      setVehicle(
-        vehicleData.vehicle
-          ? vehicleDetailFromApiRecord(vehicleData.vehicle as unknown as VehicleDetailApiRecord)
-          : null
-      );
-      setNodeTree(nodeTreeData.nodeTree ?? []);
-      const mappedItems = (wishlistData.items ?? []).map(buildPartWishlistItemViewModel);
-      setItems(mappedItems);
+  const applyServiceEventLinks = useCallback(
+    (serviceEvents: Awaited<ReturnType<ReturnType<typeof createMobileApiClient>["getServiceEvents"]>>["serviceEvents"]) => {
       const byWishlistItemId = new Map<string, string>();
-      const newestEventsFirst = [...(serviceData.serviceEvents ?? [])].sort((left, right) => {
+      const newestEventsFirst = [...(serviceEvents ?? [])].sort((left, right) => {
         const leftTime = new Date(left.eventDate || left.createdAt).getTime();
         const rightTime = new Date(right.eventDate || right.createdAt).getTime();
         if (rightTime !== leftTime) {
@@ -335,23 +310,126 @@ export default function VehicleWishlistScreen() {
         }
       }
       setServiceEventIdByWishlistItemId(byWishlistItemId);
+    },
+    []
+  );
+
+  const loadWishlistExtras = useCallback(
+    async (
+      seq: number,
+      endpoints: ReturnType<typeof createMobileApiClient>
+    ) => {
+      const [serviceResult, nodeTreeResult] = await Promise.allSettled([
+        endpoints.getServiceEvents(vehicleId),
+        endpoints.getNodeTree(vehicleId),
+      ]);
+      if (seq !== loadSeqRef.current) {
+        return;
+      }
+      if (serviceResult.status === "fulfilled") {
+        applyServiceEventLinks(serviceResult.value.serviceEvents);
+      }
+      if (nodeTreeResult.status === "fulfilled") {
+        setNodeTree(nodeTreeResult.value.nodeTree ?? []);
+      }
+    },
+    [applyServiceEventLinks, vehicleId]
+  );
+
+  const load = useCallback(async (): Promise<PartWishlistItemViewModel[] | null> => {
+    if (!vehicleId) {
+      setError("Не удалось определить ID мотоцикла.");
+      setIsLoading(false);
+      return null;
+    }
+
+    const seq = ++loadSeqRef.current;
+    const showBlockingSpinner = !hasLoadedOnceRef.current;
+    prioritizeMobileApiForNavigation();
+
+    try {
+      if (showBlockingSpinner) {
+        setIsLoading(true);
+        setError("");
+      }
+      const endpoints = createMobileApiClient();
+      const fetchCore = () =>
+        withAuthGuard(
+          () =>
+            Promise.all([
+              endpoints.getVehicleWishlist(vehicleId),
+              endpoints.getVehicleDetail(vehicleId),
+            ]),
+          () => router.replace("/login")
+        );
+
+      let payload: Awaited<ReturnType<typeof fetchCore>> | null = null;
+      try {
+        payload = await fetchCore();
+      } catch (firstError) {
+        const isTimeout =
+          firstError instanceof Error &&
+          firstError.message.includes("Превышено время ожидания");
+        if (!isTimeout || seq !== loadSeqRef.current) {
+          throw firstError;
+        }
+        prioritizeMobileApiForNavigation();
+        payload = await fetchCore();
+      }
+
+      if (seq !== loadSeqRef.current) {
+        return null;
+      }
+      if (!payload) {
+        return null;
+      }
+
+      const [wishlistData, vehicleData] = payload;
+      setVehicle(
+        vehicleData.vehicle
+          ? vehicleDetailFromApiRecord(vehicleData.vehicle as unknown as VehicleDetailApiRecord)
+          : null
+      );
+      const mappedItems = (wishlistData.items ?? []).map(buildPartWishlistItemViewModel);
+      setItems(mappedItems);
+      hasLoadedOnceRef.current = true;
+      setError("");
+      void loadWishlistExtras(seq, endpoints);
       return mappedItems;
     } catch (e) {
+      if (seq !== loadSeqRef.current) {
+        return null;
+      }
+      if (e instanceof Error && e.message === "Запрос отменён.") {
+        return null;
+      }
       setError("Не удалось загрузить список покупок.");
-      setItems([]);
-      setVehicle(null);
-      setNodeTree([]);
+      if (showBlockingSpinner) {
+        setItems([]);
+        setVehicle(null);
+        setNodeTree([]);
+      }
       return null;
     } finally {
-      setIsLoading(false);
+      if (seq === loadSeqRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [router, vehicleId]);
+  }, [loadWishlistExtras, router, vehicleId]);
 
   useFocusEffect(
     useCallback(() => {
       void load();
+      return () => {
+        loadSeqRef.current += 1;
+        prioritizeMobileApiForNavigation();
+      };
     }, [load])
   );
+
+  useEffect(() => {
+    hasLoadedOnceRef.current = false;
+  }, [vehicleId]);
 
   useEffect(() => {
     if (

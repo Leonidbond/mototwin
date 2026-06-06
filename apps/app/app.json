@@ -6,9 +6,11 @@
     "version": "0.1.0",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#080D12"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -18,7 +20,11 @@
       "expo-apple-authentication"
     ],
     "android": {
-      "package": "ru.mototwin.app"
+      "package": "ru.mototwin.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#080D12"
+      }
     },
     "ios": {
       "bundleIdentifier": "ru.mototwin.app",

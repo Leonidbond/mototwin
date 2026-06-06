@@ -43,7 +43,17 @@ nano .env
 NODE_ENV=production
 DATABASE_URL="postgresql://mototwin_app:YOUR_PASSWORD@127.0.0.1:5432/mototwin?schema=public"
 AUTH_SECRET="generate-with-openssl-rand-base64-32"
+AUTH_BASE_URL="https://mototwin.online"
+NEXTAUTH_URL="https://mototwin.online"
 MOTOTWIN_BETA_ALLOWED_EMAILS="you@example.com,tester@example.com"
+```
+
+OAuth (web Google — см. [auth-oauth-production.md](../auth-oauth-production.md)):
+
+```env
+AUTH_GOOGLE_CLIENT_ID="....apps.googleusercontent.com"
+AUTH_GOOGLE_CLIENT_SECRET="GOCSPX-..."
+GOOGLE_OAUTH_CLIENT_ID="....apps.googleusercontent.com"
 ```
 
 Первый деплой:

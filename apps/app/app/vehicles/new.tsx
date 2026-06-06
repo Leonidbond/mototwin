@@ -192,8 +192,9 @@ export default function NewVehicleScreen() {
     };
   }, [router]);
 
+  const maxVehicles = capabilities?.maxVehicles;
   const vehicleLimitReached =
-    capabilities.maxVehicles != null && garageVehicleCount >= capabilities.maxVehicles;
+    maxVehicles != null && garageVehicleCount >= maxVehicles;
 
   useEffect(() => {
     if (isSubscriptionLoading || !vehicleLimitReached) {
@@ -400,11 +401,11 @@ export default function NewVehicleScreen() {
             <SubscriptionLockBanner
               title="Лимит мотоциклов в гараже"
               description={
-                capabilities.maxVehicles === 1
+                maxVehicles === 1
                   ? "Тариф Free позволяет вести только 1 мотоцикл. Перейдите на Rider, чтобы добавить до 3."
                   : "Тариф Rider позволяет вести до 3 мотоциклов. Перейдите на Pro для неограниченного гаража."
               }
-              requiredPlan={capabilities.maxVehicles === 1 ? "RIDER" : "PRO"}
+              requiredPlan={maxVehicles === 1 ? "RIDER" : "PRO"}
             />
           </View>
         ) : null}

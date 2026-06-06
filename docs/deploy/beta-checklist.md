@@ -5,7 +5,9 @@
 - [ ] HTTPS работает (`curl -sI https://ваш-домен/`)
 - [ ] `MOTOTWIN_ENABLE_DEV_USER_SWITCHER` **не** задан в production `.env`
 - [ ] `AUTH_SECRET` задан (длинная случайная строка)
-- [ ] `MOTOTWIN_BETA_ALLOWED_EMAILS` содержит email всех тестеров
+- [ ] `AUTH_BASE_URL` и `NEXTAUTH_URL` = публичный HTTPS origin (напр. `https://mototwin.online`)
+- [ ] `MOTOTWIN_BETA_ALLOWED_EMAILS` содержит email всех тестеров (**только для `/register`**, не для Google OAuth)
+- [ ] Google OAuth (если включён): Test users в Google Console + redirect `https://<домен>/api/auth/callback/google` — см. [auth-oauth-production.md](../auth-oauth-production.md)
 - [ ] Регистрация с неразрешённым email отклоняется
 - [ ] Два аккаунта: `GET /api/garage` изолированы; чужой `vehicleId` → 404
 - [ ] Ежедневный бэкап Postgres (`deploy/scripts/backup.sh` в cron)

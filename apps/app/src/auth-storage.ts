@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { invalidateMobileAccessTokenCache } from "./mobile-access-token-cache";
 
 export type StoredAuthTokens = {
   accessToken: string;
@@ -41,6 +42,7 @@ export async function readAuthTokens(): Promise<StoredAuthTokens | null> {
 
 export async function writeAuthTokens(tokens: StoredAuthTokens): Promise<void> {
   memoryTokens = tokens;
+  invalidateMobileAccessTokenCache();
   try {
     await SecureStore.setItemAsync(AUTH_TOKENS_KEY, JSON.stringify(tokens), SECURE_STORE_OPTIONS);
   } catch (error) {
@@ -52,6 +54,7 @@ export async function writeAuthTokens(tokens: StoredAuthTokens): Promise<void> {
 
 export async function clearAuthTokens(): Promise<void> {
   memoryTokens = null;
+  invalidateMobileAccessTokenCache();
   try {
     await SecureStore.deleteItemAsync(AUTH_TOKENS_KEY, SECURE_STORE_OPTIONS);
   } catch (error) {

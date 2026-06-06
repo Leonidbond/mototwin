@@ -25,7 +25,7 @@
 |-------|----------|----------------|
 | Гость (anon) | Без сессии | `/login`, `/register`, `/forgot-password`, `/reset-password`, `/api/auth/*`, `/api/auth/oauth/mobile`, `/api/auth/[...nextauth]` |
 | Пользователь | Авторизован cookie или Bearer | Все user-scoped API (`/api/vehicles/**`, `/api/expenses/**`, `/api/notifications/**`, …) |
-| Beta-allowlisted | Email в `MOTOTWIN_BETA_ALLOWED_EMAILS` (в проде регистрация только allowlist) | Регистрация открыта; см. [`src/lib/auth/beta-allowlist.ts`](../../src/lib/auth/beta-allowlist.ts) |
+| Beta-allowlisted | Email в `MOTOTWIN_BETA_ALLOWED_EMAILS` (в проде **регистрация** email+пароль только allowlist; **web OAuth не проверяет** этот список) | Регистрация открыта; см. [`src/lib/auth/beta-allowlist.ts`](../../src/lib/auth/beta-allowlist.ts) |
 | Модератор | `User.isModerator = true` | `/api/moderation/**`, моде-эндпоинты |
 | Админ | `User.adminRole IN (SUPER_ADMIN, CATALOG_MANAGER, ANALYST, MODERATOR)` | `/api/admin/**`, страницы `/admin/**`; см. [`src/lib/admin-auth.ts`](../../src/lib/admin-auth.ts) |
 | Внешние интеграции | Google / Apple / Yandex OAuth (вход), Resend (письма сброса пароля), Yandex Geocoder (геокодинг), Web Push / FCM / APNS (нотификации) | Outbound + callbacks |

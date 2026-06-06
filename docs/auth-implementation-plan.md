@@ -185,6 +185,10 @@ Why not overbuild roles yet:
 - Web: Auth.js providers for Google/Apple/Yandex (enabled by env credentials).
 - Mobile: provider token verification and exchange at `POST /api/auth/oauth/mobile`.
 - Account linking policy: one user can have multiple provider accounts (`auth_accounts`).
+- **Web login split:** email/password uses `POST /api/auth/login` (cookie `mototwin_session`); OAuth buttons use Auth.js `signIn()` (table `authjs_sessions`). Both resolve via `resolveAuthenticatedUserId()`.
+- **Prisma adapter:** `@auth/prisma-adapter` expects `User.name`; MotoTwin uses `User.displayName`. Custom wrapper [`mototwinPrismaAdapter()`](../src/lib/auth/prisma-auth-adapter.ts) maps fields — required to avoid `OAuthCreateAccount` on first Google sign-in.
+- **New-user bootstrap:** `ensureUserBootstrap()` (garage, settings, subscription) runs in Auth.js **`events.signIn`**, not in the `signIn` callback — the callback can fire before PrismaAdapter persists a new OAuth user (FK `garages_ownerUserId_fkey` if called too early).
+- **Production setup:** see [auth-oauth-production.md](./auth-oauth-production.md) (Google Console URLs, `NEXTAUTH_URL`, beta allowlist vs Google Test users).
 
 ### Password recovery (implemented baseline)
 
@@ -340,4 +344,5 @@ Cross-platform parity checks:
 
 - [auth-roadmap.md](./auth-roadmap.md)
 - [auth-data-ownership-architecture.md](./auth-data-ownership-architecture.md)
+- [auth-oauth-production.md](./auth-oauth-production.md)
 - [data-model.md](./data-model.md)

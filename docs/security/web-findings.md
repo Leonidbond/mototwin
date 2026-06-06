@@ -12,7 +12,7 @@
 - Server action: [src/app/admin/actions.ts:15-16](../../src/app/admin/actions.ts) — `revalidateAdminAction` тоже стартует с `await requireAnyAdmin()`. Это **единственный** server action в репозитории (подтверждено grep `use server`).
 - User-страницы — все client-side с `createWebApiClient` → защита API-слоем.
 
-Доп. наблюдение: страница `/login` использует `signIn("credentials", ...)` через **next-auth**, не через кастомный `/api/auth/login`. Web-сессия после этого — Auth.js `Session` (database strategy). Это другой ID-токен, чем cookie `mototwin_session` (которая выставляется кастомным `/api/auth/login`). Оба пути работают параллельно (см. [api-findings.md API2](./api-findings.md)).
+Доп. наблюдение: страница `/login` использует **два пути** — email/password через `POST /api/auth/login` (cookie `mototwin_session`), OAuth-кнопки через Auth.js `signIn("google"|…)` (таблица `authjs_sessions`). Оба резолвятся в `resolveAuthenticatedUserId()`. См. [auth-oauth-production.md](../auth-oauth-production.md).
 
 ## A02:2021 — Cryptographic Failures
 

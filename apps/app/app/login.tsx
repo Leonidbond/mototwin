@@ -74,14 +74,23 @@ function GoogleSignInButton(props: {
 }) {
   const [request, response, promptAsync] = Google.useAuthRequest({
     scopes: ["openid", "email", "profile"],
-    expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID,
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID,
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
   });
 
   useEffect(() => {
-    if (response?.type !== "success") {
+    if (!response) {
+      return;
+    }
+    if (response.type === "cancel" || response.type === "dismiss") {
+      props.onFinish();
+      return;
+    }
+    if (response.type !== "success") {
+      props.onError("Не удалось войти через Google.");
+      props.onFinish();
       return;
     }
     const idToken =
@@ -141,7 +150,16 @@ function YandexSignInButton(props: {
   );
 
   useEffect(() => {
-    if (response?.type !== "success") {
+    if (!response) {
+      return;
+    }
+    if (response.type === "cancel" || response.type === "dismiss") {
+      props.onFinish();
+      return;
+    }
+    if (response.type !== "success") {
+      props.onError("Не удалось войти через Yandex.");
+      props.onFinish();
       return;
     }
     const accessToken =
@@ -198,7 +216,7 @@ export default function LoginScreen() {
       refreshToken: result.refreshToken,
       expiresAt: result.expiresAt,
     });
-    router.replace("/");
+    router.replace("/garage");
   }
 
   async function onSubmit() {
@@ -218,7 +236,7 @@ export default function LoginScreen() {
         refreshToken: result.refreshToken,
         expiresAt: result.expiresAt,
       });
-      router.replace("/");
+      router.replace("/garage");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка авторизации.");
     } finally {

@@ -7,12 +7,12 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://beta.mototwin.ru"
+        "EXPO_PUBLIC_API_BASE_URL": "https://mototwin.online"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://beta.mototwin.ru"
+        "EXPO_PUBLIC_API_BASE_URL": "https://mototwin.online"
       }
     }
   },
