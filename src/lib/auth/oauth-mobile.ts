@@ -29,17 +29,28 @@ export async function resolveMobileOAuthProfile(input: MobileOAuthPayload): Prom
   return verifyYandex(input.accessToken);
 }
 
+function collectGoogleOAuthAudiences(): string[] {
+  const raw = [
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.AUTH_GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_ANDROID_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_IOS_OAUTH_CLIENT_ID,
+    ...(process.env.GOOGLE_OAUTH_CLIENT_IDS?.split(",") ?? []),
+  ];
+  return [...new Set(raw.map((value) => value?.trim()).filter(Boolean) as string[])];
+}
+
 async function verifyGoogle(idToken?: string) {
   if (!idToken?.trim()) {
     throw new AuthServiceError("INVALID_OAUTH_TOKEN", 400, "Google idToken обязателен.");
   }
-  const audience = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
-  if (!audience) {
+  const audiences = collectGoogleOAuthAudiences();
+  if (audiences.length === 0) {
     throw new AuthServiceError("GOOGLE_CONFIG_MISSING", 500, "Не настроен GOOGLE_OAUTH_CLIENT_ID.");
   }
   const ticket = await googleClient.verifyIdToken({
     idToken: idToken.trim(),
-    audience,
+    audience: audiences.length === 1 ? audiences[0] : audiences,
   });
   const payload = ticket.getPayload();
   const sub = payload?.sub;

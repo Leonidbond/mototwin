@@ -18,6 +18,7 @@ import * as Crypto from "expo-crypto";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { createMobileApiClient } from "../src/create-mobile-api-client";
 import { writeAuthTokens } from "../src/auth-storage";
+import { writeCachedAccessToken } from "../src/mobile-access-token-cache";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -216,6 +217,11 @@ export default function LoginScreen() {
       refreshToken: result.refreshToken,
       expiresAt: result.expiresAt,
     });
+    const expiresAtMs = Date.parse(result.expiresAt);
+    writeCachedAccessToken(
+      result.accessToken,
+      Number.isFinite(expiresAtMs) ? expiresAtMs : Date.now() + 15 * 60_000
+    );
     router.replace("/garage");
   }
 

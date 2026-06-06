@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { createWebApiClient } from "@/lib/create-web-api-client";
 import { productSemanticColors } from "@mototwin/design-tokens";
@@ -13,11 +13,26 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") || "/garage";
+  const oauthErrorCode = searchParams.get("error");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!oauthErrorCode) return;
+    const decoded = decodeURIComponent(oauthErrorCode);
+    if (decoded === "OAuthCreateAccount") {
+      setError("Не удалось создать аккаунт через Google. Попробуйте ещё раз или войдите по email.");
+      return;
+    }
+    if (decoded === "AccessDenied") {
+      setError("Google отклонил вход. Проверьте, что ваш Gmail добавлен в Test users приложения.");
+      return;
+    }
+    setError(decoded);
+  }, [oauthErrorCode]);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();

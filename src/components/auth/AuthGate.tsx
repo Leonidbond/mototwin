@@ -23,10 +23,20 @@ export function AuthGate({ children }: AuthGateProps) {
       try {
         await api.getAuthMe();
         if (!cancelled) setReady(true);
-      } catch {
-        if (!cancelled) {
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "";
+        if (message.toLowerCase().includes("требуется вход")) {
           router.replace("/login");
+          return;
         }
+        router.replace(
+          `/login?next=${encodeURIComponent(
+            typeof window !== "undefined"
+              ? window.location.pathname + window.location.search
+              : "/garage"
+          )}&error=${encodeURIComponent(message || "Не удалось проверить сессию.")}`
+        );
       }
     })();
     return () => {

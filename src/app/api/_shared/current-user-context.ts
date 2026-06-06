@@ -8,6 +8,7 @@ import {
 import { isDevUserSwitcherEnabled } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
 import { resolveAuthenticatedUserId } from "@/lib/auth/request-auth";
+import { ensureUserBootstrap } from "@/lib/auth/user-bootstrap";
 
 export const DEMO_USER_EMAIL = "demo@mototwin.local";
 export const DEMO_GARAGE_TITLE = "Мой гараж";
@@ -133,11 +134,19 @@ async function findUserContextByUserId(userId: string): Promise<CurrentUserConte
     );
   }
 
-  const garage = await prisma.garage.findFirst({
+  let garage = await prisma.garage.findFirst({
     where: { ownerUserId: user.id },
     orderBy: { createdAt: "asc" },
     select: { id: true },
   });
+  if (!garage) {
+    await ensureUserBootstrap(user.id);
+    garage = await prisma.garage.findFirst({
+      where: { ownerUserId: user.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+  }
   if (!garage) {
     throw new CurrentUserContextError(
       "CURRENT_GARAGE_NOT_FOUND",
