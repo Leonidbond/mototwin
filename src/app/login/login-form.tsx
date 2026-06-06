@@ -45,11 +45,80 @@ export function LoginForm({ nextPath, oauthErrorCode }: LoginFormProps) {
 
   useEffect(() => {
     clearWebSessionCache();
+    // #region agent log
+    fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+      body: JSON.stringify({
+        sessionId: "6800ea",
+        runId: "run-google-click-1",
+        hypothesisId: "H3",
+        location: "src/app/login/login-form.tsx:50",
+        message: "LoginForm mounted",
+        data: {
+          path: typeof window !== "undefined" ? window.location.pathname : "server",
+          hasNextAuthClient: typeof signIn === "function",
+          nextPath,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
   }, []);
 
   useEffect(() => {
     setError(resolveOauthErrorMessage(oauthErrorCode));
   }, [oauthErrorCode]);
+
+  useEffect(() => {
+    const onError = (event: ErrorEvent) => {
+      // #region agent log
+      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+        body: JSON.stringify({
+          sessionId: "6800ea",
+          runId: "run-google-click-1",
+          hypothesisId: "H3",
+          location: "src/app/login/login-form.tsx:71",
+          message: "window error on login page",
+          data: {
+            message: event.message,
+            file: event.filename,
+            line: event.lineno,
+            col: event.colno,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      // #region agent log
+      fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+        body: JSON.stringify({
+          sessionId: "6800ea",
+          runId: "run-google-click-1",
+          hypothesisId: "H3",
+          location: "src/app/login/login-form.tsx:91",
+          message: "unhandled rejection on login page",
+          data: {
+            reason: String(event.reason),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
+  }, []);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -124,9 +193,81 @@ export function LoginForm({ nextPath, oauthErrorCode }: LoginFormProps) {
         <div className="mt-4 grid grid-cols-1 gap-2">
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               const callbackPath = nextPath.startsWith("/") ? nextPath : "/garage";
-              void signIn("google", { callbackUrl: callbackPath });
+              // #region agent log
+              fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+                body: JSON.stringify({
+                  sessionId: "6800ea",
+                  runId: "run-google-click-1",
+                  hypothesisId: "H1",
+                  location: "src/app/login/login-form.tsx:189",
+                  message: "Google button clicked",
+                  data: {
+                    callbackPath,
+                    href: typeof window !== "undefined" ? window.location.href : "server",
+                  },
+                  timestamp: Date.now(),
+                }),
+              }).catch(() => {});
+              // #endregion
+              try {
+                // #region agent log
+                fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+                  body: JSON.stringify({
+                    sessionId: "6800ea",
+                    runId: "run-google-click-1",
+                    hypothesisId: "H2",
+                    location: "src/app/login/login-form.tsx:207",
+                    message: "Calling signIn google",
+                    data: {
+                      callbackPath,
+                    },
+                    timestamp: Date.now(),
+                  }),
+                }).catch(() => {});
+                // #endregion
+                const result = await signIn("google", { callbackUrl: callbackPath });
+                // #region agent log
+                fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+                  body: JSON.stringify({
+                    sessionId: "6800ea",
+                    runId: "run-google-click-1",
+                    hypothesisId: "H2",
+                    location: "src/app/login/login-form.tsx:223",
+                    message: "signIn promise resolved",
+                    data: {
+                      result: result ?? null,
+                    },
+                    timestamp: Date.now(),
+                  }),
+                }).catch(() => {});
+                // #endregion
+              } catch (error) {
+                // #region agent log
+                fetch("http://127.0.0.1:7691/ingest/26105bb6-0b1c-4ea6-81d5-5f2a1ba438cd", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6800ea" },
+                  body: JSON.stringify({
+                    sessionId: "6800ea",
+                    runId: "run-google-click-1",
+                    hypothesisId: "H2",
+                    location: "src/app/login/login-form.tsx:241",
+                    message: "signIn threw error",
+                    data: {
+                      error: error instanceof Error ? error.message : String(error),
+                    },
+                    timestamp: Date.now(),
+                  }),
+                }).catch(() => {});
+                // #endregion
+              }
             }}
             className="rounded-lg border py-2 text-sm"
             style={{ borderColor: "rgba(255,255,255,0.15)" }}
