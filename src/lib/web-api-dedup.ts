@@ -1,11 +1,11 @@
 import type {
   AuthMeResponse,
   GarageVehiclesResponse,
-  NodeTreeResponse,
   ServiceEventsResponse,
   ServiceNodesResponse,
   TopServiceNodesResponse,
   VehicleDetailResponse,
+  VehicleNodeTreeResponse,
   VehicleWishlistResponse,
 } from "@mototwin/types";
 import { createWebApiClient } from "@/lib/create-web-api-client";
@@ -100,7 +100,7 @@ export type VehicleDashboardBootstrap = {
   detail: VehicleDetailResponse;
   serviceEvents: ServiceEventsResponse;
   expenses: Awaited<ReturnType<typeof api.getExpenses>>;
-  nodeTree: NodeTreeResponse;
+  nodeTree: VehicleNodeTreeResponse;
   wishlist: VehicleWishlistResponse;
   catalog: ServiceCatalogBundle;
 };
