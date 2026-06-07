@@ -1,0 +1,18 @@
+# EAS uploads from monorepo root — exclude heavy dirs (npm ci runs on server).
+.next
+node_modules
+.git
+.cursor
+.venv-tools
+.venv-icon
+coverage
+mototwin.dump
+*.tsbuildinfo
+apps/app/android/.gradle
+apps/app/android/app/build
+apps/app/android/build
+apps/app/ios/build
+auth
+.env
+.env.*
+**/*.log
