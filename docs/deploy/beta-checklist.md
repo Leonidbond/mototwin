@@ -10,6 +10,7 @@
 - [ ] Google OAuth (если включён): Test users в Google Console + redirect `https://mototwin.space/api/auth/callback/google` — см. [auth-oauth-production.md](../auth-oauth-production.md)
 - [ ] Apple Sign In: Service ID + Return URL `https://mototwin.space/api/auth/callback/apple`, JWT `AUTH_APPLE_CLIENT_SECRET`, `APPLE_CLIENT_ID=ru.mototwin.app`
 - [ ] Yandex OAuth: redirect URIs web + `mototwin://oauth/yandex`, env `YANDEX_*` на VPS
+- [ ] Reg.ru SMTP: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `AUTH_EMAIL_FROM` — см. [email-smtp.md](../email-smtp.md)
 - [ ] `curl -s https://mototwin.space/api/auth/providers` — google, apple, yandex с callback на `.space`
 - [ ] Регистрация с неразрешённым email отклоняется
 - [ ] Два аккаунта: `GET /api/garage` изолированы; чужой `vehicleId` → 404
@@ -31,7 +32,7 @@ BASE_URL=https://ваш-домен npm run qa:notifications-smoke   # после
 2. Регистрация (email из allowlist) / логин
 3. Android: ссылка на APK / iOS: TestFlight
 4. Канал обратной связи
-5. Не тестируем: email/push (пока заглушки)
+5. Email: сброс пароля и оповещения (если включён канал email); push — по готовности FCM/APNS
 
 ## Порядок приглашения
 

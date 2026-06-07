@@ -11,6 +11,7 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sendNotificationEmail } from "@/lib/email/notification-email";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -409,7 +410,11 @@ export async function dispatchPendingNotificationDeliveriesForUser(userId: strin
       notification: { userId },
     },
     include: {
-      notification: true,
+      notification: {
+        include: {
+          user: { select: { email: true } },
+        },
+      },
     },
     orderBy: { createdAt: "asc" },
     take: 100,
@@ -503,6 +508,45 @@ export async function dispatchPendingNotificationDeliveriesForUser(userId: strin
           });
           continue;
         }
+      }
+
+      if (delivery.channel === NotificationChannel.EMAIL) {
+        const recipient = delivery.notification.user.email?.trim();
+        if (!recipient) {
+          await prisma.notificationDelivery.update({
+            where: { id: delivery.id },
+            data: {
+              status: NotificationDeliveryStatus.SKIPPED,
+              attemptCount: { increment: 1 },
+              errorCode: "NO_RECIPIENT_EMAIL",
+            },
+          });
+          continue;
+        }
+
+        const sent = await sendNotificationEmail({
+          to: recipient,
+          title: delivery.notification.title,
+          body: delivery.notification.body,
+          actionLabel: delivery.notification.actionLabel,
+          actionUrl: delivery.notification.actionUrl,
+        });
+
+        await prisma.notificationDelivery.update({
+          where: { id: delivery.id },
+          data: {
+            status: NotificationDeliveryStatus.SENT,
+            sentAt: now,
+            attemptCount: { increment: 1 },
+            providerMessageId: sent.messageId,
+          },
+        });
+        console.info("[notifications] delivery.sent", {
+          deliveryId: delivery.id,
+          notificationId: delivery.notificationId,
+          channel: delivery.channel,
+        });
+        continue;
       }
 
       await prisma.notificationDelivery.update({

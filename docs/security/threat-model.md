@@ -17,7 +17,7 @@
 | Координаты места установки (`ServiceEvent.installLocationLat/Lng/Address`) | Postgres | Средняя — геолокация |
 | Push-токены (FCM/APNS) | Postgres | Средняя |
 | Админ-операции: модерация, импорт каталога, аудит-лог (`AdminAuditLog`) | Postgres | Высокая для целостности каталога |
-| Серверные секреты: `AUTH_SECRET`, `RESEND_API_KEY`, `YANDEX_GEOCODER_API_KEY`, OAuth client secrets | `.env` / процесс Next.js | Критическая |
+| Серверные секреты: `AUTH_SECRET`, `SMTP_PASS`, `YANDEX_GEOCODER_API_KEY`, OAuth client secrets | `.env` / процесс Next.js | Критическая |
 
 ## 2. Актеры
 
@@ -28,7 +28,7 @@
 | Beta-allowlisted | Email в `MOTOTWIN_BETA_ALLOWED_EMAILS` (в проде **регистрация** email+пароль только allowlist; **web OAuth не проверяет** этот список) | Регистрация открыта; см. [`src/lib/auth/beta-allowlist.ts`](../../src/lib/auth/beta-allowlist.ts) |
 | Модератор | `User.isModerator = true` | `/api/moderation/**`, моде-эндпоинты |
 | Админ | `User.adminRole IN (SUPER_ADMIN, CATALOG_MANAGER, ANALYST, MODERATOR)` | `/api/admin/**`, страницы `/admin/**`; см. [`src/lib/admin-auth.ts`](../../src/lib/admin-auth.ts) |
-| Внешние интеграции | Google / Apple / Yandex OAuth (вход), Resend (письма сброса пароля), Yandex Geocoder (геокодинг), Web Push / FCM / APNS (нотификации) | Outbound + callbacks |
+| Внешние интеграции | Google / Apple / Yandex OAuth (вход), Reg.ru SMTP (письма), Yandex Geocoder (геокодинг), Web Push / FCM / APNS (нотификации) | Outbound + callbacks |
 
 ## 3. Trust boundaries
 
@@ -40,12 +40,12 @@ flowchart LR
 
     NextAPI --> Postgres[(Postgres / Prisma)]
     NextAPI -->|"verifyIdToken / fetch"| OAuth[Google / Apple / Yandex]
-    NextAPI -->|"SMTP"| Resend[Resend]
+    NextAPI -->|"SMTP"| RegRuMail[Reg.ru SMTP]
     NextAPI -->|"HTTP"| Geocoder[Yandex Geocoder]
     NextAPI -->|"FCM / APNS / WebPush"| PushOut[Push providers]
 
     OAuth -.idToken/accessToken.-> Mobile
-    Resend -.password reset email.-> Browser
+    RegRuMail -.transactional email.-> Browser
 ```
 
 Границы доверия:
@@ -103,17 +103,17 @@ sequenceDiagram
 sequenceDiagram
     participant U as User
     participant N as Next /api/auth/forgot-password
-    participant R as Resend
+    participant M as Reg.ru SMTP
     U->>N: POST {email}
     N->>N: throttle 60s per user, generateRawToken, store hash
-    N->>R: sendPasswordResetEmail
+    N->>M: sendPasswordResetEmail (SMTP)
     N-->>U: 200 OK ({ok:true, message:"если аккаунт существует..."})
     U->>N: POST /api/auth/reset-password {token, password}
     N->>N: validatePassword (len>=8), bcrypt.hash, revoke ALL sessions
     N-->>U: 200 OK
 ```
 
-Защиты: ответ единообразный (нет enumeration на forgot), 60-секундный throttle на одного пользователя, ротация всех сессий после сброса, глобальный in-memory rate-limit на `forgot`/`reset` (`MT-SEC-002`, resolved), masked email в логах + hard-fail на отсутствующий Resend в prod (`MT-SEC-022`, resolved). Открыто: политика пароля — только длина (`MT-SEC-012`), нет капчи.
+Защиты: ответ единообразный (нет enumeration на forgot), 60-секундный throttle на одного пользователя, ротация всех сессий после сброса, глобальный in-memory rate-limit на `forgot`/`reset` (`MT-SEC-002`, resolved), masked email в логах + hard-fail на отсутствующий SMTP в prod (`MT-SEC-022`, resolved). Открыто: политика пароля — только длина (`MT-SEC-012`), нет капчи.
 
 ### 4.4 BOLA-цепочка для пользовательских ресурсов
 

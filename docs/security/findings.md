@@ -51,7 +51,7 @@
 | `MT-SEC-073` | **P0** (IDOR) | **resolved** | `parts/recommended-skus` — добавлен `getVehicleInCurrentContext` (был полностью без auth); `part-masters/duplicates` — добавлен `getCurrentUserContext` + rate-limit |
 | `MT-SEC-074` | P1 | **resolved** | `geocode` — добавлен `getCurrentUserContext` + rate-limit 60/min per-user (был полностью без auth, paid Yandex API → cost abuse) |
 | `MT-SEC-075` | P2 | **resolved** | `admin/imports` POST — sanitize `file.name` (strip path separators + control chars + length cap 200) перед записью в БД и audit log |
-| `MT-SEC-027` | P0 (scope:infra) | **partial** | `mototwin.dump` untracked + в `.gitignore`. **Открыто:** rewrite git history (commit `85860f1`) + ротация `AUTH_SECRET`/DB-пароля/`RESEND_API_KEY`/`YANDEX_GEOCODER_API_KEY` — см. [docs/deploy/vps.md §11](../deploy/vps.md#11-инцидент-mototwindump-в-git-history-mt-sec-027) |
+| `MT-SEC-027` | P0 (scope:infra) | **partial** | `mototwin.dump` untracked + в `.gitignore`. **Открыто:** rewrite git history (commit `85860f1`) + ротация `AUTH_SECRET`/DB-пароля/`SMTP_PASS`/`YANDEX_GEOCODER_API_KEY` — см. [docs/deploy/vps.md §11](../deploy/vps.md#11-инцидент-mototwindump-в-git-history-mt-sec-027) |
 | `MT-SEC-029` | P0 (scope:infra) | **resolved** | `deploy/nginx/mototwin.conf` переписан: HTTPS-only, TLS Mozilla intermediate, HSTS preload, X-Frame-Options/X-Content-Type-Options/Referrer-Policy/Permissions-Policy/COOP, OCSP stapling, `client_max_body_size 16m`, proxy timeouts, HTTP→HTTPS 301 redirect с открытым `/.well-known/acme-challenge/` |
 
 Открытые приоритеты:

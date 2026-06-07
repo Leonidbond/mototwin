@@ -64,6 +64,17 @@ YANDEX_CLIENT_SECRET="..."
 YANDEX_OAUTH_CLIENT_ID="..."
 ```
 
+Email (Reg.ru SMTP — см. [email-smtp.md](../email-smtp.md)):
+
+```env
+SMTP_HOST=mail.hosting.reg.ru
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=reminder@mototwin.space
+SMTP_PASS="<mailbox password>"
+AUTH_EMAIL_FROM="MotoTwin <reminder@mototwin.space>"
+```
+
 Первый деплой:
 
 ```bash
@@ -192,7 +203,7 @@ chmod +x deploy/scripts/backup.sh
 
    - `AUTH_SECRET` (`/opt/mototwin/app/.env`) — перегенерировать `openssl rand -base64 32`. **Последствие:** все active web-сессии и mobile refresh-токены инвалидируются → пользователи будут перелогиниваться.
    - `DATABASE_URL` / `POSTGRES_PASSWORD` (`/opt/mototwin/.env`) — поменять пароль роли `mototwin_app` в Postgres + обновить `.env` + перезапустить docker-compose и `mototwin.service`.
-   - `RESEND_API_KEY` — revoke в Resend dashboard, выпустить новый.
+   - `SMTP_PASS` — сменить пароль ящика в Reg.ru.
    - `YANDEX_GEOCODER_API_KEY` — revoke в Yandex Console, выпустить новый.
    - `GOOGLE_OAUTH_CLIENT_ID`/`SECRET`, `APPLE_CLIENT_ID`, `YANDEX_OAUTH_CLIENT_ID` — ревью, поменять при подозрении.
    - Пароли всех пользователей в дампе — форсированный `password_reset` (массовый `revokeAllSessionsForUser` + email).
