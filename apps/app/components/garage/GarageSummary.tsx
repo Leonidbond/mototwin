@@ -1,6 +1,7 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 import { Card } from "../ui";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
+import { pluralizeMotorcycleRu } from "@mototwin/domain";
 import motorcyclesIcon from "../../../../images/garage-top-icons/motorcycles.png";
 import attentionIcon from "../../../../images/garage-top-icons/attention.png";
 import tasksIcon from "../../../../images/garage-top-icons/tasks.png";
@@ -22,7 +23,7 @@ export function GarageSummary(props: {
   expensesLabel: string | null;
 }) {
   const metrics = [
-    { label: "мотоцикла", value: String(props.motorcyclesCount), kind: "vehicle" as const },
+    { label: pluralizeMotorcycleRu(props.motorcyclesCount), value: String(props.motorcyclesCount), kind: "vehicle" as const },
     {
       label: "требует внимания",
       value: String(props.motorcyclesWithAttentionCount),

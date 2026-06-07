@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1077634581739",
+    "project_id": "mototwin-1b521",
+    "storage_bucket": "mototwin-1b521.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1077634581739:android:fdf200af1efd31ef436aae",
+        "android_client_info": {
+          "package_name": "ru.mototwin.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVnfbmR1Vf6F9y55FTonW6WIdEMWFTMHI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

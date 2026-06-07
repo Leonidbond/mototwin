@@ -270,6 +270,7 @@ export {
 } from "./component-contract-props";
 export { calculateGarageScore } from "./garage-score";
 export { buildGarageDashboardSummary } from "./garage-dashboard";
+export { pluralizeMotorcycleRu, pluralizeRu } from "./pluralize-ru";
 export {
   DEFAULT_USER_SETTINGS,
   DEFAULT_USER_LOCAL_SETTINGS,

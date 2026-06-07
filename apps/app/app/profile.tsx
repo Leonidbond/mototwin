@@ -384,6 +384,10 @@ export default function ProfileScreen() {
           <InfoRow label="Email" value={profile.email} />
           <InfoRow label="Дата регистрации" value={profile.createdAtLabel} />
           <InfoRow label="Гараж" value={profile.garageTitle} />
+          <Pressable style={styles.linkButton} onPress={() => router.push("/notifications")}>
+            <Text style={styles.linkButtonText}>Оповещения и push</Text>
+            <Text style={styles.linkButtonHint}>Список напоминаний и подключение push</Text>
+          </Pressable>
           {!__DEV__ ? (
             <Pressable
               style={styles.logoutButton}
@@ -730,6 +734,17 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 13, color: c.textMuted },
   infoValue: { fontSize: 13, fontWeight: "600", color: c.textPrimary, flexShrink: 1, textAlign: "right" },
   hintText: { marginTop: 2, fontSize: 11, color: c.textMuted },
+  linkButton: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 4,
+  },
+  linkButtonText: { fontSize: 14, fontWeight: "600", color: c.textPrimary },
+  linkButtonHint: { fontSize: 12, color: c.textMuted },
   logoutButton: {
     marginTop: 8,
     borderWidth: 1,

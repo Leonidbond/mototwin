@@ -40,7 +40,14 @@ Expo доставляет push через FCM (Android) и APNs (iOS). Credentia
 
 1. [Firebase Console](https://console.firebase.google.com/) → создать проект (например `mototwin`).
 2. Добавить Android-приложение с package **`ru.mototwin.app`**.
-3. Скачать `google-services.json` → положить в `apps/app/` (или путь из доки Expo).
+3. Скачать `google-services.json` → положить в `auth/google-services.json`, затем:
+
+```bash
+bash apps/app/scripts/sync-push-files-from-auth.sh
+```
+
+Скрипт копирует файл в `apps/app/` и **`apps/app/android/app/`** (нужно для нативной сборки Android).
+
 4. Firebase → Project settings → Service accounts → **Generate new private key** (JSON).
 5. Загрузить в EAS:
 

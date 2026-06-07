@@ -2,6 +2,7 @@ import Image from "next/image";
 import type { CSSProperties } from "react";
 import { Card } from "@/components/ui";
 import { productSemanticColors } from "@mototwin/design-tokens";
+import { pluralizeMotorcycleRu } from "@mototwin/domain";
 import motorcyclesIcon from "../../../../images/garage-top-icons/motorcycles.png";
 import attentionIcon from "../../../../images/garage-top-icons/attention.png";
 import tasksIcon from "../../../../images/garage-top-icons/tasks.png";
@@ -27,7 +28,7 @@ export function GarageSummary(props: {
       key: "vehicles",
       kind: "vehicle",
       value: String(props.motorcyclesCount),
-      label: "мотоцикла",
+      label: pluralizeMotorcycleRu(props.motorcyclesCount),
     },
     {
       key: "attention",

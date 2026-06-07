@@ -8,11 +8,26 @@ node_modules
 coverage
 mototwin.dump
 *.tsbuildinfo
+**/*.log
+
+# Android local build cache (rebuilt on EAS)
 apps/app/android/.gradle
-apps/app/android/app/build
-apps/app/android/build
+apps/app/android/.cxx
+apps/app/android/**/build
+
+# iOS — Pods reinstalled by EAS via `pod install`; source kept for future iOS builds
+apps/app/ios/Pods
 apps/app/ios/build
+
+# Web/backend — not used by mobile EAS build (prisma/ kept for postinstall)
+/src
+public
+images
+docs
+scripts
+deploy
+data
+
 auth
 .env
 .env.*
-**/*.log

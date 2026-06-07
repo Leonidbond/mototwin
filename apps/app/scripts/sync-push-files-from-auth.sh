@@ -16,9 +16,10 @@ copy_if_exists() {
 }
 
 copy_if_exists "$AUTH/google-services.json" "$APP/google-services.json"
+copy_if_exists "$AUTH/google-services.json" "$APP/android/app/google-services.json"
 
 if [[ -f "$AUTH/google-services.json" ]]; then
-  echo "OK: google-services.json ready for EAS build"
+  echo "OK: google-services.json ready for EAS build (apps/app + android/app)"
 else
   echo "WARN: add auth/google-services.json from Firebase Console first"
   exit 1

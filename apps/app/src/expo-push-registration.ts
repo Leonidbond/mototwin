@@ -43,11 +43,22 @@ export async function registerExpoPushToken(): Promise<
     };
   }
 
-  const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
-  const token = tokenResult.data?.trim();
-  if (!token) {
-    return { ok: false, reason: "Не удалось получить Expo push token." };
+  try {
+    const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
+    const token = tokenResult.data?.trim();
+    if (!token) {
+      return { ok: false, reason: "Не удалось получить Expo push token." };
+    }
+    return { ok: true, token };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/firebase|fcm|google-services/i.test(message)) {
+      return {
+        ok: false,
+        reason:
+          "Firebase не настроен в сборке приложения. Пересоберите APK после добавления google-services.json.",
+      };
+    }
+    return { ok: false, reason: message || "Не удалось получить Expo push token." };
   }
-
-  return { ok: true, token };
 }

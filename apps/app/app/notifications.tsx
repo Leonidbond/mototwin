@@ -97,7 +97,9 @@ export default function NotificationsScreen() {
 
       Alert.alert("Push подключен", "Устройство зарегистрировано для push-уведомлений.");
     } catch (requestError) {
-      Alert.alert("Ошибка", "Не удалось подключить push.");
+      const message =
+        requestError instanceof Error ? requestError.message : "Не удалось подключить push.";
+      Alert.alert("Ошибка", message);
     } finally {
       setIsConnectingPush(false);
     }
