@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MotoTwin",
-    "slug": "mototwin-app",
+    "slug": "mototwin",
     "scheme": "mototwin",
     "version": "0.1.0",
     "orientation": "default",
@@ -32,7 +32,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "REPLACE_AFTER_eas_init"
+        "projectId": "9bd6ab62-91aa-4298-b3cd-d9a78e2ff53a"
       }
     }
   }
