@@ -15,5 +15,8 @@ mototwin.dump
 *.tsbuildinfo
 .venv-icon/
 auth/
+apps/app/google-services.json
+apps/app/GoogleService-Info.plist
+**/firebase*fcm*.json
 apps/app/android/keystore.properties
 apps/app/android/keystores/

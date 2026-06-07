@@ -1,8 +1,15 @@
+import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
 const PRODUCTION_API_BASE_URL = "https://mototwin.space";
+const GOOGLE_SERVICES_FILE = "./google-services.json";
+
+function hasGoogleServicesJson(): boolean {
+  return fs.existsSync(path.join(process.cwd(), "google-services.json"));
+}
 
 /** Interface name substrings to skip (VPN, tunnels, bridges). Do not use plain "lo" — it matches `wlo1`. */
 const SKIP_IFACE_SUBSTR = [
@@ -79,6 +86,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   return {
     ...baseConfig,
+    android: {
+      ...baseConfig.android,
+      ...(hasGoogleServicesJson() ? { googleServicesFile: GOOGLE_SERVICES_FILE } : {}),
+    },
     plugins: [
       ...(baseConfig.plugins ?? []),
       "@react-native-community/datetimepicker",
