@@ -110,6 +110,15 @@ export default function RootLayout() {
     void import("expo-notifications")
       .then((Notifications) => {
         if (cancelled) return;
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
+          }),
+        });
         subscription = Notifications.addNotificationResponseReceivedListener((response) => {
           const maybePath = (response.notification.request.content.data?.actionUrl ??
             response.notification.request.content.data?.url) as string | undefined;

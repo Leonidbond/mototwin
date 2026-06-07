@@ -25,6 +25,8 @@ eas build -p ios --profile preview
 
 Раздача: internal APK link (Android), TestFlight (iOS, Apple Developer).
 
+**Push-уведомления:** пошагово — [`../mobile-push-setup.md`](../mobile-push-setup.md) (EAS projectId, FCM, APNs, сборка).
+
 **Expo Go не подходит** для production API — только standalone с HTTPS URL.
 
 ## Проверка

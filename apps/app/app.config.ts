@@ -82,7 +82,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       ...(baseConfig.plugins ?? []),
       "@react-native-community/datetimepicker",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/adaptive-icon.png",
+          color: "#080D12",
+        },
+      ],
       [
         "@react-native-google-signin/google-signin",
         {

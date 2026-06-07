@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { NotificationItemWire } from "@mototwin/types";
+import { registerExpoPushToken } from "../src/expo-push-registration";
 import { createMobileApiClient } from "../src/create-mobile-api-client";
 import { withAuthGuard } from "../src/mobile-auth-guard";
 
@@ -64,20 +65,13 @@ export default function NotificationsScreen() {
   const connectPush = useCallback(async () => {
     try {
       setIsConnectingPush(true);
-      const Notifications = await import("expo-notifications");
-      const Device = await import("expo-device");
-      const permission = await Notifications.getPermissionsAsync();
-      let status = permission.status;
-      if (status !== "granted") {
-        const requested = await Notifications.requestPermissionsAsync();
-        status = requested.status;
-      }
-      if (status !== "granted") {
-        Alert.alert("Push не подключен", "Разрешите уведомления в настройках устройства.");
+      const registration = await registerExpoPushToken();
+      if (!registration.ok) {
+        Alert.alert("Push не подключен", registration.reason);
         return;
       }
-      const tokenResult = await Notifications.getExpoPushTokenAsync();
-      const token = tokenResult.data;
+
+      const Device = await import("expo-device");
       const endpoints = createMobileApiClient();
       const connected = await withAuthGuard(
         () =>
@@ -85,7 +79,7 @@ export default function NotificationsScreen() {
             channelType: "MOBILE_PUSH",
             provider: "EXPO",
             platform: Device.osName === "iOS" ? "IOS" : "ANDROID",
-            token,
+            token: registration.token,
             deviceName: Device.deviceName ?? null,
             osVersion: Device.osVersion ?? null,
             appVersion: "0.1.0",
@@ -95,6 +89,12 @@ export default function NotificationsScreen() {
       if (!connected) {
         return;
       }
+
+      await withAuthGuard(
+        () => endpoints.updateNotificationSettings({ pushEnabled: true }),
+        () => router.replace("/login")
+      );
+
       Alert.alert("Push подключен", "Устройство зарегистрировано для push-уведомлений.");
     } catch (requestError) {
       Alert.alert("Ошибка", "Не удалось подключить push.");

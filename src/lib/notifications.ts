@@ -5,6 +5,7 @@ import {
   NotificationStatus,
   NotificationType,
   PushChannelType,
+  PushProvider,
   TopNodeStatus,
   type Notification,
   type NotificationDelivery,
@@ -471,6 +472,7 @@ export async function dispatchPendingNotificationDeliveriesForUser(userId: strin
             enabled: true,
             invalidatedAt: null,
             channelType: PushChannelType.MOBILE_PUSH,
+            provider: PushProvider.EXPO,
           },
           select: { id: true, token: true },
         });
@@ -485,6 +487,47 @@ export async function dispatchPendingNotificationDeliveriesForUser(userId: strin
           });
           continue;
         }
+
+        const { sendExpoPushToSubscriptions } = await import("@/lib/push/send-expo-push");
+        const pushResult = await sendExpoPushToSubscriptions({
+          subscriptions,
+          title: delivery.notification.title,
+          body: delivery.notification.body,
+          actionUrl: delivery.notification.actionUrl,
+        });
+
+        if (pushResult.sentCount === 0) {
+          await prisma.notificationDelivery.update({
+            where: { id: delivery.id },
+            data: {
+              status: NotificationDeliveryStatus.FAILED,
+              failedAt: now,
+              attemptCount: { increment: 1 },
+              errorCode: "EXPO_PUSH_FAILED",
+              errorMessage: pushResult.errors.join("; ") || "No valid Expo push tokens",
+            },
+          });
+          continue;
+        }
+
+        await prisma.notificationDelivery.update({
+          where: { id: delivery.id },
+          data: {
+            status: NotificationDeliveryStatus.SENT,
+            sentAt: now,
+            attemptCount: { increment: 1 },
+            providerMessageId: pushResult.messageIds.join(",") || `expo:${delivery.id}`,
+            errorMessage: pushResult.failedCount > 0 ? pushResult.errors.join("; ") : null,
+          },
+        });
+        console.info("[notifications] delivery.sent", {
+          deliveryId: delivery.id,
+          notificationId: delivery.notificationId,
+          channel: delivery.channel,
+          sentCount: pushResult.sentCount,
+          failedCount: pushResult.failedCount,
+        });
+        continue;
       }
 
       if (delivery.channel === NotificationChannel.PUSH_WEB) {
