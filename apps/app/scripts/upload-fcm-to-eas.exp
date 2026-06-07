@@ -1,0 +1,51 @@
+#!/usr/bin/expect -f
+set timeout 90
+set profile [lindex $argv 0]
+if {$profile eq ""} { set profile "preview" }
+
+cd [file dirname [info script]]/..
+
+spawn eas credentials -p android
+
+expect -re "Which build profile"
+# preview is first; production needs one down
+if {$profile eq "production"} {
+  send "\033\[B\r"
+} else {
+  send "\r"
+}
+
+expect -re "What do you want to do\\?"
+send "\033\[B\r"
+
+expect -re "What do you want to do\\?"
+send "\033\[B\r"
+
+expect -re "Set up a Google Service Account Key for Push Notifications \\(FCM V1\\)"
+send "\r"
+
+expect {
+  -re "Would you like to use this file\\?" {
+    send "y\r"
+  }
+  -re "Path to Google Service Account file:" {
+    send "fcm-service-account.json\r"
+  }
+}
+
+expect {
+  -re "Uploaded Google Service Account Key" {
+    puts "\n>>> FCM upload success\n"
+  }
+  -re "Google Service Account Key for FCM V1 already set up" {
+    puts "\n>>> FCM already configured\n"
+  }
+  timeout {
+    puts "\n>>> timeout after confirm\n"
+    exit 1
+  }
+}
+
+sleep 1
+send "\003"
+expect eof

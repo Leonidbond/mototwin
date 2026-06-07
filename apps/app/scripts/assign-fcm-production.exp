@@ -1,0 +1,25 @@
+#!/usr/bin/expect -f
+# Assign existing FCM key to production profile.
+set timeout 90
+cd [file dirname [info script]]/..
+
+spawn eas credentials -p android
+expect -re "Which build profile"
+send "\033\[B\r"
+expect -re "What do you want to do\\?"
+send "\033\[B\r"
+expect -re "What do you want to do\\?"
+send "\033\[B\r"
+expect -re "Push Notifications \\(FCM V1\\)|FCM V1"
+send "\r"
+expect -re "Select an existing Google Service Account Key"
+send "\033\[B\r"
+expect -re "Select a Google Service Account Key:"
+send "\r"
+expect {
+  -re "Uploaded|assigned|already set up|succeed" { puts "\n>>> production FCM ok\n" }
+  timeout { puts "\n>>> production FCM timeout\n"; exit 1 }
+}
+sleep 1
+send "\003"
+expect eof

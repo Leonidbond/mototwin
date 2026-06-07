@@ -17,6 +17,7 @@ mototwin.dump
 auth/
 apps/app/google-services.json
 apps/app/GoogleService-Info.plist
+apps/app/fcm-service-account.json
 **/firebase*fcm*.json
 apps/app/android/keystore.properties
 apps/app/android/keystores/
