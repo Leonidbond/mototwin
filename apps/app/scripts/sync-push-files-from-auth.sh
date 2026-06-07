@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Копирует push-файлы из auth/ в apps/app/ перед eas build.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 AUTH="$ROOT/auth"
 APP="$ROOT/apps/app"
 
