@@ -11,3 +11,9 @@ export {
   ACTION_ICON_LABELS_RU,
 } from "./actions";
 export type { ActionIconKey } from "./actions";
+export {
+  OAUTH_PROVIDER_KEYS,
+  OAUTH_PROVIDER_LABELS_RU,
+  OAUTH_PROVIDER_SVG,
+} from "./oauth-providers";
+export type { OauthProviderKey } from "./oauth-providers";

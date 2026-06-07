@@ -25,6 +25,8 @@ import {
   resolveNativeGoogleSignInError,
   signInWithNativeGoogle,
 } from "../src/google-native-sign-in";
+import { OauthProviderIcon } from "../components/icons/oauth-provider-icon";
+import type { OauthProviderKey } from "@mototwin/icons/oauth-providers";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -73,6 +75,22 @@ type OAuthSuccessInput = {
   accessToken?: string;
   rawNonce?: string;
 };
+
+function OAuthButtonLabel(props: {
+  provider: OauthProviderKey;
+  loading: boolean;
+  loadingLabel: string;
+  label: string;
+}) {
+  return (
+    <View style={styles.oauthButtonContent}>
+      <OauthProviderIcon provider={props.provider} size={18} />
+      <Text style={styles.oauthButtonText}>
+        {props.loading ? props.loadingLabel : props.label}
+      </Text>
+    </View>
+  );
+}
 
 function GoogleSignInButtonAuthSession(props: {
   disabled: boolean;
@@ -137,9 +155,12 @@ function GoogleSignInButtonAuthSession(props: {
         });
       }}
     >
-      <Text style={styles.oauthButtonText}>
-        {props.loading ? "Google..." : "Войти через Google"}
-      </Text>
+      <OAuthButtonLabel
+        provider="google"
+        loading={props.loading}
+        loadingLabel="Google..."
+        label="Войти через Google"
+      />
     </Pressable>
   );
 }
@@ -169,9 +190,12 @@ function GoogleSignInButtonNative(props: {
           .finally(props.onFinish);
       }}
     >
-      <Text style={styles.oauthButtonText}>
-        {props.loading ? "Google..." : "Войти через Google"}
-      </Text>
+      <OAuthButtonLabel
+        provider="google"
+        loading={props.loading}
+        loadingLabel="Google..."
+        label="Войти через Google"
+      />
     </Pressable>
   );
 }
@@ -251,9 +275,12 @@ function YandexSignInButton(props: {
         });
       }}
     >
-      <Text style={styles.oauthButtonText}>
-        {props.loading ? "Yandex..." : "Войти через Yandex"}
-      </Text>
+      <OAuthButtonLabel
+        provider="yandex"
+        loading={props.loading}
+        loadingLabel="Yandex..."
+        label="Войти через Yandex"
+      />
     </Pressable>
   );
 }
@@ -369,9 +396,12 @@ export default function LoginScreen() {
                 .finally(() => setOauthLoading(null));
             }}
           >
-            <Text style={styles.oauthButtonText}>
-              {oauthLoading === "apple" ? "Apple..." : "Войти через Apple"}
-            </Text>
+            <OAuthButtonLabel
+              provider="apple"
+              loading={oauthLoading === "apple"}
+              loadingLabel="Apple..."
+              label="Войти через Apple"
+            />
           </Pressable>
         ) : null}
         {googleOAuthEnabled ? (
@@ -439,7 +469,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: 4,
+  },
+  oauthButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
   },
   oauthButtonText: { color: c.textPrimary, fontWeight: "500" },
 });

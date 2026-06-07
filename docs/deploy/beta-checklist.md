@@ -5,9 +5,12 @@
 - [ ] HTTPS работает (`curl -sI https://ваш-домен/`)
 - [ ] `MOTOTWIN_ENABLE_DEV_USER_SWITCHER` **не** задан в production `.env`
 - [ ] `AUTH_SECRET` задан (длинная случайная строка)
-- [ ] `AUTH_BASE_URL` и `NEXTAUTH_URL` = публичный HTTPS origin (напр. `https://mototwin.online`)
+- [ ] `AUTH_BASE_URL` и `NEXTAUTH_URL` = публичный HTTPS origin (напр. `https://mototwin.space`)
 - [ ] `MOTOTWIN_BETA_ALLOWED_EMAILS` содержит email всех тестеров (**только для `/register`**, не для Google OAuth)
-- [ ] Google OAuth (если включён): Test users в Google Console + redirect `https://<домен>/api/auth/callback/google` — см. [auth-oauth-production.md](../auth-oauth-production.md)
+- [ ] Google OAuth (если включён): Test users в Google Console + redirect `https://mototwin.space/api/auth/callback/google` — см. [auth-oauth-production.md](../auth-oauth-production.md)
+- [ ] Apple Sign In: Service ID + Return URL `https://mototwin.space/api/auth/callback/apple`, JWT `AUTH_APPLE_CLIENT_SECRET`, `APPLE_CLIENT_ID=ru.mototwin.app`
+- [ ] Yandex OAuth: redirect URIs web + `mototwin://oauth/yandex`, env `YANDEX_*` на VPS
+- [ ] `curl -s https://mototwin.space/api/auth/providers` — google, apple, yandex с callback на `.space`
 - [ ] Регистрация с неразрешённым email отклоняется
 - [ ] Два аккаунта: `GET /api/garage` изолированы; чужой `vehicleId` → 404
 - [ ] Ежедневный бэкап Postgres (`deploy/scripts/backup.sh` в cron)

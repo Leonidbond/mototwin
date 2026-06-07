@@ -1,7 +1,7 @@
 import Constants from "expo-constants";
 
 /** Production Next.js API (see docs/mobile-build.md). */
-export const PRODUCTION_API_BASE_URL = "https://mototwin.online";
+export const PRODUCTION_API_BASE_URL = "https://mototwin.space";
 
 /** Hostnames that Expo/ngrok use for the Metro tunnel — they are not your Next.js server. */
 const TUNNEL_PACKAGER_MARKERS = ["exp.direct", "ngrok-free.app", "ngrok.io", "ngrok.app"];
@@ -26,7 +26,7 @@ function apiBaseFromExpoExtra(): string | undefined {
  * 1. `EXPO_PUBLIC_API_BASE_URL` in `apps/app/.env` (optional override)
  * 2. Metro `hostUri` when not a tunnel (LAN — same host as bundler, port 3000)
  * 3. `expo.extra.apiBaseUrl` / `devApiBaseUrl` from `app.config.ts`
- * 4. `https://mototwin.online` in release builds (`!__DEV__`)
+ * 4. `https://mototwin.space` in release builds (`!__DEV__`)
  * 5. `http://localhost:3000` (simulator / web dev)
  */
 export function getApiBaseUrl(): string {

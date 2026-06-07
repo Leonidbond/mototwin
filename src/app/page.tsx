@@ -70,24 +70,13 @@ export default function Home() {
               подбора совместимых компонентов.
             </p>
 
-            <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-              <Link
-                href="/onboarding"
-                className="inline-flex items-center justify-center rounded-xl bg-gray-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-gray-800"
-              >
-                Начать
-              </Link>
+            <div className="mt-10">
               <Link
                 href="/garage"
-                className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                className="inline-flex w-full sm:w-auto items-center justify-center rounded-2xl px-10 py-4 text-lg font-semibold text-white transition hover:brightness-110 active:scale-[0.99]"
+                style={{ backgroundColor: productSemanticColors.primaryAction }}
               >
                 Перейти в гараж
-              </Link>
-              <Link
-                href="/onboarding"
-                className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
-              >
-                Посмотреть сценарий
               </Link>
             </div>
           </div>

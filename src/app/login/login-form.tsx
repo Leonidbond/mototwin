@@ -7,6 +7,7 @@ import { signIn } from "next-auth/react";
 import { createWebApiClient } from "@/lib/create-web-api-client";
 import { clearWebSessionCache } from "@/lib/web-api-dedup";
 import { productSemanticColors } from "@mototwin/design-tokens";
+import { OauthProviderIcon } from "@/components/icons/oauth-provider-icon";
 
 const api = createWebApiClient({ redirectOn401: false });
 
@@ -137,39 +138,42 @@ export function LoginForm({ nextPath, oauthErrorCode }: LoginFormProps) {
             type="button"
             onClick={() => beginOauthSignIn("google")}
             disabled={isBusy}
-            className="rounded-lg border py-2 text-sm transition-all duration-150 active:scale-[0.99] active:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border py-2 text-sm transition-all duration-150 active:scale-[0.99] active:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2.5"
             style={{
               borderColor: oauthLoadingProvider === "google" ? productSemanticColors.primaryAction : "rgba(255,255,255,0.15)",
               backgroundColor: oauthLoadingProvider === "google" ? productSemanticColors.primaryAction : "transparent",
               color: oauthLoadingProvider === "google" ? "#fff" : undefined,
             }}
           >
+            <OauthProviderIcon provider="google" size={18} />
             {oauthLoadingProvider === "google" ? "Переход к Google…" : "Войти через Google"}
           </button>
           <button
             type="button"
             onClick={() => beginOauthSignIn("apple")}
             disabled={isBusy}
-            className="rounded-lg border py-2 text-sm transition-all duration-150 active:scale-[0.99] active:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border py-2 text-sm transition-all duration-150 active:scale-[0.99] active:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2.5"
             style={{
               borderColor: oauthLoadingProvider === "apple" ? productSemanticColors.primaryAction : "rgba(255,255,255,0.15)",
               backgroundColor: oauthLoadingProvider === "apple" ? productSemanticColors.primaryAction : "transparent",
               color: oauthLoadingProvider === "apple" ? "#fff" : undefined,
             }}
           >
+            <OauthProviderIcon provider="apple" size={18} />
             {oauthLoadingProvider === "apple" ? "Переход к Apple…" : "Войти через Apple"}
           </button>
           <button
             type="button"
             onClick={() => beginOauthSignIn("yandex")}
             disabled={isBusy}
-            className="rounded-lg border py-2 text-sm transition-all duration-150 active:scale-[0.99] active:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border py-2 text-sm transition-all duration-150 active:scale-[0.99] active:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2.5"
             style={{
               borderColor: oauthLoadingProvider === "yandex" ? productSemanticColors.primaryAction : "rgba(255,255,255,0.15)",
               backgroundColor: oauthLoadingProvider === "yandex" ? productSemanticColors.primaryAction : "transparent",
               color: oauthLoadingProvider === "yandex" ? "#fff" : undefined,
             }}
           >
+            <OauthProviderIcon provider="yandex" size={18} />
             {oauthLoadingProvider === "yandex" ? "Переход к Yandex…" : "Войти через Yandex"}
           </button>
         </div>

@@ -33,10 +33,38 @@ function YandexProvider(config: OAuthUserConfig<Record<string, never>>): OAuthCo
   };
 }
 
+/** Apple OAuth uses response_mode=form_post; cross-site POST needs SameSite=None cookies. */
+function buildAuthCookies(): NextAuthOptions["cookies"] {
+  const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false;
+  const prefix = useSecureCookies ? "__Secure-" : "";
+  const crossSite = {
+    httpOnly: true,
+    sameSite: "none" as const,
+    path: "/",
+    secure: useSecureCookies,
+  };
+
+  return {
+    pkceCodeVerifier: {
+      name: `${prefix}next-auth.pkce.code_verifier`,
+      options: { ...crossSite, maxAge: 60 * 15 },
+    },
+    state: {
+      name: `${prefix}next-auth.state`,
+      options: { ...crossSite, maxAge: 60 * 15 },
+    },
+    callbackUrl: {
+      name: `${prefix}next-auth.callback-url`,
+      options: crossSite,
+    },
+  };
+}
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
   adapter: mototwinPrismaAdapter(),
   session: { strategy: "database" },
+  cookies: buildAuthCookies(),
   providers: buildProviders(),
   callbacks: {
     async session({ session, user }) {

@@ -1,5 +1,7 @@
 # MotoTwin deploy — reference
 
+Production host: **`mototwin-vps2`** → `https://mototwin.space`
+
 ## Directory layout on VPS
 
 ```
@@ -16,7 +18,7 @@
 Verify if unsure:
 
 ```bash
-systemctl show mototwin -p WorkingDirectory -p EnvironmentFile
+ssh mototwin-vps2 'sudo systemctl show mototwin -p WorkingDirectory -p EnvironmentFile'
 ```
 
 ## Production `.env` checklist (names only)
@@ -25,12 +27,14 @@ systemctl show mototwin -p WorkingDirectory -p EnvironmentFile
 - `DATABASE_URL`
 - `AUTH_SECRET` (≥ 32 chars)
 - `MOTOTWIN_BETA_ALLOWED_EMAILS`
-- `AUTH_BASE_URL` (public URL)
-- `NEXTAUTH_URL` (same as public URL for NextAuth v4)
-- OAuth: `AUTH_GOOGLE_*`, `GOOGLE_OAUTH_CLIENT_ID` — see [docs/auth-oauth-production.md](../../docs/auth-oauth-production.md)
+- `AUTH_BASE_URL` → `https://mototwin.space`
+- `NEXTAUTH_URL` → `https://mototwin.space`
+- OAuth: `AUTH_GOOGLE_*`, `GOOGLE_OAUTH_CLIENT_ID` — see [docs/auth-oauth-production.md](../../docs/auth-oauth-production.md); add redirect URI for `mototwin.space` in Google Console
 - `MOTOTWIN_ENABLE_DEV_USER_SWITCHER` must be **unset or false**
 
 ## Post-deploy smoke (with session)
+
+On server (`ssh mototwin-vps2`):
 
 ```bash
 curl -s -X POST http://127.0.0.1:3000/api/auth/login \
@@ -38,15 +42,33 @@ curl -s -X POST http://127.0.0.1:3000/api/auth/login \
   -d '{"email":"test1@mototwin.online","password":"..."}' \
   -c /tmp/mt.jar
 
+curl -s -b /tmp/mt.jar http://127.0.0.1:3000/api/auth/me
 curl -s -b /tmp/mt.jar http://127.0.0.1:3000/api/garage
-curl -s -b /tmp/mt.jar "http://127.0.0.1:3000/api/expenses?year=2026&vehicleId=VEHICLE_ID"
 ```
 
-Test accounts are created with `npx tsx scripts/seed-beta-test-users.ts` on server (passwords not stored in git).
+Public HTTPS check:
+
+```bash
+curl -sI https://mototwin.space/ | head -5
+curl -s -o /dev/null -w "%{http_code}\n" https://mototwin.space/api/auth/me
+```
+
+Test accounts: `npx tsx scripts/seed-beta-test-users.ts` on server (passwords in script, not in git docs).
 
 ## Nginx / TLS
 
-Config template: `deploy/nginx/mototwin.conf` (domain `mototwin.online` on current server).
+- Live config: `/etc/nginx/sites-enabled/mototwin` on vps2
+- Template: `deploy/nginx/mototwin.conf` — replace domain with `mototwin.space` before fresh install
+- Cert: `sudo certbot --nginx -d mototwin.space --redirect`
+- Renew: `certbot.timer` (systemd)
+
+## SSH access summary
+
+| Role | User | How |
+|------|------|-----|
+| Deploy agent / admin | `lbondarenko` | `ssh mototwin-vps2` |
+| App, git, npm, docker | `deploy` | `sudo -u deploy bash -c 'cd /opt/mototwin/app/mototwin && ...'` |
+| systemd / nginx | `lbondarenko` | `sudo systemctl restart mototwin` |
 
 ## Related npm scripts (local vs server)
 
@@ -56,3 +78,7 @@ Config template: `deploy/nginx/mototwin.conf` (domain `mototwin.online` on curre
 | `npm run db:seed:motorcycle` | safe on prod |
 | `npm run db:seed` | **local / empty DB only** |
 | `bash deploy/scripts/backup.sh` | cron on VPS |
+
+## Legacy
+
+Old production: `mototwin-vps` (`195.24.71.143`, `mototwin.online`). Do not use for deploy unless explicitly requested.

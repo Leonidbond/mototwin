@@ -54,7 +54,7 @@ cp apps/app/.env.example apps/app/.env
 
 | Переменная | Назначение |
 |------------|------------|
-| `EXPO_PUBLIC_API_BASE_URL` | Базовый URL Next.js API (без завершающего `/`). Для prod: `https://mototwin.online` |
+| `EXPO_PUBLIC_API_BASE_URL` | Базовый URL Next.js API (без завершающего `/`). Для prod: `https://mototwin.space` |
 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | **Android release:** native Google Sign-In (`webClientId` + audience idToken на сервере) |
 | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | **iOS:** Expo AuthSession |
 | `EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID` | **Expo Go** (dev) |
@@ -193,7 +193,7 @@ Debug-сборка **не вкладывает** JS-бандл в APK — нуж
 В `apps/app/.env`:
 
 ```env
-EXPO_PUBLIC_API_BASE_URL=https://mototwin.online
+EXPO_PUBLIC_API_BASE_URL=https://mototwin.space
 ```
 
 Или экспортируйте переменную в shell на время сборки (она подхватывается Metro при `export:embed`).
@@ -205,7 +205,7 @@ cd apps/app/android
 
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 export NODE_ENV=production
-export EXPO_PUBLIC_API_BASE_URL=https://mototwin.online
+export EXPO_PUBLIC_API_BASE_URL=https://mototwin.space
 export EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID="....apps.googleusercontent.com"
 
 ./gradlew assembleRelease

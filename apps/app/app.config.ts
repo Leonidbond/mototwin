@@ -2,7 +2,7 @@ import os from "node:os";
 
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
-const PRODUCTION_API_BASE_URL = "https://mototwin.online";
+const PRODUCTION_API_BASE_URL = "https://mototwin.space";
 
 /** Interface name substrings to skip (VPN, tunnels, bridges). Do not use plain "lo" — it matches `wlo1`. */
 const SKIP_IFACE_SUBSTR = [

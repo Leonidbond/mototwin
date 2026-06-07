@@ -93,14 +93,8 @@ export default function HomeScreen() {
               MotoTwin это не просто каталог деталей. Это система сопровождения владения мотоциклом: от
               профиля техники до сервиса, расходов и подбора совместимых компонентов.
             </Text>
-            <Pressable style={styles.primaryButton} onPress={() => router.push("/vehicles/new")}>
-              <Text style={styles.primaryButtonText}>Начать</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => router.push("/garage")}>
-              <Text style={styles.secondaryButtonText}>Перейти в гараж</Text>
-            </Pressable>
-            <Pressable style={styles.tertiaryButton} onPress={() => router.push("/login")}>
-              <Text style={styles.tertiaryButtonText}>Войти</Text>
+            <Pressable style={styles.garageButton} onPress={() => router.push("/garage")}>
+              <Text style={styles.garageButtonText}>Перейти в гараж</Text>
             </Pressable>
           </View>
 
@@ -216,42 +210,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  primaryButton: {
-    marginTop: 6,
+  garageButton: {
+    marginTop: 8,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 14,
+    borderRadius: 16,
     backgroundColor: c.primaryAction,
-    paddingVertical: 13,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
   },
-  primaryButtonText: {
+  garageButtonText: {
     color: c.canvas,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "700",
-  },
-  secondaryButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: c.borderStrong,
-    backgroundColor: c.cardSubtle,
-    paddingVertical: 13,
-  },
-  secondaryButtonText: {
-    color: c.textPrimary,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  tertiaryButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-  },
-  tertiaryButtonText: {
-    color: c.textMuted,
-    fontSize: 14,
-    fontWeight: "600",
   },
   section: {
     gap: 10,

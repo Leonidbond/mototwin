@@ -190,6 +190,8 @@ npx tsx scripts/seed-beta-test-users.ts
 | «Неверный email или пароль» на localhost | пользователь не засеян локально | `seed-beta-test-users.ts` |
 | После входа снова `/login` | `next=/login…` в URL | исправлено `sanitizeNextPath`; очистить URL |
 | OAuth работает, API 401 | нет `mototwin_session` | проверить `WebAuthReadyProvider` и `/api/auth/sync-web-session` |
+| Apple: `OAuthCallback` / PKCE cookie missing | POST callback с appleid.apple.com | `buildAuthCookies()` в authjs.ts — см. [auth-oauth-production.md](./auth-oauth-production.md) §8 |
+| Yandex: redirect_uri mismatch | URI не в oauth.yandex.ru | web + `mototwin://oauth/yandex` — см. [auth-oauth-production.md](./auth-oauth-production.md) §7 |
 | «Превышено время ожидания…» | медленная сеть / тяжёлый `/api/garage` | split-load + `heavyRead` profile; проверить VPS |
 | Chrome: запрос «доступ к другим приложениям» | FedCM для federated login | ожидаемое поведение Chrome, не permission приложения |
 | Пустой гараж после первого входа | bootstrap создаёт garage без vehicles | onboarding «Добавить мотоцикл» |
@@ -200,10 +202,10 @@ npx tsx scripts/seed-beta-test-users.ts
 
 ```bash
 # Провайдеры OAuth
-curl -s https://mototwin.online/api/auth/providers | jq .
+curl -s https://mototwin.space/api/auth/providers | jq .
 
 # Auth smoke (register/login/block)
-BASE_URL=https://mototwin.online npx tsx scripts/qa-auth-smoke.ts
+BASE_URL=https://mototwin.space npx tsx scripts/qa-auth-smoke.ts
 
 # Локально
 BASE_URL=http://localhost:3000 npx tsx scripts/qa-auth-smoke.ts
@@ -213,7 +215,7 @@ BASE_URL=http://localhost:3000 npx tsx scripts/qa-auth-smoke.ts
 
 1. `/login` → email/password → редирект на `/garage` (или `next`).
 2. Logout → `/garage` редиректит на `/login`.
-3. Google OAuth → callback → `/garage`, в DevTools есть `mototwin_session`.
+3. Google / Apple / Yandex OAuth → callback → `/garage`, в DevTools есть `mototwin_session`.
 4. Медленная сеть: страница гаража **не** висит на полноэкранном «Загрузка…» до auth.
 
 ---
