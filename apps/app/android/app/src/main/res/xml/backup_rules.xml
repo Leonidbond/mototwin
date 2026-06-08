@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+  <!-- Auth tokens live in Android Keystore via expo-secure-store — not in app files. -->
+  <!-- Exclude all app-private storage from Google Backup / device transfer. -->
+  <exclude domain="root" />
+  <exclude domain="file" />
+  <exclude domain="database" />
+  <exclude domain="sharedpref" />
+  <exclude domain="external" />
+</full-backup-content>

@@ -3,7 +3,7 @@
     "name": "MotoTwin",
     "slug": "mototwin",
     "scheme": "mototwin",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
@@ -21,6 +21,12 @@
     ],
     "android": {
       "package": "ru.mototwin.app",
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#080D12"

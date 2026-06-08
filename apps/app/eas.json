@@ -6,6 +6,12 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "DATABASE_URL": "postgresql://eas-build:eas-build@127.0.0.1:5432/eas_build?schema=public",
         "EXPO_PUBLIC_API_BASE_URL": "https://mototwin.space",
@@ -15,6 +21,10 @@
       }
     },
     "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "DATABASE_URL": "postgresql://eas-build:eas-build@127.0.0.1:5432/eas_build?schema=public",
         "EXPO_PUBLIC_API_BASE_URL": "https://mototwin.space",
@@ -25,6 +35,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
   }
 }

@@ -60,17 +60,23 @@ eas credentials -p android
 
 ### iOS — APNs
 
+0. **Identifiers** → `ru.mototwin.app` → включить **Push Notifications** (Capability).
 1. [Apple Developer](https://developer.apple.com/account/resources/authkeys/list) → Keys → **+** → включить **Apple Push Notifications service (APNs)**.
-2. Скачать `.p8`, запомнить **Key ID** и **Team ID** (`BM9LAU7B7D` — как для Apple OAuth).
+2. Скачать `.p8` → `auth/AuthKey_XXXXXXXXXX.p8`, создать `auth/apns_push.key` (см. `auth/apns_push.key.example`).
 3. Загрузить в EAS:
 
 ```bash
+bash apps/app/scripts/prepare-ios-push-from-auth.sh
 cd apps/app
-eas credentials -p ios
-# → Push Notifications: Set up your APNs Key
+APNS_KEY_ID=XXXXXXXXXX ./scripts/upload-apns-to-eas.exp preview
+APNS_KEY_ID=XXXXXXXXXX ./scripts/upload-apns-to-eas.exp production
 ```
 
-Bundle ID: **`ru.mototwin.app`**.
+Ключ `AuthKey_SXBSD9822T.p8` (Apple Sign In) **не подходит** — нужен отдельный ключ с APNs.
+
+Bundle ID: **`ru.mototwin.app`**. Team ID: **`BM9LAU7B7D`**.
+
+Подробнее: `auth/apns_push_steps.txt`.
 
 ---
 

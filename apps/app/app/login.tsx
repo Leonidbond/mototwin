@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useEffect } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -342,7 +343,7 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.card}>
         <Text style={styles.title}>{mode === "login" ? "Вход" : "Регистрация"}</Text>
-        <Text style={styles.subtitle}>Закрытая бета MotoTwin</Text>
+        <Text style={styles.subtitle}>Цифровой гараж для вашего мотоцикла</Text>
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -430,6 +431,12 @@ export default function LoginScreen() {
             onFinish={() => setOauthLoading(null)}
           />
         ) : null}
+        <Pressable
+          onPress={() => void Linking.openURL("https://mototwin.space/privacy")}
+          accessibilityRole="link"
+        >
+          <Text style={styles.privacyLink}>Политика конфиденциальности</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -479,4 +486,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   oauthButtonText: { color: c.textPrimary, fontWeight: "500" },
+  privacyLink: {
+    color: c.textMuted,
+    textAlign: "center",
+    fontSize: 12,
+    marginTop: 16,
+    textDecorationLine: "underline",
+  },
 });

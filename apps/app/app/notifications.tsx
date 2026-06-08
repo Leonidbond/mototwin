@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type { NotificationItemWire } from "@mototwin/types";
+import Constants from "expo-constants";
 import { registerExpoPushToken } from "../src/expo-push-registration";
 import { createMobileApiClient } from "../src/create-mobile-api-client";
 import { withAuthGuard } from "../src/mobile-auth-guard";
@@ -82,7 +83,7 @@ export default function NotificationsScreen() {
             token: registration.token,
             deviceName: Device.deviceName ?? null,
             osVersion: Device.osVersion ?? null,
-            appVersion: "0.1.0",
+            appVersion: Constants.expoConfig?.version ?? "1.0.0",
           }),
         () => router.replace("/login")
       );

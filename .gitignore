@@ -18,6 +18,7 @@ auth/
 apps/app/google-services.json
 apps/app/GoogleService-Info.plist
 apps/app/fcm-service-account.json
+apps/app/apns-key.p8
 **/firebase*fcm*.json
 apps/app/android/keystore.properties
 apps/app/android/keystores/

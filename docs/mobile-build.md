@@ -252,7 +252,9 @@ eas login
 eas init   # записать projectId в app.json → extra.eas.projectId
 ```
 
-Профили в `apps/app/eas.json`. Перед сборкой замените `EXPO_PUBLIC_API_BASE_URL` на ваш beta/prod домен.
+Профили в `apps/app/eas.json` (`EXPO_PUBLIC_API_BASE_URL=https://mototwin.space`).
+
+**Закрытая бета (APK):**
 
 ```bash
 cd apps/app
@@ -260,7 +262,17 @@ eas build -p android --profile preview
 eas build -p ios --profile preview
 ```
 
-Раздача: internal APK (Android), TestFlight (iOS, нужен Apple Developer).
+**Google Play (AAB):**
+
+```bash
+bash apps/app/scripts/build-play-release.sh
+# или: eas build -p android --profile production
+eas submit -p android --profile production   # draft → internal track
+```
+
+Полный чеклист Play Console: [deploy/google-play.md](./deploy/google-play.md).
+
+Раздача: internal APK link (preview), AAB → Play internal/production, TestFlight (iOS).
 
 ---
 

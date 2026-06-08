@@ -1,0 +1,79 @@
+#!/usr/bin/expect -f
+# Upload APNs .p8 to EAS for iOS push.
+# Usage: APNS_KEY_ID=... APNS_TEAM_ID=BM9LAU7B7D ./scripts/upload-apns-to-eas.exp [preview|production]
+set timeout 180
+set profile [lindex $argv 0]
+if {$profile eq ""} { set profile "preview" }
+
+if {![info exists env(APNS_KEY_ID)] || $env(APNS_KEY_ID) eq ""} {
+  puts "ERROR: set APNS_KEY_ID"
+  exit 1
+}
+if {![info exists env(APNS_TEAM_ID)] || $env(APNS_TEAM_ID) eq ""} {
+  set env(APNS_TEAM_ID) "BM9LAU7B7D"
+}
+
+cd [file dirname [info script]]/..
+
+if {![file exists "apns-key.p8"]} {
+  puts "ERROR: run scripts/prepare-ios-push-from-auth.sh first"
+  exit 1
+}
+
+spawn eas credentials -p ios
+
+expect -re "Which build profile"
+if {$profile eq "production"} {
+  send "\033\[B\r"
+} else {
+  send "\r"
+}
+
+expect -re "log in to your Apple account"
+send "n\r"
+
+expect -re "What do you want to do\\?"
+send "\033\[B\r"
+
+expect -re "What do you want to do\\?"
+send "\033\[B\r"
+
+expect {
+  -re "internal distribution" {
+    send "\r"
+    exp_continue
+  }
+  -re "Generate a new Apple Push Notifications service key" {
+    send "n\r"
+  }
+}
+
+expect {
+  -re "Path to .p8|Push Key file|file path|Upload" {
+    send "apns-key.p8\r"
+  }
+  -re "Would you like to use this file" {
+    send "y\r"
+    exp_continue
+  }
+}
+
+expect -re "Key ID|Apple Push Key ID"
+send "$env(APNS_KEY_ID)\r"
+
+expect -re "Team ID|Apple Team ID"
+send "$env(APNS_TEAM_ID)\r"
+
+expect {
+  -re "Apple Push Notifications Key|Push Notifications Key|successfully|already set up|Uploaded|assigned" {
+    puts "\n>>> APNs upload success ($profile)\n"
+  }
+  timeout {
+    puts "\n>>> APNs upload timeout ($profile)\n"
+    exit 1
+  }
+}
+
+sleep 1
+send "\003"
+expect eof

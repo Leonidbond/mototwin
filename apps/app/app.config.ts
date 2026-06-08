@@ -92,12 +92,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       ...(baseConfig.plugins ?? []),
+      "./plugins/with-android-play-release.js",
       "@react-native-community/datetimepicker",
       [
         "expo-notifications",
         {
           icon: "./assets/adaptive-icon.png",
           color: "#080D12",
+          mode: "production",
         },
       ],
       [
