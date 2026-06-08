@@ -167,6 +167,7 @@ OAuth (Google/Yandex) работает независимо от allowlist.
 | Push не работает | FCM service account в EAS + `google-services.json` в сборке |
 | Data safety mismatch | Сверить с фактом: email, OAuth, push token, гараж |
 | Permission warnings | В release только INTERNET, POST_NOTIFICATIONS, VIBRATE |
+| `Unable to resolve .../src/node-tree-icons` | Не исключайте `/src/node-tree-icons.ts` и `images/` в `.easignore` |
 
 ---
 

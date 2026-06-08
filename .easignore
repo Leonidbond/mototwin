@@ -19,10 +19,14 @@ apps/app/android/**/build
 apps/app/ios/Pods
 apps/app/ios/build
 
-# Web/backend — not used by mobile EAS build (prisma/ kept for postinstall)
-/src
+# Web/backend — not used by mobile EAS build (prisma/ kept for postinstall).
+# Mobile bundles repo-root src/node-tree-icons.ts and images/* — do not exclude wholesale.
+/src/*
+!/src/node-tree-icons.ts
 public
-images
+# Unused heavy image trees (mobile uses images/node-tree-icons/nodes, Motocycles, etc.)
+/images/node-tree-icons-new/**
+/images/node-tree-icons/from-design/**
 docs
 scripts
 deploy
