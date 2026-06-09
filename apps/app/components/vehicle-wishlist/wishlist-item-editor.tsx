@@ -53,7 +53,7 @@ import { createMobileApiClient } from "../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../src/mobile-auth-guard";
 import { InternalScreenChrome } from "../expo-shell/internal-screen-chrome";
 import { GarageVehicleContextPlaque } from "../garage/GarageVehicleContextPlaque";
-import { buildServiceEventNewFromWishlistHref } from "./hrefs";
+import { replaceServiceEventNewFromWishlist } from "./hrefs";
 import { MobileNodePickerModal } from "../vehicle-detail/mobile-node-picker-modal";
 import { useMobileSubscription } from "../../src/use-mobile-subscription";
 
@@ -363,7 +363,7 @@ export function WishlistItemEditor({ vehicleId, itemId }: WishlistItemEditorProp
       }
       if (shouldDeferInstalledStatus) {
         if (res.item.nodeId) {
-          router.replace(buildServiceEventNewFromWishlistHref(vehicleId, res.item, { pendingInstall: true }));
+          replaceServiceEventNewFromWishlist(router, vehicleId, res.item, { pendingInstall: true });
         } else {
           Alert.alert("Список покупок", WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT);
           router.replace(`/vehicles/${vehicleId}/wishlist`);

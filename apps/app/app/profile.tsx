@@ -38,6 +38,7 @@ import {
   writeUserLocalSettingsForIdentity,
 } from "../src/ui-user-local-settings";
 import { ScreenHeader } from "../components/expo-shell/screen-header";
+import { usePrivateScreenProtection } from "../src/use-private-screen-protection";
 import {
   MobileNodePickerModal,
   type MobileNodePickerOption,
@@ -54,6 +55,7 @@ function buildProfileData(selectedDevUserEmail: string) {
 }
 
 export default function ProfileScreen() {
+  usePrivateScreenProtection();
   const apiBaseUrl = getApiBaseUrl();
   const [userSettings, setUserSettings] = useState<UserLocalSettings>({
     ...DEFAULT_USER_LOCAL_SETTINGS,

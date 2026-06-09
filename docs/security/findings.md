@@ -22,6 +22,7 @@
 | `MT-SEC-005` | P1 | **resolved** | `src/lib/auth/authjs.ts` — `allowDangerousEmailAccountLinking: false` для Yandex |
 | `MT-SEC-006` | P1 | **partial** (без CSP) | `next.config.ts` — HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, COOP. CSP отложен (см. MT-SEC-047) |
 | `MT-SEC-007` | P1 | **resolved** | `apps/app/src/auth-storage.ts` — `getAccessToken` возвращает `null` для истёкшего токена |
+| `MT-SEC-010` | P1 | **resolved** | `apps/app/app/login.tsx` (Code+PKCE) + `src/lib/auth/yandex-oauth-exchange.ts` + App Links redirect |
 | `MT-SEC-013` | P2 | **resolved** | `src/app/api/_shared/route-error-response.ts` — детали скрываются в prod, опциональный `MOTOTWIN_EXPOSE_DEV_ERROR_DETAILS` |
 | `MT-SEC-014` | P1 | **resolved** (auth-ручки) | `src/lib/http/parse-json-body.ts` + применён к 6 auth endpoint-ам. Остальные write-ручки — follow-up |
 | `MT-SEC-015` | P1 | **resolved** | `src/lib/http/fetch-with-timeout.ts` + применён к `yandex-geocoder.ts` и `oauth-mobile.ts` |
@@ -40,6 +41,8 @@
 | `MT-SEC-055` | P2 | **resolved** | `src/lib/auth-audit-retention.ts` — purge старше 90 дней (`AUTH_AUDIT_RETENTION_DAYS`); cron `scripts/cron-auth-audit-retention.ts` (`--purge-only` daily, `--alerts-only` каждые 5 мин); алерты `[auth-audit:alert]` при ≥10 `login.failure`/min на IP или userId. Внешний paging (Grafana/PagerDuty) — ops follow-up |
 | `MT-SEC-056` | P2 | **resolved** | `src/app/layout.tsx` — `metadata.title = "MotoTwin"` |
 | `MT-SEC-063` | P2 | **resolved** | `apps/app/src/auth-storage.ts` — `keychainAccessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY` |
+| `MT-SEC-057` | P2 | **resolved** | `apps/app/src/mobile-biometric-gate.tsx` + `_layout.tsx` |
+| `MT-SEC-059` | P2 | **resolved** | `apps/app/src/use-private-screen-protection.ts` — `/login`, `/profile` |
 | `MT-SEC-065` | **P0** | **resolved** | `fitment/evidence` — `safeUrl()` zod helper; `part-compatibility-report` — `safeRenderUrl()` фильтрация legacy записей в БД |
 | `MT-SEC-066` | P1 | **resolved** | `vehicles/[id]/service-events` POST+PATCH — `boundedJsonValue({64KB, depth 24})` вместо `z.any()`/`z.unknown()` |
 | `MT-SEC-067` | P1 | **resolved** | `user-service-event-templates` POST — `boundedJsonValue({128KB, depth 20})` для `formSnapshot` |
@@ -56,7 +59,8 @@
 
 Открытые приоритеты:
 
-- `MT-SEC-010` (Yandex mobile implicit → code+PKCE) — требует client-side refactor login.tsx + EXPO_PUBLIC_YANDEX_CLIENT_ID/SECRET, оставлено follow-up'ом.
+- `MT-SEC-010` (Yandex mobile implicit → code+PKCE) — **resolved** (итерация 6 — public release hardening).
+- `MT-SEC-057` / `MT-SEC-059` — **resolved** (biometric gate + screenshot block).
 - `MT-SEC-049` (npm audit) — операционная задача, требует решения по обновлению `next-auth` 4 → 5.
 - `MT-SEC-068`/`069`/`070`/`071` (input-validation hardening) — **полностью закрыты** в итерации 3 (см. ниже). Регрессий не будет — ESLint guard в `eslint.config.mjs` блокирует `await request.json()` и `z.object(` в `src/app/api/**/route.ts`.
 
@@ -422,36 +426,18 @@ export async function getAccessToken(): Promise<string | null> {
 - **Severity:** P1
 - **OWASP:** M3
 - **Scope:** mobile
-- **Status:** open
+- **Status:** resolved
 - **Owner:** mobile + backend
 - **Effort:** M (1 день — переход на code+PKCE + server-side token exchange)
 
-**Evidence:** [apps/app/app/login.tsx:45-56](../../apps/app/app/login.tsx)
-
-```ts
-const [yandexRequest, yandexResponse, promptYandexAsync] = AuthSession.useAuthRequest(
-  {
-    clientId: process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID ?? "",
-    responseType: AuthSession.ResponseType.Token,  // ← implicit
-    scopes: ["login:email", "login:info"],
-    redirectUri: AuthSession.makeRedirectUri({ scheme: "mototwin", path: "oauth/yandex" }),
-  },
-  yandexDiscovery
-);
-```
-
-**Impact:** access token попадает в redirect URI `mototwin://oauth/yandex?access_token=...`. На iOS токен может оказаться в логах Universal Links / `OSLog`; на Android — в `logcat` / в обработчиках Intent. На устройстве с другими приложениями, перехватывающими `mototwin://` (если scheme conflict) — direct leakage.
-
-**Likelihood:** низкая–средняя.
-
-**Recommendation:** перейти на `ResponseType.Code` + PKCE, обмен code → token делать на **сервере** (`/api/auth/oauth/mobile` принимает `code` + `redirectUri` и выполняет POST на `https://oauth.yandex.ru/token` с `client_secret`). После этого `YANDEX_CLIENT_SECRET` остаётся только на сервере, а audience-проверка (MT-SEC-001) делается на серверном обмене.
+**Evidence:** [apps/app/app/login.tsx](../../apps/app/app/login.tsx), [src/lib/auth/yandex-oauth-exchange.ts](../../src/lib/auth/yandex-oauth-exchange.ts)
 
 **Acceptance criteria:**
 
-- [ ] Mobile использует `ResponseType.Code` с PKCE.
-- [ ] `/api/auth/oauth/mobile { provider: "yandex", code, redirectUri }` выполняет обмен на сервере.
-- [ ] Реализован client_id check (см. MT-SEC-001).
-- [ ] Старый implicit flow удалён.
+- [x] Mobile использует `ResponseType.Code` с PKCE.
+- [x] `/api/auth/oauth/mobile { provider: "yandex", code, redirectUri }` выполняет обмен на сервере.
+- [x] Реализован client_id check (см. MT-SEC-001) — через `verifyYandex` после обмена.
+- [x] Старый implicit flow удалён (legacy `accessToken` отклоняется с 400).
 
 ---
 
@@ -616,9 +602,9 @@ export async function fetchWithTimeout(url: string, opts: RequestInit & { timeou
 | `MT-SEC-053` | (scope:supply-chain) SRI / CSP `script-src` | A08 / A05 | web | M | Покрывается MT-SEC-006 + MT-SEC-047 |
 | `MT-SEC-055` | Ретеншн логов и алертинг | A09 | api / infra | M | **resolved (итерация 5):** 90-дневный purge `AuthAuditLog` + cron alerting на всплески `login.failure`. Внешний paging — ops |
 | `MT-SEC-056` | `metadata.title = "Create Next App"` | A05 (косметика) | web | XS | Заменить на «MotoTwin» |
-| `MT-SEC-057` | Нет biometric-gate на запуск приложения | M3 | mobile | M | `expo-local-authentication` гейт |
+| `MT-SEC-057` | ~~Нет biometric-gate~~ **resolved** — `MobileBiometricGate` | M3 | mobile | M | — |
 | `MT-SEC-058` | Нет certificate pinning | M5 | mobile | L | Для MASVS L2; через `expo-ssl-pinning` или нативный модуль |
-| `MT-SEC-059` | Нет screenshot-блокировки для приватных экранов | M6 | mobile | S | `expo-screen-capture.preventScreenCaptureAsync()` на `/login`, `/profile` |
+| `MT-SEC-059` | ~~Нет screenshot-блокировки~~ **resolved** — `usePrivateScreenProtection` | M6 | mobile | S | — |
 | `MT-SEC-060` | Аналитики/трекинга нет — OK (info) | M6 | mobile | — | Зафиксировать в политике |
 | `MT-SEC-061` | gap для MASVS L2 (jailbreak detection, app integrity) | M7 | mobile | L | Отдельный milestone |
 | `MT-SEC-062` | `"projectId": "REPLACE_AFTER_eas_init"` | M8 | mobile | XS | Заменить на реальный EAS project ID |

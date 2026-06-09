@@ -31,6 +31,9 @@ export async function POST(request: Request) {
       idToken?: string;
       accessToken?: string;
       rawNonce?: string;
+      code?: string;
+      redirectUri?: string;
+      codeVerifier?: string;
     }>(request, { maxBytes: 16 * 1024 });
     const provider = body.provider;
     if (provider !== "google" && provider !== "apple" && provider !== "yandex") {
@@ -42,6 +45,9 @@ export async function POST(request: Request) {
       idToken: body.idToken,
       accessToken: body.accessToken,
       rawNonce: body.rawNonce,
+      code: body.code,
+      redirectUri: body.redirectUri,
+      codeVerifier: body.codeVerifier,
     });
     const user = await resolveOrCreateOAuthUser(profile);
     const [tokens, garage] = await Promise.all([

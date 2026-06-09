@@ -3,6 +3,7 @@ import { OAuth2Client } from "google-auth-library";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { AuthServiceError } from "./session-service";
 import { fetchWithTimeout } from "@/lib/http/fetch-with-timeout";
+import { exchangeYandexAuthorizationCode } from "./yandex-oauth-exchange";
 
 const googleClient = new OAuth2Client();
 const appleJwks = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
@@ -12,6 +13,10 @@ type MobileOAuthPayload = {
   idToken?: string;
   accessToken?: string;
   rawNonce?: string;
+  /** Yandex authorization code (MT-SEC-010 — server-side token exchange). */
+  code?: string;
+  redirectUri?: string;
+  codeVerifier?: string;
 };
 
 export async function resolveMobileOAuthProfile(input: MobileOAuthPayload): Promise<{
@@ -26,7 +31,31 @@ export async function resolveMobileOAuthProfile(input: MobileOAuthPayload): Prom
   if (input.provider === "apple") {
     return verifyApple(input.idToken, input.rawNonce);
   }
-  return verifyYandex(input.accessToken);
+  return resolveYandexProfile(input);
+}
+
+async function resolveYandexProfile(input: MobileOAuthPayload) {
+  if (input.code?.trim() && input.redirectUri?.trim()) {
+    const accessToken = await exchangeYandexAuthorizationCode({
+      code: input.code,
+      redirectUri: input.redirectUri,
+      codeVerifier: input.codeVerifier,
+    });
+    return verifyYandex(accessToken);
+  }
+  if (input.accessToken?.trim()) {
+    // Legacy implicit-grant clients — reject after MT-SEC-010 migration.
+    throw new AuthServiceError(
+      "INVALID_OAUTH_CODE",
+      400,
+      "Yandex вход требует authorization code. Обновите приложение."
+    );
+  }
+  throw new AuthServiceError(
+    "INVALID_OAUTH_CODE",
+    400,
+    "Yandex authorization code и redirectUri обязательны."
+  );
 }
 
 function collectGoogleOAuthAudiences(): string[] {

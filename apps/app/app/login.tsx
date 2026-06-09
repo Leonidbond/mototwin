@@ -26,8 +26,10 @@ import {
   resolveNativeGoogleSignInError,
   signInWithNativeGoogle,
 } from "../src/google-native-sign-in";
+import { getYandexOAuthRedirectUri } from "../src/yandex-oauth-redirect";
 import { OauthProviderIcon } from "../components/icons/oauth-provider-icon";
 import type { OauthProviderKey } from "@mototwin/icons/oauth-providers";
+import { usePrivateScreenProtection } from "../src/use-private-screen-protection";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -73,8 +75,10 @@ const yandexOAuthEnabled = Boolean(process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID);
 type OAuthSuccessInput = {
   provider: "google" | "apple" | "yandex";
   idToken?: string;
-  accessToken?: string;
   rawNonce?: string;
+  code?: string;
+  redirectUri?: string;
+  codeVerifier?: string;
 };
 
 function OAuthButtonLabel(props: {
@@ -223,15 +227,14 @@ function YandexSignInButton(props: {
   onError: (message: string) => void;
   onFinish: () => void;
 }) {
+  const redirectUri = getYandexOAuthRedirectUri();
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID ?? "",
-      responseType: AuthSession.ResponseType.Token,
+      responseType: AuthSession.ResponseType.Code,
+      usePKCE: true,
       scopes: ["login:email", "login:info"],
-      redirectUri: AuthSession.makeRedirectUri({
-        scheme: "mototwin",
-        path: "oauth/yandex",
-      }),
+      redirectUri,
     },
     yandexDiscovery
   );
@@ -249,20 +252,30 @@ function YandexSignInButton(props: {
       props.onFinish();
       return;
     }
-    const accessToken =
-      typeof response.params.access_token === "string" ? response.params.access_token : undefined;
-    if (!accessToken) {
-      props.onError("Yandex не вернул access token.");
+    const code = typeof response.params.code === "string" ? response.params.code : undefined;
+    if (!code) {
+      props.onError("Yandex не вернул authorization code.");
+      props.onFinish();
+      return;
+    }
+    const codeVerifier = request?.codeVerifier;
+    if (!codeVerifier) {
+      props.onError("Не удалось получить PKCE code verifier.");
       props.onFinish();
       return;
     }
     void props
-      .onSuccess({ provider: "yandex", accessToken })
+      .onSuccess({
+        provider: "yandex",
+        code,
+        redirectUri,
+        codeVerifier,
+      })
       .catch((err) => {
         props.onError(err instanceof Error ? err.message : "Ошибка входа через Yandex.");
       })
       .finally(props.onFinish);
-  }, [response]);
+  }, [response, request?.codeVerifier, redirectUri]);
 
   return (
     <Pressable
@@ -287,6 +300,7 @@ function YandexSignInButton(props: {
 }
 
 export default function LoginScreen() {
+  usePrivateScreenProtection();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

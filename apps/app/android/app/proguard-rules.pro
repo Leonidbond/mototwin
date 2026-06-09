@@ -11,4 +11,17 @@
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
 
+# React Native / Hermes (release minification — MT-SEC-061)
+-keep class com.facebook.react.** { *; }
+-keep class com.facebook.hermes.** { *; }
+-keep class com.facebook.jni.** { *; }
+-keep class com.facebook.soloader.** { *; }
+
+# Expo modules
+-keep class expo.modules.** { *; }
+
+# Google Sign-In
+-keep class com.google.android.gms.** { *; }
+-keep class com.reactnativegooglesignin.** { *; }
+
 # Add any project specific keep options here:

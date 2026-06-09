@@ -36,32 +36,26 @@ expect -re "What do you want to do\\?"
 send "\033\[B\r"
 
 expect -re "What do you want to do\\?"
-send "\033\[B\r"
+send "\r"
 
 expect {
   -re "internal distribution" {
     send "\r"
-    exp_continue
+    expect -re "Generate a new Apple Push Notifications service key"
+    send "n\r"
   }
   -re "Generate a new Apple Push Notifications service key" {
     send "n\r"
   }
 }
 
-expect {
-  -re "Path to .p8|Push Key file|file path|Upload" {
-    send "apns-key.p8\r"
-  }
-  -re "Would you like to use this file" {
-    send "y\r"
-    exp_continue
-  }
-}
+expect -re "Path to P8 file"
+send "apns-key.p8\r"
 
-expect -re "Key ID|Apple Push Key ID"
+expect -re "Key ID"
 send "$env(APNS_KEY_ID)\r"
 
-expect -re "Team ID|Apple Team ID"
+expect -re "Team ID"
 send "$env(APNS_TEAM_ID)\r"
 
 expect {

@@ -39,6 +39,10 @@ import {
 import { BasicServiceEventBundleForm } from "../../../../components/vehicle-detail/basic-service-event-bundle-form";
 import { GarageVehicleContextPlaque } from "../../../../components/garage/GarageVehicleContextPlaque";
 
+function resolveWishlistItemNodeId(item: Pick<PartWishlistItem, "nodeId" | "node">): string {
+  return (item.nodeId ?? item.node?.id ?? "").trim();
+}
+
 function buildWishlistItemFromRouteParams(
   vehicleId: string,
   args: {
@@ -169,17 +173,32 @@ export default function NewServiceEventScreen() {
   ]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const load = async () => {
       if (!vehicleId) {
-        setError("Не удалось определить ID мотоцикла.");
-        setIsLoading(false);
+        if (!cancelled) {
+          setError("Не удалось определить ID мотоцикла.");
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      if (
+        (wishlistPendingInstall || source === "wishlist") &&
+        !wlId.trim() &&
+        !initialNodeId.trim() &&
+        !wlTitle.trim()
+      ) {
         return;
       }
 
       try {
-        setIsLoading(true);
-        setError("");
-        setContextVehicleDetail(null);
+        if (!cancelled) {
+          setIsLoading(true);
+          setError("");
+          setContextVehicleDetail(null);
+        }
         const defaultCurrency = DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
         const endpoints = createMobileApiClient();
         const needsServiceEventsForForm = isEditMode || isRepeatMode;
@@ -194,7 +213,11 @@ export default function NewServiceEventScreen() {
             ]),
           () => router.replace("/login")
         );
+        if (cancelled) {
+          return;
+        }
         if (!payload) {
+          setIsLoading(false);
           return;
         }
         const [vehicleData, treeData, eventsData] = payload;
@@ -206,8 +229,8 @@ export default function NewServiceEventScreen() {
         const detail = rawV ? vehicleDetailFromApiRecord(rawV) : null;
         setContextVehicleDetail(detail);
         setVehicleDisplayName(detail ? buildVehicleDetailViewModel(detail).displayName : "Мотоцикл");
-        const vehicleOdometer = v?.odometer ?? null;
-        const vehicleEngineHours = v?.engineHours ?? null;
+        const vehicleOdometer = detail?.odometer ?? v?.odometer ?? null;
+        const vehicleEngineHours = detail?.engineHours ?? v?.engineHours ?? null;
         const todayYmd = getTodayDateYmdLocal();
         setCurrentVehicleOdometer(vehicleOdometer);
         setCurrentVehicleEngineHours(vehicleEngineHours ?? null);
@@ -244,7 +267,7 @@ export default function NewServiceEventScreen() {
             { odometer: v.odometer, engineHours: v.engineHours ?? null },
             { todayDateYmd: todayYmd }
           );
-        } else if (!isEditMode && !isRepeatMode && wishlistPrefillRequested && v) {
+        } else if (!isEditMode && !isRepeatMode && wishlistPrefillRequested) {
           const queryItem = buildWishlistItemFromRouteParams(vehicleId, {
             wlId,
             initialNodeId,
@@ -257,22 +280,37 @@ export default function NewServiceEventScreen() {
           let resolvedItem: PartWishlistItem | null = null;
           if (wlId.trim()) {
             const wish = await endpoints.getVehicleWishlist(vehicleId);
+            if (cancelled) {
+              return;
+            }
             const apiItem = (wish.items ?? []).find((w) => w.id === wlId.trim());
-            if (apiItem?.nodeId?.trim()) {
-              resolvedItem = apiItem;
+            if (apiItem) {
+              const apiNodeId = resolveWishlistItemNodeId(apiItem);
+              if (apiNodeId) {
+                resolvedItem = { ...apiItem, nodeId: apiNodeId };
+              }
             }
           }
           if (!resolvedItem) {
             resolvedItem = queryItem;
           }
-          if (!resolvedItem?.nodeId?.trim()) {
+          const resolvedNodeId = resolvedItem ? resolveWishlistItemNodeId(resolvedItem) : "";
+          if (!resolvedItem || !resolvedNodeId) {
             setError("Позиция корзины не найдена или без узла.");
             setIsLoading(false);
             return;
           }
+          if (!getNodePathById(nextTree, resolvedNodeId)?.length) {
+            setError("Не удалось определить путь узла для позиции корзины.");
+            setIsLoading(false);
+            return;
+          }
           nextForm = createInitialAddServiceEventFromWishlistItem(
-            resolvedItem,
-            { odometer: v.odometer, engineHours: v.engineHours ?? null },
+            { ...resolvedItem, nodeId: resolvedNodeId },
+            {
+              odometer: vehicleOdometer ?? 0,
+              engineHours: vehicleEngineHours ?? null,
+            },
             { todayDateYmd: todayYmd }
           );
         } else if (
@@ -312,16 +350,26 @@ export default function NewServiceEventScreen() {
           }
         }
 
+        if (cancelled) {
+          return;
+        }
         setBundleInitial(nextForm);
         setBundleSessionKey((k) => k + 1);
       } catch (requestError) {
-        setError("Не удалось загрузить данные для формы.");
+        if (!cancelled) {
+          setError("Не удалось загрузить данные для формы.");
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     void load();
+    return () => {
+      cancelled = true;
+    };
   }, [
     vehicleId,
     initialNodeId,
@@ -338,7 +386,7 @@ export default function NewServiceEventScreen() {
     wlCostStr,
     wlCurrency,
     wishlistPrefillRequested,
-    router,
+    wishlistPendingInstall,
   ]);
 
   const handleSubmit = async (form: AddServiceEventFormValues) => {

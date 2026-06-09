@@ -14,7 +14,7 @@ apps/app/.expo
 mototwin.dump
 *.tsbuildinfo
 .venv-icon/
-auth/
+/auth/
 apps/app/google-services.json
 apps/app/GoogleService-Info.plist
 apps/app/fcm-service-account.json

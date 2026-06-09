@@ -48,7 +48,8 @@ import {
 } from "../../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../../src/mobile-auth-guard";
 import {
-  buildServiceEventNewFromWishlistHref,
+  pushServiceEventNewFromWishlist,
+  replaceServiceEventNewFromWishlist,
   buildVehicleServiceLogEventHref,
   buildVehicleWishlistCommunityHref,
   buildVehicleWishlistNewHref,
@@ -651,7 +652,7 @@ export default function VehicleWishlistScreen() {
     if (!item || item.status !== "BOUGHT") {
       return;
     }
-    router.replace(buildServiceEventNewFromWishlistHref(vehicleId, item, { pendingInstall: true }));
+    replaceServiceEventNewFromWishlist(router, vehicleId, item, { pendingInstall: true });
   }, [installWishlistItemId, items, router, vehicleId]);
 
   useEffect(() => {
@@ -734,7 +735,7 @@ export default function VehicleWishlistScreen() {
     }
     if (isWishlistTransitionToInstalled(previousStatus, status)) {
       setDetailItemId(null);
-      router.push(buildServiceEventNewFromWishlistHref(vehicleId, item, { pendingInstall: true }));
+      pushServiceEventNewFromWishlist(router, vehicleId, item, { pendingInstall: true });
       return;
     }
     try {
@@ -751,7 +752,7 @@ export default function VehicleWishlistScreen() {
       if (isWishlistTransitionToInstalled(previousStatus, res.item.status)) {
         setDetailItemId(null);
         if (res.item.nodeId) {
-          router.push(buildServiceEventNewFromWishlistHref(vehicleId, res.item, { pendingInstall: false }));
+          pushServiceEventNewFromWishlist(router, vehicleId, res.item, { pendingInstall: false });
         } else {
           Alert.alert("Список покупок", WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT);
         }

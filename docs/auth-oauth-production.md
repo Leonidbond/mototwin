@@ -234,7 +234,8 @@ console.log(await new SignJWT({}).setProtectedHeader({alg:'ES256',kid:keyId}).se
 |----------|-----|
 | Web prod | `https://mototwin.space/api/auth/callback/yandex` |
 | Web local | `http://localhost:3000/api/auth/callback/yandex` |
-| Mobile | `mototwin://oauth/yandex` |
+| Mobile | `mototwin://oauth/yandex` (dev / Expo Go) |
+| Mobile release | `https://mototwin.space/oauth/yandex/callback` (App Links / Universal Links) |
 
 **Доступ к данным:** `login:email`, `login:info` (email + имя).
 

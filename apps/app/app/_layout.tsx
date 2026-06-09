@@ -9,6 +9,7 @@ import { productSemanticColors as c } from "@mototwin/design-tokens";
 import { AppHelpProvider } from "../src/components/app-help-fab";
 import { readAuthTokens } from "../src/auth-storage";
 import { refreshMobileSessionIfNeeded, warmMobileApiConnection } from "../src/create-mobile-api-client";
+import { MobileBiometricGate } from "../src/mobile-biometric-gate";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -138,41 +139,37 @@ export default function RootLayout() {
     return null;
   }
 
-  if (bootError) {
-    return (
-      <View style={styles.bootState}>
-        <Text style={styles.bootTitle}>Сервер временно недоступен</Text>
-        <Text style={styles.bootText}>{bootError}</Text>
-        <Pressable style={styles.bootButton} onPress={() => setBootAttempt((attempt) => attempt + 1)}>
-          <Text style={styles.bootButtonText}>Повторить</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  if (!authChecked) {
-    return (
-      <View style={styles.bootState}>
-        <ActivityIndicator size="large" color={c.textPrimary} />
-        <Text style={styles.bootText}>Подключаемся к серверу...</Text>
-      </View>
-    );
-  }
-
   return (
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      <AppHelpProvider>
-        <View style={{ flex: 1, backgroundColor: c.canvas }}>
-          <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: c.canvas },
-            }}
-          />
+    <MobileBiometricGate>
+      {bootError ? (
+        <View style={styles.bootState}>
+          <Text style={styles.bootTitle}>Сервер временно недоступен</Text>
+          <Text style={styles.bootText}>{bootError}</Text>
+          <Pressable style={styles.bootButton} onPress={() => setBootAttempt((attempt) => attempt + 1)}>
+            <Text style={styles.bootButtonText}>Повторить</Text>
+          </Pressable>
         </View>
-      </AppHelpProvider>
-    </SafeAreaProvider>
+      ) : !authChecked ? (
+        <View style={styles.bootState}>
+          <ActivityIndicator size="large" color={c.textPrimary} />
+          <Text style={styles.bootText}>Подключаемся к серверу...</Text>
+        </View>
+      ) : (
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+          <AppHelpProvider>
+            <View style={{ flex: 1, backgroundColor: c.canvas }}>
+              <StatusBar style="light" />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: c.canvas },
+                }}
+              />
+            </View>
+          </AppHelpProvider>
+        </SafeAreaProvider>
+      )}
+    </MobileBiometricGate>
   );
 }
 

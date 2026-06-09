@@ -3,7 +3,7 @@
 Пошаговый чеклист для релиза **MotoTwin** (`ru.mototwin.app`) в Google Play.  
 Сборка: EAS Build → **AAB** (Android App Bundle). API: `https://mototwin.space`.
 
-См. также: [mobile-build.md](../mobile-build.md), [mobile-push-setup.md](../mobile-push-setup.md).
+См. также: [mobile-build.md](../mobile-build.md), [mobile-push-setup.md](../mobile-push-setup.md), [google-play-store-listing.md](./google-play-store-listing.md) (тексты Store Listing).
 
 ---
 
@@ -19,6 +19,19 @@
 | Privacy policy URL | **https://mototwin.space/privacy** (`src/app/privacy/page.tsx`) |
 | Release permissions | только `INTERNET`, `POST_NOTIFICATIONS`, `VIBRATE` |
 | Backup rules | `android/.../res/xml/backup_rules.xml` |
+| App Links (`/oauth/*`) | `app.json` intentFilters + `/.well-known/assetlinks.json` |
+| R8 minify (release) | `android/gradle.properties` |
+
+После первой EAS production-сборки добавьте на VPS (см. `.env.example`):
+
+```bash
+MOTOTWIN_ANDROID_RELEASE_SHA256_FINGERPRINTS="<SHA-256 из eas credentials -p android>"
+MOTOTWIN_APPLE_TEAM_ID="BM9LAU7B7D"
+```
+
+Проверка App Links: `curl -s https://mototwin.space/.well-known/assetlinks.json`
+
+В Yandex OAuth console добавьте redirect URI: `https://mototwin.space/oauth/yandex/callback`.
 
 ---
 

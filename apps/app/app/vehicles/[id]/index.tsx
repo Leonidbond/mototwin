@@ -113,7 +113,7 @@ import { readUserLocalSettings } from "../../../src/ui-user-local-settings";
 import { getNodeTreeIconAsset } from "../../../../../src/node-tree-icons";
 import { buildVehicleServiceLogHref } from "./service-log";
 import {
-  buildServiceEventNewFromWishlistHref,
+  pushServiceEventNewFromWishlist,
   buildVehicleWishlistItemHighlightHref,
   buildVehicleWishlistNewHref,
 } from "../../../components/vehicle-wishlist/hrefs";
@@ -1853,7 +1853,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       if (nextStatus === "INSTALLED") {
         persistNodeTreeReturnState(itemNodeId);
         closeNodeContextModal();
-        router.push(buildServiceEventNewFromWishlistHref(vehicleId, item, { pendingInstall: true }));
+        pushServiceEventNewFromWishlist(router, vehicleId, item, { pendingInstall: true });
         return;
       }
       try {

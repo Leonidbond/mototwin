@@ -70,6 +70,10 @@ export type MobileOAuthInput = {
    * MT-SEC-003 in docs/security/findings.md.
    */
   rawNonce?: string;
+  /** Yandex authorization code (MT-SEC-010 — exchanged server-side). */
+  code?: string;
+  redirectUri?: string;
+  codeVerifier?: string;
 };
 
 export type ForgotPasswordInput = {
