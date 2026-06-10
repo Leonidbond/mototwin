@@ -21,10 +21,10 @@ function resolveOauthErrorMessage(oauthErrorCode: string | null): string {
     return "Google отклонил вход. Проверьте, что ваш Gmail добавлен в Test users приложения.";
   }
   if (decoded === "OAuthAccountNotLinked") {
-    return "Этот Google-аккаунт не привязан. Войдите по email и паролю или используйте тот же Gmail, что при регистрации.";
+    return "Этот аккаунт не привязан. Войдите по email и паролю или используйте тот провайдер, которым регистрировались.";
   }
-  if (decoded === "Callback") {
-    return "Google вернул ошибку при входе. Попробуйте ещё раз через минуту.";
+  if (decoded === "Callback" || decoded === "OAuthCallback") {
+    return "OAuth вернул ошибку при входе. Если это Apple — попробуйте другой браузер или повторите через минуту.";
   }
   if (decoded === "Configuration") {
     return "OAuth на сервере настроен некорректно. Напишите в поддержку.";

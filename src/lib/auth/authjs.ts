@@ -137,11 +137,17 @@ function buildProviders(): Provider[] {
 
   if (process.env.AUTH_APPLE_CLIENT_ID && process.env.AUTH_APPLE_CLIENT_SECRET) {
     providers.push(
-      Apple({
-        clientId: process.env.AUTH_APPLE_CLIENT_ID,
-        clientSecret: process.env.AUTH_APPLE_CLIENT_SECRET,
-        allowDangerousEmailAccountLinking: true,
-      })
+      // Apple web uses response_mode=form_post (cross-site POST). PKCE cookies are often
+      // dropped by browsers even with SameSite=None; confidential client + JWT secret
+      // does not require PKCE for the authorization code exchange.
+      {
+        ...Apple({
+          clientId: process.env.AUTH_APPLE_CLIENT_ID,
+          clientSecret: process.env.AUTH_APPLE_CLIENT_SECRET,
+          allowDangerousEmailAccountLinking: true,
+        }),
+        checks: [],
+      }
     );
   }
 
