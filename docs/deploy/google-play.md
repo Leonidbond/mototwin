@@ -31,7 +31,7 @@ MOTOTWIN_APPLE_TEAM_ID="BM9LAU7B7D"
 
 Проверка App Links: `curl -s https://mototwin.space/.well-known/assetlinks.json`
 
-В Yandex OAuth console добавьте redirect URI: `https://mototwin.space/oauth/yandex/callback`.
+В Yandex OAuth console один Callback URL для web и mobile: `https://mototwin.space/api/auth/callback/yandex`. Mobile после авторизации получает code через server bridge → `mototwin://oauth/yandex`.
 
 ---
 
