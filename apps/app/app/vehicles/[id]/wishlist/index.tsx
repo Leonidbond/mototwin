@@ -423,7 +423,6 @@ export default function VehicleWishlistScreen() {
       void load();
       return () => {
         loadSeqRef.current += 1;
-        prioritizeMobileApiForNavigation();
       };
     }, [load])
   );

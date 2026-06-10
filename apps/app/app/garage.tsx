@@ -41,6 +41,7 @@ export default function GarageScreen() {
   const router = useRouter();
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
   const [seasonExpenses, setSeasonExpenses] = useState<ExpenseItem[]>([]);
+  const [seasonExpensesLoaded, setSeasonExpensesLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [trashCount, setTrashCount] = useState(0);
@@ -51,36 +52,36 @@ export default function GarageScreen() {
   const hasLoadedOnceRef = useRef(false);
   const appStateRef = useRef(AppState.currentState);
 
-  const loadGarageExtras = useCallback(async (endpoints: ReturnType<typeof createMobileApiClient>) => {
-    const [trashResult, notificationsResult, subscriptionResult, expensesResult] =
-      await Promise.allSettled([
-      endpoints.getTrashedVehicles(),
-      endpoints.getNotifications({ limit: 1 }),
-      endpoints.getSubscriptionCurrent(),
-      endpoints.getExpenses({ year: getCurrentExpenseYear() }),
-    ]);
+  const loadGarageExtras = useCallback(
+    async (seq: number, endpoints: ReturnType<typeof createMobileApiClient>) => {
+      const [trashResult, notificationsResult, subscriptionResult] = await Promise.allSettled([
+        endpoints.getTrashedVehicles(),
+        endpoints.getNotifications({ limit: 1 }),
+        endpoints.getSubscriptionCurrent(),
+      ]);
 
-    if (trashResult.status === "fulfilled") {
-      setTrashCount(trashResult.value.vehicles?.length ?? 0);
-    } else {
-      setTrashCount(0);
-    }
-    if (notificationsResult.status === "fulfilled") {
-      setNotificationCount(notificationsResult.value.unreadCount ?? 0);
-    } else {
-      setNotificationCount(0);
-    }
-    if (subscriptionResult.status === "fulfilled") {
-      setSubscription(subscriptionResult.value);
-    } else {
-      setSubscription(null);
-    }
-    if (expensesResult.status === "fulfilled") {
-      setSeasonExpenses(expensesResult.value.expenses ?? []);
-    } else {
-      setSeasonExpenses([]);
-    }
-  }, []);
+      if (seq !== loadSeqRef.current) {
+        return;
+      }
+
+      if (trashResult.status === "fulfilled") {
+        setTrashCount(trashResult.value.vehicles?.length ?? 0);
+      } else {
+        setTrashCount(0);
+      }
+      if (notificationsResult.status === "fulfilled") {
+        setNotificationCount(notificationsResult.value.unreadCount ?? 0);
+      } else {
+        setNotificationCount(0);
+      }
+      if (subscriptionResult.status === "fulfilled") {
+        setSubscription(subscriptionResult.value);
+      } else {
+        setSubscription(null);
+      }
+    },
+    []
+  );
 
   const loadGarage = useCallback(async () => {
     const seq = ++loadSeqRef.current;
@@ -92,28 +93,29 @@ export default function GarageScreen() {
         setError("");
       }
       const endpoints = createMobileApiClient();
-      const fetchGarage = () => endpoints.getGarageVehicles();
-
-      let garageResult: Awaited<ReturnType<typeof fetchGarage>>;
-      try {
-        garageResult = await fetchGarage();
-      } catch (firstError) {
-        const isTimeout =
-          firstError instanceof Error &&
-          firstError.message.includes("Превышено время ожидания");
-        if (isTimeout) {
-          // no-op: timeout is handled by user-facing error state below
-        }
-        throw firstError;
-      }
+      setSeasonExpensesLoaded(false);
+      const [garageResult, expensesResult] = await Promise.allSettled([
+        endpoints.getGarageVehicles(),
+        endpoints.getExpenses({ year: getCurrentExpenseYear() }),
+      ]);
 
       if (seq !== loadSeqRef.current) {
         return;
       }
-      setVehicles(garageResult.vehicles ?? []);
+      if (garageResult.status !== "fulfilled") {
+        throw garageResult.reason;
+      }
+      setVehicles(garageResult.value.vehicles ?? []);
+      if (expensesResult.status === "fulfilled") {
+        setSeasonExpenses(expensesResult.value.expenses ?? []);
+      } else {
+        console.error(expensesResult.reason);
+        setSeasonExpenses([]);
+      }
+      setSeasonExpensesLoaded(true);
       hasLoadedOnceRef.current = true;
       setError("");
-      void loadGarageExtras(endpoints);
+      void loadGarageExtras(seq, endpoints);
     } catch (requestError) {
       if (seq !== loadSeqRef.current) {
         return;
@@ -174,6 +176,7 @@ export default function GarageScreen() {
 
   const dashboardSummary = buildGarageDashboardSummary(vehicles, {
     seasonExpenses,
+    seasonExpensesLoaded,
     selectedYear: getCurrentExpenseYear(),
   });
   const openTrash = useCallback(() => router.push("/trash"), [router]);

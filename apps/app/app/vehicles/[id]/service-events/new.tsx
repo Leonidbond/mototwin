@@ -327,13 +327,8 @@ export default function NewServiceEventScreen() {
             setIsLoading(false);
             return;
           }
-          if (nextTree.length === 0) {
-            setError("Дерево узлов не загружено. Проверьте сеть и откройте форму снова.");
-            setIsLoading(false);
-            return;
-          }
-          const nodePath = getNodePathById(nextTree, resolvedNodeId);
-          if (!nodePath?.length) {
+          const nodePath = nextTree.length > 0 ? getNodePathById(nextTree, resolvedNodeId) : null;
+          if (nextTree.length > 0 && !nodePath?.length) {
             logServiceEventFormDiag("wishlist node missing in tree", {
               vehicleId,
               nodeId: resolvedNodeId,

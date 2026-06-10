@@ -100,6 +100,7 @@ function GaragePageContent() {
     () =>
       buildGarageDashboardSummary(vehicles, {
         seasonExpenses,
+        seasonExpensesLoaded: !isLoading,
         selectedYear: getCurrentExpenseYear(),
       }),
     [vehicles, seasonExpenses]

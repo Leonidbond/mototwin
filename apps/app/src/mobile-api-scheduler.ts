@@ -92,7 +92,14 @@ export function priorityForMobileApiPath(path: string): MobileApiPriority {
   if (path.includes("/wishlist")) {
     return "high";
   }
-  if (path.includes("/node-tree") || path.includes("/api/nodes/service")) {
+  if (path.startsWith("/api/expenses")) {
+    return "high";
+  }
+  if (path.includes("/service-events")) {
+    return "high";
+  }
+  // node-tree is required for service-event forms and wishlist install handoff — not "low".
+  if (path.includes("/api/nodes/service")) {
     return "low";
   }
   return "normal";

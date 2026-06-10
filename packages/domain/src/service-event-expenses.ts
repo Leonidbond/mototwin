@@ -1,5 +1,78 @@
-import type { ServiceEventItem } from "@mototwin/types";
+import type { ServiceBundleItem, ServiceEventItem } from "@mototwin/types";
 import { formatExpenseAmountRu, formatExpenseTotalsByCurrency } from "./expense-summary";
+
+function resolveEventCostCurrency(event: Pick<ServiceEventItem, "currency">): string | null {
+  const currency = event.currency?.trim();
+  return currency || null;
+}
+
+function getPartsAndLaborCostTotal(
+  event: Pick<ServiceEventItem, "partsCost" | "laborCost" | "currency">
+): { amount: number; currency: string } | null {
+  const currency = resolveEventCostCurrency(event);
+  if (!currency) {
+    return null;
+  }
+  const parts =
+    event.partsCost != null && Number.isFinite(event.partsCost) && event.partsCost > 0
+      ? event.partsCost
+      : 0;
+  const labor =
+    event.laborCost != null && Number.isFinite(event.laborCost) && event.laborCost > 0
+      ? event.laborCost
+      : 0;
+  const amount = parts + labor;
+  return amount > 0 ? { amount, currency } : null;
+}
+
+function getBundleItemsCostTotal(
+  event: Pick<ServiceEventItem, "items" | "currency">
+): { amount: number; currency: string } | null {
+  const currency = resolveEventCostCurrency(event);
+  if (!currency) {
+    return null;
+  }
+  let amount = 0;
+  let hasLineCost = false;
+  for (const item of event.items ?? []) {
+    amount += sumBundleItemLineCost(item);
+    if (bundleItemHasLineCost(item)) {
+      hasLineCost = true;
+    }
+  }
+  return hasLineCost && amount > 0 ? { amount, currency } : null;
+}
+
+function bundleItemHasLineCost(item: ServiceBundleItem): boolean {
+  return (
+    (item.partCost != null && Number.isFinite(item.partCost) && item.partCost > 0) ||
+    (item.laborCost != null && Number.isFinite(item.laborCost) && item.laborCost > 0)
+  );
+}
+
+function sumBundleItemLineCost(item: ServiceBundleItem): number {
+  const parts =
+    item.partCost != null && Number.isFinite(item.partCost) && item.partCost > 0 ? item.partCost : 0;
+  const labor =
+    item.laborCost != null && Number.isFinite(item.laborCost) && item.laborCost > 0 ? item.laborCost : 0;
+  return parts + labor;
+}
+
+function resolveDirectServiceEventCost(
+  event: ServiceEventItem
+): { amount: number; currency: string } | null {
+  const directAmount = event.totalCost ?? event.costAmount ?? null;
+  const directCurrency = resolveEventCostCurrency(event);
+  if (
+    directAmount !== null &&
+    Number.isFinite(directAmount) &&
+    directAmount > 0 &&
+    directCurrency
+  ) {
+    return { amount: directAmount, currency: directCurrency };
+  }
+  return getPartsAndLaborCostTotal(event) ?? getBundleItemsCostTotal(event);
+}
 
 export type ServiceEventExpenseCurrencyTotal = {
   currency: string;
@@ -34,19 +107,12 @@ export type ResolvedServiceEventCost = {
  * otherwise rolls up linked expense rows.
  */
 export function resolveServiceEventCost(event: ServiceEventItem): ResolvedServiceEventCost {
-  const directAmount = event.totalCost ?? event.costAmount ?? null;
-  const directCurrency = event.currency?.trim() || null;
-  const hasDirectCost =
-    directAmount !== null &&
-    Number.isFinite(directAmount) &&
-    directAmount > 0 &&
-    Boolean(directCurrency);
-
-  if (hasDirectCost) {
+  const direct = resolveDirectServiceEventCost(event);
+  if (direct) {
     return {
-      totalAmount: directAmount,
-      currency: directCurrency,
-      totalsLabel: `${formatExpenseAmountRu(directAmount)} ${directCurrency}`,
+      totalAmount: direct.amount,
+      currency: direct.currency,
+      totalsLabel: `${formatExpenseAmountRu(direct.amount)} ${direct.currency}`,
       hasCost: true,
     };
   }
@@ -68,15 +134,9 @@ export function resolveServiceEventCost(event: ServiceEventItem): ResolvedServic
 
 /** Totals by currency for monthly journal rollups and cost filters. */
 export function getServiceEventCostByCurrency(event: ServiceEventItem): Record<string, number> {
-  const directAmount = event.totalCost ?? event.costAmount ?? null;
-  const directCurrency = event.currency?.trim();
-  if (
-    directAmount !== null &&
-    Number.isFinite(directAmount) &&
-    directAmount > 0 &&
-    directCurrency
-  ) {
-    return { [directCurrency]: directAmount };
+  const direct = resolveDirectServiceEventCost(event);
+  if (direct) {
+    return { [direct.currency]: direct.amount };
   }
 
   const result: Record<string, number> = {};
@@ -89,8 +149,12 @@ export function getServiceEventCostByCurrency(event: ServiceEventItem): Record<s
 /** Single numeric total when unambiguous (direct cost or one linked currency). */
 export function getServiceEventComparableTotalCost(event: ServiceEventItem): number | null {
   const resolved = resolveServiceEventCost(event);
-  if (!resolved.hasCost) return null;
-  if (resolved.totalAmount !== null) return resolved.totalAmount;
+  if (!resolved.hasCost) {
+    return null;
+  }
+  if (resolved.totalAmount !== null) {
+    return resolved.totalAmount;
+  }
 
   const linkedTotals = getServiceEventLinkedExpenseTotals(event);
   if (linkedTotals.length === 1) {

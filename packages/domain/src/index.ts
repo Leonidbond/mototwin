@@ -200,6 +200,8 @@ export {
   getTodayDateYmdLocal,
   DEFAULT_ADD_SERVICE_EVENT_CURRENCY,
   buildAddServiceEventCostBreakdownLines,
+  switchAddServiceEventFormToBasic,
+  switchAddServiceEventFormToAdvanced,
   ADD_SERVICE_EVENT_COMMENT_MAX_LENGTH,
   ADD_SERVICE_EVENT_SERVICE_NOTE_MAX_LENGTH,
   SERVICE_ACTION_TYPE_OPTIONS,

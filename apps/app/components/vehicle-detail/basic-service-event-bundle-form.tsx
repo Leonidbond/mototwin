@@ -34,6 +34,8 @@ import {
   revertExpenseInstallFormPatch,
   SERVICE_ACTION_TYPE_OPTIONS,
   stripAddServiceEventFormValuesForUserTemplate,
+  switchAddServiceEventFormToAdvanced,
+  switchAddServiceEventFormToBasic,
   validateAddServiceEventFormValuesMobile,
   canUseServiceEventEntryMode,
 } from "@mototwin/domain";
@@ -149,57 +151,6 @@ function appendNodeItems(form: AddServiceEventFormValues, nodeIds: string[]): Ad
     existing.add(nodeId);
   }
   return { ...form, items };
-}
-
-function switchFormToAdvanced(prev: AddServiceEventFormValues): AddServiceEventFormValues {
-  return {
-    ...prev,
-    mode: "ADVANCED",
-    items: prev.items.map((it) => ({
-      ...it,
-      actionType: it.actionType ?? prev.commonActionType,
-    })),
-  };
-}
-
-function switchFormToBasic(prev: AddServiceEventFormValues): AddServiceEventFormValues {
-  const ct = prev.items[0]?.actionType ?? prev.commonActionType;
-  let partsCost = prev.partsCost;
-  let laborCost = prev.laborCost;
-  if (prev.mode === "ADVANCED") {
-    if (!partsCost.trim()) {
-      let rowPartsSum = 0;
-      for (const it of prev.items) {
-        const v = parseExpenseAmountInputToNumberOrNull(it.partCost.trim());
-        if (v != null) {
-          rowPartsSum += v;
-        }
-      }
-      if (rowPartsSum > 0) {
-        partsCost = formatExpenseAmountRu(rowPartsSum);
-      }
-    }
-    if (!laborCost.trim()) {
-      let rowLaborSum = 0;
-      for (const it of prev.items) {
-        const v = parseExpenseAmountInputToNumberOrNull(it.laborCost.trim());
-        if (v != null) {
-          rowLaborSum += v;
-        }
-      }
-      if (rowLaborSum > 0) {
-        laborCost = formatExpenseAmountRu(rowLaborSum);
-      }
-    }
-  }
-  return {
-    ...prev,
-    mode: "BASIC",
-    commonActionType: ct,
-    partsCost,
-    laborCost,
-    items: prev.items.map((it) => ({ ...it, actionType: ct })),
-  };
 }
 
 function resolveInstallableExpenseTargetRow(
@@ -585,7 +536,7 @@ export function BasicServiceEventBundleForm({
       return;
     }
     setSkuSearchRowIndex(0);
-    updateForm((prev) => switchFormToBasic(prev));
+    updateForm((prev) => switchAddServiceEventFormToBasic(prev));
   }, [detailedEntryAllowed, form.mode, updateForm]);
 
   useEffect(() => {
@@ -1094,7 +1045,9 @@ export function BasicServiceEventBundleForm({
           }
           setSkuSearchRowIndex(0);
           updateForm((prev) =>
-            nextMode === "BASIC" ? switchFormToBasic(prev) : switchFormToAdvanced(prev)
+            nextMode === "BASIC"
+              ? switchAddServiceEventFormToBasic(prev)
+              : switchAddServiceEventFormToAdvanced(prev)
           );
         }}
       />

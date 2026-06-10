@@ -974,7 +974,6 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
       void load();
       return () => {
         loadSeqRef.current += 1;
-        prioritizeMobileApiForNavigation();
       };
     }, [load])
   );

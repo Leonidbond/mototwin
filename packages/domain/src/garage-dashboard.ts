@@ -7,6 +7,8 @@ import {
 
 export type BuildGarageDashboardSummaryOptions = {
   seasonExpenses?: ExpenseItem[];
+  /** When true, season expense totals are shown even if the year total is zero. */
+  seasonExpensesLoaded?: boolean;
   selectedYear?: number;
 };
 
@@ -26,13 +28,11 @@ export function buildGarageDashboardSummary(
   const seasonExpenses = options?.seasonExpenses ?? [];
   const selectedYear = options?.selectedYear ?? getCurrentExpenseYear();
   let currentMonthExpensesLabel: string | null = null;
-  if (seasonExpenses.length > 0) {
+  if (options?.seasonExpensesLoaded) {
     const analytics = buildExpenseAnalyticsFromItems(seasonExpenses, selectedYear);
-    if (analytics.selectedYearExpenseCount > 0) {
-      currentMonthExpensesLabel = formatExpenseTotalsByCurrency(
-        analytics.selectedYearTotalsByCurrency
-      );
-    }
+    currentMonthExpensesLabel = formatExpenseTotalsByCurrency(
+      analytics.selectedYearTotalsByCurrency
+    );
   }
 
   return {

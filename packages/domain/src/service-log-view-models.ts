@@ -265,6 +265,14 @@ function formatBundleCostLabel(label: string, amount: number | null, currency: s
   return `${label} ${formatExpenseAmountRu(amount)} ${currency}`;
 }
 
+/** Компактная сумма для строк журнала (без префикса «Итого»). */
+function formatCompactCostAmount(amount: number | null, currency: string | null): string | null {
+  if (amount == null || !Number.isFinite(amount) || amount <= 0 || !currency) {
+    return null;
+  }
+  return `${formatExpenseAmountRu(amount)} ${currency}`;
+}
+
 function formatBundleItemLineCostsRu(
   partCost: number | null,
   laborCost: number | null,
@@ -409,9 +417,9 @@ export function buildServiceLogEntryViewModel(
     totalCostLabel:
       hasCost && resolvedCost.totalsLabel
         ? totalAmount !== null && totalCurrency
-          ? formatBundleCostLabel("Итого", totalAmount, totalCurrency)
-          : `Итого ${resolvedCost.totalsLabel}`
-        : formatBundleCostLabel("Итого", event.totalCost ?? event.costAmount ?? null, event.currency ?? null),
+          ? formatCompactCostAmount(totalAmount, totalCurrency)
+          : resolvedCost.totalsLabel
+        : formatCompactCostAmount(event.totalCost ?? event.costAmount ?? null, event.currency ?? null),
   };
 }
 

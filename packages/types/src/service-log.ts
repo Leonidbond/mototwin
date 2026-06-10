@@ -166,7 +166,7 @@ export type ServiceLogEntryViewModel = {
   partsCostLabel: string | null;
   /** Лейбл сводки работы. */
   laborCostLabel: string | null;
-  /** Лейбл итоговой суммы (`«Итого 17 000 ₽»`). */
+  /** Компактная итоговая сумма для строк журнала (`«17 000 ₽»`). */
   totalCostLabel: string | null;
 };
 

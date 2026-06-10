@@ -460,9 +460,7 @@ function JournalTimelineRow({
   const nodeOrSubtitleLine = isStateUpdate
     ? (entry.stateUpdateSubtitle ?? entry.compactMetricsLine)
     : (entry.expoServiceNodeLabel ?? entry.secondaryTitle);
-  const cost = isStateUpdate
-    ? null
-    : (getCompactCost(entry)?.replace(/^Итого\s+/u, "") ?? null);
+  const cost = isStateUpdate ? null : getCompactCost(entry);
 
   return (
     <Pressable

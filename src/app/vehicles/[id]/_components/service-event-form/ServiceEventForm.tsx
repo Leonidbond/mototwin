@@ -22,6 +22,8 @@ import {
   SERVICE_EVENT_TEMPLATE_SELECT_SYSTEM_PREFIX,
   SERVICE_EVENT_TEMPLATE_SELECT_USER_PREFIX,
   stripAddServiceEventFormValuesForUserTemplate,
+  switchAddServiceEventFormToAdvanced,
+  switchAddServiceEventFormToBasic,
   validateAddServiceEventFormValues,
 } from "@mototwin/domain";
 import { productSemanticColors } from "@mototwin/design-tokens";
@@ -128,57 +130,6 @@ function appendEmptyItem(form: AddServiceEventFormValues): AddServiceEventFormVa
     actionType: form.mode === "BASIC" ? form.commonActionType : "REPLACE",
   });
   return { ...form, items: [...form.items, next] };
-}
-
-function switchFormToAdvanced(prev: AddServiceEventFormValues): AddServiceEventFormValues {
-  return {
-    ...prev,
-    mode: "ADVANCED",
-    items: prev.items.map((it) => ({
-      ...it,
-      actionType: it.actionType ?? prev.commonActionType,
-    })),
-  };
-}
-
-function switchFormToBasic(prev: AddServiceEventFormValues): AddServiceEventFormValues {
-  const ct = prev.items[0]?.actionType ?? prev.commonActionType;
-  let partsCost = prev.partsCost;
-  let laborCost = prev.laborCost;
-  if (prev.mode === "ADVANCED") {
-    if (!partsCost.trim()) {
-      let rowPartsSum = 0;
-      for (const it of prev.items) {
-        const v = parseExpenseAmountInputToNumberOrNull(it.partCost.trim());
-        if (v != null) {
-          rowPartsSum += v;
-        }
-      }
-      if (rowPartsSum > 0) {
-        partsCost = formatExpenseAmountRu(rowPartsSum);
-      }
-    }
-    if (!laborCost.trim()) {
-      let rowLaborSum = 0;
-      for (const it of prev.items) {
-        const v = parseExpenseAmountInputToNumberOrNull(it.laborCost.trim());
-        if (v != null) {
-          rowLaborSum += v;
-        }
-      }
-      if (rowLaborSum > 0) {
-        laborCost = formatExpenseAmountRu(rowLaborSum);
-      }
-    }
-  }
-  return {
-    ...prev,
-    mode: "BASIC",
-    commonActionType: ct,
-    partsCost,
-    laborCost,
-    items: prev.items.map((it) => ({ ...it, actionType: ct })),
-  };
 }
 
 function resolveInstallableExpenseTargetRow(
@@ -512,7 +463,7 @@ function ServiceEventFormInner({
     }
     setSkuSearchRowIndex(0);
     setSkuSearchPanelOpen(false);
-    updateForm((prev) => switchFormToBasic(prev));
+    updateForm((prev) => switchAddServiceEventFormToBasic(prev));
   }, [detailedEntryAllowed, form.mode, updateForm]);
 
   const openSkuSearchForRow = useCallback((rowIndex: number) => {
@@ -1469,12 +1420,14 @@ function ServiceEventFormInner({
           setDetailedModePaywallVisible(false);
           setSkuSearchRowIndex(0);
           setSkuSearchPanelOpen(false);
-          updateForm((prev) => (prev.mode === "BASIC" ? prev : switchFormToBasic(prev)));
+          updateForm((prev) => (prev.mode === "BASIC" ? prev : switchAddServiceEventFormToBasic(prev)));
         }}
         onSelectDetailed={() => {
           setSkuSearchRowIndex(0);
           setSkuSearchPanelOpen(false);
-          updateForm((prev) => (prev.mode === "ADVANCED" ? prev : switchFormToAdvanced(prev)));
+          updateForm((prev) =>
+            prev.mode === "ADVANCED" ? prev : switchAddServiceEventFormToAdvanced(prev)
+          );
         }}
         onBlockedDetailed={() => setDetailedModePaywallVisible(true)}
       />

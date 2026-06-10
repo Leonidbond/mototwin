@@ -115,6 +115,141 @@ export function buildAddServiceEventCostBreakdownLines(
   };
 }
 
+function sumBundleRowPartCostInput(values: Pick<AddServiceEventFormValues, "items">): number {
+  let sum = 0;
+  for (const it of values.items) {
+    const v = parseExpenseAmountInputToNumberOrNull(it.partCost.trim());
+    if (v != null) {
+      sum += v;
+    }
+  }
+  return sum;
+}
+
+function sumBundleRowLaborCostInput(values: Pick<AddServiceEventFormValues, "items">): number {
+  let sum = 0;
+  for (const it of values.items) {
+    const v = parseExpenseAmountInputToNumberOrNull(it.laborCost.trim());
+    if (v != null) {
+      sum += v;
+    }
+  }
+  return sum;
+}
+
+/**
+ * Переключение «Подробно» → «Быстро»: суммы строк bundle переносятся в верхние поля,
+ * чтобы BASIC-сводка не теряла стоимость; строки очищаются, иначе при возврате в ADVANCED
+ * итог считается дважды (строки + верхний блок).
+ */
+export function switchAddServiceEventFormToBasic(
+  prev: AddServiceEventFormValues
+): AddServiceEventFormValues {
+  const ct = prev.items[0]?.actionType ?? prev.commonActionType;
+  let partsCost = prev.partsCost;
+  let laborCost = prev.laborCost;
+  let items = prev.items;
+
+  if (prev.mode === "ADVANCED") {
+    let foldedParts = false;
+    let foldedLabor = false;
+
+    if (!partsCost.trim()) {
+      const rowPartsSum = sumBundleRowPartCostInput(prev);
+      if (rowPartsSum > 0) {
+        partsCost = formatExpenseAmountRu(rowPartsSum);
+        foldedParts = true;
+      }
+    }
+    if (!laborCost.trim()) {
+      const rowLaborSum = sumBundleRowLaborCostInput(prev);
+      if (rowLaborSum > 0) {
+        laborCost = formatExpenseAmountRu(rowLaborSum);
+        foldedLabor = true;
+      }
+    }
+    if (foldedParts || foldedLabor) {
+      items = prev.items.map((it) => ({
+        ...it,
+        partCost: foldedParts ? "" : it.partCost,
+        laborCost: foldedLabor ? "" : it.laborCost,
+      }));
+    }
+  }
+
+  return {
+    ...prev,
+    mode: "BASIC",
+    commonActionType: ct,
+    partsCost,
+    laborCost,
+    items: items.map((it) => ({ ...it, actionType: ct })),
+  };
+}
+
+/**
+ * Переключение «Быстро» → «Подробно»: восстанавливает стоимость в строках bundle,
+ * если она была свёрнута в верхние поля при переходе в BASIC.
+ */
+export function switchAddServiceEventFormToAdvanced(
+  prev: AddServiceEventFormValues
+): AddServiceEventFormValues {
+  if (prev.mode !== "BASIC") {
+    return {
+      ...prev,
+      mode: "ADVANCED",
+      items: prev.items.map((it) => ({
+        ...it,
+        actionType: it.actionType ?? prev.commonActionType,
+      })),
+    };
+  }
+
+  const topP = parseExpenseAmountInputToNumberOrNull(prev.partsCost.trim());
+  const topL = parseExpenseAmountInputToNumberOrNull(prev.laborCost.trim());
+  const rowHasParts = prev.items.some((it) => it.partCost.trim() !== "");
+  const rowHasLabor = prev.items.some((it) => it.laborCost.trim() !== "");
+
+  let partsCost = prev.partsCost;
+  let laborCost = prev.laborCost;
+  let items = prev.items;
+
+  if (topP != null && topP > 0 && !rowHasParts && items.length > 0) {
+    items = items.map((it, index) =>
+      index === 0 ? { ...it, partCost: formatExpenseAmountRu(topP) } : it
+    );
+    partsCost = "";
+  }
+  if (topL != null && topL > 0 && !rowHasLabor && items.length > 0) {
+    items = items.map((it, index) =>
+      index === 0 ? { ...it, laborCost: formatExpenseAmountRu(topL) } : it
+    );
+    laborCost = "";
+  }
+
+  const rowPartsSum = sumBundleRowPartCostInput({ items });
+  const rowLaborSum = sumBundleRowLaborCostInput({ items });
+  const nextTopP = parseExpenseAmountInputToNumberOrNull(partsCost.trim());
+  const nextTopL = parseExpenseAmountInputToNumberOrNull(laborCost.trim());
+  if (rowPartsSum > 0 && nextTopP != null && nextTopP === rowPartsSum) {
+    partsCost = "";
+  }
+  if (rowLaborSum > 0 && nextTopL != null && nextTopL === rowLaborSum) {
+    laborCost = "";
+  }
+
+  return {
+    ...prev,
+    mode: "ADVANCED",
+    partsCost,
+    laborCost,
+    items: items.map((it) => ({
+      ...it,
+      actionType: it.actionType ?? prev.commonActionType,
+    })),
+  };
+}
+
 function getBundleItemQuantityMultiplier(item: Pick<BundleItemFormValues, "quantity">): number {
   const trimmed = item.quantity.trim();
   if (!trimmed) {
