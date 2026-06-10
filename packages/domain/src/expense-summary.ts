@@ -85,7 +85,7 @@ function currentLocalMonthLabel(now: Date): string {
   return now.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
 }
 
-/** SERVICE rows with positive amount and currency (excludes STATE_UPDATE and null/zero cost). */
+/** SERVICE rows with explicit totals or linked expense rows (excludes STATE_UPDATE). */
 export function filterPaidServiceExpenseEvents(
   serviceEvents: ServiceEventItem[]
 ): ServiceEventItem[] {
@@ -95,10 +95,21 @@ export function filterPaidServiceExpenseEvents(
       return false;
     }
     const currency = e.currency?.trim();
-    return (
-      e.costAmount !== null &&
-      e.costAmount > 0 &&
-      Boolean(currency && currency.length > 0)
+    const directAmount = e.totalCost ?? e.costAmount;
+    const hasDirectCost =
+      directAmount !== null &&
+      directAmount !== undefined &&
+      Number.isFinite(directAmount) &&
+      directAmount > 0 &&
+      Boolean(currency && currency.length > 0);
+    if (hasDirectCost) {
+      return true;
+    }
+    return (e.expenseItems ?? []).some(
+      (expense) =>
+        Number.isFinite(expense.amount) &&
+        expense.amount > 0 &&
+        Boolean(expense.currency?.trim())
     );
   });
 }

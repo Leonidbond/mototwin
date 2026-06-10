@@ -11,9 +11,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { buildGarageDashboardSummary } from "@mototwin/domain";
+import { buildGarageDashboardSummary, getCurrentExpenseYear } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
-import type { GarageVehicleItem, SubscriptionCurrentResponse } from "@mototwin/types";
+import type { ExpenseItem, GarageVehicleItem, SubscriptionCurrentResponse } from "@mototwin/types";
 import {
   cancelInFlightMobileApiRequests,
   createMobileApiClient,
@@ -40,6 +40,7 @@ function formatGarageLoadError(message: string): string {
 export default function GarageScreen() {
   const router = useRouter();
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
+  const [seasonExpenses, setSeasonExpenses] = useState<ExpenseItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [trashCount, setTrashCount] = useState(0);
@@ -51,10 +52,12 @@ export default function GarageScreen() {
   const appStateRef = useRef(AppState.currentState);
 
   const loadGarageExtras = useCallback(async (endpoints: ReturnType<typeof createMobileApiClient>) => {
-    const [trashResult, notificationsResult, subscriptionResult] = await Promise.allSettled([
+    const [trashResult, notificationsResult, subscriptionResult, expensesResult] =
+      await Promise.allSettled([
       endpoints.getTrashedVehicles(),
       endpoints.getNotifications({ limit: 1 }),
       endpoints.getSubscriptionCurrent(),
+      endpoints.getExpenses({ year: getCurrentExpenseYear() }),
     ]);
 
     if (trashResult.status === "fulfilled") {
@@ -71,6 +74,11 @@ export default function GarageScreen() {
       setSubscription(subscriptionResult.value);
     } else {
       setSubscription(null);
+    }
+    if (expensesResult.status === "fulfilled") {
+      setSeasonExpenses(expensesResult.value.expenses ?? []);
+    } else {
+      setSeasonExpenses([]);
     }
   }, []);
 
@@ -164,7 +172,10 @@ export default function GarageScreen() {
     setLastViewedVehicleId(readLastViewedVehicleId());
   }, [vehicles.length]);
 
-  const dashboardSummary = buildGarageDashboardSummary(vehicles);
+  const dashboardSummary = buildGarageDashboardSummary(vehicles, {
+    seasonExpenses,
+    selectedYear: getCurrentExpenseYear(),
+  });
   const openTrash = useCallback(() => router.push("/trash"), [router]);
   const openNotifications = useCallback(() => router.push("/notifications"), [router]);
   const openProfile = useCallback(() => router.push("/profile"), [router]);

@@ -25,6 +25,7 @@ import {
   mapServiceTypeStringToActionType,
 } from "./forms";
 import { isLikelyWishlistInstallServiceEvent } from "./part-wishlist";
+import { resolveServiceEventCost } from "./service-event-expenses";
 
 /** Preview length for collapsed journal comments (web + Expo). */
 export const SERVICE_LOG_COMMENT_PREVIEW_MAX_CHARS = 120;
@@ -356,12 +357,10 @@ export function buildServiceLogEntryViewModel(
       ? `${nodeCount} узлов`
       : (event.node?.name ?? bundleItemsSummary[0]?.nodeName ?? "—");
 
-  const totalAmount = event.totalCost ?? event.costAmount ?? null;
-  const hasCost =
-    !isState &&
-    totalAmount !== null &&
-    totalAmount > 0 &&
-    Boolean(event.currency);
+  const resolvedCost = resolveServiceEventCost(event);
+  const hasCost = !isState && resolvedCost.hasCost;
+  const totalAmount = resolvedCost.totalAmount;
+  const totalCurrency = resolvedCost.currency;
 
   const wishlistOriginLabelRu =
     !isState && isLikelyWishlistInstallServiceEvent(event) ? "Из списка покупок" : null;
@@ -395,7 +394,7 @@ export function buildServiceLogEntryViewModel(
     compactMetricsLine: buildCompactMetricsLine(event),
     costLabel: hasCost ? "Стоимость" : null,
     costAmount: hasCost ? totalAmount : null,
-    costCurrency: hasCost ? event.currency : null,
+    costCurrency: hasCost ? totalCurrency : null,
     comment: event.comment,
     partSku: headerPartSku,
     partName: headerPartName,
@@ -407,7 +406,12 @@ export function buildServiceLogEntryViewModel(
     bundleItemsSummary,
     partsCostLabel: formatBundleCostLabel("Детали", event.partsCost ?? null, event.currency ?? null),
     laborCostLabel: formatBundleCostLabel("Работа", event.laborCost ?? null, event.currency ?? null),
-    totalCostLabel: formatBundleCostLabel("Итого", totalAmount, event.currency ?? null),
+    totalCostLabel:
+      hasCost && resolvedCost.totalsLabel
+        ? totalAmount !== null && totalCurrency
+          ? formatBundleCostLabel("Итого", totalAmount, totalCurrency)
+          : `Итого ${resolvedCost.totalsLabel}`
+        : formatBundleCostLabel("Итого", event.totalCost ?? event.costAmount ?? null, event.currency ?? null),
   };
 }
 

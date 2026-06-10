@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createWebApiClient } from "@/lib/create-web-api-client";
 import { getGarageVehiclesDeduped } from "@/lib/web-api-dedup";
-import { buildGarageDashboardSummary } from "@mototwin/domain";
+import { buildGarageDashboardSummary, getCurrentExpenseYear } from "@mototwin/domain";
 import { Card } from "@/components/ui";
 import { productSemanticColors, typeScale } from "@mototwin/design-tokens";
-import type { GarageVehicleItem } from "@mototwin/types";
+import type { ExpenseItem, GarageVehicleItem } from "@mototwin/types";
 import { GarageEmptyState } from "./_components/GarageEmptyState";
 import { AddMotorcycleCard } from "./_components/AddMotorcycleCard";
 import { GarageHeader } from "./_components/GarageHeader";
@@ -26,6 +26,7 @@ export default function GaragePage() {
 
 function GaragePageContent() {
   const [vehicles, setVehicles] = useState<GarageVehicleItem[]>([]);
+  const [seasonExpenses, setSeasonExpenses] = useState<ExpenseItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [trashCount, setTrashCount] = useState(0);
@@ -50,7 +51,8 @@ function GaragePageContent() {
       void Promise.allSettled([
         garageApi.getTrashedVehicles(),
         garageApi.getNotifications({ limit: 1 }),
-      ]).then(([trashResult, notificationsResult]) => {
+        garageApi.getExpenses({ year: getCurrentExpenseYear() }),
+      ]).then(([trashResult, notificationsResult, expensesResult]) => {
         if (trashResult.status === "fulfilled") {
           setTrashCount(trashResult.value.vehicles?.length ?? 0);
         } else {
@@ -62,6 +64,12 @@ function GaragePageContent() {
         } else {
           console.warn("Failed to fetch notifications count:", notificationsResult.reason);
           setNotificationCount(0);
+        }
+        if (expensesResult.status === "fulfilled") {
+          setSeasonExpenses(expensesResult.value.expenses ?? []);
+        } else {
+          console.warn("Failed to fetch garage season expenses:", expensesResult.reason);
+          setSeasonExpenses([]);
         }
       });
     } catch (err) {
@@ -89,8 +97,12 @@ function GaragePageContent() {
   }, [loadGarage]);
 
   const dashboardSummary = useMemo(
-    () => buildGarageDashboardSummary(vehicles),
-    [vehicles]
+    () =>
+      buildGarageDashboardSummary(vehicles, {
+        seasonExpenses,
+        selectedYear: getCurrentExpenseYear(),
+      }),
+    [vehicles, seasonExpenses]
   );
   const hasVehicles = vehicles.length > 0;
   const showSummary = !isLoading && !error && hasVehicles;

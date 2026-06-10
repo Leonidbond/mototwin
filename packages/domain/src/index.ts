@@ -269,7 +269,19 @@ export {
   buildServiceLogTimelineProps,
 } from "./component-contract-props";
 export { calculateGarageScore } from "./garage-score";
-export { buildGarageDashboardSummary } from "./garage-dashboard";
+export {
+  buildGarageDashboardSummary,
+  type BuildGarageDashboardSummaryOptions,
+} from "./garage-dashboard";
+export {
+  getServiceEventComparableTotalCost,
+  getServiceEventCostByCurrency,
+  getServiceEventLinkedExpenseTotals,
+  hasPaidLinkedExpenses,
+  resolveServiceEventCost,
+  type ResolvedServiceEventCost,
+  type ServiceEventExpenseCurrencyTotal,
+} from "./service-event-expenses";
 export { pluralizeMotorcycleRu, pluralizeRu } from "./pluralize-ru";
 export {
   DEFAULT_USER_SETTINGS,

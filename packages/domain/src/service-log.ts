@@ -10,18 +10,15 @@ import type {
   ServicePerformedBy,
 } from "@mototwin/types";
 import { applyServiceLogNodeFilter } from "./service-log-node-filter";
+import {
+  getServiceEventComparableTotalCost,
+  getServiceEventCostByCurrency,
+  resolveServiceEventCost,
+} from "./service-event-expenses";
 
-/** Positive finite amount and non-empty currency (any event kind). */
+/** Event has explicit totals or linked expense rows with positive amounts. */
 export function isPaidServiceEvent(event: ServiceEventItem): boolean {
-  const amount = event.totalCost ?? event.costAmount;
-  if (amount === null || amount === undefined || !Number.isFinite(amount)) {
-    return false;
-  }
-  if (amount <= 0) {
-    return false;
-  }
-  const cur = event.currency?.trim();
-  return Boolean(cur && cur.length > 0);
+  return resolveServiceEventCost(event).hasCost;
 }
 
 export function filterPaidServiceEvents(
@@ -135,11 +132,7 @@ function parseCostBound(raw: string): number | null {
 }
 
 function eventTotalCost(event: ServiceEventItem): number | null {
-  const v = event.totalCost ?? event.costAmount;
-  if (v === null || v === undefined || !Number.isFinite(v)) {
-    return null;
-  }
-  return v;
+  return getServiceEventComparableTotalCost(event);
 }
 
 export function filterServiceLogEntries(
@@ -259,8 +252,8 @@ export function sortServiceLogEntries(
         return compareNullableNumbers(left.engineHours, right.engineHours);
       case "cost":
         return compareNullableNumbers(
-          left.totalCost ?? left.costAmount,
-          right.totalCost ?? right.costAmount
+          getServiceEventComparableTotalCost(left),
+          getServiceEventComparableTotalCost(right)
         );
       case "comment":
         return compareStrings(left.comment || "", right.comment || "");
@@ -297,7 +290,7 @@ export function groupServiceEventsByMonth(
     const monthStart = getMonthStartTimestamp(event.eventDate);
     const existingGroup = groupsMap.get(key);
 
-    const eventTotal = event.totalCost ?? event.costAmount ?? null;
+    const eventCostByCurrency = getServiceEventCostByCurrency(event);
     if (existingGroup) {
       existingGroup.events.push(event);
       if (event.eventKind === "STATE_UPDATE") {
@@ -305,9 +298,11 @@ export function groupServiceEventsByMonth(
       } else {
         existingGroup.summary.serviceCount += 1;
       }
-      if (eventTotal !== null && eventTotal > 0 && event.currency) {
-        existingGroup.summary.costByCurrency[event.currency] =
-          (existingGroup.summary.costByCurrency[event.currency] || 0) + eventTotal;
+      for (const [currency, amount] of Object.entries(eventCostByCurrency)) {
+        if (amount > 0) {
+          existingGroup.summary.costByCurrency[currency] =
+            (existingGroup.summary.costByCurrency[currency] || 0) + amount;
+        }
       }
       return;
     }
@@ -320,10 +315,7 @@ export function groupServiceEventsByMonth(
       summary: {
         serviceCount: event.eventKind === "STATE_UPDATE" ? 0 : 1,
         stateUpdateCount: event.eventKind === "STATE_UPDATE" ? 1 : 0,
-        costByCurrency:
-          eventTotal !== null && eventTotal > 0 && event.currency
-            ? { [event.currency]: eventTotal }
-            : {},
+        costByCurrency: { ...eventCostByCurrency },
       },
     });
   });
