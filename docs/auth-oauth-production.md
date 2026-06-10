@@ -290,7 +290,8 @@ Apple шлёт callback **POST**-ом (`response_mode=form_post`). Cookies PKCE/
 | Google: Access blocked / 403 | OAuth app в Testing, Gmail не в Test users | Google Console → Test users |
 | `DEVELOPER_ERROR` (Android Google) | SHA-1/package ≠ подпись APK | Android OAuth client: package `ru.mototwin.app` + **release SHA-1** (§5) |
 | `redirect_uri_mismatch` (web Google) | URI в Google ≠ callback | `https://mototwin.space/api/auth/callback/google` |
-| `OAuthCallback` / `PKCE code_verifier cookie was missing` (Apple) | POST callback без PKCE cookie (браузер / form_post) | Apple web: `checks: []` в authjs.ts (confidential client + JWT secret); cookies SameSite=None остаются для Google/Yandex |
+| `OAuthCallback` / `PKCE code_verifier cookie was missing` (Apple) | POST callback без PKCE cookie (браузер / form_post) | Apple web: `appleWebProvider()` — ручной token exchange без PKCE/state cookies |
+| `checks.state argument is missing` (Apple) | `checks: []` + openid-client `client.callback` | тот же `appleWebProvider()` с `token.request` |
 | `invalid_client` (Apple) | истёк JWT secret или неверный Key/Team/Service ID | `node scripts/generate-apple-client-secret.mjs` → обновить `AUTH_APPLE_CLIENT_SECRET`, restart |
 | Yandex: redirect_uri не совпадает | не тот URI в кабинете | добавить web + `mototwin://oauth/yandex` (§7) |
 | Callback на `localhost` (Google/Yandex) | нет `NEXTAUTH_URL` / `AUTH_BASE_URL` | задать на сервере, restart |

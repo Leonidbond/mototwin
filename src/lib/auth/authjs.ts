@@ -2,7 +2,7 @@ import NextAuth, { type NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import type { DefaultSession } from "next-auth";
 import Google from "next-auth/providers/google";
-import Apple from "next-auth/providers/apple";
+import { appleWebProvider } from "./apple-web-provider";
 import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers/oauth";
 
 type Provider = NonNullable<NextAuthOptions["providers"]>[number];
@@ -137,17 +137,11 @@ function buildProviders(): Provider[] {
 
   if (process.env.AUTH_APPLE_CLIENT_ID && process.env.AUTH_APPLE_CLIENT_SECRET) {
     providers.push(
-      // Apple web uses response_mode=form_post (cross-site POST). PKCE cookies are often
-      // dropped by browsers even with SameSite=None; confidential client + JWT secret
-      // does not require PKCE for the authorization code exchange.
-      {
-        ...Apple({
-          clientId: process.env.AUTH_APPLE_CLIENT_ID,
-          clientSecret: process.env.AUTH_APPLE_CLIENT_SECRET,
-          allowDangerousEmailAccountLinking: true,
-        }),
-        checks: [],
-      }
+      appleWebProvider({
+        clientId: process.env.AUTH_APPLE_CLIENT_ID,
+        clientSecret: process.env.AUTH_APPLE_CLIENT_SECRET,
+        allowDangerousEmailAccountLinking: true,
+      })
     );
   }
 
