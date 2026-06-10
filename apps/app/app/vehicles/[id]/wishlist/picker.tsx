@@ -39,6 +39,7 @@ import {
   arePickerQuantityResolutionsComplete,
   computePickerSubmitPriceEstimate,
   computePickerSubmitWishlistPieceDelta,
+  getPickerWillAddPieceCountLabel,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -1110,9 +1111,9 @@ export default function WishlistPickerScreen() {
                       />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={styles.submitDecisionTitle}>{decision.label}</Text>
-                        {decision.kind === "willAdd" && decision.pieceCount > 1 ? (
+                        {decision.kind === "willAdd" && getPickerWillAddPieceCountLabel(decision) ? (
                           <Text style={styles.submitDecisionMeta}>
-                            В количестве: {decision.pieceCount} шт.
+                            {getPickerWillAddPieceCountLabel(decision)}
                           </Text>
                         ) : null}
                         {decision.kind === "quantityUpgrade" ? (

@@ -1,3 +1,5 @@
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 import {
   GoogleSignin,
   isErrorWithCode,
@@ -10,8 +12,37 @@ export const ANDROID_OAUTH_RELEASE_SHA1 =
   "4E:6C:7C:70:18:59:AB:89:66:92:DE:49:47:7D:1A:17:13:E2:B9:31";
 
 const ANDROID_OAUTH_PACKAGE = "ru.mototwin.app";
+const IOS_OAUTH_BUNDLE_ID = "ru.mototwin.app";
 
 let configured = false;
+
+/** Native SDK (dev/release APK/IPA). Expo Go on iOS uses AuthSession instead. */
+export function shouldUseNativeGoogleSignIn(): boolean {
+  if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim()) {
+    return false;
+  }
+  if (Platform.OS === "android") {
+    return true;
+  }
+  if (Platform.OS === "ios") {
+    return Constants.appOwnership !== "expo";
+  }
+  return false;
+}
+
+/** Показывать кнопку «Войти через Google» на экране логина. */
+export function isGoogleOAuthEnabled(): boolean {
+  if (shouldUseNativeGoogleSignIn()) {
+    return true;
+  }
+  if (Platform.OS === "ios") {
+    return Boolean(
+      process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() ||
+        process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID?.trim()
+    );
+  }
+  return false;
+}
 
 export function ensureGoogleSignInConfigured(): void {
   if (configured) {
@@ -21,8 +52,10 @@ export function ensureGoogleSignInConfigured(): void {
   if (!webClientId) {
     throw new Error("Не настроен EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.");
   }
+  const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
   GoogleSignin.configure({
     webClientId,
+    iosClientId: Platform.OS === "ios" ? iosClientId : undefined,
     offlineAccess: false,
   });
   configured = true;
@@ -30,7 +63,9 @@ export function ensureGoogleSignInConfigured(): void {
 
 export async function signInWithNativeGoogle(): Promise<string> {
   ensureGoogleSignInConfigured();
-  await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  if (Platform.OS === "android") {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  }
   const response = await GoogleSignin.signIn();
   if (!isSuccessResponse(response)) {
     throw new Error("GOOGLE_SIGN_IN_CANCELLED");
@@ -46,7 +81,7 @@ function isDeveloperError(error: unknown): boolean {
   if (!isErrorWithCode(error)) {
     return false;
   }
-  if (error.code === "10" || error.code === 10) {
+  if (String(error.code) === "10") {
     return true;
   }
   const message = error.message?.toLowerCase() ?? "";
@@ -58,6 +93,13 @@ export function resolveNativeGoogleSignInError(error: unknown): string {
     return "";
   }
   if (isDeveloperError(error)) {
+    if (Platform.OS === "ios") {
+      return (
+        "Google DEVELOPER_ERROR: в Google Cloud Console → Credentials → iOS OAuth client " +
+        `укажите Bundle ID ${IOS_OAUTH_BUNDLE_ID} и проверьте EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID. ` +
+        "Подождите 5–10 минут после сохранения."
+      );
+    }
     return (
       "Google DEVELOPER_ERROR: в Google Cloud Console → Credentials → Android OAuth client " +
       `укажите package ${ANDROID_OAUTH_PACKAGE} и SHA-1 ${ANDROID_OAUTH_RELEASE_SHA1}. ` +

@@ -294,7 +294,13 @@ export function buildPickerSubmitPreview(
         continue;
       }
       const pieces = pieceCountForDraftSku(item);
-      decisions.push({ kind: "willAdd", draftId: item.draftId, label, pieceCount: pieces });
+      decisions.push({
+        kind: "willAdd",
+        draftId: item.draftId,
+        label,
+        draftLineKind: "sku",
+        pieceCount: pieces,
+      });
       willAddCount += 1;
       willAddTotalPieces += pieces;
       estimatedTotal += getSkuLineAmount(item);
@@ -303,7 +309,13 @@ export function buildPickerSubmitPreview(
     } else {
       const label = buildKitLabel(item);
       const pieces = pieceCountForDraftKit(item);
-      decisions.push({ kind: "willAdd", draftId: item.draftId, label, pieceCount: pieces });
+      decisions.push({
+        kind: "willAdd",
+        draftId: item.draftId,
+        label,
+        draftLineKind: "kit",
+        pieceCount: pieces,
+      });
       willAddCount += 1;
       willAddTotalPieces += pieces;
       estimatedTotal += getKitLineAmount(item);
@@ -324,6 +336,17 @@ export function buildPickerSubmitPreview(
     estimatedTotal: estimatedCurrency ? estimatedTotal : null,
     estimatedCurrency,
   };
+}
+
+type PickerWillAddDecision = Extract<PickerSubmitDecision, { kind: "willAdd" }>;
+
+/** Подпись к количеству в превью сабмита; `null` — не показывать (одна штука). */
+export function getPickerWillAddPieceCountLabel(decision: PickerWillAddDecision): string | null {
+  if (decision.pieceCount <= 1) return null;
+  if (decision.draftLineKind === "kit") {
+    return `Деталей и расходников — ${decision.pieceCount} шт`;
+  }
+  return `В количестве: ${decision.pieceCount} шт.`;
 }
 
 /** Все строки `quantityUpgrade` в превью имеют выбранный режим в `map`. */

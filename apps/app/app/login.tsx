@@ -23,7 +23,9 @@ import { writeAuthTokens } from "../src/auth-storage";
 import { writeCachedAccessToken } from "../src/mobile-access-token-cache";
 import { getGoogleNativeRedirectUri } from "../src/google-oauth-redirect";
 import {
+  isGoogleOAuthEnabled,
   resolveNativeGoogleSignInError,
+  shouldUseNativeGoogleSignIn,
   signInWithNativeGoogle,
 } from "../src/google-native-sign-in";
 import { getYandexOAuthRedirectUri } from "../src/yandex-oauth-redirect";
@@ -66,10 +68,7 @@ const yandexDiscovery: AuthSession.DiscoveryDocument = {
   tokenEndpoint: "https://oauth.yandex.ru/token",
 };
 
-const googleOAuthEnabled =
-  Platform.OS === "android"
-    ? Boolean(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
-    : Boolean(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
+const googleOAuthEnabled = isGoogleOAuthEnabled();
 const yandexOAuthEnabled = Boolean(process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID);
 
 type OAuthSuccessInput = {
@@ -213,7 +212,7 @@ function GoogleSignInButton(props: {
   onError: (message: string) => void;
   onFinish: () => void;
 }) {
-  if (Platform.OS === "android") {
+  if (shouldUseNativeGoogleSignIn()) {
     return <GoogleSignInButtonNative {...props} />;
   }
   return <GoogleSignInButtonAuthSession {...props} />;

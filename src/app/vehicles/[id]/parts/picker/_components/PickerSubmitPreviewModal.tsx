@@ -6,6 +6,7 @@ import {
   arePickerQuantityResolutionsComplete,
   computePickerSubmitPriceEstimate,
   computePickerSubmitWishlistPieceDelta,
+  getPickerWillAddPieceCountLabel,
 } from "@mototwin/domain";
 import { pickerColors } from "./picker-styles";
 
@@ -78,9 +79,9 @@ export function PickerSubmitPreviewModal(props: {
               <DecisionDot kind={decision.kind} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: pickerColors.text }}>{decision.label}</div>
-                {decision.kind === "willAdd" && decision.pieceCount > 1 ? (
+                {decision.kind === "willAdd" && getPickerWillAddPieceCountLabel(decision) ? (
                   <div style={{ fontSize: 11, color: pickerColors.textMuted, marginTop: 2 }}>
-                    В количестве: {decision.pieceCount} шт.
+                    {getPickerWillAddPieceCountLabel(decision)}
                   </div>
                 ) : null}
                 {decision.kind === "quantityUpgrade" ? (

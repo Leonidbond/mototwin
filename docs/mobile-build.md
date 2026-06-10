@@ -56,7 +56,7 @@ cp apps/app/.env.example apps/app/.env
 |------------|------------|
 | `EXPO_PUBLIC_API_BASE_URL` | Базовый URL Next.js API (без завершающего `/`). Для prod: `https://mototwin.space` |
 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | **Android release:** native Google Sign-In (`webClientId` + audience idToken на сервере) |
-| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | **iOS:** Expo AuthSession |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | **iOS:** native Google Sign-In (`iosClientId`) + Expo Go (AuthSession) |
 | `EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID` | **Expo Go** (dev) |
 | `EXPO_PUBLIC_YANDEX_CLIENT_ID` | OAuth Yandex |
 
@@ -261,6 +261,14 @@ cd apps/app
 eas build -p android --profile preview
 eas build -p ios --profile preview
 ```
+
+**Сборка + установка на подключённый телефон (одной командой):**
+
+```bash
+bash apps/app/scripts/build-and-install-android-device.sh
+```
+
+Скилл для агента: `.cursor/skills/mototwin-android-device-install/SKILL.md`.
 
 **Google Play (AAB):**
 

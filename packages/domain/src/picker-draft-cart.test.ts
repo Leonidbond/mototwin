@@ -5,6 +5,7 @@ import {
   addKitToDraft,
   addSkuToDraft,
   buildPickerSubmitPreview,
+  getPickerWillAddPieceCountLabel,
   clearDraft,
   computePickerSubmitPriceEstimate,
   computePickerSubmitWishlistPieceDelta,
@@ -345,6 +346,27 @@ describe("picker-draft-cart", () => {
     assert.equal(p.blockedCount, 0);
   });
 
+  it("buildPickerSubmitPreview kit pieceCount is sum of composition lines", () => {
+    const kit3: ServiceKitViewModel = {
+      ...kit("C3", "Kit three"),
+      items: [
+        kit("C3", "Kit three").items[0]!,
+        { ...kit("C3", "Kit three").items[0]!, key: "line-2", title: "Прокладка" },
+        { ...kit("C3", "Kit three").items[0]!, key: "line-3", title: "Болт" },
+      ],
+    };
+    let d = createEmptyDraftCart("v");
+    d = addKitToDraft(d, { kit: kit3, contextNodeId: "node-a" });
+    const p = buildPickerSubmitPreview({ draft: d, activeWishlistItems: [] });
+    const dec = p.decisions[0];
+    assert.ok(dec && dec.kind === "willAdd");
+    if (dec?.kind === "willAdd") {
+      assert.equal(dec.draftLineKind, "kit");
+      assert.equal(dec.pieceCount, 3);
+      assert.equal(getPickerWillAddPieceCountLabel(dec), "Деталей и расходников — 3 шт");
+    }
+  });
+
   it("buildPickerSubmitPreview sums pieceCount for SKU quantity", () => {
     let d = addSkuToDraft(createEmptyDraftCart("v"), {
       sku: sku({ priceAmount: 10, currency: "RUB" }),
@@ -359,7 +381,9 @@ describe("picker-draft-cart", () => {
     const dec = p.decisions[0];
     assert.ok(dec && dec.kind === "willAdd");
     if (dec?.kind === "willAdd") {
+      assert.equal(dec.draftLineKind, "sku");
       assert.equal(dec.pieceCount, 5);
+      assert.equal(getPickerWillAddPieceCountLabel(dec), "В количестве: 5 шт.");
     }
   });
 });

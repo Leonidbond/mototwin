@@ -486,6 +486,7 @@ export {
   isKitInDraft,
   getDraftTotals,
   buildPickerSubmitPreview,
+  getPickerWillAddPieceCountLabel,
   arePickerQuantityResolutionsComplete,
   computePickerSubmitWishlistPieceDelta,
   computePickerSubmitPriceEstimate,

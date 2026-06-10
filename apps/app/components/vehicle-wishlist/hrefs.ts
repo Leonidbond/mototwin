@@ -1,5 +1,7 @@
 import type { Router } from "expo-router";
 import type { PartWishlistItem } from "@mototwin/types";
+import { setPendingWishlistServiceEvent } from "../../src/pending-wishlist-service-event";
+import { logServiceEventFormDiag } from "../../src/service-event-form-diag";
 
 /** Deep link / router href for the parts picker (create flow), optionally with a node / catalog hints. */
 export function buildVehicleWishlistNewHref(
@@ -88,22 +90,36 @@ export function buildServiceEventNewFromWishlistHref(
   return `/vehicles/${vehicleId}/service-events/new?${q.toString()}`;
 }
 
-/** Prefer this over string hrefs in-app: avoids long Cyrillic query strings on Android. */
+function handoffWishlistItemToServiceEventForm(
+  vehicleId: string,
+  item: PartWishlistItem,
+  options?: { pendingInstall?: boolean }
+): string {
+  const nodeId = (item.nodeId ?? item.node?.id ?? "").trim();
+  setPendingWishlistServiceEvent({
+    vehicleId,
+    item: { ...item, nodeId: nodeId || item.nodeId },
+    pendingInstall: Boolean(options?.pendingInstall),
+  });
+  const href = buildServiceEventNewFromWishlistHref(vehicleId, item, options);
+  logServiceEventFormDiag("wishlist handoff set", {
+    vehicleId,
+    itemId: item.id,
+    nodeId: nodeId || null,
+    pendingInstall: Boolean(options?.pendingInstall),
+    href,
+  });
+  return href;
+}
+
+/** In-app navigation: in-memory handoff + short href (Android-safe). */
 export function pushServiceEventNewFromWishlist(
   router: Pick<Router, "push">,
   vehicleId: string,
   item: PartWishlistItem,
   options?: { pendingInstall?: boolean }
 ): void {
-  const params = buildServiceEventNewFromWishlistParams(item, options);
-  if (!params) {
-    router.push(`/vehicles/${vehicleId}/service-events/new`);
-    return;
-  }
-  router.push({
-    pathname: `/vehicles/${vehicleId}/service-events/new`,
-    params,
-  });
+  router.push(handoffWishlistItemToServiceEventForm(vehicleId, item, options));
 }
 
 export function replaceServiceEventNewFromWishlist(
@@ -112,15 +128,7 @@ export function replaceServiceEventNewFromWishlist(
   item: PartWishlistItem,
   options?: { pendingInstall?: boolean }
 ): void {
-  const params = buildServiceEventNewFromWishlistParams(item, options);
-  if (!params) {
-    router.replace(`/vehicles/${vehicleId}/service-events/new`);
-    return;
-  }
-  router.replace({
-    pathname: `/vehicles/${vehicleId}/service-events/new`,
-    params,
-  });
+  router.replace(handoffWishlistItemToServiceEventForm(vehicleId, item, options));
 }
 
 export function buildVehicleWishlistCommunityHref(

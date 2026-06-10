@@ -1528,6 +1528,71 @@ export default function ServiceLogScreen() {
     );
   };
 
+  const handleNavigateBack = useCallback(() => {
+    if (returnOrigin === "attention") {
+      const q = new URLSearchParams({ returnFocus: "attention" });
+      if (returnAttentionNodeId) {
+        q.set("attentionNodeId", returnAttentionNodeId);
+      }
+      router.replace(`/vehicles/${vehicleId}?${q.toString()}`);
+      return;
+    }
+    if (returnNodeId) {
+      router.replace(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeId)}`);
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace(`/vehicles/${vehicleId}`);
+  }, [returnAttentionNodeId, returnNodeId, returnOrigin, router, vehicleId]);
+
+  const journalBottomNav = (
+    <GarageBottomNav
+      activeKey="journal"
+      onOpenGarage={() => router.push("/garage")}
+      onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
+      onOpenJournal={() => undefined}
+      onOpenPicker={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
+      onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
+      onOpenProfile={() => router.push("/profile")}
+      hasVehicleContext
+      currentVehicleId={vehicleId}
+    />
+  );
+
+  const journalScreenChrome = (
+    <InternalScreenChrome
+      crumbs={[
+        { label: "Мой гараж", href: "/" },
+        { label: vehicleDisplayName || "Мотоцикл", href: `/vehicles/${vehicleId}` },
+        { label: "Журнал обслуживания" },
+      ]}
+      title="Журнал обслуживания"
+      declutterMobile
+      scrollOffsetY={headerScrollY}
+      belowNavRow={
+        contextVehicleDetail ? (
+          <GarageVehicleContextPlaque
+            vehicle={contextVehicleDetail}
+            currentVehicleId={vehicleId}
+            compactByDefault
+          />
+        ) : null
+      }
+      actions={
+        <Pressable
+          style={({ pressed }) => [styles.journalAddButton, pressed && styles.addButtonPressed]}
+          onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
+        >
+          <Text style={styles.addButtonText}>Добавить событие</Text>
+        </Pressable>
+      }
+      onBack={handleNavigateBack}
+    />
+  );
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -1535,6 +1600,7 @@ export default function ServiceLogScreen() {
           <ActivityIndicator size="large" color={c.textPrimary} />
           <Text style={styles.stateText}>Загрузка журнала...</Text>
         </View>
+        {journalBottomNav}
       </SafeAreaView>
     );
   }
@@ -1546,6 +1612,7 @@ export default function ServiceLogScreen() {
           <Text style={styles.errorTitle}>Ошибка загрузки</Text>
           <Text style={styles.errorText}>{error}</Text>
         </View>
+        {journalBottomNav}
       </SafeAreaView>
     );
   }
@@ -1553,12 +1620,14 @@ export default function ServiceLogScreen() {
   if (events.length === 0 && !(serviceMeta?.plan === "FREE" && (serviceMeta.hiddenCount ?? 0) > 0)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        {journalScreenChrome}
         <View style={styles.stateContainer}>
           <Text style={styles.emptyTitle}>Журнал пуст</Text>
           <Text style={styles.emptyText}>
             Сервисные записи появятся здесь после первого обслуживания.
           </Text>
         </View>
+        {journalBottomNav}
       </SafeAreaView>
     );
   }
@@ -1567,52 +1636,7 @@ export default function ServiceLogScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <InternalScreenChrome
-        crumbs={[
-          { label: "Мой гараж", href: "/" },
-          { label: vehicleDisplayName || "Мотоцикл", href: `/vehicles/${vehicleId}` },
-          { label: "Журнал обслуживания" },
-        ]}
-        title="Журнал обслуживания"
-        declutterMobile
-        scrollOffsetY={headerScrollY}
-        belowNavRow={
-          contextVehicleDetail ? (
-            <GarageVehicleContextPlaque
-              vehicle={contextVehicleDetail}
-              currentVehicleId={vehicleId}
-              compactByDefault
-            />
-          ) : null
-        }
-        actions={
-          <Pressable
-            style={({ pressed }) => [styles.journalAddButton, pressed && styles.addButtonPressed]}
-            onPress={() => router.push(`/vehicles/${vehicleId}/service-events/new`)}
-          >
-            <Text style={styles.addButtonText}>Добавить событие</Text>
-          </Pressable>
-        }
-        onBack={() => {
-          if (returnOrigin === "attention") {
-            const q = new URLSearchParams({ returnFocus: "attention" });
-            if (returnAttentionNodeId) {
-              q.set("attentionNodeId", returnAttentionNodeId);
-            }
-            router.replace(`/vehicles/${vehicleId}?${q.toString()}`);
-            return;
-          }
-          if (returnNodeId) {
-            router.replace(`/vehicles/${vehicleId}/nodes?nodeId=${encodeURIComponent(returnNodeId)}`);
-            return;
-          }
-          if (router.canGoBack()) {
-            router.back();
-            return;
-          }
-          router.replace(`/vehicles/${vehicleId}`);
-        }}
-      />
+      {journalScreenChrome}
       <KeyboardAwareScrollScreen
         contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
         scrollViewRef={scrollRef}
@@ -2095,17 +2119,7 @@ export default function ServiceLogScreen() {
         onEdit={() => (detailSheetEntry ? openEditServiceEvent(detailSheetEntry.id) : undefined)}
         onDelete={() => (detailSheetEntry ? openDeleteServiceEventConfirm(detailSheetEntry.id) : undefined)}
       />
-      <GarageBottomNav
-        activeKey="journal"
-        onOpenGarage={() => router.push("/garage")}
-        onOpenNodes={() => router.push(`/vehicles/${vehicleId}/nodes`)}
-        onOpenJournal={() => undefined}
-        onOpenPicker={() => router.push(`/vehicles/${vehicleId}/wishlist`)}
-        onOpenExpenses={() => router.push(`/vehicles/${vehicleId}/expenses`)}
-        onOpenProfile={() => router.push("/profile")}
-        hasVehicleContext
-        currentVehicleId={vehicleId}
-      />
+      {journalBottomNav}
 
     </SafeAreaView>
   );

@@ -57,6 +57,8 @@ export type PickerSubmitDecision =
       kind: "willAdd";
       draftId: string;
       label: string;
+      /** SKU — количество в корзине; комплект — сумма quantity по строкам состава. */
+      draftLineKind: "sku" | "kit";
       /** Сколько штук уйдёт в wishlist по этой строке драфта (SKU: quantity; комплект: сумма quantity по строкам состава). */
       pieceCount: number;
     }

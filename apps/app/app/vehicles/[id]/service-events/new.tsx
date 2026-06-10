@@ -29,7 +29,12 @@ import type {
 import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../../src/mobile-auth-guard";
+import {
+  clearPendingWishlistServiceEvent,
+  peekPendingWishlistServiceEvent,
+} from "../../../../src/pending-wishlist-service-event";
 import { readSearchParam } from "../../../../src/read-search-param";
+import { logServiceEventFormDiag } from "../../../../src/service-event-form-diag";
 import { useMobileSubscription } from "../../../../src/use-mobile-subscription";
 import { KeyboardAwareScrollScreen } from "../../../../components/expo-shell/keyboard-aware-scroll-screen";
 import {
@@ -120,8 +125,13 @@ export default function NewServiceEventScreen() {
   const pendingInstallRaw = readSearchParam(params.pendingInstall) ?? "";
   const wishlistPendingInstall =
     pendingInstallRaw === "1" || pendingInstallRaw.toLowerCase() === "true";
+  const pendingWishlistHandoff = peekPendingWishlistServiceEvent(vehicleId);
   const wishlistPrefillRequested =
-    source === "wishlist" || wishlistItemIdParam.trim().length > 0 || wlIdFromQuery.trim().length > 0;
+    source === "wishlist" ||
+    wishlistItemIdParam.trim().length > 0 ||
+    wlIdFromQuery.trim().length > 0 ||
+    wishlistPendingInstall ||
+    pendingWishlistHandoff != null;
   const apiBaseUrl = getApiBaseUrl();
   const { capabilities: subscriptionCapabilities } = useMobileSubscription();
   const [nodeTree, setNodeTree] = useState<NodeTreeItem[]>([]);
@@ -137,6 +147,10 @@ export default function NewServiceEventScreen() {
   const [vehicleDisplayName, setVehicleDisplayName] = useState("");
   const [contextVehicleDetail, setContextVehicleDetail] = useState<VehicleDetail | null>(null);
   const [headerScrollY, setHeaderScrollY] = useState(0);
+  const [wishlistInstallMeta, setWishlistInstallMeta] = useState<{
+    itemId: string;
+    pendingInstall: boolean;
+  } | null>(null);
 
   const isEditMode = editingEventId.length > 0;
   const isRepeatMode = !isEditMode && repeatFromId.length > 0;
@@ -188,7 +202,8 @@ export default function NewServiceEventScreen() {
         (wishlistPendingInstall || source === "wishlist") &&
         !wlId.trim() &&
         !initialNodeId.trim() &&
-        !wlTitle.trim()
+        !wlTitle.trim() &&
+        !peekPendingWishlistServiceEvent(vehicleId)
       ) {
         return;
       }
@@ -198,6 +213,7 @@ export default function NewServiceEventScreen() {
           setIsLoading(true);
           setError("");
           setContextVehicleDetail(null);
+          setWishlistInstallMeta(null);
         }
         const defaultCurrency = DEFAULT_ADD_SERVICE_EVENT_CURRENCY;
         const endpoints = createMobileApiClient();
@@ -226,7 +242,14 @@ export default function NewServiceEventScreen() {
 
         const v = vehicleData.vehicle;
         const rawV = v as VehicleDetailApiRecord | null | undefined;
-        const detail = rawV ? vehicleDetailFromApiRecord(rawV) : null;
+        let detail: VehicleDetail | null = null;
+        if (rawV) {
+          try {
+            detail = vehicleDetailFromApiRecord(rawV);
+          } catch {
+            detail = null;
+          }
+        }
         setContextVehicleDetail(detail);
         setVehicleDisplayName(detail ? buildVehicleDetailViewModel(detail).displayName : "Мотоцикл");
         const vehicleOdometer = detail?.odometer ?? v?.odometer ?? null;
@@ -268,26 +291,37 @@ export default function NewServiceEventScreen() {
             { todayDateYmd: todayYmd }
           );
         } else if (!isEditMode && !isRepeatMode && wishlistPrefillRequested) {
+          const pendingHandoff = peekPendingWishlistServiceEvent(vehicleId);
           const queryItem = buildWishlistItemFromRouteParams(vehicleId, {
-            wlId,
-            initialNodeId,
-            wlTitle,
-            wlQty,
-            wlComment,
-            wlCostStr,
-            wlCurrency,
+            wlId: wlId || pendingHandoff?.item.id || "",
+            initialNodeId: initialNodeId || resolveWishlistItemNodeId(pendingHandoff?.item ?? { nodeId: null, node: null }),
+            wlTitle: wlTitle || pendingHandoff?.item.title || "",
+            wlQty: wlQty || (pendingHandoff?.item.quantity != null ? String(pendingHandoff.item.quantity) : ""),
+            wlComment: wlComment ?? pendingHandoff?.item.comment ?? null,
+            wlCostStr:
+              wlCostStr ||
+              (pendingHandoff?.item.costAmount != null && Number.isFinite(pendingHandoff.item.costAmount)
+                ? String(pendingHandoff.item.costAmount)
+                : ""),
+            wlCurrency: wlCurrency ?? pendingHandoff?.item.currency ?? null,
           });
-          let resolvedItem: PartWishlistItem | null = null;
-          if (wlId.trim()) {
-            const wish = await endpoints.getVehicleWishlist(vehicleId);
+          let resolvedItem: PartWishlistItem | null = pendingHandoff?.item ?? null;
+          const lookupId = (wlId || pendingHandoff?.item.id || "").trim();
+          if (!resolvedItem && lookupId) {
+            const wishPayload = await withAuthGuard(
+              () => endpoints.getVehicleWishlist(vehicleId),
+              () => router.replace("/login")
+            );
             if (cancelled) {
               return;
             }
-            const apiItem = (wish.items ?? []).find((w) => w.id === wlId.trim());
-            if (apiItem) {
-              const apiNodeId = resolveWishlistItemNodeId(apiItem);
-              if (apiNodeId) {
-                resolvedItem = { ...apiItem, nodeId: apiNodeId };
+            if (wishPayload) {
+              const apiItem = (wishPayload.items ?? []).find((w) => w.id === lookupId);
+              if (apiItem) {
+                const apiNodeId = resolveWishlistItemNodeId(apiItem);
+                if (apiNodeId) {
+                  resolvedItem = { ...apiItem, nodeId: apiNodeId };
+                }
               }
             }
           }
@@ -300,19 +334,41 @@ export default function NewServiceEventScreen() {
             setIsLoading(false);
             return;
           }
-          if (!getNodePathById(nextTree, resolvedNodeId)?.length) {
+          const itemTitle = (resolvedItem.title ?? "").trim();
+          if (!itemTitle) {
+            setError("Позиция корзины без названия.");
+            setIsLoading(false);
+            return;
+          }
+          const nodePath = getNodePathById(nextTree, resolvedNodeId);
+          if (!nodePath?.length && nextTree.length > 0) {
             setError("Не удалось определить путь узла для позиции корзины.");
             setIsLoading(false);
             return;
           }
+          const installItemId = lookupId || resolvedItem.id;
+          const installPending =
+            wishlistPendingInstall || Boolean(pendingHandoff?.pendingInstall);
+          if (installItemId) {
+            setWishlistInstallMeta({ itemId: installItemId, pendingInstall: installPending });
+          }
           nextForm = createInitialAddServiceEventFromWishlistItem(
-            { ...resolvedItem, nodeId: resolvedNodeId },
+            { ...resolvedItem, nodeId: resolvedNodeId, title: itemTitle },
             {
               odometer: vehicleOdometer ?? 0,
               engineHours: vehicleEngineHours ?? null,
             },
             { todayDateYmd: todayYmd }
           );
+          logServiceEventFormDiag("wishlist prefill ok", {
+            vehicleId,
+            itemId: installItemId,
+            nodeId: resolvedNodeId,
+            title: itemTitle,
+            source: pendingHandoff ? "handoff" : lookupId ? "api" : "query",
+            treeLeaves: nextTree.length,
+            pendingInstall: installPending,
+          });
         } else if (
           !isEditMode &&
           !isRepeatMode &&
@@ -355,9 +411,17 @@ export default function NewServiceEventScreen() {
         }
         setBundleInitial(nextForm);
         setBundleSessionKey((k) => k + 1);
+        if (wishlistPrefillRequested) {
+          clearPendingWishlistServiceEvent(vehicleId);
+        }
       } catch (requestError) {
         if (!cancelled) {
-          setError("Не удалось загрузить данные для формы.");
+          console.error("[service-events/new] load failed", requestError);
+          const message =
+            requestError instanceof Error
+              ? requestError.message
+              : "Не удалось загрузить данные для формы.";
+          setError(message.trim() || "Не удалось загрузить данные для формы.");
         }
       } finally {
         if (!cancelled) {
@@ -427,10 +491,13 @@ export default function NewServiceEventScreen() {
           return;
         }
         savedServiceEventId = response.serviceEvent.id;
-        if (wishlistPendingInstall && wlId.trim()) {
+        const installItemId = wishlistInstallMeta?.itemId ?? wlId.trim();
+        const shouldMarkWishlistInstalled =
+          wishlistInstallMeta?.pendingInstall ?? wishlistPendingInstall;
+        if (shouldMarkWishlistInstalled && installItemId) {
           const updated = await withAuthGuard(
             () =>
-              endpoints.updateWishlistItem(vehicleId, wlId.trim(), {
+              endpoints.updateWishlistItem(vehicleId, installItemId, {
                 status: "INSTALLED",
                 nodeId: anchorNodeId,
               }),
@@ -534,7 +601,8 @@ export default function NewServiceEventScreen() {
           onSubmit={handleSubmit}
           isEditMode={isEditMode}
           contextHint={
-            wishlistPendingInstall && wlId.trim()
+            (wishlistInstallMeta?.pendingInstall ?? wishlistPendingInstall) &&
+            (wishlistInstallMeta?.itemId ?? wlId.trim())
               ? "После сохранения позиция будет отмечена как установленная."
               : undefined
           }
