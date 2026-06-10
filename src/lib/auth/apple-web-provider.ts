@@ -1,10 +1,8 @@
-import Apple from "next-auth/providers/apple";
+import Apple, { type AppleProfile } from "next-auth/providers/apple";
 import type { OAuthConfig, OAuthUserConfig } from "next-auth/providers/oauth";
 
-type AppleProfile = {
-  sub: string;
-  email?: string;
-  name?: string;
+type AppleWebProviderConfig = OAuthUserConfig<AppleProfile> & {
+  clientSecret: string;
 };
 
 /**
@@ -12,9 +10,7 @@ type AppleProfile = {
  * unreliable on the cross-site POST callback; exchange the code directly with the
  * JWT client_secret instead of openid-client callback (which requires checks.state).
  */
-export function appleWebProvider(
-  config: OAuthUserConfig<AppleProfile>
-): OAuthConfig<AppleProfile> {
+export function appleWebProvider(config: AppleWebProviderConfig): OAuthConfig<AppleProfile> {
   const base = Apple({
     ...config,
     allowDangerousEmailAccountLinking: config.allowDangerousEmailAccountLinking ?? true,
@@ -64,14 +60,6 @@ export function appleWebProvider(
 
         return { tokens };
       },
-    },
-    profile(profile) {
-      return {
-        id: profile.sub,
-        name: profile.name ?? null,
-        email: profile.email ?? null,
-        image: null,
-      };
     },
   };
 }
