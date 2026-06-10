@@ -375,14 +375,50 @@ export function buildVehicleDashboardExpensesViewModel(
   return buildVehicleDashboardExpensesViewModelFromAnalytics(expenses, analytics, now);
 }
 
+function getPaidServiceEventCostByCurrency(event: ServiceEventItem): Record<string, number> {
+  const directAmount = event.totalCost ?? event.costAmount ?? null;
+  const directCurrency = event.currency?.trim();
+  if (
+    directAmount !== null &&
+    Number.isFinite(directAmount) &&
+    directAmount > 0 &&
+    directCurrency
+  ) {
+    return { [directCurrency]: directAmount };
+  }
+
+  const result: Record<string, number> = {};
+  for (const expense of event.expenseItems ?? []) {
+    if (!Number.isFinite(expense.amount) || expense.amount <= 0) continue;
+    const currency = expense.currency?.trim();
+    if (!currency) continue;
+    result[currency] = (result[currency] ?? 0) + expense.amount;
+  }
+  return result;
+}
+
+function pickPrimaryPaidServiceEventCost(event: ServiceEventItem): {
+  currency: string;
+  totalAmount: number;
+} | null {
+  const costByCurrency = getPaidServiceEventCostByCurrency(event);
+  const entries = Object.entries(costByCurrency).filter(([, amount]) => amount > 0);
+  if (entries.length === 0) {
+    return null;
+  }
+  const [currency, totalAmount] = entries.sort((left, right) => right[1] - left[1])[0]!;
+  return { currency, totalAmount };
+}
+
 /** Roll up paid SERVICE events by currency (no mixing). */
 export function groupExpensesByCurrency(
   paidEvents: ServiceEventItem[]
 ): ExpenseByCurrencyViewModel[] {
   const map = new Map<string, { total: number; count: number }>();
   for (const e of paidEvents) {
-    const currency = e.currency!.trim();
-    addToCurrencyMap(map, currency, e.costAmount!);
+    for (const [currency, amount] of Object.entries(getPaidServiceEventCostByCurrency(e))) {
+      addToCurrencyMap(map, currency, amount);
+    }
   }
   return currencyMapToViewModels(map);
 }
@@ -403,7 +439,9 @@ export function groupExpensesByMonth(
       curMap = new Map();
       byMonth.set(monthKey, curMap);
     }
-    addToCurrencyMap(curMap, e.currency!.trim(), e.costAmount!);
+    for (const [currency, amount] of Object.entries(getPaidServiceEventCostByCurrency(e))) {
+      addToCurrencyMap(curMap, currency, amount);
+    }
   }
 
   const rows: ExpenseByMonthViewModel[] = [];
@@ -439,7 +477,9 @@ export function groupExpensesByCalendarYear(
       curMap = new Map();
       byYear.set(year, curMap);
     }
-    addToCurrencyMap(curMap, e.currency!.trim(), e.costAmount!);
+    for (const [currency, amount] of Object.entries(getPaidServiceEventCostByCurrency(e))) {
+      addToCurrencyMap(curMap, currency, amount);
+    }
   }
 
   return Array.from(byYear.entries())
@@ -466,7 +506,9 @@ export function groupExpensesByNode(
       bucket = { name: nodeName, map: new Map() };
       byNode.set(e.nodeId, bucket);
     }
-    addToCurrencyMap(bucket.map, e.currency!.trim(), e.costAmount!);
+    for (const [currency, amount] of Object.entries(getPaidServiceEventCostByCurrency(e))) {
+      addToCurrencyMap(bucket.map, currency, amount);
+    }
   }
 
   return Array.from(byNode.entries())
@@ -488,15 +530,21 @@ function pickLatestPaidEvent(
     (a, b) =>
       new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime()
   );
-  const e = sorted[0];
-  return {
-    id: e.id,
-    eventDate: e.eventDate,
-    serviceType: e.serviceType,
-    totalAmount: e.costAmount!,
-    currency: e.currency!.trim(),
-    nodeLabel: e.node?.name?.trim() || e.nodeId,
-  };
+  for (const e of sorted) {
+    const primaryCost = pickPrimaryPaidServiceEventCost(e);
+    if (!primaryCost) {
+      continue;
+    }
+    return {
+      id: e.id,
+      eventDate: e.eventDate,
+      serviceType: e.serviceType,
+      totalAmount: primaryCost.totalAmount,
+      currency: primaryCost.currency,
+      nodeLabel: e.node?.name?.trim() || e.nodeId,
+    };
+  }
+  return null;
 }
 
 export function buildExpenseSummaryFromServiceEvents(
