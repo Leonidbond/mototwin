@@ -30,9 +30,10 @@ import { getApiBaseUrl } from "../../../../src/api-base-url";
 import { createMobileApiClient } from "../../../../src/create-mobile-api-client";
 import { withAuthGuard } from "../../../../src/mobile-auth-guard";
 import {
-  clearPendingWishlistServiceEvent,
+  consumePendingWishlistServiceEvent,
   peekPendingWishlistServiceEvent,
 } from "../../../../src/pending-wishlist-service-event";
+import { resolveWishlistItemNodeId } from "../../../../components/vehicle-wishlist/hrefs";
 import { readSearchParam } from "../../../../src/read-search-param";
 import { logServiceEventFormDiag } from "../../../../src/service-event-form-diag";
 import { useMobileSubscription } from "../../../../src/use-mobile-subscription";
@@ -43,10 +44,6 @@ import {
 } from "../../../../components/expo-shell/internal-screen-chrome";
 import { BasicServiceEventBundleForm } from "../../../../components/vehicle-detail/basic-service-event-bundle-form";
 import { GarageVehicleContextPlaque } from "../../../../components/garage/GarageVehicleContextPlaque";
-
-function resolveWishlistItemNodeId(item: Pick<PartWishlistItem, "nodeId" | "node">): string {
-  return (item.nodeId ?? item.node?.id ?? "").trim();
-}
 
 function buildWishlistItemFromRouteParams(
   vehicleId: string,
@@ -198,16 +195,6 @@ export default function NewServiceEventScreen() {
         return;
       }
 
-      if (
-        (wishlistPendingInstall || source === "wishlist") &&
-        !wlId.trim() &&
-        !initialNodeId.trim() &&
-        !wlTitle.trim() &&
-        !peekPendingWishlistServiceEvent(vehicleId)
-      ) {
-        return;
-      }
-
       try {
         if (!cancelled) {
           setIsLoading(true);
@@ -291,7 +278,7 @@ export default function NewServiceEventScreen() {
             { todayDateYmd: todayYmd }
           );
         } else if (!isEditMode && !isRepeatMode && wishlistPrefillRequested) {
-          const pendingHandoff = peekPendingWishlistServiceEvent(vehicleId);
+          const pendingHandoff = consumePendingWishlistServiceEvent(vehicleId);
           const queryItem = buildWishlistItemFromRouteParams(vehicleId, {
             wlId: wlId || pendingHandoff?.item.id || "",
             initialNodeId: initialNodeId || resolveWishlistItemNodeId(pendingHandoff?.item ?? { nodeId: null, node: null }),
@@ -340,11 +327,18 @@ export default function NewServiceEventScreen() {
             setIsLoading(false);
             return;
           }
-          const nodePath = getNodePathById(nextTree, resolvedNodeId);
-          if (!nodePath?.length && nextTree.length > 0) {
-            setError("Не удалось определить путь узла для позиции корзины.");
+          if (nextTree.length === 0) {
+            setError("Дерево узлов не загружено. Проверьте сеть и откройте форму снова.");
             setIsLoading(false);
             return;
+          }
+          const nodePath = getNodePathById(nextTree, resolvedNodeId);
+          if (!nodePath?.length) {
+            logServiceEventFormDiag("wishlist node missing in tree", {
+              vehicleId,
+              nodeId: resolvedNodeId,
+              itemId: lookupId || resolvedItem.id,
+            });
           }
           const installItemId = lookupId || resolvedItem.id;
           const installPending =
@@ -411,9 +405,6 @@ export default function NewServiceEventScreen() {
         }
         setBundleInitial(nextForm);
         setBundleSessionKey((k) => k + 1);
-        if (wishlistPrefillRequested) {
-          clearPendingWishlistServiceEvent(vehicleId);
-        }
       } catch (requestError) {
         if (!cancelled) {
           console.error("[service-events/new] load failed", requestError);

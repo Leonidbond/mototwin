@@ -28,7 +28,7 @@ import {
   shouldUseNativeGoogleSignIn,
   signInWithNativeGoogle,
 } from "../src/google-native-sign-in";
-import { getYandexOAuthRedirectUri } from "../src/yandex-oauth-redirect";
+import { promptYandexOAuthSignIn } from "../src/yandex-oauth-flow";
 import { OauthProviderIcon } from "../components/icons/oauth-provider-icon";
 import type { OauthProviderKey } from "@mototwin/icons/oauth-providers";
 import { usePrivateScreenProtection } from "../src/use-private-screen-protection";
@@ -62,11 +62,6 @@ async function startAppleSignIn(): Promise<{ rawNonce: string; identityToken: st
   }
   return { rawNonce, identityToken: credential.identityToken };
 }
-
-const yandexDiscovery: AuthSession.DiscoveryDocument = {
-  authorizationEndpoint: "https://oauth.yandex.ru/authorize",
-  tokenEndpoint: "https://oauth.yandex.ru/token",
-};
 
 const googleOAuthEnabled = isGoogleOAuthEnabled();
 const yandexOAuthEnabled = Boolean(process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID);
@@ -226,66 +221,37 @@ function YandexSignInButton(props: {
   onError: (message: string) => void;
   onFinish: () => void;
 }) {
-  const redirectUri = getYandexOAuthRedirectUri();
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID ?? "",
-      responseType: AuthSession.ResponseType.Code,
-      usePKCE: true,
-      scopes: ["login:email", "login:info"],
-      redirectUri,
-    },
-    yandexDiscovery
-  );
-
-  useEffect(() => {
-    if (!response) {
-      return;
-    }
-    if (response.type === "cancel" || response.type === "dismiss") {
-      props.onFinish();
-      return;
-    }
-    if (response.type !== "success") {
-      props.onError("Не удалось войти через Yandex.");
-      props.onFinish();
-      return;
-    }
-    const code = typeof response.params.code === "string" ? response.params.code : undefined;
-    if (!code) {
-      props.onError("Yandex не вернул authorization code.");
-      props.onFinish();
-      return;
-    }
-    const codeVerifier = request?.codeVerifier;
-    if (!codeVerifier) {
-      props.onError("Не удалось получить PKCE code verifier.");
-      props.onFinish();
-      return;
-    }
-    void props
-      .onSuccess({
-        provider: "yandex",
-        code,
-        redirectUri,
-        codeVerifier,
-      })
-      .catch((err) => {
-        props.onError(err instanceof Error ? err.message : "Ошибка входа через Yandex.");
-      })
-      .finally(props.onFinish);
-  }, [response, request?.codeVerifier, redirectUri]);
+  const yandexClientId = process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID?.trim() ?? "";
 
   return (
     <Pressable
       style={styles.oauthButton}
-      disabled={props.disabled || !request}
+      disabled={props.disabled || !yandexClientId}
       onPress={() => {
         props.onPressStart();
-        void promptAsync().catch((err) => {
-          props.onError(err instanceof Error ? err.message : "Ошибка входа через Yandex.");
-          props.onFinish();
-        });
+        void promptYandexOAuthSignIn(yandexClientId)
+          .then(async (result) => {
+            if (result.type === "cancel" || result.type === "dismiss" || result.type === "locked") {
+              return;
+            }
+            if (result.type === "error") {
+              props.onError(result.message);
+              return;
+            }
+            if (result.type !== "success") {
+              return;
+            }
+            await props.onSuccess({
+              provider: "yandex",
+              code: result.code,
+              redirectUri: result.redirectUri,
+              codeVerifier: result.codeVerifier,
+            });
+          })
+          .catch((err) => {
+            props.onError(err instanceof Error ? err.message : "Ошибка входа через Yandex.");
+          })
+          .finally(props.onFinish);
       }}
     >
       <OAuthButtonLabel

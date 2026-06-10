@@ -35,3 +35,7 @@ data
 auth
 .env
 .env.*
+
+# Deep-link OAuth screens — login uses WebBrowser + mototwin:// (no Associated Domains)
+apps/app/app/oauth
+apps/app/components/auth

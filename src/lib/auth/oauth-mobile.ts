@@ -133,76 +133,34 @@ async function verifyApple(identityToken?: string, rawNonce?: string) {
   };
 }
 
-type YandexIntrospectResponse = {
-  active?: boolean;
+type YandexInfoProfile = {
+  id?: string;
   client_id?: string;
-  scope?: string;
-  user_id?: string;
-  expires_in?: number;
+  default_email?: string;
+  real_name?: string;
+  display_name?: string;
 };
 
 /**
- * Verifies a Yandex access_token actually belongs to our mobile client_id
- * before trusting any profile data — MT-SEC-001 in docs/security/findings.md.
- *
- * Yandex exposes RFC 7662-style token introspection at
- * https://oauth.yandex.ru/introspect (HTTP Basic with the *web* OAuth app
- * credentials). The response carries the access-token's actual `client_id`
- * which we compare against `YANDEX_OAUTH_CLIENT_ID` (the mobile app).
- *
- * Yandex's /info endpoint does NOT echo client_id, so without this check any
- * Yandex access_token issued for any 3rd-party app could impersonate a
- * MotoTwin user as long as the e-mails matched.
+ * Verifies a Yandex access_token belongs to our OAuth app before trusting profile
+ * data — MT-SEC-001. Yandex documents `client_id` on login.yandex.ru/info; there
+ * is no public JSON introspection endpoint at oauth.yandex.ru/introspect.
  */
 async function verifyYandex(accessToken?: string) {
   if (!accessToken?.trim()) {
     throw new AuthServiceError("INVALID_OAUTH_TOKEN", 400, "Yandex accessToken обязателен.");
   }
-  const expectedClientId = process.env.YANDEX_OAUTH_CLIENT_ID?.trim();
-  const introspectClientId = process.env.YANDEX_CLIENT_ID?.trim();
-  const introspectClientSecret = process.env.YANDEX_CLIENT_SECRET?.trim();
-  if (!expectedClientId || !introspectClientId || !introspectClientSecret) {
+  const expectedClientId =
+    process.env.YANDEX_OAUTH_CLIENT_ID?.trim() ?? process.env.YANDEX_CLIENT_ID?.trim();
+  if (!expectedClientId) {
     throw new AuthServiceError(
       "YANDEX_CONFIG_MISSING",
       500,
-      "Не настроен YANDEX_OAUTH_CLIENT_ID / YANDEX_CLIENT_ID / YANDEX_CLIENT_SECRET для проверки токена."
+      "Не настроен YANDEX_OAUTH_CLIENT_ID для проверки токена."
     );
   }
 
   const trimmedToken = accessToken.trim();
-  const basic = Buffer.from(`${introspectClientId}:${introspectClientSecret}`).toString("base64");
-
-  const introspectResponse = await fetchWithTimeout("https://oauth.yandex.ru/introspect", {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${basic}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    body: new URLSearchParams({ access_token: trimmedToken }).toString(),
-    timeoutMs: 5_000,
-  });
-  if (!introspectResponse.ok) {
-    throw new AuthServiceError("INVALID_OAUTH_TOKEN", 401, "Yandex токен недействителен.");
-  }
-  const introspect = (await introspectResponse.json()) as YandexIntrospectResponse;
-  if (!introspect.active) {
-    throw new AuthServiceError("INVALID_OAUTH_TOKEN", 401, "Yandex токен отозван или истёк.");
-  }
-  if (introspect.client_id !== expectedClientId) {
-    // Hide the actual mismatched client_id from the response to avoid leaking
-    // 3rd-party app IDs to attackers; log it on the server for forensic trails.
-    console.warn(
-      "[oauth-mobile] yandex access_token client_id mismatch",
-      JSON.stringify({ expectedClientId, actualClientId: introspect.client_id })
-    );
-    throw new AuthServiceError(
-      "INVALID_OAUTH_TOKEN",
-      401,
-      "Yandex токен выпущен для другого приложения."
-    );
-  }
-
   const infoResponse = await fetchWithTimeout("https://login.yandex.ru/info?format=json", {
     headers: {
       Authorization: `OAuth ${trimmedToken}`,
@@ -213,19 +171,31 @@ async function verifyYandex(accessToken?: string) {
   if (!infoResponse.ok) {
     throw new AuthServiceError("INVALID_OAUTH_TOKEN", 401, "Yandex токен недействителен.");
   }
-  const profile = (await infoResponse.json()) as {
-    id?: string;
-    default_email?: string;
-    real_name?: string;
-    display_name?: string;
-  };
+
+  let profile: YandexInfoProfile;
+  try {
+    profile = (await infoResponse.json()) as YandexInfoProfile;
+  } catch {
+    throw new AuthServiceError("INVALID_OAUTH_TOKEN", 401, "Yandex токен недействителен.");
+  }
+
   if (!profile.id) {
     throw new AuthServiceError("INVALID_OAUTH_TOKEN", 401, "Не удалось получить профиль Yandex.");
   }
-  if (introspect.user_id && introspect.user_id !== profile.id) {
-    // Defense in depth: introspect.user_id must match /info id for the same token.
-    throw new AuthServiceError("INVALID_OAUTH_TOKEN", 401, "Yandex токен не соответствует профилю.");
+
+  const tokenClientId = typeof profile.client_id === "string" ? profile.client_id.trim() : "";
+  if (!tokenClientId || tokenClientId !== expectedClientId) {
+    console.warn(
+      "[oauth-mobile] yandex access_token client_id mismatch",
+      JSON.stringify({ expectedClientId, actualClientId: tokenClientId || null })
+    );
+    throw new AuthServiceError(
+      "INVALID_OAUTH_TOKEN",
+      401,
+      "Yandex токен выпущен для другого приложения."
+    );
   }
+
   return {
     provider: "yandex",
     providerAccountId: profile.id,

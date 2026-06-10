@@ -48,8 +48,7 @@
     },
     "ios": {
       "bundleIdentifier": "ru.mototwin.app",
-      "usesAppleSignIn": true,
-      "associatedDomains": ["applinks:mototwin.space"]
+      "usesAppleSignIn": true
     },
     "extra": {
       "eas": {

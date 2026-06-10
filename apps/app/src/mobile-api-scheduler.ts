@@ -65,7 +65,7 @@ export function scheduleMobileApiRequest<T>(
       priority,
       pathHint,
       fn,
-      resolve,
+      resolve: resolve as (value: unknown) => void,
       reject,
       abortController: null,
     });

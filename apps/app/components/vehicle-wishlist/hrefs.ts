@@ -42,31 +42,97 @@ export function buildVehicleServiceLogEventHref(vehicleId: string, eventId: stri
   return `/vehicles/${vehicleId}/service-log?serviceEventId=${encodeURIComponent(eventId)}`;
 }
 
+export function resolveWishlistItemNodeId(
+  item: Pick<PartWishlistItem, "nodeId" | "node">
+): string {
+  return (item.nodeId ?? item.node?.id ?? "").trim();
+}
+
+export function enrichWishlistItemForServiceEventHandoff(
+  item: PartWishlistItem
+): PartWishlistItem {
+  const nodeId = resolveWishlistItemNodeId(item);
+  return nodeId ? { ...item, nodeId } : item;
+}
+
 export type ServiceEventNewFromWishlistRouteParams = {
   source: "wishlist";
   wishlistItemId: string;
-  nodeId?: string;
+  nodeId: string;
   pendingInstall?: "1";
+  wlTitle?: string;
+  wlQty?: string;
+  wlComment?: string;
+  wlCost?: string;
+  wlCurrency?: string;
 };
 
-/** Minimal route params for wishlist prefill (data loaded from API on the form screen). */
+/** Route params for wishlist prefill (+ query fallback when in-memory handoff is lost). */
 export function buildServiceEventNewFromWishlistParams(
   item: PartWishlistItem,
   options?: { pendingInstall?: boolean }
 ): ServiceEventNewFromWishlistRouteParams | null {
-  const nodeId = item.nodeId?.trim();
+  const enriched = enrichWishlistItemForServiceEventHandoff(item);
+  const nodeId = resolveWishlistItemNodeId(enriched);
   if (!nodeId) {
     return null;
   }
   const params: ServiceEventNewFromWishlistRouteParams = {
     source: "wishlist",
-    wishlistItemId: item.id,
+    wishlistItemId: enriched.id,
     nodeId,
   };
   if (options?.pendingInstall) {
     params.pendingInstall = "1";
   }
+  const title = enriched.title?.trim();
+  if (title) {
+    params.wlTitle = title;
+  }
+  if (enriched.quantity != null && Number.isFinite(enriched.quantity)) {
+    params.wlQty = String(enriched.quantity);
+  }
+  if (enriched.comment?.trim()) {
+    params.wlComment = enriched.comment.trim();
+  }
+  if (
+    enriched.costAmount != null &&
+    Number.isFinite(enriched.costAmount) &&
+    enriched.costAmount > 0
+  ) {
+    params.wlCost = String(enriched.costAmount);
+    if (enriched.currency?.trim()) {
+      params.wlCurrency = enriched.currency.trim();
+    }
+  }
   return params;
+}
+
+function appendWishlistPrefillQuery(
+  q: URLSearchParams,
+  params: ServiceEventNewFromWishlistRouteParams
+): void {
+  q.set("source", params.source);
+  q.set("wishlistItemId", params.wishlistItemId);
+  q.set("nodeId", params.nodeId);
+  if (params.pendingInstall) {
+    q.set("pendingInstall", params.pendingInstall);
+  }
+  if (params.wlTitle) {
+    q.set("wlTitle", params.wlTitle);
+  }
+  if (params.wlQty) {
+    q.set("wlQty", params.wlQty);
+  }
+  if (params.wlComment) {
+    q.set("wlComment", params.wlComment);
+  }
+  if (params.wlCost) {
+    q.set("wlCost", params.wlCost);
+  }
+  if (params.wlCurrency) {
+    q.set("wlCurrency", params.wlCurrency);
+  }
 }
 
 /** Opens Add Service Event with wishlist-driven prefill (read in `service-events/new`). */
@@ -79,14 +145,8 @@ export function buildServiceEventNewFromWishlistHref(
   if (!params) {
     return `/vehicles/${vehicleId}/service-events/new`;
   }
-  const q = new URLSearchParams({
-    source: params.source,
-    wishlistItemId: params.wishlistItemId,
-    nodeId: params.nodeId!,
-  });
-  if (params.pendingInstall) {
-    q.set("pendingInstall", params.pendingInstall);
-  }
+  const q = new URLSearchParams();
+  appendWishlistPrefillQuery(q, params);
   return `/vehicles/${vehicleId}/service-events/new?${q.toString()}`;
 }
 
@@ -95,13 +155,14 @@ function handoffWishlistItemToServiceEventForm(
   item: PartWishlistItem,
   options?: { pendingInstall?: boolean }
 ): string {
-  const nodeId = (item.nodeId ?? item.node?.id ?? "").trim();
+  const enriched = enrichWishlistItemForServiceEventHandoff(item);
+  const nodeId = resolveWishlistItemNodeId(enriched);
   setPendingWishlistServiceEvent({
     vehicleId,
-    item: { ...item, nodeId: nodeId || item.nodeId },
+    item: enriched,
     pendingInstall: Boolean(options?.pendingInstall),
   });
-  const href = buildServiceEventNewFromWishlistHref(vehicleId, item, options);
+  const href = buildServiceEventNewFromWishlistHref(vehicleId, enriched, options);
   logServiceEventFormDiag("wishlist handoff set", {
     vehicleId,
     itemId: item.id,
