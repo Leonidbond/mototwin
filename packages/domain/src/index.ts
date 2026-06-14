@@ -514,3 +514,31 @@ export {
   filterLeafOptionsUnderTopNodeAncestors,
 } from "./picker-top-nodes";
 export { normalizePowerToHp } from "./motorcycle-power";
+export {
+  normalizeMotorcycleCatalogName,
+  slugifyMotorcycleCatalogValue,
+  buildMotorcycleYearsLabel,
+  buildMotorcycleGenerationName,
+} from "./motorcycle-catalog-slug";
+export {
+  createInitialMotorcycleCatalogPickerState,
+  isBrandLevelReady,
+  isCatalogPickerComplete,
+  isFamilyLevelReady,
+  isFullCatalogPath,
+  isGenerationLevelReady,
+  isVariantLevelReady,
+  requiresCatalogRequest,
+  resetPickerFromLevel,
+  setPickerLevelMode,
+  toCatalogRequestDraft,
+  validateCatalogPickerState,
+  getCatalogPickerDisplayLabel,
+  syncLegacyPickerIds,
+} from "./motorcycle-catalog-picker";
+export type {
+  CatalogPickerFieldErrors,
+  CatalogPickerLevel,
+  CatalogPickerLevelMode,
+  MotorcycleCatalogPickerState,
+} from "./motorcycle-catalog-picker";

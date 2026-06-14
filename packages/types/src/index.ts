@@ -115,7 +115,9 @@ export type {
   EditVehicleProfilePayload,
   AddMotorcycleFormValues,
   AddMotorcyclePayload,
+  CatalogPickerLevelMode,
   FormValidationResult,
+  MotorcycleCatalogPickerFormState,
   RideProfileFieldOption,
   AddServiceEventValidationContext,
 } from "./forms";
@@ -478,6 +480,11 @@ export type {
   MotorcycleGenerationWire,
   MotorcycleTechnicalSpecsWire,
   VehicleMotorcycleRefWire,
+  MotorcycleCatalogRequestStatusWire,
+  CreateMotorcycleCatalogRequestInput,
+  MotorcycleCatalogRequestWire,
+  CreateMotorcycleCatalogRequestResponse,
+  MotorcycleCatalogRequestsResponse,
 } from "./motorcycle-master";
 export {
   DEFAULT_DEV_USER_EMAIL,

@@ -14,11 +14,13 @@ import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 import { formatRelativeRu } from "../../_components/format";
 
 const TABS: Array<{ key: AdminModerationQueueKey; label: string }> = [
+  { key: "pendingCatalogRequests", label: "Заявки на модели" },
   { key: "pendingMasters", label: "Новые детали" },
   { key: "pendingReports", label: "Reports на публикацию" },
   { key: "needsReviewReports", label: "Нужна проверка" },
   { key: "safetyCriticalReports", label: "Safety-critical" },
   { key: "mixedFitments", label: "Конфликтующие fitments" },
+  { key: "rejectedCatalogRequests", label: "Отклонённые модели" },
   { key: "hiddenReports", label: "Скрытые" },
   { key: "rejectedReports", label: "Отклонённые" },
 ];
@@ -39,6 +41,7 @@ export function ModerationConsole({ initial, canMutate }: ModerationConsoleProps
   const [error, setError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [editableValues, setEditableValues] = useState<Record<string, string>>({});
 
   const loadQueue = useCallback(async (queue: AdminModerationQueueKey) => {
     setActiveQueue(queue);
@@ -78,7 +81,16 @@ export function ModerationConsole({ initial, canMutate }: ModerationConsoleProps
           return;
         }
         const data = (await res.json()) as AdminModerationInspectorWire;
-        if (!cancelled) setInspector(data);
+        if (!cancelled) {
+          setInspector(data);
+          if (data.editableFields) {
+            setEditableValues(
+              Object.fromEntries(data.editableFields.map((field) => [field.key, field.value]))
+            );
+          } else {
+            setEditableValues({});
+          }
+        }
       } catch (err) {
         console.error(err);
         if (!cancelled) setInspector(null);
@@ -96,6 +108,27 @@ export function ModerationConsole({ initial, canMutate }: ModerationConsoleProps
     setPendingAction(actionId);
     setError(null);
     try {
+      const resolvedFields =
+        selected.kind === "CATALOG_REQUEST" && inspector?.editableFields
+          ? {
+              brandName: editableValues.brandName?.trim(),
+              familyName: editableValues.familyName?.trim(),
+              variantName: editableValues.variantName?.trim(),
+              yearFrom: editableValues.yearFrom ? Number(editableValues.yearFrom) : undefined,
+              yearTo:
+                editableValues.yearTo?.trim() === ""
+                  ? null
+                  : editableValues.yearTo
+                    ? Number(editableValues.yearTo)
+                    : undefined,
+            }
+          : undefined;
+
+      const moderationComment =
+        selected.kind === "CATALOG_REQUEST"
+          ? editableValues.moderationComment?.trim() || reason.trim() || undefined
+          : reason.trim() || undefined;
+
       const res = await fetch("/api/admin/moderation/action", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -103,7 +136,8 @@ export function ModerationConsole({ initial, canMutate }: ModerationConsoleProps
           kind: selected.kind,
           id: selected.id,
           action: actionId,
-          reason: reason.trim() || undefined,
+          reason: moderationComment,
+          resolvedFields,
         }),
       });
       if (!res.ok) {
@@ -283,6 +317,32 @@ export function ModerationConsole({ initial, canMutate }: ModerationConsoleProps
                 </div>
               ))}
             </dl>
+            {inspector.editableFields && inspector.editableFields.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: productSemanticColors.textPrimary }}>
+                  Данные для каталога
+                </div>
+                {inspector.editableFields.map((field) => (
+                  <label key={field.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: 12, color: productSemanticColors.textMuted, fontWeight: 600 }}>
+                      {field.label}
+                    </span>
+                    <input
+                      type={field.inputType === "number" ? "number" : "text"}
+                      value={editableValues[field.key] ?? field.value}
+                      onChange={(event) =>
+                        setEditableValues((prev) => ({
+                          ...prev,
+                          [field.key]: event.target.value,
+                        }))
+                      }
+                      disabled={!canMutate}
+                      style={textareaStyle}
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : null}
             {inspector.notes ? (
               <div
                 style={{
@@ -318,7 +378,11 @@ export function ModerationConsole({ initial, canMutate }: ModerationConsoleProps
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                   rows={2}
-                  placeholder="Обоснование (опционально, попадет в audit log)"
+                  placeholder={
+                    selected.kind === "CATALOG_REQUEST"
+                      ? "Комментарий для audit log (при отклонении — обязателен)"
+                      : "Обоснование (опционально, попадет в audit log)"
+                  }
                   disabled={!canMutate}
                   style={textareaStyle}
                 />

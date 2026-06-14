@@ -11,6 +11,9 @@ import type {
   DeleteServiceEventResponse,
   CreateVehicleInput,
   CreateVehicleResponse,
+  CreateMotorcycleCatalogRequestInput,
+  CreateMotorcycleCatalogRequestResponse,
+  MotorcycleCatalogRequestsResponse,
   CreateWishlistItemResponse,
   DeleteExpenseItemResponse,
   GarageVehiclesResponse,
@@ -653,6 +656,22 @@ export function createMotoTwinEndpoints(client: ApiClient) {
         method: "POST",
         body: JSON.stringify(input),
       });
+    },
+
+    createMotorcycleCatalogRequest(input: CreateMotorcycleCatalogRequestInput) {
+      return client.request<CreateMotorcycleCatalogRequestResponse>(
+        "/api/motorcycle-catalog-requests",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        }
+      );
+    },
+
+    getMotorcycleCatalogRequests() {
+      return client.request<MotorcycleCatalogRequestsResponse>(
+        "/api/motorcycle-catalog-requests"
+      );
     },
 
     getPartCompatibilityReport(

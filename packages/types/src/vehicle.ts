@@ -153,6 +153,15 @@ export type GarageVehicleItem = {
   rideProfile: VehicleRideProfile | null;
   /** Present when garage API computed maintenance attention for this row. */
   attentionSummary?: GarageAttentionSummaryWire | null;
+  /** User-submitted catalog request pending admin review. */
+  catalogRequest?: {
+    id: string;
+    status: "PENDING" | "APPROVED" | "REJECTED";
+    displayBrandName: string;
+    displayFamilyName: string;
+    displayVariantName: string;
+    yearsLabel: string;
+  } | null;
 };
 
 export type VehicleRideProfile = {
@@ -281,12 +290,18 @@ export type MotorcycleGenerationPickerItem = {
   technicalSpecs: VehicleTechnicalSpecsView | null;
 };
 
+import type { CreateMotorcycleCatalogRequestInput } from "./motorcycle-master";
+
 /** Anchors for creating a `Vehicle`: 4-level FK set + ownership/state fields. */
 export type CreateVehicleInput = {
-  motorcycleBrandId: string;
-  motorcycleModelFamilyId: string;
-  motorcycleVariantId: string;
-  motorcycleGenerationId: string;
+  motorcycleBrandId?: string;
+  motorcycleModelFamilyId?: string;
+  motorcycleVariantId?: string;
+  motorcycleGenerationId?: string;
+  /** When set, server binds placeholder catalog refs for a pending user request. */
+  catalogRequestId?: string;
+  /** Inline catalog request draft — created atomically with the vehicle. */
+  catalogRequest?: CreateMotorcycleCatalogRequestInput;
   nickname?: string | null;
   vin?: string | null;
   odometer: number;

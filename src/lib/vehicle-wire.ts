@@ -6,6 +6,7 @@ import type {
   VehicleRideProfile,
   VehicleTechnicalSpecsView,
 } from "@mototwin/types";
+import { getCatalogRequestDisplayNames } from "@/lib/motorcycle-catalog-request-wire";
 
 /**
  * Prisma `include` shape that produces all data the wire helpers below need.
@@ -44,6 +45,19 @@ export const vehicleWireInclude = {
           seatMm: true,
         },
       },
+    },
+  },
+  pendingCatalogRequest: {
+    select: {
+      id: true,
+      status: true,
+      brandName: true,
+      familyName: true,
+      variantName: true,
+      yearFrom: true,
+      yearTo: true,
+      motorcycleBrand: { select: { name: true } },
+      motorcycleModelFamily: { select: { name: true } },
     },
   },
   rideProfile: true,
@@ -101,6 +115,22 @@ function toRideProfileWire(
 export function toGarageVehicleItem(
   row: VehicleWithMotorcycleIncludes
 ): GarageVehicleItem {
+  const catalogRequest = row.pendingCatalogRequest;
+  const pendingDisplay =
+    catalogRequest != null ? getCatalogRequestDisplayNames(catalogRequest) : null;
+
+  const brandName =
+    pendingDisplay?.brandName ??
+    catalogRequest?.motorcycleBrand?.name ??
+    row.motorcycleBrand.name;
+  const familyName =
+    pendingDisplay?.familyName ??
+    catalogRequest?.motorcycleModelFamily?.name ??
+    row.motorcycleModelFamily.name;
+  const variantName = pendingDisplay?.variantName ?? row.motorcycleVariant.name;
+  const generationYearsLabel =
+    pendingDisplay?.yearsLabel ?? row.motorcycleGeneration.yearsLabel;
+
   return {
     id: row.id,
     nickname: row.nickname,
@@ -113,25 +143,35 @@ export function toGarageVehicleItem(
       : null,
     motorcycleBrand: {
       id: row.motorcycleBrand.id,
-      name: row.motorcycleBrand.name,
+      name: brandName,
     },
     motorcycleModelFamily: {
       id: row.motorcycleModelFamily.id,
-      name: row.motorcycleModelFamily.name,
+      name: familyName,
     },
     motorcycleVariant: {
       id: row.motorcycleVariant.id,
-      name: row.motorcycleVariant.name,
+      name: variantName,
     },
     motorcycleGeneration: {
       id: row.motorcycleGeneration.id,
       name: row.motorcycleGeneration.name,
-      yearFrom: row.motorcycleGeneration.yearFrom,
-      yearTo: row.motorcycleGeneration.yearTo ?? null,
-      yearsLabel: row.motorcycleGeneration.yearsLabel,
+      yearFrom: catalogRequest?.yearFrom ?? row.motorcycleGeneration.yearFrom,
+      yearTo: catalogRequest?.yearTo ?? row.motorcycleGeneration.yearTo ?? null,
+      yearsLabel: generationYearsLabel,
     },
-    technicalSpecs: buildTechnicalSpecsView(row.motorcycleGeneration),
+    technicalSpecs: catalogRequest ? null : buildTechnicalSpecsView(row.motorcycleGeneration),
     rideProfile: toRideProfileWire(row.rideProfile),
+    catalogRequest: catalogRequest
+      ? {
+          id: catalogRequest.id,
+          status: catalogRequest.status,
+          displayBrandName: brandName,
+          displayFamilyName: familyName,
+          displayVariantName: variantName,
+          yearsLabel: generationYearsLabel,
+        }
+      : null,
   };
 }
 

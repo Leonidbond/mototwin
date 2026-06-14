@@ -602,6 +602,8 @@ export interface AdminPartMergePayload {
 
 export type AdminModerationQueueKey =
   | "pendingMasters"
+  | "pendingCatalogRequests"
+  | "rejectedCatalogRequests"
   | "pendingReports"
   | "needsReviewReports"
   | "safetyCriticalReports"
@@ -611,6 +613,8 @@ export type AdminModerationQueueKey =
 
 export interface AdminModerationCountsWire {
   pendingMasters: number;
+  pendingCatalogRequests: number;
+  rejectedCatalogRequests: number;
   pendingReports: number;
   needsReviewReports: number;
   safetyCriticalReports: number;
@@ -621,7 +625,7 @@ export interface AdminModerationCountsWire {
 
 export interface AdminModerationItemWire {
   id: string;
-  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE";
+  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE" | "CATALOG_REQUEST";
   title: string;
   subtitle: string | null;
   status: string;
@@ -637,11 +641,17 @@ export interface AdminModerationListResponse {
 
 export interface AdminModerationInspectorWire {
   id: string;
-  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE";
+  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE" | "CATALOG_REQUEST";
   heading: string;
   subheading: string;
   status: string;
   fields: Array<{ label: string; value: string }>;
+  editableFields?: Array<{
+    key: "brandName" | "familyName" | "variantName" | "yearFrom" | "yearTo" | "moderationComment";
+    label: string;
+    value: string;
+    inputType: "text" | "number";
+  }>;
   notes: string | null;
   actions: Array<{ id: string; label: string; tone?: "primary" | "danger" | "neutral" }>;
   links: Array<{ label: string; href: string }>;

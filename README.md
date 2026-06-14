@@ -57,18 +57,24 @@ In a second terminal, start the web API for local data: `npm run dev` (port 3000
 - [`docs/parity/cross-platform-parity.md`](docs/parity/cross-platform-parity.md) — web ↔ Expo parity matrix
 - [`docs/mototwin_recent_implementation_notes_ru.md`](docs/mototwin_recent_implementation_notes_ru.md) — сводка недавних изменений UI/API (§10 — навигация 2026-06)
 
-ssh root@195.24.71.143  
-ssh mototwin-vps
+## Production deploy (VPS2)
 
-для обновления кода на сервере
-sudo -iu deploy
-cd /opt/mototwin/app/mototwin
-git status
-git pull origin main
+Канонический прод: **`https://mototwin.space`**, SSH-алиас **`mototwin-vps2`** (`158.160.161.173`, пользователь `lbondarenko`, приложение от `deploy`).
 
-Напиши в чате, например: «деплой», «обнови прод», «задеплой на VPS» — агент должен подхватить skill по описанию и выполнить SSH-скрипт из SKILL.md.
+```bash
+# ~/.ssh/config — см. .cursor/skills/mototwin-deploy/SKILL.md
+ssh mototwin-vps2
 
-Если skill не подключается сам: @mototwin-deploy или явно «используй skill mototwin-deploy».
+# ручное обновление кода (полный деплой — через skill / deploy-app.sh)
+sudo -u deploy bash -c 'cd /opt/mototwin/app/mototwin && git pull origin main'
+sudo systemctl restart mototwin
+```
+
+В чате: «деплой», «обнови прод» — агент подхватит skill **mototwin-deploy** (target `mototwin-vps2`).
+
+Legacy (не деплоить): `mototwin-vps` / `195.24.71.143` / `mototwin.online`.
+
+Подробнее: [`.cursor/skills/mototwin-deploy/SKILL.md`](.cursor/skills/mototwin-deploy/SKILL.md), [`docs/deploy/vps.md`](docs/deploy/vps.md).
 
 для запуска мобилного в режиме туннеля
 

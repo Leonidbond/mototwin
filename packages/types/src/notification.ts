@@ -4,7 +4,9 @@ export type NotificationTypeWire =
   | "MILEAGE_UPDATE_REQUIRED"
   | "ENGINE_HOURS_UPDATE_REQUIRED"
   | "MISSING_SERVICE_DATA"
-  | "WEEKLY_DIGEST";
+  | "WEEKLY_DIGEST"
+  | "CATALOG_REQUEST_APPROVED"
+  | "CATALOG_REQUEST_REJECTED";
 
 export type NotificationSeverityWire = "INFO" | "WARNING" | "CRITICAL";
 

@@ -53,8 +53,10 @@ export async function loadWorkQueue(
   tab: AdminWorkQueueTabKey = "all",
   limit = 8
 ): Promise<AdminWorkQueueResponse> {
-  const [pendingMastersTotal, pendingReportsTotal, conflictsTotal, safetyTotal] = await Promise.all([
+  const [pendingMastersTotal, pendingCatalogRequestsTotal, pendingReportsTotal, conflictsTotal, safetyTotal] =
+    await Promise.all([
     prisma.partMaster.count({ where: { status: "PENDING_REVIEW" } }),
+    prisma.motorcycleCatalogRequest.count({ where: { status: "PENDING" } }),
     prisma.fitmentReport.count({ where: { moderationStatus: "PENDING" } }),
     prisma.fitmentConfidence.count({ where: { status: "MIXED_REPORTS" } }),
     prisma.fitmentReport.count({
@@ -66,7 +68,7 @@ export async function loadWorkQueue(
   ]);
 
   const totals: AdminWorkQueueResponse["totals"] = {
-    all: pendingMastersTotal + pendingReportsTotal + conflictsTotal + safetyTotal,
+    all: pendingMastersTotal + pendingCatalogRequestsTotal + pendingReportsTotal + conflictsTotal + safetyTotal,
     "new-parts": pendingMastersTotal,
     fitment: pendingReportsTotal,
     conflicts: conflictsTotal,
@@ -83,7 +85,7 @@ export async function loadWorkQueue(
     const masters = await prisma.partMaster.findMany({
       where: { status: "PENDING_REVIEW" },
       orderBy: { createdAt: "desc" },
-      take: tab === "new-parts" ? limit : Math.ceil(limit / 3),
+      take: tab === "new-parts" ? limit : Math.ceil(limit / 4),
       select: { id: true, brandName: true, sku: true, title: true },
     });
     for (const master of masters) {
@@ -100,6 +102,35 @@ export async function loadWorkQueue(
         reviewHref: `/admin/moderation?focus=pm-${master.id}`,
         detailsHref: `/admin/catalog/${master.id}`,
       });
+    }
+
+    if (tab === "all") {
+      const catalogRequests = await prisma.motorcycleCatalogRequest.findMany({
+        where: { status: "PENDING" },
+        orderBy: { createdAt: "desc" },
+        take: Math.ceil(limit / 4),
+        include: {
+          motorcycleBrand: { select: { name: true } },
+          motorcycleModelFamily: { select: { name: true } },
+        },
+      });
+      for (const request of catalogRequests) {
+        const brand = request.brandName ?? request.motorcycleBrand?.name ?? "—";
+        const family = request.familyName ?? request.motorcycleModelFamily?.name ?? "—";
+        rows.push({
+          id: `cr-${request.id}`,
+          kind: "part-master",
+          priority: "high",
+          partLabel: `${brand} ${family} ${request.variantName}`.trim(),
+          modelLabel: `${request.yearFrom}${request.yearTo ? `–${request.yearTo}` : "–"}`,
+          nodeLabel: "Заявка на модель",
+          statusKey: "pending",
+          statusLabel: "Catalog request",
+          confirmations: 0,
+          reviewHref: `/admin/moderation?queue=pendingCatalogRequests`,
+          detailsHref: `/admin/moderation?queue=pendingCatalogRequests`,
+        });
+      }
     }
   }
 

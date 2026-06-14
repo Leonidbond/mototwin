@@ -6,11 +6,22 @@ import { logAdminAction } from "@/lib/admin-audit";
 import { ADMIN_CACHE_TAGS } from "@/lib/admin-cache";
 import { prisma } from "@/lib/prisma";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
-import { strictObject } from "@/lib/http/input-validation";
+import { boundedInt, boundedText, boundedTextOptional, strictObject } from "@/lib/http/input-validation";
+import {
+  approveMotorcycleCatalogRequest,
+  rejectMotorcycleCatalogRequest,
+} from "@/lib/motorcycle-catalog-request-service";
 
-// MT-SEC-068 + MT-SEC-070: strict + bounded id length.
+const resolvedFieldsSchema = strictObject({
+  brandName: boundedText({ min: 1, max: 120 }).optional(),
+  familyName: boundedText({ min: 1, max: 120 }).optional(),
+  variantName: boundedText({ min: 1, max: 160 }).optional(),
+  yearFrom: boundedInt({ min: 1900, max: 2100 }).optional(),
+  yearTo: boundedInt({ min: 1900, max: 2100 }).nullable().optional(),
+}).optional();
+
 const PayloadSchema = strictObject({
-  kind: z.enum(["PART_MASTER", "FITMENT_REPORT", "FITMENT_CONFIDENCE"]),
+  kind: z.enum(["PART_MASTER", "FITMENT_REPORT", "FITMENT_CONFIDENCE", "CATALOG_REQUEST"]),
   id: z.string().min(1).max(64),
   action: z.enum([
     "approve",
@@ -21,14 +32,15 @@ const PayloadSchema = strictObject({
     "verify",
     "community_confirm",
   ]),
-  reason: z.string().max(500).optional(),
+  reason: z.string().max(1000).optional(),
+  resolvedFields: resolvedFieldsSchema,
 });
 
 /** Apply a moderation action and write to the audit log. */
 export async function POST(request: Request) {
   try {
     const ctx = await requireAdminRole(["SUPER_ADMIN", "CATALOG_MANAGER", "MODERATOR"]);
-    const body = await parseJsonBody<unknown>(request, { maxBytes: 4 * 1024 });
+    const body = await parseJsonBody<unknown>(request, { maxBytes: 8 * 1024 });
     const parsed = PayloadSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -38,6 +50,7 @@ export async function POST(request: Request) {
     }
     const { kind, id, action } = parsed.data;
     const reason = parsed.data.reason?.trim() || undefined;
+    const resolvedFields = parsed.data.resolvedFields;
 
     const flushCache = () => {
       revalidatePath("/admin");
@@ -45,6 +58,56 @@ export async function POST(request: Request) {
       revalidateTag(ADMIN_CACHE_TAGS.dashboardWorkQueue, "max");
       revalidateTag(ADMIN_CACHE_TAGS.dashboardKpis, "max");
     };
+
+    if (kind === "CATALOG_REQUEST") {
+      if (action !== "approve" && action !== "reject") {
+        return NextResponse.json({ error: "Действие не поддерживается" }, { status: 400 });
+      }
+      const before = await prisma.motorcycleCatalogRequest.findUnique({ where: { id } });
+      if (!before) return NextResponse.json({ error: "Не найдено" }, { status: 404 });
+
+      try {
+        const after =
+          action === "approve"
+            ? await approveMotorcycleCatalogRequest({
+                requestId: id,
+                reviewerUserId: ctx.userId,
+                overrides: resolvedFields,
+                moderationComment: reason,
+              })
+            : await rejectMotorcycleCatalogRequest({
+                requestId: id,
+                reviewerUserId: ctx.userId,
+                moderationComment: reason ?? "",
+              });
+
+        await logAdminAction({
+          actorId: ctx.userId,
+          action: `catalog_request.${action}`,
+          entityType: "MotorcycleCatalogRequest",
+          entityId: id,
+          before,
+          after: await prisma.motorcycleCatalogRequest.findUnique({ where: { id } }),
+          reason,
+        });
+        flushCache();
+        return NextResponse.json({ ok: true });
+      } catch (error) {
+        if (error instanceof Error) {
+          if (error.message === "NOT_FOUND") {
+            return NextResponse.json({ error: "Не найдено" }, { status: 404 });
+          }
+          if (error.message === "NOT_PENDING") {
+            return NextResponse.json({ error: "Заявка уже обработана." }, { status: 409 });
+          }
+          if (error.message === "COMMENT_REQUIRED") {
+            return NextResponse.json({ error: "Укажите причину отклонения." }, { status: 400 });
+          }
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        throw error;
+      }
+    }
 
     if (kind === "PART_MASTER") {
       if (action !== "approve" && action !== "reject") {

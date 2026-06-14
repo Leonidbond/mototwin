@@ -36,6 +36,7 @@ function pickBestSupportLevel(
 export async function GET() {
   try {
     const rows = await prisma.motorcycleBrand.findMany({
+      where: { isCatalogPlaceholder: false },
       orderBy: { name: "asc" },
       select: {
         id: true,

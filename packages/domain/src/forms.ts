@@ -21,9 +21,12 @@ import type {
   VehicleProfileFormValues,
 } from "@mototwin/types";
 import {
-  formatExpenseAmountRu,
-  parseExpenseAmountInputToNumberOrNull,
-} from "./expense-summary";
+  createInitialMotorcycleCatalogPickerState,
+  requiresCatalogRequest,
+  toCatalogRequestDraft,
+  validateCatalogPickerState,
+  type CatalogPickerFieldErrors,
+} from "./motorcycle-catalog-picker";
 import { buildPartSkuLabel } from "./part-catalog";
 import {
   filterActiveWishlistItems,
@@ -1760,6 +1763,8 @@ export function createInitialAddMotorcycleFormValues(
     motorcycleModelFamilyId: "",
     motorcycleVariantId: "",
     motorcycleGenerationId: "",
+    catalogRequestId: "",
+    catalogPicker: createInitialMotorcycleCatalogPickerState(overrides?.catalogPicker),
     nickname: "",
     vin: "",
     odometer: "",
@@ -1782,21 +1787,43 @@ export function normalizeAddMotorcyclePayload(
     engineHours = Math.trunc(Number(trimmedEngine));
   }
 
-  return {
-    motorcycleBrandId: values.motorcycleBrandId.trim(),
-    motorcycleModelFamilyId: values.motorcycleModelFamilyId.trim(),
-    motorcycleVariantId: values.motorcycleVariantId.trim(),
-    motorcycleGenerationId: values.motorcycleGenerationId.trim(),
+  const rideProfile = {
+    usageType: values.usageType,
+    ridingStyle: values.ridingStyle,
+    loadType: values.loadType,
+    usageIntensity: values.usageIntensity,
+  };
+
+  const basePayload = {
     nickname: values.nickname.trim() || null,
     vin: values.vin.trim() || null,
     odometer,
     engineHours,
-    rideProfile: {
-      usageType: values.usageType,
-      ridingStyle: values.ridingStyle,
-      loadType: values.loadType,
-      usageIntensity: values.usageIntensity,
-    },
+    rideProfile,
+  };
+
+  const catalogRequestId = values.catalogRequestId.trim();
+  if (catalogRequestId) {
+    return {
+      catalogRequestId,
+      ...basePayload,
+    };
+  }
+
+  const picker = values.catalogPicker;
+  if (requiresCatalogRequest(picker)) {
+    return {
+      catalogRequest: toCatalogRequestDraft(picker),
+      ...basePayload,
+    };
+  }
+
+  return {
+    motorcycleBrandId: picker.brandId.trim(),
+    motorcycleModelFamilyId: picker.familyId.trim(),
+    motorcycleVariantId: picker.variantId.trim(),
+    motorcycleGenerationId: picker.generationId.trim(),
+    ...basePayload,
   };
 }
 
@@ -1814,7 +1841,8 @@ export type AddMotorcycleFieldErrors = Partial<
     | "engineHours",
     string
   >
->;
+> &
+  CatalogPickerFieldErrors;
 
 export function validateAddMotorcycleFormValues(
   values: AddMotorcycleFormValues,
@@ -1823,29 +1851,26 @@ export function validateAddMotorcycleFormValues(
   const errors: string[] = [];
   const fieldErrors: AddMotorcycleFieldErrors = {};
 
-  const missingTree =
-    !values.motorcycleBrandId.trim() ||
-    !values.motorcycleModelFamilyId.trim() ||
-    !values.motorcycleVariantId.trim() ||
-    !values.motorcycleGenerationId.trim();
+  const hasLegacyCatalogRequest = Boolean(values.catalogRequestId.trim());
 
-  if (missingTree) {
-    if (style === "web") {
-      errors.push("Выберите бренд, семейство, модификацию и поколение.");
-    } else {
-      if (!values.motorcycleBrandId.trim()) {
-        fieldErrors.motorcycleBrandId = "Выберите марку.";
+  if (!hasLegacyCatalogRequest) {
+    const pickerValidation = validateCatalogPickerState(values.catalogPicker);
+    errors.push(...pickerValidation.errors);
+    Object.assign(fieldErrors, pickerValidation.fieldErrors);
+
+    if (style === "mobile") {
+      if (fieldErrors.brand) {
+        fieldErrors.motorcycleBrandId = fieldErrors.brand;
       }
-      if (!values.motorcycleModelFamilyId.trim()) {
-        fieldErrors.motorcycleModelFamilyId = "Выберите семейство.";
+      if (fieldErrors.family) {
+        fieldErrors.motorcycleModelFamilyId = fieldErrors.family;
       }
-      if (!values.motorcycleVariantId.trim()) {
-        fieldErrors.motorcycleVariantId = "Выберите модификацию.";
+      if (fieldErrors.variant) {
+        fieldErrors.motorcycleVariantId = fieldErrors.variant;
       }
-      if (!values.motorcycleGenerationId.trim()) {
-        fieldErrors.motorcycleGenerationId = "Выберите поколение.";
+      if (fieldErrors.generation) {
+        fieldErrors.motorcycleGenerationId = fieldErrors.generation;
       }
-      errors.push("Проверьте обязательные поля формы.");
     }
   }
 

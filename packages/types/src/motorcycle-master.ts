@@ -158,3 +158,55 @@ export interface VehicleMotorcycleRefWire {
   variant: { id: string; name: string; slug: string };
   generation: MotorcycleGenerationWire;
 }
+
+export type MotorcycleCatalogRequestStatusWire = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface CreateMotorcycleCatalogRequestInput {
+  motorcycleBrandId?: string;
+  brandName?: string;
+  motorcycleModelFamilyId?: string;
+  familyName?: string;
+  motorcycleVariantId?: string;
+  variantName?: string;
+  yearFrom: number;
+  yearTo?: number | null;
+  userComment?: string;
+}
+
+export interface MotorcycleCatalogRequestWire {
+  id: string;
+  status: MotorcycleCatalogRequestStatusWire;
+  motorcycleBrandId: string | null;
+  motorcycleModelFamilyId: string | null;
+  brandName: string | null;
+  familyName: string | null;
+  variantName: string;
+  yearFrom: number;
+  yearTo: number | null;
+  userComment: string | null;
+  resolvedBrandName: string | null;
+  resolvedFamilyName: string | null;
+  resolvedVariantName: string | null;
+  resolvedYearFrom: number | null;
+  resolvedYearTo: number | null;
+  moderationComment: string | null;
+  resolvedGenerationId: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  displayLabel: string;
+  vehicleCount: number;
+  submittedBy: {
+    id: string;
+    displayName: string | null;
+    email: string | null;
+  } | null;
+}
+
+export interface CreateMotorcycleCatalogRequestResponse {
+  request: MotorcycleCatalogRequestWire;
+  placeholderGenerationId: string;
+}
+
+export interface MotorcycleCatalogRequestsResponse {
+  requests: MotorcycleCatalogRequestWire[];
+}

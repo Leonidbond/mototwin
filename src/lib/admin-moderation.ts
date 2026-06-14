@@ -6,6 +6,7 @@ import type {
   AdminModerationQueueKey,
 } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
+import { getCatalogRequestEditableFields } from "@/lib/motorcycle-catalog-request-wire";
 
 const SAFETY_GROUPS = ["BRAKES", "FRONT_SUSPENSION", "REAR_SUSPENSION"] as const;
 const QUEUE_TAKE = 50;
@@ -13,6 +14,8 @@ const QUEUE_TAKE = 50;
 export async function loadAdminModerationCounts(): Promise<AdminModerationCountsWire> {
   const [
     pendingMasters,
+    pendingCatalogRequests,
+    rejectedCatalogRequests,
     pendingReports,
     needsReviewReports,
     safetyCriticalReports,
@@ -21,6 +24,8 @@ export async function loadAdminModerationCounts(): Promise<AdminModerationCounts
     mixedFitments,
   ] = await Promise.all([
     prisma.partMaster.count({ where: { status: "PENDING_REVIEW" } }),
+    prisma.motorcycleCatalogRequest.count({ where: { status: "PENDING" } }),
+    prisma.motorcycleCatalogRequest.count({ where: { status: "REJECTED" } }),
     prisma.fitmentReport.count({ where: { moderationStatus: "PENDING" } }),
     prisma.fitmentReport.count({ where: { moderationStatus: "NEEDS_REVIEW" } }),
     prisma.fitmentReport.count({
@@ -36,6 +41,8 @@ export async function loadAdminModerationCounts(): Promise<AdminModerationCounts
 
   return {
     pendingMasters,
+    pendingCatalogRequests,
+    rejectedCatalogRequests,
     pendingReports,
     needsReviewReports,
     safetyCriticalReports,
@@ -78,6 +85,39 @@ async function loadQueueItems(queue: AdminModerationQueueKey): Promise<AdminMode
         badges: [row.source === "USER" ? "От пользователя" : "Каталог"],
         createdAt: row.createdAt.toISOString(),
       }));
+    }
+    case "pendingCatalogRequests":
+    case "rejectedCatalogRequests": {
+      const rows = await prisma.motorcycleCatalogRequest.findMany({
+        where: {
+          status: queue === "pendingCatalogRequests" ? "PENDING" : "REJECTED",
+        },
+        orderBy: { createdAt: "desc" },
+        take: QUEUE_TAKE,
+        include: {
+          motorcycleBrand: { select: { name: true } },
+          motorcycleModelFamily: { select: { name: true } },
+          submittedBy: { select: { displayName: true, email: true } },
+          _count: { select: { vehicles: true } },
+        },
+      });
+      return rows.map((row) => {
+        const brand = row.brandName ?? row.motorcycleBrand?.name ?? "—";
+        const family = row.familyName ?? row.motorcycleModelFamily?.name ?? "—";
+        const author =
+          row.submittedBy?.displayName ?? row.submittedBy?.email ?? "Пользователь";
+        return {
+          id: row.id,
+          kind: "CATALOG_REQUEST",
+          title: `${brand} ${family} ${row.variantName}`.trim(),
+          subtitle: `${row.yearFrom}${row.yearTo ? `–${row.yearTo}` : "–"} · ${author}`,
+          status: row.status,
+          badges: [
+            row._count.vehicles > 0 ? `${row._count.vehicles} мото` : "Без мото",
+          ],
+          createdAt: row.createdAt.toISOString(),
+        };
+      });
     }
     case "pendingReports":
     case "safetyCriticalReports":
@@ -163,7 +203,7 @@ async function loadQueueItems(queue: AdminModerationQueueKey): Promise<AdminMode
 }
 
 export async function loadModerationInspector(
-  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE",
+  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE" | "CATALOG_REQUEST",
   id: string
 ): Promise<AdminModerationInspectorWire | null> {
   if (kind === "PART_MASTER") {
@@ -291,6 +331,101 @@ export async function loadModerationInspector(
       links: [
         { label: "Деталь", href: `/admin/catalog/${fc.partMasterId}` },
         { label: "Модель", href: `/admin/models/${fc.motorcycleGenerationId}` },
+      ],
+    };
+  }
+  if (kind === "CATALOG_REQUEST") {
+    const request = await prisma.motorcycleCatalogRequest.findUnique({
+      where: { id },
+      include: {
+        motorcycleBrand: { select: { id: true, name: true } },
+        motorcycleModelFamily: { select: { id: true, name: true } },
+        submittedBy: { select: { id: true, displayName: true, email: true } },
+        vehicles: {
+          select: { id: true, nickname: true },
+          take: 10,
+        },
+        _count: { select: { vehicles: true } },
+      },
+    });
+    if (!request) return null;
+
+    const editable = getCatalogRequestEditableFields(request);
+    const author =
+      request.submittedBy?.displayName ?? request.submittedBy?.email ?? "—";
+
+    const actions: AdminModerationInspectorWire["actions"] = [];
+    if (request.status === "PENDING") {
+      actions.push({ id: "approve", label: "Одобрить", tone: "primary" });
+      actions.push({ id: "reject", label: "Отклонить", tone: "danger" });
+    }
+
+    return {
+      id: request.id,
+      kind: "CATALOG_REQUEST",
+      heading: `${editable.brandName} ${editable.familyName} ${editable.variantName}`.trim(),
+      subheading: `${editable.yearFrom}${editable.yearTo ? `–${editable.yearTo}` : "–"}`,
+      status: request.status,
+      fields: [
+        { label: "Автор", value: author },
+        {
+          label: "Выбрано из каталога",
+          value: [
+            request.motorcycleBrand?.name,
+            request.motorcycleModelFamily?.name,
+          ]
+            .filter(Boolean)
+            .join(" / ") || "—",
+        },
+        { label: "Мото в гараже", value: String(request._count.vehicles) },
+        { label: "Создана", value: request.createdAt.toISOString().slice(0, 10) },
+      ],
+      editableFields:
+        request.status === "PENDING"
+          ? [
+              { key: "brandName", label: "Марка", value: editable.brandName, inputType: "text" },
+              {
+                key: "familyName",
+                label: "Модель (семейство)",
+                value: editable.familyName,
+                inputType: "text",
+              },
+              {
+                key: "variantName",
+                label: "Модификация",
+                value: editable.variantName,
+                inputType: "text",
+              },
+              {
+                key: "yearFrom",
+                label: "Год от",
+                value: String(editable.yearFrom),
+                inputType: "number",
+              },
+              {
+                key: "yearTo",
+                label: "Год до",
+                value: editable.yearTo != null ? String(editable.yearTo) : "",
+                inputType: "number",
+              },
+              {
+                key: "moderationComment",
+                label: "Комментарий модератора",
+                value: request.moderationComment ?? "",
+                inputType: "text",
+              },
+            ]
+          : undefined,
+      notes: request.userComment,
+      actions,
+      links: [
+        ...(request.submittedBy
+          ? [{ label: "Пользователь", href: `/admin/users/${request.submittedBy.id}` }]
+          : []),
+        ...request.vehicles.map((vehicle) => ({
+          label: vehicle.nickname?.trim() || `Мото ${vehicle.id.slice(0, 6)}`,
+          href: `/admin/vehicles?query=${vehicle.id}`,
+        })),
       ],
     };
   }

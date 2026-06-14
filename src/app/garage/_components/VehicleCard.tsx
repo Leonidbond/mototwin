@@ -82,6 +82,13 @@ export function VehicleCard({ vehicle, silhouettePriority }: Props) {
     .filter((chunk): chunk is string => Boolean(chunk))
     .join(" · ");
 
+  const catalogBadge =
+    vehicle.catalogRequest?.status === "PENDING"
+      ? "На модерации"
+      : vehicle.catalogRequest?.status === "REJECTED"
+        ? "Модель отклонена"
+        : null;
+
   return (
     <Card padding="md">
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
@@ -92,6 +99,25 @@ export function VehicleCard({ vehicle, silhouettePriority }: Props) {
             </Link>
           </h2>
           <p style={{ marginTop: 2, ...metaStyle }}>{metaLine || card.summary.yearVersionLine}</p>
+          {catalogBadge ? (
+            <span
+              style={{
+                display: "inline-flex",
+                marginTop: 6,
+                borderRadius: 999,
+                padding: "2px 8px",
+                fontSize: 11,
+                fontWeight: 600,
+                color: vehicle.catalogRequest?.status === "REJECTED" ? "#B91C1C" : "#B45309",
+                backgroundColor:
+                  vehicle.catalogRequest?.status === "REJECTED"
+                    ? "rgba(239,68,68,0.12)"
+                    : "rgba(245,158,11,0.14)",
+              }}
+            >
+              {catalogBadge}
+            </span>
+          ) : null}
         </div>
         <button type="button" style={moreButtonStyle} aria-label="Меню карточки">
           <DotsIcon />

@@ -11,12 +11,19 @@ import { AppTextInput as TextInput } from "../../components/ui/AppTextInput";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   createInitialAddMotorcycleFormValues,
+  createInitialMotorcycleCatalogPickerState,
+  isBrandLevelReady,
+  isFamilyLevelReady,
+  isVariantLevelReady,
   normalizeAddMotorcyclePayload,
+  requiresCatalogRequest,
   RIDE_LOAD_TYPE_OPTIONS,
   RIDE_RIDING_STYLE_OPTIONS,
   RIDE_USAGE_INTENSITY_OPTIONS,
   RIDE_USAGE_TYPE_OPTIONS,
+  setPickerLevelMode,
   validateAddMotorcycleFormValues,
+  type MotorcycleCatalogPickerState,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
 import type {
@@ -136,6 +143,8 @@ export default function NewVehicleScreen() {
   const { capabilities, isLoading: isSubscriptionLoading } = useMobileSubscription();
   const [garageVehicleCount, setGarageVehicleCount] = useState(0);
 
+  const [catalogPicker, setCatalogPicker] = useState(createInitialMotorcycleCatalogPickerState());
+
   const [brands, setBrands] = useState<MotorcycleBrandPickerItem[]>([]);
   const [modelFamilies, setModelFamilies] = useState<MotorcycleModelFamilyPickerItem[]>([]);
   const [variants, setVariants] = useState<MotorcycleVariantPickerItem[]>([]);
@@ -150,11 +159,6 @@ export default function NewVehicleScreen() {
   const [screenError, setScreenError] = useState("");
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
-  const [motorcycleBrandId, setMotorcycleBrandId] = useState("");
-  const [motorcycleModelFamilyId, setMotorcycleModelFamilyId] = useState("");
-  const [motorcycleVariantId, setMotorcycleVariantId] = useState("");
-  const [motorcycleGenerationId, setMotorcycleGenerationId] = useState("");
-
   const [nickname, setNickname] = useState("");
   const [vin, setVin] = useState("");
   const [odometer, setOdometer] = useState("");
@@ -166,6 +170,20 @@ export default function NewVehicleScreen() {
   const [usageIntensity, setUsageIntensity] = useState<RideUsageIntensity>(
     defaultNewMotorcycleForm.usageIntensity
   );
+
+  const updatePicker = (next: MotorcycleCatalogPickerState) => {
+    setCatalogPicker(next);
+    setFormErrors((prev) => ({
+      ...prev,
+      motorcycleBrandId: undefined,
+      motorcycleModelFamilyId: undefined,
+      motorcycleVariantId: undefined,
+      motorcycleGenerationId: undefined,
+    }));
+  };
+
+  const showCustomGeneration =
+    catalogPicker.generationMode === "custom" || catalogPicker.variantMode === "custom";
 
   useEffect(() => {
     let cancelled = false;
@@ -217,7 +235,7 @@ export default function NewVehicleScreen() {
           return;
         }
         setBrands(response.brands || []);
-      } catch (error) {
+      } catch {
         setScreenError("Не удалось загрузить марки. Проверьте подключение к backend.");
       } finally {
         setIsLoadingBrands(false);
@@ -228,13 +246,8 @@ export default function NewVehicleScreen() {
   }, [router]);
 
   useEffect(() => {
-    if (!motorcycleBrandId) {
+    if (catalogPicker.brandMode !== "catalog" || !catalogPicker.brandId) {
       setModelFamilies([]);
-      setMotorcycleModelFamilyId("");
-      setVariants([]);
-      setMotorcycleVariantId("");
-      setGenerations([]);
-      setMotorcycleGenerationId("");
       return;
     }
 
@@ -244,34 +257,26 @@ export default function NewVehicleScreen() {
         setScreenError("");
         const endpoints = createMobileApiClient();
         const response = await withAuthGuard(
-          () => endpoints.getMotorcycleModelFamilies(motorcycleBrandId),
+          () => endpoints.getMotorcycleModelFamilies(catalogPicker.brandId),
           () => router.replace("/login")
         );
         if (!response) {
           return;
         }
         setModelFamilies(response.families || []);
-      } catch (error) {
+      } catch {
         setScreenError("Не удалось загрузить семейства выбранной марки.");
       } finally {
         setIsLoadingModelFamilies(false);
       }
     };
 
-    setMotorcycleModelFamilyId("");
-    setVariants([]);
-    setMotorcycleVariantId("");
-    setGenerations([]);
-    setMotorcycleGenerationId("");
     void loadModelFamilies();
-  }, [motorcycleBrandId, router]);
+  }, [catalogPicker.brandId, catalogPicker.brandMode, router]);
 
   useEffect(() => {
-    if (!motorcycleModelFamilyId) {
+    if (catalogPicker.familyMode !== "catalog" || !catalogPicker.familyId) {
       setVariants([]);
-      setMotorcycleVariantId("");
-      setGenerations([]);
-      setMotorcycleGenerationId("");
       return;
     }
 
@@ -281,30 +286,26 @@ export default function NewVehicleScreen() {
         setScreenError("");
         const endpoints = createMobileApiClient();
         const response = await withAuthGuard(
-          () => endpoints.getMotorcycleVariants(motorcycleModelFamilyId),
+          () => endpoints.getMotorcycleVariants(catalogPicker.familyId),
           () => router.replace("/login")
         );
         if (!response) {
           return;
         }
         setVariants(response.variants || []);
-      } catch (error) {
+      } catch {
         setScreenError("Не удалось загрузить модификации выбранного семейства.");
       } finally {
         setIsLoadingVariants(false);
       }
     };
 
-    setMotorcycleVariantId("");
-    setGenerations([]);
-    setMotorcycleGenerationId("");
     void loadVariants();
-  }, [motorcycleModelFamilyId, router]);
+  }, [catalogPicker.familyId, catalogPicker.familyMode, router]);
 
   useEffect(() => {
-    if (!motorcycleVariantId) {
+    if (catalogPicker.variantMode !== "catalog" || !catalogPicker.variantId) {
       setGenerations([]);
-      setMotorcycleGenerationId("");
       return;
     }
 
@@ -314,23 +315,22 @@ export default function NewVehicleScreen() {
         setScreenError("");
         const endpoints = createMobileApiClient();
         const response = await withAuthGuard(
-          () => endpoints.getMotorcycleGenerations(motorcycleVariantId),
+          () => endpoints.getMotorcycleGenerations(catalogPicker.variantId),
           () => router.replace("/login")
         );
         if (!response) {
           return;
         }
         setGenerations(response.generations || []);
-      } catch (error) {
+      } catch {
         setScreenError("Не удалось загрузить поколения выбранной модификации.");
       } finally {
         setIsLoadingGenerations(false);
       }
     };
 
-    setMotorcycleGenerationId("");
     void loadGenerations();
-  }, [motorcycleVariantId, router]);
+  }, [catalogPicker.variantId, catalogPicker.variantMode, router]);
 
   const submitCreateVehicle = async () => {
     if (vehicleLimitReached) {
@@ -339,10 +339,8 @@ export default function NewVehicleScreen() {
     }
 
     const motorcycleForm: AddMotorcycleFormValues = {
-      motorcycleBrandId,
-      motorcycleModelFamilyId,
-      motorcycleVariantId,
-      motorcycleGenerationId,
+      ...createInitialAddMotorcycleFormValues(),
+      catalogPicker,
       nickname,
       vin,
       odometer,
@@ -381,7 +379,7 @@ export default function NewVehicleScreen() {
         router.push("/subscription");
         return;
       }
-      setScreenError("Не удалось добавить мотоцикл. Проверьте данные и попробуйте снова.");
+      setScreenError(message || "Не удалось добавить мотоцикл. Проверьте данные и попробуйте снова.");
     } finally {
       setIsSaving(false);
     }
@@ -392,7 +390,7 @@ export default function NewVehicleScreen() {
       <ScreenHeader title="Добавить мотоцикл" />
       <KeyboardAwareScrollScreen contentContainerStyle={styles.content}>
         <Text style={styles.description}>
-          Заполните базовые данные. Сначала выберите марку, семейство, модификацию и поколение.
+          Выберите марку, семейство, модификацию и поколение — или укажите своё на любом уровне.
         </Text>
 
         {screenError ? <Text style={styles.errorText}>{screenError}</Text> : null}
@@ -412,175 +410,322 @@ export default function NewVehicleScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Марка *</Text>
-          {isLoadingBrands ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color={c.textPrimary} />
-              <Text style={styles.loadingText}>Загрузка марок...</Text>
-            </View>
-          ) : (
-            <View style={styles.chipsWrap}>
-              {brands.map((brand) => {
-                const isSelected = brand.id === motorcycleBrandId;
-                return (
+          {catalogPicker.brandMode === "catalog" ? (
+            <>
+              {isLoadingBrands ? (
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator size="small" color={c.textPrimary} />
+                  <Text style={styles.loadingText}>Загрузка марок...</Text>
+                </View>
+              ) : (
+                <View style={styles.chipsWrap}>
+                  {brands.map((brand) => {
+                    const isSelected = brand.id === catalogPicker.brandId;
+                    return (
+                      <Pressable
+                        key={brand.id}
+                        onPress={() =>
+                          updatePicker({
+                            ...setPickerLevelMode(catalogPicker, "brand", "catalog"),
+                            brandId: brand.id,
+                          })
+                        }
+                        style={[styles.chip, isSelected && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipLabel, isSelected && styles.chipLabelActive]}>
+                          {brand.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                   <Pressable
-                    key={brand.id}
-                    onPress={() => {
-                      setMotorcycleBrandId(brand.id);
-                      setFormErrors((prev) => ({ ...prev, motorcycleBrandId: undefined }));
-                    }}
-                    style={[styles.chip, isSelected && styles.chipActive]}
+                    onPress={() => updatePicker(setPickerLevelMode(catalogPicker, "brand", "custom"))}
+                    style={styles.chip}
                   >
-                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelActive]}>
-                      {brand.name}
-                    </Text>
+                    <Text style={styles.chipLabel}>Другая…</Text>
                   </Pressable>
-                );
-              })}
-            </View>
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              <TextInput
+                style={styles.input}
+                value={catalogPicker.brandName}
+                onChangeText={(brandName) => updatePicker({ ...catalogPicker, brandName })}
+                placeholder="Марка"
+                placeholderTextColor={c.textTertiary}
+              />
+              <Pressable onPress={() => updatePicker(setPickerLevelMode(catalogPicker, "brand", "catalog"))}>
+                <Text style={styles.linkText}>Выбрать из списка</Text>
+              </Pressable>
+            </>
           )}
           {formErrors.motorcycleBrandId ? (
             <Text style={styles.inlineErrorText}>{formErrors.motorcycleBrandId}</Text>
           ) : null}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Семейство *</Text>
-          {!motorcycleBrandId ? (
-            <Text style={styles.hintText}>Сначала выберите марку.</Text>
-          ) : null}
-          {motorcycleBrandId && isLoadingModelFamilies ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color={c.textPrimary} />
-              <Text style={styles.loadingText}>Загрузка семейств...</Text>
-            </View>
-          ) : null}
-          {motorcycleBrandId && !isLoadingModelFamilies ? (
-            <View style={styles.chipsWrap}>
-              {modelFamilies.map((family) => {
-                const isSelected = family.id === motorcycleModelFamilyId;
-                return (
-                  <Pressable
-                    key={family.id}
-                    onPress={() => {
-                      setMotorcycleModelFamilyId(family.id);
-                      setFormErrors((prev) => ({
-                        ...prev,
-                        motorcycleModelFamilyId: undefined,
-                      }));
-                    }}
-                    style={[styles.chip, isSelected && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelActive]}>
-                      {family.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
-          {formErrors.motorcycleModelFamilyId ? (
-            <Text style={styles.inlineErrorText}>{formErrors.motorcycleModelFamilyId}</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Модификация *</Text>
-          {!motorcycleModelFamilyId ? (
-            <Text style={styles.hintText}>Сначала выберите семейство.</Text>
-          ) : null}
-          {motorcycleModelFamilyId && isLoadingVariants ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color={c.textPrimary} />
-              <Text style={styles.loadingText}>Загрузка модификаций...</Text>
-            </View>
-          ) : null}
-          {motorcycleModelFamilyId && !isLoadingVariants ? (
-            <View style={styles.chipsWrap}>
-              {variants.map((variant) => {
-                const isSelected = variant.id === motorcycleVariantId;
-                return (
-                  <Pressable
-                    key={variant.id}
-                    onPress={() => {
-                      setMotorcycleVariantId(variant.id);
-                      setFormErrors((prev) => ({
-                        ...prev,
-                        motorcycleVariantId: undefined,
-                      }));
-                    }}
-                    style={[styles.chip, isSelected && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelActive]}>
-                      {variant.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
-          {formErrors.motorcycleVariantId ? (
-            <Text style={styles.inlineErrorText}>{formErrors.motorcycleVariantId}</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Поколение *</Text>
-          {!motorcycleVariantId ? (
-            <Text style={styles.hintText}>Сначала выберите модификацию.</Text>
-          ) : null}
-          {motorcycleVariantId && isLoadingGenerations ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color={c.textPrimary} />
-              <Text style={styles.loadingText}>Загрузка поколений...</Text>
-            </View>
-          ) : null}
-          {motorcycleVariantId && !isLoadingGenerations ? (
-            <View style={styles.generationList}>
-              {generations.map((generation) => {
-                const isSelected = generation.id === motorcycleGenerationId;
-                const specsHint = getGenerationSpecsHint(generation);
-                return (
-                  <Pressable
-                    key={generation.id}
-                    onPress={() => {
-                      setMotorcycleGenerationId(generation.id);
-                      setFormErrors((prev) => ({
-                        ...prev,
-                        motorcycleGenerationId: undefined,
-                      }));
-                    }}
-                    style={[
-                      styles.generationCard,
-                      isSelected && styles.generationCardActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.generationTitle,
-                        isSelected && styles.generationTitleActive,
-                      ]}
+        {isBrandLevelReady(catalogPicker) ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Семейство *</Text>
+            {catalogPicker.familyMode === "catalog" ? (
+              <>
+                {catalogPicker.brandMode === "catalog" && isLoadingModelFamilies ? (
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator size="small" color={c.textPrimary} />
+                    <Text style={styles.loadingText}>Загрузка семейств...</Text>
+                  </View>
+                ) : null}
+                {!(catalogPicker.brandMode === "catalog" && isLoadingModelFamilies) ? (
+                  <View style={styles.chipsWrap}>
+                    {modelFamilies.map((family) => {
+                      const isSelected = family.id === catalogPicker.familyId;
+                      return (
+                        <Pressable
+                          key={family.id}
+                          onPress={() =>
+                            updatePicker({
+                              ...setPickerLevelMode(catalogPicker, "family", "catalog"),
+                              familyId: family.id,
+                            })
+                          }
+                          style={[styles.chip, isSelected && styles.chipActive]}
+                        >
+                          <Text style={[styles.chipLabel, isSelected && styles.chipLabelActive]}>
+                            {family.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                    <Pressable
+                      onPress={() =>
+                        updatePicker(setPickerLevelMode(catalogPicker, "family", "custom"))
+                      }
+                      style={styles.chip}
                     >
-                      {getGenerationLabel(generation)}
-                    </Text>
-                    {specsHint ? (
-                      <Text
-                        style={[
-                          styles.generationSubtitle,
-                          isSelected && styles.generationSubtitleActive,
-                        ]}
-                      >
-                        {specsHint}
-                      </Text>
-                    ) : null}
+                      <Text style={styles.chipLabel}>Другое…</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <TextInput
+                  style={styles.input}
+                  value={catalogPicker.familyName}
+                  onChangeText={(familyName) => updatePicker({ ...catalogPicker, familyName })}
+                  placeholder="Модель (семейство)"
+                  placeholderTextColor={c.textTertiary}
+                />
+                {catalogPicker.brandMode === "catalog" ? (
+                  <Pressable
+                    onPress={() => updatePicker(setPickerLevelMode(catalogPicker, "family", "catalog"))}
+                  >
+                    <Text style={styles.linkText}>Выбрать из списка</Text>
                   </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
-          {formErrors.motorcycleGenerationId ? (
-            <Text style={styles.inlineErrorText}>{formErrors.motorcycleGenerationId}</Text>
-          ) : null}
-        </View>
+                ) : null}
+              </>
+            )}
+            {formErrors.motorcycleModelFamilyId ? (
+              <Text style={styles.inlineErrorText}>{formErrors.motorcycleModelFamilyId}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {isFamilyLevelReady(catalogPicker) ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Модификация *</Text>
+            {catalogPicker.variantMode === "catalog" ? (
+              <>
+                {catalogPicker.familyMode === "catalog" && isLoadingVariants ? (
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator size="small" color={c.textPrimary} />
+                    <Text style={styles.loadingText}>Загрузка модификаций...</Text>
+                  </View>
+                ) : null}
+                {!(catalogPicker.familyMode === "catalog" && isLoadingVariants) ? (
+                  <View style={styles.chipsWrap}>
+                    {variants.map((variant) => {
+                      const isSelected = variant.id === catalogPicker.variantId;
+                      return (
+                        <Pressable
+                          key={variant.id}
+                          onPress={() =>
+                            updatePicker({
+                              ...setPickerLevelMode(catalogPicker, "variant", "catalog"),
+                              variantId: variant.id,
+                            })
+                          }
+                          style={[styles.chip, isSelected && styles.chipActive]}
+                        >
+                          <Text style={[styles.chipLabel, isSelected && styles.chipLabelActive]}>
+                            {variant.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                    <Pressable
+                      onPress={() =>
+                        updatePicker(setPickerLevelMode(catalogPicker, "variant", "custom"))
+                      }
+                      style={styles.chip}
+                    >
+                      <Text style={styles.chipLabel}>Другая…</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <TextInput
+                  style={styles.input}
+                  value={catalogPicker.variantName}
+                  onChangeText={(variantName) => updatePicker({ ...catalogPicker, variantName })}
+                  placeholder="Модификация *"
+                  placeholderTextColor={c.textTertiary}
+                />
+                {catalogPicker.familyMode === "catalog" ? (
+                  <Pressable
+                    onPress={() => updatePicker(setPickerLevelMode(catalogPicker, "variant", "catalog"))}
+                  >
+                    <Text style={styles.linkText}>Выбрать из списка</Text>
+                  </Pressable>
+                ) : null}
+              </>
+            )}
+            {formErrors.motorcycleVariantId ? (
+              <Text style={styles.inlineErrorText}>{formErrors.motorcycleVariantId}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {isVariantLevelReady(catalogPicker) ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Поколение *</Text>
+            {showCustomGeneration ? (
+              <>
+                <TextInput
+                  style={styles.input}
+                  value={catalogPicker.yearFrom}
+                  onChangeText={(yearFrom) =>
+                    updatePicker({
+                      ...catalogPicker,
+                      generationMode: "custom",
+                      generationId: "",
+                      yearFrom,
+                    })
+                  }
+                  placeholder="Год от *"
+                  keyboardType="number-pad"
+                  placeholderTextColor={c.textTertiary}
+                />
+                <TextInput
+                  style={styles.input}
+                  value={catalogPicker.yearTo}
+                  onChangeText={(yearTo) =>
+                    updatePicker({
+                      ...catalogPicker,
+                      generationMode: "custom",
+                      generationId: "",
+                      yearTo,
+                    })
+                  }
+                  placeholder="Год до (опционально)"
+                  keyboardType="number-pad"
+                  placeholderTextColor={c.textTertiary}
+                />
+                <TextInput
+                  style={styles.input}
+                  value={catalogPicker.userComment}
+                  onChangeText={(userComment) => updatePicker({ ...catalogPicker, userComment })}
+                  placeholder="Комментарий для модератора (опционально)"
+                  placeholderTextColor={c.textTertiary}
+                />
+                {catalogPicker.variantMode === "catalog" ? (
+                  <Pressable
+                    onPress={() =>
+                      updatePicker(setPickerLevelMode(catalogPicker, "generation", "catalog"))
+                    }
+                  >
+                    <Text style={styles.linkText}>Выбрать поколение из списка</Text>
+                  </Pressable>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {isLoadingGenerations ? (
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator size="small" color={c.textPrimary} />
+                    <Text style={styles.loadingText}>Загрузка поколений...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.generationList}>
+                    {generations.map((generation) => {
+                      const isSelected = generation.id === catalogPicker.generationId;
+                      const specsHint = getGenerationSpecsHint(generation);
+                      return (
+                        <Pressable
+                          key={generation.id}
+                          onPress={() =>
+                            updatePicker({
+                              ...catalogPicker,
+                              generationMode: "catalog",
+                              generationId: generation.id,
+                              yearFrom: "",
+                              yearTo: "",
+                            })
+                          }
+                          style={[
+                            styles.generationCard,
+                            isSelected && styles.generationCardActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.generationTitle,
+                              isSelected && styles.generationTitleActive,
+                            ]}
+                          >
+                            {getGenerationLabel(generation)}
+                          </Text>
+                          {specsHint ? (
+                            <Text
+                              style={[
+                                styles.generationSubtitle,
+                                isSelected && styles.generationSubtitleActive,
+                              ]}
+                            >
+                              {specsHint}
+                            </Text>
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+                <Pressable
+                  onPress={() =>
+                    updatePicker(setPickerLevelMode(catalogPicker, "generation", "custom"))
+                  }
+                >
+                  <Text style={styles.linkText}>Моего поколения нет</Text>
+                </Pressable>
+              </>
+            )}
+            {formErrors.motorcycleGenerationId ? (
+              <Text style={styles.inlineErrorText}>{formErrors.motorcycleGenerationId}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {requiresCatalogRequest(catalogPicker) && isVariantLevelReady(catalogPicker) ? (
+          <View style={styles.noticeBox}>
+            <Text style={styles.noticeText}>
+              Новая модель будет отправлена на модерацию вместе с сохранением мотоцикла.
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Базовые данные</Text>
@@ -647,7 +792,7 @@ export default function NewVehicleScreen() {
         </View>
 
         <Pressable
-          onPress={submitCreateVehicle}
+          onPress={() => void submitCreateVehicle()}
           disabled={isSaving || vehicleLimitReached}
           style={[styles.submitButton, (isSaving || vehicleLimitReached) && styles.submitButtonDisabled]}
         >
@@ -692,11 +837,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: c.textPrimary,
-  },
-  hintText: {
-    marginTop: 8,
-    fontSize: 13,
-    color: c.textMuted,
   },
   loadingRow: {
     marginTop: 10,
@@ -808,5 +948,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: c.onPrimaryAction,
+  },
+  linkText: {
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: "600",
+    color: c.primaryAction,
+  },
+  noticeBox: {
+    marginTop: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    backgroundColor: "#FFFBEB",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  noticeText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#92400E",
   },
 });

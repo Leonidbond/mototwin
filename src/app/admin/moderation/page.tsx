@@ -7,6 +7,8 @@ import { ModerationConsole } from "./_components/ModerationConsole";
 import { ruAdmin } from "../_locales/ru";
 
 const VALID: AdminModerationQueueKey[] = [
+  "pendingCatalogRequests",
+  "rejectedCatalogRequests",
   "pendingMasters",
   "pendingReports",
   "needsReviewReports",

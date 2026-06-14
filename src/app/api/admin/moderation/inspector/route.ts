@@ -12,7 +12,10 @@ export async function GET(request: Request) {
     const id = parseSearchParamText(url.searchParams.get("id"), { max: 64 });
     if (
       !id ||
-      (kind !== "PART_MASTER" && kind !== "FITMENT_REPORT" && kind !== "FITMENT_CONFIDENCE")
+      (kind !== "PART_MASTER" &&
+        kind !== "FITMENT_REPORT" &&
+        kind !== "FITMENT_CONFIDENCE" &&
+        kind !== "CATALOG_REQUEST")
     ) {
       return NextResponse.json({ error: "Неверные параметры" }, { status: 400 });
     }

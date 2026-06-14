@@ -4,6 +4,8 @@ import { requireAnyAdmin, toAdminErrorResponse } from "@/lib/admin-auth";
 import { loadAdminModerationQueue } from "@/lib/admin-moderation";
 
 const VALID: AdminModerationQueueKey[] = [
+  "pendingCatalogRequests",
+  "rejectedCatalogRequests",
   "pendingMasters",
   "pendingReports",
   "needsReviewReports",

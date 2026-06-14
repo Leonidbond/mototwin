@@ -12,30 +12,55 @@ import {
 } from "../_shared/current-user-context";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 import { boundedInt, boundedText, boundedTextOptional, strictObject } from "@/lib/http/input-validation";
+import { ensureCatalogPlaceholder } from "@/lib/motorcycle-catalog-placeholder";
+import { createCatalogRequestSchema } from "@/lib/motorcycle-catalog-request-validation";
+import {
+  CatalogRequestAlreadyExistsError,
+  CatalogRequestValidationError,
+  createMotorcycleCatalogRequestForUser,
+} from "@/lib/motorcycle-catalog-request-service";
 
-// MT-SEC-068 + MT-SEC-070: strictObject blocks mass assignment; nickname/vin
-// length-capped; nested rideProfile object is also strict.
+const rideProfileSchema = strictObject({
+  usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
+  ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
+  loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
+  usageIntensity: z.enum(["LOW", "MEDIUM", "HIGH"]),
+});
+
 const createVehicleSchema = strictObject({
-  motorcycleBrandId: boundedText({ max: 64 }),
-  motorcycleModelFamilyId: boundedText({ max: 64 }),
-  motorcycleVariantId: boundedText({ max: 64 }),
-  motorcycleGenerationId: boundedText({ max: 64 }),
+  motorcycleBrandId: boundedText({ max: 64 }).optional(),
+  motorcycleModelFamilyId: boundedText({ max: 64 }).optional(),
+  motorcycleVariantId: boundedText({ max: 64 }).optional(),
+  motorcycleGenerationId: boundedText({ max: 64 }).optional(),
+  catalogRequestId: boundedText({ max: 64 }).optional(),
+  catalogRequest: createCatalogRequestSchema.optional(),
   nickname: boundedTextOptional({ max: 120 }),
-  // VIN is 17 chars max per ISO 3779; allow some slack for legacy inputs.
   vin: boundedTextOptional({ max: 32 }),
   odometer: boundedInt({ min: 0, max: 10_000_000 }),
   engineHours: boundedInt({ min: 0, max: 1_000_000 }).nullable(),
-  rideProfile: strictObject({
-    usageType: z.enum(["CITY", "HIGHWAY", "MIXED", "OFFROAD"]),
-    ridingStyle: z.enum(["CALM", "ACTIVE", "AGGRESSIVE"]),
-    loadType: z.enum(["SOLO", "PASSENGER", "LUGGAGE", "PASSENGER_LUGGAGE"]),
-    usageIntensity: z.enum(["LOW", "MEDIUM", "HIGH"]),
-  }),
+  rideProfile: rideProfileSchema,
+}).superRefine((data, ctx) => {
+  const hasCatalogRequestId = Boolean(data.catalogRequestId?.trim());
+  const hasCatalogRequestDraft = Boolean(data.catalogRequest);
+  const hasTree =
+    Boolean(data.motorcycleBrandId?.trim()) &&
+    Boolean(data.motorcycleModelFamilyId?.trim()) &&
+    Boolean(data.motorcycleVariantId?.trim()) &&
+    Boolean(data.motorcycleGenerationId?.trim());
+
+  const modeCount = [hasCatalogRequestId, hasCatalogRequestDraft, hasTree].filter(Boolean).length;
+  if (modeCount !== 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        "Укажите либо catalogRequestId, либо catalogRequest, либо полный набор FK каталога.",
+    });
+  }
 });
 
 export async function POST(request: NextRequest) {
   try {
-    const json = await parseJsonBody<unknown>(request, { maxBytes: 8 * 1024 });
+    const json = await parseJsonBody<unknown>(request, { maxBytes: 16 * 1024 });
     const data = createVehicleSchema.parse(json);
     const currentUser = await getCurrentUserContext();
     const subscription = await getOrCreateUserSubscription(currentUser.userId);
@@ -60,33 +85,103 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    /** Validate the 4-level FK chain belongs together before creating the vehicle. */
-    const generation = await prisma.motorcycleGeneration.findFirst({
-      where: {
-        id: data.motorcycleGenerationId,
-        variantId: data.motorcycleVariantId,
-        variant: {
-          familyId: data.motorcycleModelFamilyId,
-          family: { brandId: data.motorcycleBrandId },
+    let motorcycleBrandId = data.motorcycleBrandId?.trim() ?? "";
+    let motorcycleModelFamilyId = data.motorcycleModelFamilyId?.trim() ?? "";
+    let motorcycleVariantId = data.motorcycleVariantId?.trim() ?? "";
+    let motorcycleGenerationId = data.motorcycleGenerationId?.trim() ?? "";
+    let pendingCatalogRequestId: string | null = null;
+
+    const catalogRequestId = data.catalogRequestId?.trim();
+    if (catalogRequestId) {
+      const catalogRequest = await prisma.motorcycleCatalogRequest.findFirst({
+        where: {
+          id: catalogRequestId,
+          submittedByUserId: currentUser.userId,
+          status: "PENDING",
         },
-      },
-      select: { id: true },
-    });
-    if (!generation) {
-      return NextResponse.json(
-        { error: "Указанные бренд/семейство/модификация/поколение не согласованы." },
-        { status: 400 }
-      );
+      });
+      if (!catalogRequest) {
+        return NextResponse.json(
+          { error: "Заявка на модель не найдена или уже обработана." },
+          { status: 404 }
+        );
+      }
+
+      const placeholder = await ensureCatalogPlaceholder(prisma);
+      motorcycleBrandId = placeholder.brandId;
+      motorcycleModelFamilyId = placeholder.familyId;
+      motorcycleVariantId = placeholder.variantId;
+      motorcycleGenerationId = placeholder.generationId;
+      pendingCatalogRequestId = catalogRequest.id;
+    } else if (data.catalogRequest) {
+      const placeholder = await ensureCatalogPlaceholder(prisma);
+
+      const vehicle = await prisma.$transaction(async (tx) => {
+        const { request: catalogRequest } = await createMotorcycleCatalogRequestForUser({
+          userId: currentUser.userId,
+          body: data.catalogRequest!,
+          tx,
+        });
+
+        return tx.vehicle.create({
+          data: {
+            userId: currentUser.userId,
+            garageId: currentUser.garageId,
+            motorcycleBrandId: placeholder.brandId,
+            motorcycleModelFamilyId: placeholder.familyId,
+            motorcycleVariantId: placeholder.variantId,
+            motorcycleGenerationId: placeholder.generationId,
+            pendingCatalogRequestId: catalogRequest.id,
+            nickname: data.nickname || null,
+            vin: data.vin || null,
+            odometer: data.odometer,
+            engineHours: data.engineHours,
+            rideProfile: {
+              create: {
+                usageType: data.rideProfile.usageType,
+                ridingStyle: data.rideProfile.ridingStyle,
+                loadType: data.rideProfile.loadType,
+                usageIntensity: data.rideProfile.usageIntensity,
+              },
+            },
+          },
+          include: vehicleWireInclude,
+        });
+      });
+
+      const payload: CreateVehicleResponse = {
+        vehicle: toGarageVehicleItem(vehicle),
+      };
+      return NextResponse.json(payload, { status: 201 });
+    } else {
+      const generation = await prisma.motorcycleGeneration.findFirst({
+        where: {
+          id: motorcycleGenerationId,
+          variantId: motorcycleVariantId,
+          variant: {
+            familyId: motorcycleModelFamilyId,
+            family: { brandId: motorcycleBrandId, isCatalogPlaceholder: false },
+          },
+        },
+        select: { id: true },
+      });
+      if (!generation) {
+        return NextResponse.json(
+          { error: "Указанные бренд/семейство/модификация/поколение не согласованы." },
+          { status: 400 }
+        );
+      }
     }
 
     const vehicle = await prisma.vehicle.create({
       data: {
         userId: currentUser.userId,
         garageId: currentUser.garageId,
-        motorcycleBrandId: data.motorcycleBrandId,
-        motorcycleModelFamilyId: data.motorcycleModelFamilyId,
-        motorcycleVariantId: data.motorcycleVariantId,
-        motorcycleGenerationId: data.motorcycleGenerationId,
+        motorcycleBrandId,
+        motorcycleModelFamilyId,
+        motorcycleVariantId,
+        motorcycleGenerationId,
+        pendingCatalogRequestId,
         nickname: data.nickname || null,
         vin: data.vin || null,
         odometer: data.odometer,
@@ -114,6 +209,15 @@ export async function POST(request: NextRequest) {
     const currentUserContextError = toCurrentUserContextErrorResponse(error);
     if (currentUserContextError) {
       return currentUserContextError;
+    }
+    if (error instanceof CatalogRequestAlreadyExistsError) {
+      return NextResponse.json(
+        { error: error.message, generationId: error.generationId },
+        { status: 409 }
+      );
+    }
+    if (error instanceof CatalogRequestValidationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
     if (error instanceof z.ZodError) {
       return NextResponse.json(

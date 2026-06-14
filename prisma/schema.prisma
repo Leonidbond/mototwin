@@ -210,6 +210,14 @@ enum NotificationType {
   ENGINE_HOURS_UPDATE_REQUIRED
   MISSING_SERVICE_DATA
   WEEKLY_DIGEST
+  CATALOG_REQUEST_APPROVED
+  CATALOG_REQUEST_REJECTED
+}
+
+enum MotorcycleCatalogRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum NotificationSeverity {
@@ -371,6 +379,8 @@ model User {
   accounts                  Account[]
   sessions                  Session[]
   passwordResetTokens       PasswordResetToken[]
+  motorcycleCatalogRequestsSubmitted MotorcycleCatalogRequest[] @relation("CatalogRequestSubmittedBy")
+  motorcycleCatalogRequestsReviewed  MotorcycleCatalogRequest[] @relation("CatalogRequestReviewedBy")
 
   @@index([adminRole])
   @@index([isBlocked])
@@ -541,11 +551,14 @@ model MotorcycleBrand {
   id        String   @id @default(cuid())
   name      String   @unique
   slug      String   @unique
+  /** System placeholder brand for vehicles awaiting catalog moderation. */
+  isCatalogPlaceholder Boolean @default(false)
   createdAt DateTime @default(now())
 
   families MotorcycleModelFamily[]
   vehicles Vehicle[]
   fitments PartFitment[]
+  catalogRequests MotorcycleCatalogRequest[]
 
   @@map("motorcycle_brands")
 }
@@ -564,6 +577,7 @@ model MotorcycleModelFamily {
   variants MotorcycleVariant[]
   vehicles Vehicle[]
   fitments PartFitment[]
+  catalogRequests MotorcycleCatalogRequest[]
 
   @@unique([brandId, slug])
   @@map("motorcycle_model_families")
@@ -618,11 +632,55 @@ model MotorcycleGeneration {
   fitments           PartFitment[]
   fitmentReports     FitmentReport[]
   fitmentConfidences FitmentConfidence[]
+  resolvedCatalogRequests MotorcycleCatalogRequest[]
 
   @@unique([variantId, name, yearFrom, yearTo])
   @@index([yearFrom, yearTo])
   @@index([supportLevel])
   @@map("motorcycle_generations")
+}
+
+/**
+ * User-submitted request to add a brand / model family / variant to the catalog.
+ * Approved requests create catalog rows and re-link pending vehicles.
+ */
+model MotorcycleCatalogRequest {
+  id                String @id @default(cuid())
+  submittedByUserId String
+  status            MotorcycleCatalogRequestStatus @default(PENDING)
+
+  motorcycleBrandId       String?
+  motorcycleModelFamilyId String?
+
+  brandName   String?
+  familyName  String?
+  variantName String
+  yearFrom    Int
+  yearTo      Int?
+  userComment String?
+
+  resolvedBrandName   String?
+  resolvedFamilyName  String?
+  resolvedVariantName String?
+  resolvedYearFrom    Int?
+  resolvedYearTo      Int?
+  moderationComment   String?
+
+  resolvedGenerationId String?
+  reviewedByUserId     String?
+  reviewedAt           DateTime?
+  createdAt            DateTime @default(now())
+
+  submittedBy        User                  @relation("CatalogRequestSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: Cascade)
+  reviewedBy         User?                 @relation("CatalogRequestReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  motorcycleBrand    MotorcycleBrand?      @relation(fields: [motorcycleBrandId], references: [id], onDelete: SetNull)
+  motorcycleModelFamily MotorcycleModelFamily? @relation(fields: [motorcycleModelFamilyId], references: [id], onDelete: SetNull)
+  resolvedGeneration MotorcycleGeneration? @relation(fields: [resolvedGenerationId], references: [id], onDelete: SetNull)
+  vehicles           Vehicle[]
+
+  @@index([submittedByUserId, status])
+  @@index([status, createdAt])
+  @@map("motorcycle_catalog_requests")
 }
 
 /**
@@ -675,6 +733,7 @@ model Vehicle {
   motorcycleModelFamilyId  String
   motorcycleVariantId      String
   motorcycleGenerationId   String
+  pendingCatalogRequestId  String?
   nickname                 String?
   vin                      String?
   odometer                 Int       @default(0)
@@ -683,6 +742,7 @@ model Vehicle {
   updatedAt                DateTime  @updatedAt
 
   user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pendingCatalogRequest  MotorcycleCatalogRequest? @relation(fields: [pendingCatalogRequestId], references: [id], onDelete: SetNull)
   garage                 Garage?               @relation(fields: [garageId], references: [id], onDelete: SetNull)
   motorcycleBrand        MotorcycleBrand       @relation(fields: [motorcycleBrandId], references: [id], onDelete: Restrict)
   motorcycleModelFamily  MotorcycleModelFamily @relation(fields: [motorcycleModelFamilyId], references: [id], onDelete: Restrict)
@@ -706,6 +766,7 @@ model Vehicle {
   @@index([garageId, trashedAt])
   @@index([garageId, userId])
   @@index([motorcycleBrandId, motorcycleModelFamilyId, motorcycleVariantId, motorcycleGenerationId])
+  @@index([pendingCatalogRequestId])
   @@map("vehicles")
 }
 

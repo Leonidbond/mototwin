@@ -6,4 +6,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Production deploy
 
-When deploying to VPS, read and follow `.cursor/skills/mototwin-deploy/SKILL.md` (SSH `mototwin-vps`, app path `/opt/mototwin/app/mototwin`).
+When deploying to VPS, read and follow `.cursor/skills/mototwin-deploy/SKILL.md` (SSH **`mototwin-vps2`**, prod `https://mototwin.space`, app path `/opt/mototwin/app/mototwin`). Legacy host `mototwin-vps` (`mototwin.online`) — не использовать.

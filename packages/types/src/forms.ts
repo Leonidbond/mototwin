@@ -110,11 +110,32 @@ export type VehicleProfileFormValues = EditVehicleProfileFormValues;
 
 export type EditVehicleProfilePayload = UpdateVehicleProfilePayload;
 
+export type CatalogPickerLevelMode = "catalog" | "custom";
+
+export type MotorcycleCatalogPickerFormState = {
+  brandMode: CatalogPickerLevelMode;
+  brandId: string;
+  brandName: string;
+  familyMode: CatalogPickerLevelMode;
+  familyId: string;
+  familyName: string;
+  variantMode: CatalogPickerLevelMode;
+  variantId: string;
+  variantName: string;
+  generationMode: CatalogPickerLevelMode;
+  generationId: string;
+  yearFrom: string;
+  yearTo: string;
+  userComment: string;
+};
+
 export type AddMotorcycleFormValues = {
   motorcycleBrandId: string;
   motorcycleModelFamilyId: string;
   motorcycleVariantId: string;
   motorcycleGenerationId: string;
+  catalogRequestId: string;
+  catalogPicker: MotorcycleCatalogPickerFormState;
   nickname: string;
   vin: string;
   odometer: string;

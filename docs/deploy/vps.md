@@ -2,6 +2,32 @@
 
 Для агента Cursor: skill **mototwin-deploy** в `.cursor/skills/mototwin-deploy/` (SSH, пути, команды, чеклист).
 
+## Production (VPS2 — канонический)
+
+| Параметр | Значение |
+|----------|----------|
+| Публичный URL | `https://mototwin.space` |
+| SSH | `ssh mototwin-vps2` (`158.160.161.173`, `lbondarenko`) |
+| App root | `/opt/mototwin/app/mototwin` |
+| App user | `deploy` (`sudo -u deploy` для git/npm) |
+| systemd | `mototwin` |
+| App `.env` | `/opt/mototwin/app/mototwin/.env` |
+| Postgres `.env` | `/opt/mototwin/.env` |
+
+Legacy (retired): `mototwin-vps` (`195.24.71.143`, `mototwin.online`) — не деплоить без явной просьбы.
+
+Быстрое обновление:
+
+```bash
+ssh mototwin-vps2
+cd /opt/mototwin/app/mototwin
+sudo -u deploy git pull origin main
+sudo -u deploy bash -c 'cd /opt/mototwin/app/mototwin && npm ci && npx prisma migrate deploy && npx prisma generate && npm run db:seed:motorcycle && NODE_OPTIONS=--max-old-space-size=4096 npm run build'
+sudo systemctl restart mototwin
+```
+
+Или `bash deploy/scripts/deploy-app.sh` (restart от `lbondarenko`: `sudo systemctl restart mototwin`).
+
 ## Требования
 
 - Ubuntu 22.04/24.04, 2+ vCPU, **4 GB RAM минимум** (сборка Next.js с TypeScript нужна ~3–4 GB heap; `npm run build` задаёт `NODE_OPTIONS=--max-old-space-size=4096`)
@@ -97,7 +123,7 @@ sudo systemctl start mototwin
 
 Конфиг `deploy/nginx/mototwin.conf` — production-ready: TLS Mozilla intermediate, HSTS, security headers, HTTP→HTTPS redirect, разумные таймауты и `client_max_body_size 16m` под admin-импорты (см. `MT-SEC-029`).
 
-Замените `beta.mototwin.ru` в конфиге (3 места: оба `server_name` + закомментированные пути к сертификату), затем:
+Замените домен в конфиге на **`mototwin.space`** (оба `server_name` + пути к сертификату), затем:
 
 ```bash
 # 1. Первичная установка БЕЗ TLS — закомментируйте HTTPS server-блок
@@ -110,13 +136,13 @@ sudo nginx -t && sudo systemctl reload nginx
 
 # 2. Выпустите сертификат. certbot --nginx сам отредактирует конфиг,
 #    добавив `ssl_certificate` / `ssl_certificate_key` пути.
-sudo certbot --nginx -d beta.mototwin.ru
+sudo certbot --nginx -d mototwin.space
 
 # 3. Раскомментируйте HTTPS server-блок (если делали шаг 1) и перезагрузите:
 sudo nginx -t && sudo systemctl reload nginx
 
 # 4. Проверьте, что HSTS + headers доходят до клиента:
-curl -sI https://beta.mototwin.ru/ | grep -iE 'strict-transport|x-frame|x-content-type|referrer|permissions-policy|cross-origin-opener'
+curl -sI https://mototwin.space/ | grep -iE 'strict-transport|x-frame|x-content-type|referrer|permissions-policy|cross-origin-opener'
 
 # 5. Авто-обновление сертификата (certbot ставит systemd timer):
 sudo systemctl status certbot.timer
@@ -124,9 +150,9 @@ sudo systemctl status certbot.timer
 
 Что важно проверить руками после установки:
 
-- `curl -I http://beta.mototwin.ru/` отвечает `301 → https://...`.
-- `curl -I https://beta.mototwin.ru/` возвращает заголовки `Strict-Transport-Security`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`.
-- [Mozilla Observatory](https://observatory.mozilla.org/) для `beta.mototwin.ru` — минимум **B**, цель **A** (см. `MT-SEC-006`/`MT-SEC-047` — CSP появится отдельной итерацией).
+- `curl -I http://mototwin.space/` отвечает `301 → https://...`.
+- `curl -I https://mototwin.space/` возвращает заголовки `Strict-Transport-Security`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`.
+- [Mozilla Observatory](https://observatory.mozilla.org/) для `mototwin.space` — минимум **B**, цель **A** (см. `MT-SEC-006`/`MT-SEC-047` — CSP появится отдельной итерацией).
 - [SSL Labs](https://www.ssllabs.com/ssltest/) — минимум **A** (intermediate profile + TLS 1.2/1.3 give A out of the box).
 
 ## 6. Обновления
