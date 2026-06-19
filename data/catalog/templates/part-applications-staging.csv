@@ -1,0 +1,2 @@
+application_key,staging_row_key,source_key,brand,model_family,variant,generation,year_from,year_to,market,node_id,node_applicability,normalized_part_number,application_type,review_status,safety_critical,confidence,verified_at
+BMW|R 1300 GS|base|KA1|ENGINE.LUBE.FILTER|11427105320|EU,BMW|R 1300 GS|base|KA1|ENGINE.LUBE.FILTER|11427105320|EU,example-dealer.official-dealer-public-catalog.eu,BMW,R 1300 GS,base,KA1,2024,,EU,ENGINE.LUBE.FILTER,APPLICABLE,11427105320,OEM_REPLACEMENT,NEEDS_REVIEW,false,MEDIUM,2026-06-16T12:00:00.000Z

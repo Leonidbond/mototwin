@@ -604,6 +604,7 @@ export type AdminModerationQueueKey =
   | "pendingMasters"
   | "pendingCatalogRequests"
   | "rejectedCatalogRequests"
+  | "stagingApplications"
   | "pendingReports"
   | "needsReviewReports"
   | "safetyCriticalReports"
@@ -615,6 +616,7 @@ export interface AdminModerationCountsWire {
   pendingMasters: number;
   pendingCatalogRequests: number;
   rejectedCatalogRequests: number;
+  stagingApplications: number;
   pendingReports: number;
   needsReviewReports: number;
   safetyCriticalReports: number;
@@ -625,7 +627,7 @@ export interface AdminModerationCountsWire {
 
 export interface AdminModerationItemWire {
   id: string;
-  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE" | "CATALOG_REQUEST";
+  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE" | "CATALOG_REQUEST" | "STAGING_APPLICATION";
   title: string;
   subtitle: string | null;
   status: string;
@@ -641,7 +643,7 @@ export interface AdminModerationListResponse {
 
 export interface AdminModerationInspectorWire {
   id: string;
-  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE" | "CATALOG_REQUEST";
+  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE" | "CATALOG_REQUEST" | "STAGING_APPLICATION";
   heading: string;
   subheading: string;
   status: string;
@@ -673,8 +675,9 @@ export interface AdminFitmentMatrixResponse {
   cells: AdminFitmentMatrixCellWire[];
 }
 
-export type AdminImportBatchTypeWire =
+export type   AdminImportBatchTypeWire =
   | "PARTS"
+  | "PARTS_STAGING"
   | "PART_ALIASES"
   | "FITMENT_RULES"
   | "SERVICE_RULES"

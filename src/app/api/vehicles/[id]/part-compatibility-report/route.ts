@@ -19,6 +19,11 @@ import {
   parseVehicleRideProfileSnapshot,
 } from "@mototwin/domain";
 import { prisma } from "@/lib/prisma";
+import {
+  buildDiagramHintRu,
+  buildProvenanceLineRu,
+  mapCatalogApplicationToEvidenceWire,
+} from "@/lib/catalog-staging/evidence-wire";
 import { toCurrentUserContextErrorResponse } from "@/app/api/_shared/current-user-context";
 import { getVehicleInCurrentContext } from "@/app/api/_shared/vehicle-context";
 import { buildRecommendationsForNodeWithCommunity } from "@/lib/build-recommendations-for-node-with-community";
@@ -190,12 +195,59 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const flatFitments = skusForCatalog.flatMap((s) => s.fitments);
-    const structured = analyzeStructuredCatalogSignals(flatFitments, {
+    const structuredSignals = analyzeStructuredCatalogSignals(flatFitments, {
       motorcycleBrandId: vehicle.motorcycleBrandId,
       motorcycleModelFamilyId: vehicle.motorcycleModelFamilyId,
       motorcycleVariantId: vehicle.motorcycleVariantId,
       motorcycleGenerationId,
     });
+
+    const skuIds = skusForCatalog.map((s) => s.id);
+    const catalogEvidenceRows = await prisma.partCatalogApplication.findMany({
+      where: {
+        promotedSkuId: { in: skuIds },
+        nodeId,
+        motorcycleGenerationId,
+        reviewStatus: "MANUAL_APPROVED",
+      },
+      include: { source: true },
+      orderBy: [{ confidence: "desc" }, { parsedAt: "desc" }],
+    });
+    const primaryEvidence = catalogEvidenceRows[0]
+      ? {
+          ...catalogEvidenceRows[0],
+          source: catalogEvidenceRows[0].source,
+        }
+      : null;
+    const evidenceWireList = catalogEvidenceRows.map((row) => {
+      const wire = mapCatalogApplicationToEvidenceWire({ ...row, source: row.source });
+      return {
+        ...wire,
+        partName: row.partName,
+        partNumber: row.partNumber,
+      };
+    });
+
+    const primaryEvidenceWire = primaryEvidence
+      ? mapCatalogApplicationToEvidenceWire({
+          ...primaryEvidence,
+          source: primaryEvidence.source,
+        })
+      : null;
+
+    const structured = {
+      catalogLineRu: structuredSignals.catalogLineRu,
+      provenanceLineRu: primaryEvidenceWire ? buildProvenanceLineRu(primaryEvidenceWire) : null,
+      diagramHint: primaryEvidenceWire ? buildDiagramHintRu(primaryEvidenceWire) : null,
+      marketMismatch: primaryEvidence
+        ? !["GLOBAL", primaryEvidence.market].includes(
+            String(vehicle.motorcycleGeneration.marketRegion ?? "GLOBAL")
+          ) && primaryEvidence.market !== "GLOBAL"
+        : false,
+      hasExactVariantFit: structuredSignals.hasExactVariantFit,
+      hasModelYearFit: structuredSignals.hasModelYearFit,
+      hasGenericNodeFit: structuredSignals.hasGenericNodeFit,
+    };
 
     const counts: Partial<Record<FitmentReportResultWire, number>> = {};
     for (const row of groupedByResult) {
@@ -380,6 +432,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       sourcePriority,
       reports,
       relatedParts,
+      catalogEvidence: evidenceWireList,
     };
 
     return NextResponse.json(payload);

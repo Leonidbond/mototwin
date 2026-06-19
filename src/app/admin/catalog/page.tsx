@@ -43,6 +43,9 @@ export default async function AdminCatalogPage({ searchParams }: AdminCatalogPag
       self={self}
       rightSlot={<CreatePartButton canMutate={canMutate(self.role)} />}
     >
+      <p style={{ margin: "0 0 12px", fontSize: 13 }}>
+        <a href="/admin/catalog/staging">Staging каталога (parts-staging.csv)</a>
+      </p>
       <AdminFilterBar
         fields={[
           { key: "q", label: "Поиск", search: true, placeholder: "Бренд, SKU или alias" },

@@ -1,0 +1,2 @@
+source_key,source_name,source_type,source_region,brand,base_url,license_notes,scraping_allowed_status,last_checked_at
+example-dealer.official-dealer-public-catalog.eu,Example Dealer Parts,OFFICIAL_DEALER_PUBLIC_CATALOG,EU,BMW,https://parts.example.com,Public catalog; no bulk scrape,RESTRICTED,2026-06-16T12:00:00.000Z

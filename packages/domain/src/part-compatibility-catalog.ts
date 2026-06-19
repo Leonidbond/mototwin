@@ -8,6 +8,9 @@ type FitmentRow = {
 
 export type StructuredCatalogSignals = {
   catalogLineRu: string | null;
+  provenanceLineRu: string | null;
+  diagramHint: string | null;
+  marketMismatch: boolean;
   hasExactGenerationFit: boolean;
   hasVariantFit: boolean;
   hasFamilyFit: boolean;
@@ -99,6 +102,9 @@ export function analyzeStructuredCatalogSignals(
 
   return {
     catalogLineRu,
+    provenanceLineRu: null,
+    diagramHint: null,
+    marketMismatch: false,
     hasExactGenerationFit,
     hasVariantFit,
     hasFamilyFit,

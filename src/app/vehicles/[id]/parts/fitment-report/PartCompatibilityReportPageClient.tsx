@@ -817,7 +817,71 @@ export function PartCompatibilityReportPageClient(props: {
               <strong style={{ color: TEXT }}>Каталог (structured): </strong>
               {data.structured.catalogLineRu ?? "Явных строк применимости к модификации не найдено."}
             </div>
+            {data.structured.provenanceLineRu ? (
+              <div style={{ marginTop: 8, fontSize: 13, color: MUTED, lineHeight: 1.5 }}>
+                <strong style={{ color: TEXT }}>Источник каталога: </strong>
+                {data.structured.provenanceLineRu}
+              </div>
+            ) : null}
+            {data.structured.diagramHint ? (
+              <div style={{ marginTop: 8, fontSize: 13, color: MUTED, lineHeight: 1.5 }}>
+                <strong style={{ color: TEXT }}>EPC: </strong>
+                {data.structured.diagramHint}
+              </div>
+            ) : null}
+            {data.structured.marketMismatch ? (
+              <div style={{ marginTop: 8, fontSize: 13, color: "#F59E0B", lineHeight: 1.5 }}>
+                Источник собран для другого рынка — проверьте применимость к вашему региону.
+              </div>
+            ) : null}
           </section>
+
+          {data.catalogEvidence.length > 0 ? (
+            <section style={{ ...sectionCard, marginTop: 16 }}>
+              <h2 style={h2}>Данные каталога MotoTwin</h2>
+              <div style={{ marginTop: 12, overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 520 }}>
+                  <thead>
+                    <tr style={{ color: MUTED, textAlign: "left" as const }}>
+                      <th style={{ padding: "8px 10px", borderBottom: `1px solid ${BORDER}` }}>Деталь</th>
+                      <th style={{ padding: "8px 10px", borderBottom: `1px solid ${BORDER}` }}>Confidence</th>
+                      <th style={{ padding: "8px 10px", borderBottom: `1px solid ${BORDER}` }}>EPC</th>
+                      <th style={{ padding: "8px 10px", borderBottom: `1px solid ${BORDER}` }}>Источник</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.catalogEvidence.map((row) => (
+                      <tr key={row.id}>
+                        <td style={{ padding: "10px", borderBottom: `1px solid ${BORDER}`, color: TEXT }}>
+                          {row.partName}
+                          <div style={{ fontSize: 12, color: MUTED }}>{row.partNumber || "—"}</div>
+                        </td>
+                        <td style={{ padding: "10px", borderBottom: `1px solid ${BORDER}`, color: TEXT }}>
+                          {row.confidence}
+                          {row.evidenceLevel ? (
+                            <div style={{ fontSize: 12, color: MUTED }}>Level {row.evidenceLevel}</div>
+                          ) : null}
+                          {row.regionMatchStatus ? (
+                            <div style={{ fontSize: 12, color: MUTED }}>{row.regionMatchStatus}</div>
+                          ) : null}
+                        </td>
+                        <td style={{ padding: "10px", borderBottom: `1px solid ${BORDER}`, color: MUTED }}>
+                          {row.diagramName || "—"}
+                          {row.diagramPosition ? ` · поз. ${row.diagramPosition}` : ""}
+                          {row.rawQuantity ? ` · qty ${row.rawQuantity}` : ""}
+                        </td>
+                        <td style={{ padding: "10px", borderBottom: `1px solid ${BORDER}` }}>
+                          <a href={row.sourceUrl} target="_blank" rel="noreferrer" style={{ color: BLUE, fontSize: 12 }}>
+                            {row.sourceType}
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
 
           {/* §15 Configuration (MVP: текущая модификация) */}
           <section style={{ ...sectionCard, marginTop: 16 }}>

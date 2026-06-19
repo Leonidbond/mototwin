@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { MERCHANDISE_LABELS_RU, getPickerRecommendationStatsLineRu } from "@mototwin/domain";
+import { MERCHANDISE_LABELS_RU, getPickerCatalogProvenanceLinesRu, getPickerRecommendationStatsLineRu } from "@mototwin/domain";
 import type {
   PartRecommendationViewModel,
   PickerMerchandiseLabel,
@@ -70,6 +70,11 @@ export function PickerRecommendationCard(props: {
         >
           {statsLine}
         </Text>
+        {getPickerCatalogProvenanceLinesRu(rec).slice(0, 3).map((line) => (
+          <Text key={line} style={styles.provenanceLine} numberOfLines={2}>
+            {line}
+          </Text>
+        ))}
       </View>
       <View style={styles.reasonList}>
         {reasons.map((reason, i) => (
@@ -188,6 +193,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
     color: c.textSecondary,
+  },
+  provenanceLine: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 14,
+    color: c.textMuted,
   },
   reasonList: {
     marginTop: 10,

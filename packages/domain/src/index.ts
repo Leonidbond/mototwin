@@ -389,6 +389,16 @@ export {
   getPartSkuViewModelDisplayLines,
 } from "./part-catalog";
 export {
+  catalogConfidenceToNumeric,
+  parseRawQuantity,
+  isCatalogMarketCompatible,
+  parseRawNotesMetadata,
+  formatCatalogConfidenceTierRu,
+  formatSourceTypeRu,
+  formatApplicationTypeRu,
+  getPickerCatalogProvenanceLinesRu,
+} from "./catalog-staging";
+export {
   getPickerFitmentShortLabelRu,
   getPickerSkuCatalogFitHintRu,
   getPickerSkuCatalogConfidencePercent,

@@ -1,11 +1,16 @@
 import {
   buildPartRecommendationViewModel,
   buildPartSkuViewModel,
+  isCatalogMarketCompatible,
   mergeCommunityFitmentIntoRecommendation,
   sortPartRecommendations,
 } from "@mototwin/domain";
 import type { PrismaClient } from "@prisma/client";
 import type { FitmentConfidenceStatus, PartRecommendationViewModel } from "@mototwin/types";
+import {
+  loadCatalogEvidenceBySkuIds,
+  loadNotApplicableNodeIdsForGeneration,
+} from "@/lib/catalog-staging/load-evidence";
 
 /**
  * Vehicle anchor used to classify catalog rows for a node.
@@ -67,6 +72,21 @@ export async function buildRecommendationsForNodeWithCommunity(
   nodeId: string,
   nodeMeta: { code: string; serviceGroup: string | null }
 ): Promise<PartRecommendationViewModel[]> {
+  const generation = await prisma.motorcycleGeneration.findUnique({
+    where: { id: vehicle.motorcycleGenerationId },
+    select: { marketRegion: true },
+  });
+  const vehicleMarket = generation?.marketRegion ?? null;
+
+  const notApplicable = await loadNotApplicableNodeIdsForGeneration(
+    prisma,
+    vehicle.motorcycleGenerationId,
+    [nodeId]
+  );
+  if (notApplicable.has(nodeId)) {
+    return [];
+  }
+
   const rows = await prisma.partSku.findMany({
     where: {
       isActive: true,
@@ -84,6 +104,13 @@ export async function buildRecommendationsForNodeWithCommunity(
       offers: { orderBy: { createdAt: "desc" }, take: 3 },
     },
     take: 60,
+  });
+
+  const skuIds = rows.map((r) => r.id);
+  const evidenceBySkuId = await loadCatalogEvidenceBySkuIds(prisma, {
+    skuIds,
+    nodeId,
+    generationId: vehicle.motorcycleGenerationId,
   });
 
   const masterIds = [...new Set(rows.map((r) => r.partMasterId).filter((id): id is string => Boolean(id)))];
@@ -156,6 +183,11 @@ export async function buildRecommendationsForNodeWithCommunity(
 
     for (const fitment of row.fitments) {
       const isGeneric = (fitment.fitmentType || "").toUpperCase() === "GENERIC_NODE";
+      const isNotApplicable = (fitment.fitmentType || "").toUpperCase() === "NOT_APPLICABLE";
+      if (isNotApplicable) {
+        hasMismatchedAnchor = true;
+        continue;
+      }
       if (isGeneric) {
         hasGenericFitment = true;
       }
@@ -219,11 +251,13 @@ export async function buildRecommendationsForNodeWithCommunity(
     const fitmentConfidence = matchingFitment?.confidence ?? row.fitments[0]?.confidence ?? 0;
     const confidence = Math.max(relationConfidence, fitmentConfidence);
 
-    // Map the buckets back to the legacy boolean inputs of the view-model builder.
-    // Until packages/domain exposes a 6-bucket primitive, anything below "exact"
-    // collapses to "model fit" — VARIANT / FAMILY / BRAND are all confident matches
-    // for the same family lineage. GENERIC stays separate. VERIFY (mismatched anchor
-    // with no other match) becomes a non-confident merch suggestion.
+    const applicationType = matchingFitment?.applicationType ?? matchingFitment?.fitmentType ?? null;
+    const catalogSafetyCritical = Boolean(matchingFitment?.safetyCritical);
+    const marketMismatch = matchingFitment?.market
+      ? !isCatalogMarketCompatible(matchingFitment.market, vehicleMarket)
+      : false;
+    const catalogEvidence = evidenceBySkuId.get(row.id) ?? [];
+
     const hasModelFit = hasExactFit || hasVariantFit || hasFamilyFit || hasBrandFit;
     const onlyMismatched =
       !hasExactFit && !hasVariantFit && !hasFamilyFit && !hasBrandFit && !hasGenericFitment;
@@ -237,6 +271,11 @@ export async function buildRecommendationsForNodeWithCommunity(
       hasModelFit,
       hasGenericFitment,
       fitmentNote: matchingFitment?.note ?? null,
+      applicationType,
+      marketMismatch,
+      catalogSafetyCritical,
+      catalogEvidence,
+      recommendedQuantity: row.defaultQuantity,
     });
 
     const cRow = row.partMasterId ? confidenceByMasterId.get(row.partMasterId) ?? null : null;
@@ -248,8 +287,11 @@ export async function buildRecommendationsForNodeWithCommunity(
       nodeServiceGroup: nodeMeta.serviceGroup,
       nodeCode: nodeMeta.code,
       publishedFitmentReportCount: published,
+      catalogSafetyCritical,
     });
   });
 
-  return sortPartRecommendations(recommendations);
+  return sortPartRecommendations(
+    recommendations.filter((item) => !item.isSpecificationOnly || item.catalogEvidence.length > 0)
+  );
 }

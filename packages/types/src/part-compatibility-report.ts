@@ -1,4 +1,5 @@
 import type { FitmentConfidenceStatus, FitmentReportResultWire, FitmentVoteTypeWire, TrustBadgeWire } from "./fitment-community";
+import type { CatalogEvidenceWire } from "./parts-staging";
 import type { VehicleRideProfile } from "./vehicle";
 
 /** Уровень уверенности для UI (спека §13): не ведущий сырой score. */
@@ -6,9 +7,17 @@ export type CompatibilityConfidenceTierWire = "high" | "medium" | "low";
 
 export type PartCompatibilityStructuredSummaryWire = {
   catalogLineRu: string | null;
+  provenanceLineRu?: string | null;
+  diagramHint?: string | null;
+  marketMismatch?: boolean;
   hasExactVariantFit: boolean;
   hasModelYearFit: boolean;
   hasGenericNodeFit: boolean;
+};
+
+export type PartCompatibilityCatalogEvidenceWire = CatalogEvidenceWire & {
+  partName: string;
+  partNumber: string;
 };
 
 export type PartCompatibilityBreakdownWire = {
@@ -172,4 +181,5 @@ export type PartCompatibilityReportWire = {
   sourcePriority: PartCompatibilitySourcePriorityWire;
   reports: PartCompatibilityReportItemWire[];
   relatedParts: PartCompatibilityRelatedPartWire[];
+  catalogEvidence: PartCompatibilityCatalogEvidenceWire[];
 };

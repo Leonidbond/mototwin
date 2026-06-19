@@ -16,6 +16,7 @@ import { formatRelativeRu } from "../../_components/format";
 const TABS: Array<{ key: AdminModerationQueueKey; label: string }> = [
   { key: "pendingCatalogRequests", label: "Заявки на модели" },
   { key: "pendingMasters", label: "Новые детали" },
+  { key: "stagingApplications", label: "Staging каталога" },
   { key: "pendingReports", label: "Reports на публикацию" },
   { key: "needsReviewReports", label: "Нужна проверка" },
   { key: "safetyCriticalReports", label: "Safety-critical" },

@@ -15,7 +15,8 @@ export async function GET(request: Request) {
       (kind !== "PART_MASTER" &&
         kind !== "FITMENT_REPORT" &&
         kind !== "FITMENT_CONFIDENCE" &&
-        kind !== "CATALOG_REQUEST")
+        kind !== "CATALOG_REQUEST" &&
+        kind !== "STAGING_APPLICATION")
     ) {
       return NextResponse.json({ error: "Неверные параметры" }, { status: 400 });
     }

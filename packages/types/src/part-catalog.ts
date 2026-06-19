@@ -56,6 +56,9 @@ export type PartFitment = {
   fitmentType: string | null;
   confidence: number;
   note: string | null;
+  applicationType?: string | null;
+  catalogConfidence?: string | null;
+  safetyCritical?: boolean;
   createdAt: string;
 };
 
@@ -94,6 +97,8 @@ export type PartSku = {
   sourceUrl: string | null;
   isOem: boolean;
   isActive: boolean;
+  defaultQuantity?: number | null;
+  catalogCategory?: string | null;
   createdAt: string;
   updatedAt: string;
 };

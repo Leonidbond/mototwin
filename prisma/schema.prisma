@@ -324,6 +324,7 @@ enum MotoWeightType {
 
 enum ImportBatchType {
   PARTS
+  PARTS_STAGING
   FITMENT_RULES
   SERVICE_RULES
   MODELS
@@ -340,6 +341,79 @@ enum ImportBatchStatus {
   COMMITTED
   ROLLED_BACK
   FAILED
+}
+
+enum CatalogSourceType {
+  OFFICIAL_EPC
+  OFFICIAL_PUBLIC_CATALOG
+  OFFICIAL_DEALER_PUBLIC_CATALOG
+  AUTHORIZED_DEALER
+  REFERENCE_ONLY
+}
+
+enum CatalogNodeApplicability {
+  APPLICABLE
+  NOT_APPLICABLE
+  UNKNOWN
+}
+
+enum CatalogApplicationType {
+  OEM_REPLACEMENT
+  OEM_SERVICE_ITEM
+  SPECIFICATION_ONLY
+  COMPATIBLE_AFTERMARKET
+  COMMUNITY_REPORTED
+}
+
+enum CatalogReviewStatus {
+  NEW
+  NEEDS_REVIEW
+  MANUAL_APPROVED
+  REJECTED
+  DUPLICATE
+  NOT_APPLICABLE
+}
+
+enum CatalogConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum CatalogMarket {
+  US
+  EU
+  RU
+  GLOBAL
+}
+
+enum CatalogEvidenceLevel {
+  A
+  B
+  C
+  D
+}
+
+enum CatalogVerificationRegion {
+  US
+  EU
+  RU
+  GLOBAL
+  UNKNOWN
+}
+
+enum CatalogRegionMatchStatus {
+  TARGET_REGION_MATCH
+  CROSS_REGION_MATCH
+  REGION_MISMATCH
+  UNKNOWN
+}
+
+enum CatalogSupersessionStatus {
+  CURRENT
+  SUPERSEDED
+  POSSIBLY_SUPERSEDED
+  UNKNOWN
 }
 
 model User {
@@ -559,6 +633,7 @@ model MotorcycleBrand {
   vehicles Vehicle[]
   fitments PartFitment[]
   catalogRequests MotorcycleCatalogRequest[]
+  catalogApplications PartCatalogApplication[]
 
   @@map("motorcycle_brands")
 }
@@ -578,6 +653,7 @@ model MotorcycleModelFamily {
   vehicles Vehicle[]
   fitments PartFitment[]
   catalogRequests MotorcycleCatalogRequest[]
+  catalogApplications PartCatalogApplication[]
 
   @@unique([brandId, slug])
   @@map("motorcycle_model_families")
@@ -598,6 +674,7 @@ model MotorcycleVariant {
   generations MotorcycleGeneration[]
   vehicles    Vehicle[]
   fitments    PartFitment[]
+  catalogApplications PartCatalogApplication[]
 
   @@unique([familyId, slug])
   @@map("motorcycle_variants")
@@ -633,6 +710,7 @@ model MotorcycleGeneration {
   fitmentReports     FitmentReport[]
   fitmentConfidences FitmentConfidence[]
   resolvedCatalogRequests MotorcycleCatalogRequest[]
+  catalogApplications PartCatalogApplication[]
 
   @@unique([variantId, name, yearFrom, yearTo])
   @@index([yearFrom, yearTo])
@@ -939,6 +1017,7 @@ model Node {
   serviceBundleTemplateItems    ServiceBundleTemplateItem[]
   fitmentConfidences            FitmentConfidence[]
   fitmentReports                FitmentReport[]
+  catalogApplications           PartCatalogApplication[]
 
   @@index([parentId])
   @@map("nodes")
@@ -1028,14 +1107,20 @@ model PartSku {
   isOem    Boolean @default(false)
   isActive Boolean @default(true)
 
+  /** Recommended quantity from catalog evidence (raw_quantity). */
+  defaultQuantity Int?
+  /** Staging part_category when distinct from category. */
+  catalogCategory String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  partNumbers   PartNumber[]
-  nodeLinks     PartSkuNodeLink[]
-  fitments      PartFitment[]
-  offers        PartOffer[]
-  wishlistItems PartWishlistItem[]
+  partNumbers         PartNumber[]
+  nodeLinks           PartSkuNodeLink[]
+  fitments            PartFitment[]
+  offers              PartOffer[]
+  wishlistItems       PartWishlistItem[]
+  catalogApplications PartCatalogApplication[] @relation("PromotedSku")
 
   @@index([partMasterId])
   @@index([primaryNodeId])
@@ -1110,9 +1195,18 @@ model PartFitment {
   confidence  Int     @default(80)
   note        String?
 
+  applicationType      CatalogApplicationType?
+  safetyCritical       Boolean            @default(false)
+  catalogConfidence    CatalogConfidence?
+  primaryApplicationId String?
+  primaryApplication   PartCatalogApplication? @relation("PrimaryFitmentApplication", fields: [primaryApplicationId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
+  promotedApplications PartCatalogApplication[] @relation("PromotedFitment")
+
   @@index([skuId])
+  @@index([primaryApplicationId])
   @@index([motorcycleBrandId])
   @@index([motorcycleModelFamilyId])
   @@index([motorcycleVariantId])
@@ -1148,6 +1242,105 @@ model PartOffer {
   @@index([sourceName])
   @@index([externalOfferId])
   @@map("part_offers")
+}
+
+/**
+ * Deduplicated catalog evidence source (EPC, dealer catalog, manual, etc.).
+ */
+model CatalogSource {
+  id           String            @id @default(cuid())
+  /** Stable key from catalog-sources.csv / parts-staging source_key column. */
+  sourceKey    String?           @unique
+  sourceName   String
+  sourceType   CatalogSourceType
+  sourceRegion CatalogMarket
+  baseUrl      String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  applications PartCatalogApplication[]
+
+  @@unique([sourceName, sourceType, sourceRegion, baseUrl])
+  @@map("catalog_sources")
+}
+
+/**
+ * One row from parts-staging.csv — full provenance before/after promote to PartSku.
+ */
+model PartCatalogApplication {
+  id String @id @default(cuid())
+
+  brand          String
+  modelFamily    String
+  variant        String
+  generationCode String
+  yearFrom       Int
+  yearTo         Int?
+  market         CatalogMarket
+
+  motorcycleBrandId       String?
+  motorcycleModelFamilyId String?
+  motorcycleVariantId     String?
+  motorcycleGenerationId  String?
+
+  partManufacturer       String
+  partNumber             String
+  normalizedPartNumber   String
+  partName               String
+  partCategory           String
+  isOem                  Boolean
+
+  nodeId             String
+  nodeApplicability  CatalogNodeApplicability
+  applicationType    CatalogApplicationType
+  safetyCritical     Boolean
+
+  sourceId          String
+  sourceUrl         String
+  diagramName       String?
+  diagramPosition   String?
+  rawQuantity       String?
+  rawNotes          String?
+  parsedAt          DateTime
+
+  reviewStatus  CatalogReviewStatus
+  confidence    CatalogConfidence
+  importBatch   String
+  stagingRowKey String
+
+  /** Explicit columns from parts-staging.csv extended contract (v1.2). */
+  sourceKey            String?
+  sourceModelCode      String?
+  sourceYear           Int?
+  verificationRegion   CatalogVerificationRegion?
+  evidenceLevel        CatalogEvidenceLevel?
+  regionMatchStatus    CatalogRegionMatchStatus?
+  supersessionStatus   CatalogSupersessionStatus?
+  verifiedAt           DateTime?
+  parserVersion        String?
+
+  promotedSkuId     String?
+  promotedFitmentId String?
+  promotedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  source               CatalogSource          @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  node                 Node                   @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  motorcycleBrand      MotorcycleBrand?       @relation(fields: [motorcycleBrandId], references: [id], onDelete: SetNull)
+  motorcycleModelFamily MotorcycleModelFamily? @relation(fields: [motorcycleModelFamilyId], references: [id], onDelete: SetNull)
+  motorcycleVariant    MotorcycleVariant?     @relation(fields: [motorcycleVariantId], references: [id], onDelete: SetNull)
+  motorcycleGeneration MotorcycleGeneration?  @relation(fields: [motorcycleGenerationId], references: [id], onDelete: SetNull)
+  promotedSku          PartSku?               @relation("PromotedSku", fields: [promotedSkuId], references: [id], onDelete: SetNull)
+  promotedFitment      PartFitment?           @relation("PromotedFitment", fields: [promotedFitmentId], references: [id], onDelete: SetNull)
+  primaryFitments      PartFitment[]          @relation("PrimaryFitmentApplication")
+
+  @@unique([stagingRowKey, importBatch])
+  @@index([reviewStatus, brand])
+  @@index([nodeId, motorcycleGenerationId])
+  @@index([importBatch])
+  @@map("part_catalog_applications")
 }
 
 model PartWishlistItem {

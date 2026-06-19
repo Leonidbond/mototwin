@@ -15,6 +15,11 @@ type RecommendationInput = {
   hasModelFit: boolean;
   hasGenericFitment: boolean;
   fitmentNote?: string | null;
+  applicationType?: string | null;
+  marketMismatch?: boolean;
+  catalogSafetyCritical?: boolean;
+  catalogEvidence?: import("@mototwin/types").CatalogEvidenceWire[];
+  recommendedQuantity?: number | null;
 };
 
 /** Display order for recommendation groups (highest trust first). */
@@ -96,6 +101,13 @@ export function buildPartRecommendationExplanation(type: PartRecommendationType)
 export function classifyPartRecommendation(input: RecommendationInput): PartRecommendationType {
   const relationUpper = input.relationType.trim().toUpperCase();
 
+  if (input.applicationType === "SPECIFICATION_ONLY") {
+    return "GENERIC_NODE_MATCH";
+  }
+  if (input.marketMismatch) {
+    return "VERIFY_REQUIRED";
+  }
+
   if (relationUpper === "RELATED_CONSUMABLE" || relationUpper === "TOOL_OR_CHEMICAL") {
     return "RELATED_CONSUMABLE";
   }
@@ -120,6 +132,15 @@ export function buildPartRecommendationViewModel(
 ): PartRecommendationViewModel {
   const recommendationType = classifyPartRecommendation(input);
   const explanation = buildPartRecommendationExplanation(recommendationType);
+  const warnings: string[] = [];
+  if (explanation.compatibilityWarning) warnings.push(explanation.compatibilityWarning);
+  if (input.marketMismatch) {
+    warnings.push("Источник каталога из другого рынка — проверьте применимость к вашему региону.");
+  }
+  if (input.catalogSafetyCritical && recommendationType === "VERIFY_REQUIRED") {
+    warnings.push("Критичный для безопасности узел — подтвердите артикул перед установкой.");
+  }
+
   return {
     skuId: input.sku.id,
     partMasterId: input.sku.partMasterId ?? null,
@@ -136,13 +157,19 @@ export function buildPartRecommendationViewModel(
     recommendationLabel: explanation.recommendationLabel,
     whyRecommended: explanation.whyRecommended,
     fitmentNote: input.fitmentNote?.trim() || null,
-    compatibilityWarning: explanation.compatibilityWarning,
+    compatibilityWarning: warnings.length > 0 ? warnings.join(" ") : null,
     trustBadge: null,
     communityReportCount: 0,
     communityScore: 0,
     communityStatus: null,
     communityLineRu: null,
     communitySortBoost: 0,
+    catalogEvidence: input.catalogEvidence ?? [],
+    applicationType: input.applicationType ?? null,
+    recommendedQuantity: input.recommendedQuantity ?? input.sku.defaultQuantity ?? null,
+    marketMismatch: Boolean(input.marketMismatch),
+    catalogSafetyCritical: Boolean(input.catalogSafetyCritical),
+    isSpecificationOnly: input.applicationType === "SPECIFICATION_ONLY",
   };
 }
 

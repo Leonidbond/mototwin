@@ -1,0 +1,12 @@
+source_key,source_name,source_type,source_region,brand,base_url,license_notes,scraping_allowed_status,last_checked_at
+bike-parts-bmw-com.official-dealer-public-catalog.eu,bike-parts-bmw.com,OFFICIAL_DEALER_PUBLIC_CATALOG,EU,BMW,https://www.bike-parts-bmw.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+bmw-motorcycle-estore.official-dealer-public-catalog.us,BMW Motorcycle eStore,OFFICIAL_DEALER_PUBLIC_CATALOG,US,BMW,https://www.bmwestore.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+bmw-motorcycles-of-grand-rapids.authorized-dealer.us,BMW Motorcycles of Grand Rapids,AUTHORIZED_DEALER,US,BMW,https://shop.bmwmcgr.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+bmw-motorrad-parts-catalog-bike-parts-bmw-com.official-epc.global,BMW Motorrad Parts Catalog (bike-parts-bmw.com),OFFICIAL_EPC,GLOBAL,BMW,https://www.bike-parts-bmw.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+bmw-motorrad-repair-manual-r-1300-gs-0m21.official-public-catalog.global,BMW Motorrad Repair Manual R 1300 GS (0M21),OFFICIAL_PUBLIC_CATALOG,GLOBAL,BMW,https://manuals.bmw-motorrad.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+bmw-motorrad-technical-data.official-public-catalog.global,BMW Motorrad Technical Data,OFFICIAL_PUBLIC_CATALOG,GLOBAL,BMW,https://www.bmwmotorcycles.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+bmw-of-tri-valley-calmoto.authorized-dealer.us,BMW of Tri-Valley — CalMoto,AUTHORIZED_DEALER,US,BMW,https://bmwparts.calmoto.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+europe-moto.authorized-dealer.eu,Europe-Moto,AUTHORIZED_DEALER,EU,BMW,https://bmw.europe-moto.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+hermy-s-bmw-supershop.authorized-dealer.eu,Hermy's BMW SuperShop,AUTHORIZED_DEALER,EU,BMW,https://bmwsupershop.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+morton-s-bmw-motorcycle-parts.authorized-dealer.us,Morton's BMW Motorcycle Parts,AUTHORIZED_DEALER,US,BMW,https://parts.mortonsbmw.com,,RESTRICTED,2026-06-16T12:00:00.000Z
+recambios-y-accesorios-bmw.authorized-dealer.eu,Recambios y Accesorios BMW,AUTHORIZED_DEALER,EU,BMW,https://www.recambiosyaccesoriosbmw.com,,RESTRICTED,2026-06-16T12:00:00.000Z

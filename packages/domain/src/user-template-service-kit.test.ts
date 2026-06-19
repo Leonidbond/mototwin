@@ -54,6 +54,12 @@ describe("user-template-service-kit", () => {
         communityStatus: null,
         communityLineRu: null,
         communitySortBoost: 0,
+        catalogEvidence: [],
+        applicationType: null,
+        recommendedQuantity: null,
+        marketMismatch: false,
+        catalogSafetyCritical: false,
+        isSpecificationOnly: false,
       },
       {
         skuId: "sku-b",
@@ -78,6 +84,12 @@ describe("user-template-service-kit", () => {
         communityStatus: null,
         communityLineRu: null,
         communitySortBoost: 0,
+        catalogEvidence: [],
+        applicationType: null,
+        recommendedQuantity: null,
+        marketMismatch: false,
+        catalogSafetyCritical: false,
+        isSpecificationOnly: false,
       },
     ];
     const picked = chooseBestSkuForKitItem(recs, {
@@ -118,6 +130,12 @@ describe("user-template-service-kit", () => {
         communityStatus: null,
         communityLineRu: null,
         communitySortBoost: 0,
+        catalogEvidence: [],
+        applicationType: null,
+        recommendedQuantity: null,
+        marketMismatch: false,
+        catalogSafetyCritical: false,
+        isSpecificationOnly: false,
       },
     ];
     const picked = chooseBestSkuForKitItem(recs, {
@@ -221,6 +239,12 @@ describe("user-template-service-kit", () => {
         communityStatus: null,
         communityLineRu: null,
         communitySortBoost: 0,
+        catalogEvidence: [],
+        applicationType: null,
+        recommendedQuantity: null,
+        marketMismatch: false,
+        catalogSafetyCritical: false,
+        isSpecificationOnly: false,
       },
     ];
     const b = inferKitItemPartBinding({

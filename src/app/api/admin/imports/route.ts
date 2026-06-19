@@ -11,6 +11,7 @@ import { parseSearchParamInt } from "@/lib/http/input-validation";
 
 const TYPES: AdminImportBatchTypeWire[] = [
   "PARTS",
+  "PARTS_STAGING",
   "PART_ALIASES",
   "FITMENT_RULES",
   "SERVICE_RULES",

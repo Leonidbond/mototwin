@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import type { PartRecommendationViewModel, PickerMerchandiseLabel } from "@mototwin/types";
-import { MERCHANDISE_LABELS_RU, getPickerRecommendationStatsLineRu } from "@mototwin/domain";
+import { MERCHANDISE_LABELS_RU, getPickerCatalogProvenanceLinesRu, getPickerRecommendationStatsLineRu } from "@mototwin/domain";
 import { merchandiseAccentColor, pickerColors } from "./picker-styles";
 import { PickerFitmentReportLinkFromRecommendation } from "./PickerFitmentReportLink";
 
@@ -50,6 +50,7 @@ export function RecommendationCard(props: {
         <div style={statsLineStyle} title={statsTitle}>
           {statsLine}
         </div>
+        <CatalogProvenanceBlock rec={rec} />
       </div>
       {reasons.length > 0 ? (
         <ul style={reasonListStyle}>
@@ -86,6 +87,26 @@ export function RecommendationCard(props: {
         </button>
       </div>
     </article>
+  );
+}
+
+function CatalogProvenanceBlock(props: { rec: PartRecommendationViewModel }) {
+  const lines = getPickerCatalogProvenanceLinesRu(props.rec);
+  const evidence = props.rec.catalogEvidence[0];
+  if (lines.length === 0 && !evidence?.sourceUrl) return null;
+  return (
+    <div style={provenanceStyle}>
+      {lines.map((line) => (
+        <div key={line} style={provenanceLineStyle}>
+          {line}
+        </div>
+      ))}
+      {evidence?.sourceUrl ? (
+        <a href={evidence.sourceUrl} target="_blank" rel="noreferrer" style={sourceLinkStyle}>
+          Источник каталога →
+        </a>
+      ) : null}
+    </div>
   );
 }
 
@@ -180,6 +201,27 @@ const statsLineStyle: CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+};
+
+const provenanceStyle: CSSProperties = {
+  marginTop: 8,
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
+};
+
+const provenanceLineStyle: CSSProperties = {
+  fontSize: 11,
+  lineHeight: 1.35,
+  color: pickerColors.textMuted,
+  overflowWrap: "anywhere",
+};
+
+const sourceLinkStyle: CSSProperties = {
+  fontSize: 11,
+  color: pickerColors.primary,
+  textDecoration: "none",
+  fontWeight: 600,
 };
 
 const reasonListStyle: CSSProperties = {

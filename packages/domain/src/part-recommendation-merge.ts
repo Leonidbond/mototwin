@@ -45,6 +45,7 @@ export type CommunityFitmentMergeInput = {
   publishedFitmentReportCount?: number;
   nodeServiceGroup: string | null | undefined;
   nodeCode: string | null | undefined;
+  catalogSafetyCritical?: boolean;
 };
 
 /**
@@ -55,10 +56,12 @@ export function mergeCommunityFitmentIntoRecommendation(
   base: PartRecommendationViewModel,
   input: CommunityFitmentMergeInput
 ): PartRecommendationViewModel {
-  const safety = isSafetyCriticalNodeContext({
-    serviceGroup: input.nodeServiceGroup,
-    nodeCode: input.nodeCode,
-  });
+  const safety =
+    Boolean(input.catalogSafetyCritical) ||
+    isSafetyCriticalNodeContext({
+      serviceGroup: input.nodeServiceGroup,
+      nodeCode: input.nodeCode,
+    });
   const c = input.confidence;
   const published = Math.max(0, input.publishedFitmentReportCount ?? 0);
   const communityReportCount = Math.max(c?.reportCount ?? 0, published);

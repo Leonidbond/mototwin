@@ -198,6 +198,8 @@ export function buildPartSkuViewModel(row: {
   sourceUrl: string | null;
   isOem: boolean;
   isActive: boolean;
+  defaultQuantity?: number | null;
+  catalogCategory?: string | null;
   createdAt: Date;
   updatedAt: Date;
   primaryNode: PartSkuNodeSummary | null;
@@ -233,6 +235,9 @@ export function buildPartSkuViewModel(row: {
     fitmentType: string | null;
     confidence: number;
     note: string | null;
+    applicationType?: string | null;
+    catalogConfidence?: string | null;
+    safetyCritical?: boolean;
     createdAt: Date;
   }>;
   offers: Array<{
@@ -274,6 +279,8 @@ export function buildPartSkuViewModel(row: {
     sourceUrl: row.sourceUrl,
     isOem: row.isOem,
     isActive: row.isActive,
+    defaultQuantity: row.defaultQuantity ?? null,
+    catalogCategory: row.catalogCategory ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -312,6 +319,9 @@ export function buildPartSkuViewModel(row: {
     fitmentType: f.fitmentType,
     confidence: f.confidence,
     note: f.note,
+    applicationType: f.applicationType ?? null,
+    catalogConfidence: f.catalogConfidence ?? null,
+    safetyCritical: f.safetyCritical ?? false,
     createdAt: f.createdAt.toISOString(),
   }));
 

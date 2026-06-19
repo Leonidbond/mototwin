@@ -22,6 +22,7 @@ export async function loadAdminModerationCounts(): Promise<AdminModerationCounts
     hiddenReports,
     rejectedReports,
     mixedFitments,
+    stagingApplications,
   ] = await Promise.all([
     prisma.partMaster.count({ where: { status: "PENDING_REVIEW" } }),
     prisma.motorcycleCatalogRequest.count({ where: { status: "PENDING" } }),
@@ -37,6 +38,9 @@ export async function loadAdminModerationCounts(): Promise<AdminModerationCounts
     prisma.fitmentReport.count({ where: { moderationStatus: "HIDDEN" } }),
     prisma.fitmentReport.count({ where: { moderationStatus: "REJECTED" } }),
     prisma.fitmentConfidence.count({ where: { status: "MIXED_REPORTS" } }),
+    prisma.partCatalogApplication.count({
+      where: { reviewStatus: { in: ["NEW", "NEEDS_REVIEW"] } },
+    }),
   ]);
 
   return {
@@ -49,6 +53,7 @@ export async function loadAdminModerationCounts(): Promise<AdminModerationCounts
     hiddenReports,
     rejectedReports,
     mixedFitments,
+    stagingApplications,
   };
 }
 
@@ -118,6 +123,23 @@ async function loadQueueItems(queue: AdminModerationQueueKey): Promise<AdminMode
           createdAt: row.createdAt.toISOString(),
         };
       });
+    }
+    case "stagingApplications": {
+      const rows = await prisma.partCatalogApplication.findMany({
+        where: { reviewStatus: { in: ["NEW", "NEEDS_REVIEW"] } },
+        orderBy: { updatedAt: "desc" },
+        take: QUEUE_TAKE,
+        include: { node: { select: { code: true, name: true } } },
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        kind: "STAGING_APPLICATION",
+        title: `${row.brand} ${row.partNumber || row.partName}`,
+        subtitle: `${row.modelFamily} · ${row.node.name} (${row.node.code})`,
+        status: row.reviewStatus,
+        badges: [row.confidence, row.market, row.safetyCritical ? "Safety" : ""].filter(Boolean),
+        createdAt: row.updatedAt.toISOString(),
+      }));
     }
     case "pendingReports":
     case "safetyCriticalReports":
@@ -203,9 +225,38 @@ async function loadQueueItems(queue: AdminModerationQueueKey): Promise<AdminMode
 }
 
 export async function loadModerationInspector(
-  kind: "PART_MASTER" | "FITMENT_REPORT" | "FITMENT_CONFIDENCE" | "CATALOG_REQUEST",
+  kind:
+    | "PART_MASTER"
+    | "FITMENT_REPORT"
+    | "FITMENT_CONFIDENCE"
+    | "CATALOG_REQUEST"
+    | "STAGING_APPLICATION",
   id: string
 ): Promise<AdminModerationInspectorWire | null> {
+  if (kind === "STAGING_APPLICATION") {
+    const row = await prisma.partCatalogApplication.findUnique({
+      where: { id },
+      include: { node: true, source: true },
+    });
+    if (!row) return null;
+    return {
+      id: row.id,
+      kind: "STAGING_APPLICATION",
+      heading: `${row.brand} ${row.partNumber || row.partName}`,
+      subheading: `${row.node.code} · ${row.reviewStatus}`,
+      status: row.reviewStatus,
+      fields: [
+        { label: "Confidence", value: row.confidence },
+        { label: "Market", value: row.market },
+        { label: "Source", value: `${row.source.sourceType} (${row.source.sourceRegion})` },
+        { label: "EPC", value: row.diagramPosition ? `поз. ${row.diagramPosition}` : "—" },
+        { label: "Batch", value: row.importBatch },
+      ],
+      notes: row.rawNotes,
+      actions: [],
+      links: [{ label: "Открыть staging", href: `/admin/catalog/staging/${row.id}` }],
+    };
+  }
   if (kind === "PART_MASTER") {
     const part = await prisma.partMaster.findUnique({
       where: { id },

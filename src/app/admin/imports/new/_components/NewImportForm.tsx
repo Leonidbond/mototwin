@@ -18,6 +18,12 @@ const TYPE_OPTIONS: Array<{
     supported: true,
   },
   {
+    value: "PARTS_STAGING",
+    label: "Parts staging (28 cols)",
+    hint: "parts-staging.csv: brand, model_family, node_id, part_number, source_url, …",
+    supported: true,
+  },
+  {
     value: "PART_ALIASES",
     label: "Альтернативные SKU (PartAlias)",
     hint: "Колонки: brand, sku, alias",

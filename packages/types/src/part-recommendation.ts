@@ -1,5 +1,6 @@
 import type { PartSkuNodeSummary } from "./part-catalog";
 import type { FitmentConfidenceStatus, TrustBadgeWire } from "./fitment-community";
+import type { CatalogEvidenceWire } from "./parts-staging";
 
 export type PartRecommendationType =
   | "EXACT_FIT"
@@ -40,6 +41,18 @@ export type PartRecommendationViewModel = {
   communityLineRu: string | null;
   /** Tie-breaker for sorting within the same {@link PartRecommendationType}. */
   communitySortBoost: number;
+  /** Approved catalog evidence rows for this SKU (staging provenance). */
+  catalogEvidence: CatalogEvidenceWire[];
+  /** Staging application type from best fitment row. */
+  applicationType: string | null;
+  /** Recommended quantity from catalog evidence. */
+  recommendedQuantity: number | null;
+  /** Market region mismatch between vehicle and catalog row. */
+  marketMismatch: boolean;
+  /** Catalog safety-critical flag from staging/fitment. */
+  catalogSafetyCritical: boolean;
+  /** True for specification-only rows (no purchasable SKU). */
+  isSpecificationOnly: boolean;
 };
 
 /** Group of SKU recommendations sharing the same {@link PartRecommendationType} (UI sections). */

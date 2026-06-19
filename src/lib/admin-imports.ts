@@ -12,8 +12,14 @@ import type {
   AdminImportBatchTypeWire,
 } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
+import { importPartsStagingRows } from "@/lib/catalog-staging/import-core";
 
-const SUPPORTED_TYPES: AdminImportBatchTypeWire[] = ["PARTS", "PART_ALIASES", "SERVICE_RULES"];
+const SUPPORTED_TYPES: AdminImportBatchTypeWire[] = [
+  "PARTS",
+  "PARTS_STAGING",
+  "PART_ALIASES",
+  "SERVICE_RULES",
+];
 
 const EMPTY_SUMMARY: AdminImportBatchSummaryWire = {
   total: 0,
@@ -215,6 +221,10 @@ export async function dryRunBatch(batchId: string): Promise<AdminImportBatchSumm
     throw new Error("Этот импорт уже зафиксирован/откачен — пересоздайте партию");
   }
 
+  if (batch.type === "PARTS_STAGING") {
+    return dryRunPartsStagingBatch(batch);
+  }
+
   await prisma.importBatch.update({ where: { id: batchId }, data: { status: "VALIDATING" } });
   const summary: AdminImportBatchSummaryWire = { ...EMPTY_SUMMARY, total: batch.rows.length };
 
@@ -256,6 +266,10 @@ export async function commitBatch(batchId: string): Promise<AdminImportBatchSumm
   if (!batch) throw new Error("Импорт не найден");
   if (batch.status !== "READY") {
     throw new Error("Сначала запустите успешный dry-run (статус должен быть READY)");
+  }
+
+  if (batch.type === "PARTS_STAGING") {
+    return commitPartsStagingBatch(batch);
   }
 
   await prisma.importBatch.update({ where: { id: batchId }, data: { status: "IMPORTING" } });
@@ -563,6 +577,95 @@ async function applyServiceRulesRow(raw: Record<string, string>): Promise<RowOut
     update: data,
   });
   return { ...validation, entityId: rule.id };
+}
+
+async function dryRunPartsStagingBatch(batch: {
+  id: string;
+  rows: Array<{ id: string; rowIndex: number; raw: unknown }>;
+}): Promise<AdminImportBatchSummaryWire> {
+  await prisma.importBatch.update({ where: { id: batch.id }, data: { status: "VALIDATING" } });
+  const rawRows = batch.rows.map((r) => r.raw as Record<string, string>);
+  const { summary, rowResults } = await importPartsStagingRows(prisma, rawRows, {
+    importBatch: batch.id,
+    dryRun: true,
+  });
+
+  for (const result of rowResults) {
+    const row = batch.rows[result.rowIndex - 1];
+    if (!row) continue;
+    await prisma.importBatchRow.update({
+      where: { id: row.id },
+      data: {
+        action: result.action,
+        status: result.status,
+        errorMessage: result.errorMessage ?? result.resolveMessage,
+      },
+    });
+  }
+
+  const wireSummary: AdminImportBatchSummaryWire = {
+    total: summary.total,
+    created: summary.created,
+    updated: summary.updated,
+    skipped: summary.skipped,
+    conflicts: 0,
+    errors: summary.errors,
+  };
+
+  await prisma.importBatch.update({
+    where: { id: batch.id },
+    data: {
+      status: wireSummary.errors > 0 ? "FAILED" : "READY",
+      dryRunAt: new Date(),
+      summary: wireSummary as unknown as Prisma.InputJsonValue,
+    },
+  });
+  return wireSummary;
+}
+
+async function commitPartsStagingBatch(batch: {
+  id: string;
+  rows: Array<{ id: string; rowIndex: number; raw: unknown }>;
+}): Promise<AdminImportBatchSummaryWire> {
+  await prisma.importBatch.update({ where: { id: batch.id }, data: { status: "IMPORTING" } });
+  const rawRows = batch.rows.map((r) => r.raw as Record<string, string>);
+  const { summary, rowResults } = await importPartsStagingRows(prisma, rawRows, {
+    importBatch: batch.id,
+    dryRun: false,
+  });
+
+  for (const result of rowResults) {
+    const row = batch.rows[result.rowIndex - 1];
+    if (!row) continue;
+    await prisma.importBatchRow.update({
+      where: { id: row.id },
+      data: {
+        action: result.action,
+        status: result.status,
+        errorMessage: result.errorMessage ?? result.resolveMessage,
+        mappedEntityId: result.applicationId,
+      },
+    });
+  }
+
+  const wireSummary: AdminImportBatchSummaryWire = {
+    total: summary.total,
+    created: summary.created,
+    updated: summary.updated,
+    skipped: summary.skipped,
+    conflicts: 0,
+    errors: summary.errors,
+  };
+
+  await prisma.importBatch.update({
+    where: { id: batch.id },
+    data: {
+      status: wireSummary.errors > 0 ? "FAILED" : "COMMITTED",
+      committedAt: new Date(),
+      summary: wireSummary as unknown as Prisma.InputJsonValue,
+    },
+  });
+  return wireSummary;
 }
 
 function errorOutcome(message: string): RowOutcome {

@@ -1,0 +1,2 @@
+staging_row_key,application_key,review_status,blocker_codes,priority,safety_critical,assigned_reviewer,notes,queued_at
+BMW|R 1300 GS|base|KA1|ENGINE.LUBE.FILTER|11427105320|EU,BMW|R 1300 GS|base|KA1|ENGINE.LUBE.FILTER|11427105320|EU,NEEDS_REVIEW,,LOW,false,,Awaiting EU EPC cross-check,2026-06-16T12:00:00.000Z
