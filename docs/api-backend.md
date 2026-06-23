@@ -337,6 +337,20 @@ See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md).
 - Response `400`: validation/self-block errors
 - Response `404`: target user not found
 
+### `GET /api/admin/team`
+- Requires `SUPER_ADMIN`.
+- Response `200`: `{ items: AdminTeamMemberWire[] }` — users with `adminRole != null` or legacy `isModerator = true`.
+
+### `PATCH /api/admin/team`
+- Requires `SUPER_ADMIN`.
+- Request body: `{ userId, adminRole: SUPER_ADMIN | CATALOG_MANAGER | MODERATOR | ANALYST | null, reason }` (reason min 3 chars).
+- Updates `User.adminRole` and syncs `User.isModerator` (`true` only for `SUPER_ADMIN` / `MODERATOR`).
+- Audit action: `team.role.change` with before/after snapshots.
+- Response `400`: self-demotion below `SUPER_ADMIN`, or removing the last `SUPER_ADMIN`.
+- Response `404`: target user not found.
+
+UI: `/admin/settings` (user search + team roster), `/admin/users/[id]` (per-user card for SUPER_ADMIN). See [admin-panel-readme.md](./admin-panel-readme.md).
+
 ## 3.10 Auth
 
 ### Custom session API (email/password, mobile tokens)

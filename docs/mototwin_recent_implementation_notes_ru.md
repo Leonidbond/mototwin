@@ -4,7 +4,16 @@
 
 **Шаблоны журнала (ADVANCED) и комплекты в подборе** (`includeInPartPicker`, коды `user_template:`, UI web/Expo) вынесены в отдельный документ: [mototwin_user_template_service_kits_implementation_ru.md](mototwin_user_template_service_kits_implementation_ru.md).
 
-## 0. Расходы — категория «Топливо» (2026-06-23)
+## 0. Админка — назначение ролей из UI (2026-06-23)
+
+- SUPER_ADMIN может назначать и снимать роли админки без правок БД на сервере.
+- **`/admin/settings`**: поиск пользователя по email/имени + блок «Текущая команда».
+- **`/admin/users/[id]`**: карточка «Права админки» на странице пользователя.
+- API: `PATCH /api/admin/team` — `{ userId, adminRole, reason }`, audit `team.role.change`, синхронизация `isModerator`.
+- Компоненты: `AdminRoleAssignmentControl`, `GrantAdminAccessPanel`, `UserAdminRolePanel`; хелпер `resolveIsModeratorForAdminRole` — `src/lib/admin-team-role.ts`.
+- Документация: [admin-panel-readme.md](admin-panel-readme.md), [api-backend.md](api-backend.md) §3.9.
+
+## 0.1. Расходы — категория «Топливо» (2026-06-23)
 
 - Enum **`FUEL`** в `ExpenseCategory` (Prisma + `EXPENSE_CATEGORIES` в `packages/types/src/expense-item.ts`).
 - Подпись **«Топливо»**, хелперы `getDefaultExpenseInstallStatusForCategory` / `expenseCategoryRequiresNode` — `packages/domain/src/expense-summary.ts`.

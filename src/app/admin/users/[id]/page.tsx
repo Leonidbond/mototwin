@@ -10,6 +10,7 @@ import {
   formatNumberRu,
 } from "../../_components/format";
 import { ruAdmin } from "../../_locales/ru";
+import { UserAdminRolePanel } from "./_components/UserAdminRolePanel";
 import { UserBlockPanel } from "./_components/UserBlockPanel";
 
 interface AdminUserDetailPageProps {
@@ -43,6 +44,14 @@ export default async function AdminUserDetailPage({ params }: AdminUserDetailPag
       </section>
 
       <section style={twoColGrid}>
+        {self.role === "SUPER_ADMIN" ? (
+          <UserAdminRolePanel
+            userId={detail.id}
+            currentUserId={self.userId}
+            adminRole={detail.adminRole}
+            isModerator={detail.isModerator}
+          />
+        ) : null}
         <UserBlockPanel
           userId={detail.id}
           isBlocked={detail.isBlocked}

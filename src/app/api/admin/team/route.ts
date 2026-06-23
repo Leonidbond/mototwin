@@ -4,6 +4,7 @@ import type { AdminRole } from "@prisma/client";
 import { requireAdminRole, toAdminErrorResponse } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { loadAdminTeam } from "@/lib/admin-settings";
+import { resolveIsModeratorForAdminRole } from "@/lib/admin-team-role";
 import { prisma } from "@/lib/prisma";
 import { BodyParseError, parseJsonBody } from "@/lib/http/parse-json-body";
 import { strictObject } from "@/lib/http/input-validation";
@@ -50,7 +51,7 @@ export async function PATCH(request: Request) {
 
     const before = await prisma.user.findUnique({
       where: { id: parsed.data.userId },
-      select: { id: true, adminRole: true },
+      select: { id: true, adminRole: true, isModerator: true },
     });
     if (!before) {
       return NextResponse.json({ error: "Пользователь не найден" }, { status: 404 });
@@ -69,10 +70,14 @@ export async function PATCH(request: Request) {
       }
     }
 
+    const nextAdminRole = parsed.data.adminRole as AdminRole | null;
     const updated = await prisma.user.update({
       where: { id: parsed.data.userId },
-      data: { adminRole: parsed.data.adminRole as AdminRole | null },
-      select: { id: true, adminRole: true },
+      data: {
+        adminRole: nextAdminRole,
+        isModerator: resolveIsModeratorForAdminRole(nextAdminRole),
+      },
+      select: { id: true, adminRole: true, isModerator: true },
     });
 
     await logAdminAction({

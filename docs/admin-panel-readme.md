@@ -41,7 +41,7 @@ The script hits every admin page (17 routes) and every read-only admin API (17 e
 | Path                                  | Purpose                                              |
 | ------------------------------------- | ---------------------------------------------------- |
 | `/admin`                              | Dashboard with 8 widgets matching the design ref     |
-| `/admin/users`, `/admin/users/[id]`   | Users list + detail + block/unblock actions           |
+| `/admin/users`, `/admin/users/[id]`   | Users list + detail + block/unblock; SUPER_ADMIN assigns admin roles on user detail |
 | `/admin/vehicles`                     | Filterable list of all garage vehicles               |
 | `/admin/models`, `/admin/models/[id]` | brand × family × variant × generation table + support-level editor (4-уровневая иерархия, см. [data-model.md](./data-model.md)) |
 | `/admin/catalog`, `/admin/catalog/[id]` | PartMaster CRUD, aliases, fitments, merge          |
@@ -51,7 +51,7 @@ The script hits every admin page (17 routes) and every read-only admin API (17 e
 | `/admin/audit`                        | Searchable audit log (read-only)                     |
 | `/admin/dictionaries`                 | Brands and node tree (read-only)                     |
 | `/admin/reports`                      | Hub of links into pre-filtered sections              |
-| `/admin/settings`                     | Team role management (SUPER_ADMIN only)              |
+| `/admin/settings`                     | Grant/revoke admin roles: user search + current team roster (SUPER_ADMIN only) |
 | `/admin/service-rules`, `/admin/service-rules/new` | Список регламентов ТО + форма создания (`POST /api/admin/service-rules`) |
 | `/admin/notifications` | Журнал доставки уведомлений (read-only) |
 | `/admin/subscriptions` | Сводка подписок (управление Stripe — в планах) |
@@ -76,6 +76,17 @@ User management actions:
 - `GET /api/admin/users`, `GET /api/admin/users/[id]` — read user directory and profile.
 - `PATCH /api/admin/users/[id]` — block/unblock account (requires any admin role, reason is mandatory, action is written to audit log).
 - Blocking a user revokes app sessions (`auth_sessions`, `refresh_tokens`, `authjs_sessions`) and denies further auth until unblocked.
+
+Team / admin role management (SUPER_ADMIN only):
+
+- **`/admin/settings`** — search any user by email or display name, assign or revoke an admin role with a mandatory audit reason; below that, edit roles for the current admin team roster.
+- **`/admin/users/[id]`** — card **«Права админки»** with the same role editor for the opened user.
+- Shared UI: `AdminRoleAssignmentControl` (`src/app/admin/_components/AdminRoleAssignmentControl.tsx`).
+- `GET /api/admin/team` — list accounts with `adminRole` or legacy `isModerator`.
+- `PATCH /api/admin/team` — body `{ userId, adminRole, reason }`; writes `team.role.change` to audit log; syncs `isModerator` (`true` for `SUPER_ADMIN` and `MODERATOR`).
+- Guardrails: cannot demote self below `SUPER_ADMIN`; cannot remove the last `SUPER_ADMIN`.
+
+On **production** (`https://mototwin.space/admin`), sign in with an account that already has `adminRole`, then use `/admin/settings` — no direct DB edits required.
 
 `src/app/admin/layout.tsx` runs `getAdminContext()` and renders `AdminAccessGuard` for unauthorized users — Next.js 16 `proxy.ts` is **not** used because edge runtime cannot do Prisma queries.
 
