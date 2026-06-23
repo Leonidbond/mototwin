@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
-import { AdminPageChrome } from "../../_components/AdminPageChrome";
+import { AdminPageChrome } from "../../../_components/AdminPageChrome";
 import { loadAdminSelf } from "@/lib/admin-self";
 import { canMutate } from "@/lib/admin-auth";
 import {
   formatStagingMetadataForAdmin,
   loadCatalogStagingDetail,
 } from "@/lib/admin-catalog-staging";
-import { ruAdmin } from "../../_locales/ru";
+import { ruAdmin } from "../../../_locales/ru";
 import { StagingActions } from "./_components/StagingActions";
 
 interface PageProps {
