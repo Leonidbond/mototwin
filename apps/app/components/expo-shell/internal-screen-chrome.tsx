@@ -35,7 +35,7 @@ export function InternalScreenChrome(props: {
     onBack,
     actions,
     belowNavRow,
-    showHelp = false,
+    showHelp = true,
     declutterMobile = false,
     scrollOffsetY = 0,
     collapseThreshold = 52,

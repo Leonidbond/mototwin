@@ -35,7 +35,7 @@
 
 ## 2. Feature specs (MVP)
 
-[`garage-dashboard-mvp.md`](./garage-dashboard-mvp.md) · [`service-log-mvp.md`](./service-log-mvp.md) · [`expense-tracking-mvp.md`](./expense-tracking-mvp.md) · [`attention-flow-mvp.md`](./attention-flow-mvp.md) · [`vehicle-profile-mvp.md`](./vehicle-profile-mvp.md) · [`vehicle-trash-mvp.md`](./vehicle-trash-mvp.md) · [`upcoming-maintenance-mvp.md`](./upcoming-maintenance-mvp.md) · [`parts-wishlist-mvp.md`](./parts-wishlist-mvp.md) · [`parts-catalog-mvp.md`](./parts-catalog-mvp.md) · [`service-kits-mvp.md`](./service-kits-mvp.md) · [`user-settings-mvp.md`](./user-settings-mvp.md) · [`custom-top-nodes-mvp.md`](./custom-top-nodes-mvp.md) · [`subscription-access-mvp.md`](./subscription-access-mvp.md)
+[`garage-dashboard-mvp.md`](./garage-dashboard-mvp.md) · [`service-log-mvp.md`](./service-log-mvp.md) · [`expense-tracking-mvp.md`](./expense-tracking-mvp.md) · [`attention-flow-mvp.md`](./attention-flow-mvp.md) · [`vehicle-profile-mvp.md`](./vehicle-profile-mvp.md) · [`vehicle-trash-mvp.md`](./vehicle-trash-mvp.md) · [`upcoming-maintenance-mvp.md`](./upcoming-maintenance-mvp.md) · [`parts-wishlist-mvp.md`](./parts-wishlist-mvp.md) · [`parts-catalog-mvp.md`](./parts-catalog-mvp.md) · [`service-kits-mvp.md`](./service-kits-mvp.md) · [`user-settings-mvp.md`](./user-settings-mvp.md) · [`custom-top-nodes-mvp.md`](./custom-top-nodes-mvp.md) · [`subscription-access-mvp.md`](./subscription-access-mvp.md) · [`feedback-help-mvp.md`](./feedback-help-mvp.md)
 
 ### Parts catalog staging (v1.2)
 

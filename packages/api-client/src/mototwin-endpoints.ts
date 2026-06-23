@@ -26,6 +26,7 @@ import type {
   PartSkusResponse,
   PartSkuSearchFilters,
   ProfileResponse,
+  SubmitFeedbackPayload,
   ExpensesResponse,
   ExpenseNodeSummaryResponse,
   MarkExpenseInstalledInput,
@@ -734,6 +735,13 @@ export function createMotoTwinEndpoints(client: ApiClient) {
 
     createFitmentEvidence(input: CreateFitmentEvidenceInput) {
       return client.request<CreateFitmentEvidenceResponse>("/api/fitment/evidence", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    submitFeedback(input: SubmitFeedbackPayload) {
+      return client.request<{ id: string; createdAt: string }>("/api/feedback", {
         method: "POST",
         body: JSON.stringify(input),
       });

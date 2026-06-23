@@ -424,6 +424,45 @@ Catch-all: `/api/auth/[...nextauth]` — Google / Apple / Yandex when env creden
 
 Resolution order in `resolveAuthenticatedUserId()`: Bearer access token → `mototwin_session` cookie → Auth.js database session.
 
+## 3.12 Feedback (помощь и обратная связь)
+
+In-app форма помощи отправляет обращения с авто-контекстом страницы. `pageKey`
+и тексты помощи живут в `packages/domain/src/page-help-registry.ts`. См.
+[feedback-help-mvp.md](./feedback-help-mvp.md).
+
+### `POST /api/feedback`
+- Только для залогиненных (`getCurrentUserContext`; аноним → `401`).
+- Тело (`strictObject`, body cap 16 KB):
+  - `type`: `PROBLEM | IDEA | QUESTION`
+  - `message`: string (min 5, max 5000)
+  - `pageKey`: string (≤ 80)
+  - `platform`: `web | ios | android`
+  - `routePath`: string (≤ 512)
+  - `appVersion?`, `locale?`, `vehicleId?` — опционально
+- Сервер дополняет `submittedByUserId` и достоверный `userAgent` (заголовок запроса), создаёт `Feedback` со `status: NEW`.
+- Метод клиента: `@mototwin/api-client` → `submitFeedback(payload)` (mobile использует его; web шлёт `fetch` напрямую).
+- Response `201`: `{ id, createdAt }`. Ошибки: `400` (валидация/тело), `401` (не залогинен).
+
+### `GET /api/admin/feedback`
+- `requireAnyAdmin`.
+- Фильтры: `q` (по тексту), `status`, `type`, `platform`, `pageKey`, `page`.
+- Response `200`: `AdminFeedbackListResponse` (пагинация; `pageTitle` резолвится из реестра).
+
+### `GET /api/admin/feedback/[id]`
+- `requireAnyAdmin`.
+- Response `200`: `AdminFeedbackDetailWire` (полный текст + авто-контекст + автор + reviewedBy). `404` если не найдено.
+
+### `PATCH /api/admin/feedback/[id]`
+- Только `SUPER_ADMIN` и `MODERATOR` (`requireAdminRole`).
+- Тело (`strictObject`): `{ status: NEW|IN_PROGRESS|RESOLVED|REJECTED, adminNote?: string|null }` (note ≤ 2000).
+- Проставляет `reviewedByUserId`/`reviewedAt`; пишет audit `feedback.status.change` (before/after).
+- Response `200`: `{ id, status, adminNote, reviewedAt }`.
+
+### `GET /api/admin/feedback/export`
+- `requireAnyAdmin`. Формат — **NDJSON** (`application/x-ndjson`, `Content-Disposition: attachment`).
+- Фильтры: те же, что у списка, плюс `ids` (CSV выбранных id) и `dateFrom`/`dateTo` (по `createdAt`).
+- Лимит выгрузки — 10000 строк. Поля строки: `id, createdAt, type, status, page, pageKey, platform, routePath, message, appVersion, locale, vehicleId, userId`.
+
 ## 4. Core backend business rules
 
 1. Service events can be created only for leaf nodes.

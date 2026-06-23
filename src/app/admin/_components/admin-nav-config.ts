@@ -28,6 +28,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: "dictionaries", label: "Справочники", href: "/admin/dictionaries", icon: "Library" },
   { key: "notifications", label: "Уведомления", href: "/admin/notifications", icon: "Bell" },
   { key: "subscriptions", label: "Подписки", href: "/admin/subscriptions", icon: "CreditCard", hasAlertDot: true },
+  { key: "feedback", label: "Обратная связь", href: "/admin/feedback", icon: "MessageSquare", hasAlertDot: true },
   { key: "audit", label: "Аудит", href: "/admin/audit", icon: "ScrollText" },
   { key: "settings", label: "Настройки", href: "/admin/settings", icon: "Settings" },
 ];

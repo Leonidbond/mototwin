@@ -557,3 +557,24 @@ export type {
   CatalogPickerLevelMode,
   MotorcycleCatalogPickerState,
 } from "./motorcycle-catalog-picker";
+export {
+  PAGE_HELP_ENTRIES,
+  getPageHelp,
+  getPageHelpTitle,
+  resolvePageKeyFromWebPath,
+  resolvePageKeyFromMobileRoute,
+  getFeedbackStatusLabelRu,
+  getFeedbackTypeLabelRu,
+  FEEDBACK_STATUS_KEYS,
+  FEEDBACK_TYPE_KEYS,
+} from "./page-help-registry";
+export type {
+  AppPageKey,
+  PageHelpPlatform,
+  FeedbackPlatform,
+  PageHelpContent,
+  PageHelpEntry,
+  ResolvedPageHelp,
+  FeedbackStatusKey,
+  FeedbackTypeKey,
+} from "./page-help-registry";

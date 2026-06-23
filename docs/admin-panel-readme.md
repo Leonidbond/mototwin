@@ -57,6 +57,7 @@ The script hits every admin page (17 routes) and every read-only admin API (17 e
 | `/admin/service-rules`, `/admin/service-rules/new` | Список регламентов ТО + форма создания (`POST /api/admin/service-rules`) |
 | `/admin/notifications` | Журнал доставки уведомлений (read-only) |
 | `/admin/subscriptions` | Сводка подписок (управление Stripe — в планах) |
+| `/admin/feedback`, `/admin/feedback/[id]` | Обратная связь пользователей: список с фильтрами, детали, смена статуса, NDJSON-экспорт (см. §9) |
 | `/admin/fitment/conflicts`, `/admin/fitment/conflicts/[id]` | Legacy URLs → redirect на `/admin/moderation?queue=mixedFitments` |
 
 The legacy `/moderation/fitment` 308-redirects to `/admin/moderation`.
@@ -178,3 +179,14 @@ Contract reference: [docs/catalog/parts-catalog-schema.md](./catalog/parts-catal
 - Pagination controls (currently URL-only `?page=`).
 - Empty-state illustrations / nicer 0-result states.
 - `unstable_cache` for the dashboard loaders (already grouped under `admin-cache.ts`).
+
+## 9. Feedback (обратная связь)
+
+In-app «Помощь и обратная связь» (см. [feedback-help-mvp.md](./feedback-help-mvp.md)) пишет обращения в модель `Feedback`. Раздел `/admin/feedback`:
+
+- **Список** (`/admin/feedback`): `AdminFilterBar` (поиск по тексту, статус, тип, платформа, страница) + `AdminDataTable` с выбором строк. Колонки: дата, тип, страница (заголовок из `page-help-registry`), платформа, статус-чип, превью сообщения, автор.
+- **Детали** (`/admin/feedback/[id]`): полный текст, авто-контекст (pageKey, платформа, маршрут, версия приложения, локаль, User-Agent), ссылки на `/admin/users/[id]` и `/admin/vehicles/[id]`.
+- **Статусы**: `NEW` → `IN_PROGRESS` → `RESOLVED` / `REJECTED`. Менять статус и комментарий администратора могут **SUPER_ADMIN** и **MODERATOR**; остальные админы видят раздел только для чтения. Каждое изменение пишется в audit log (`feedback.status.change`).
+- **Экспорт**: кнопка «Экспорт NDJSON» отдаёт все строки по текущим фильтрам; при выделении строк — «Экспорт выбранных» (через `ids=`). Формат — NDJSON (одна запись = одна строка JSON) для обработки нейросетью.
+
+RBAC и API подробно — в [api-backend.md](./api-backend.md).

@@ -221,6 +221,19 @@ enum MotorcycleCatalogRequestStatus {
   REJECTED
 }
 
+enum FeedbackStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
+
+enum FeedbackType {
+  PROBLEM
+  IDEA
+  QUESTION
+}
+
 enum NotificationSeverity {
   INFO
   WARNING
@@ -456,6 +469,8 @@ model User {
   passwordResetTokens       PasswordResetToken[]
   motorcycleCatalogRequestsSubmitted MotorcycleCatalogRequest[] @relation("CatalogRequestSubmittedBy")
   motorcycleCatalogRequestsReviewed  MotorcycleCatalogRequest[] @relation("CatalogRequestReviewedBy")
+  feedbackSubmitted                  Feedback[] @relation("FeedbackSubmittedBy")
+  feedbackReviewed                   Feedback[] @relation("FeedbackReviewedBy")
 
   @@index([adminRole])
   @@index([isBlocked])
@@ -760,6 +775,49 @@ model MotorcycleCatalogRequest {
   @@index([submittedByUserId, status])
   @@index([status, createdAt])
   @@map("motorcycle_catalog_requests")
+}
+
+/**
+ * User feedback captured from the in-app Help & Feedback flow.
+ * Auto-context (pageKey/platform/routePath/...) is collected client-side and
+ * hardened on the server (userId/userAgent). Mirrors the status workflow of
+ * {@link MotorcycleCatalogRequest}.
+ */
+model Feedback {
+  id      String         @id @default(cuid())
+  status  FeedbackStatus @default(NEW)
+  type    FeedbackType   @default(PROBLEM)
+
+  message String
+
+  // auto-context
+  pageKey     String
+  platform    String // web | ios | android
+  routePath   String
+  appVersion  String?
+  locale      String?
+  vehicleId   String?
+  userAgent   String?
+  contextJson Json?
+
+  // author (always authenticated at submit time)
+  submittedByUserId String?
+  submittedBy       User?   @relation("FeedbackSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+
+  // processing
+  adminNote        String?
+  reviewedByUserId String?
+  reviewedBy       User?     @relation("FeedbackReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([pageKey])
+  @@index([platform])
+  @@index([createdAt])
+  @@map("feedback")
 }
 
 /**

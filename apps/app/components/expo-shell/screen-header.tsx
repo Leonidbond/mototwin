@@ -12,7 +12,7 @@ export function ScreenHeader(props: {
   showHelp?: boolean;
 }) {
   const router = useRouter();
-  const { title, onBack, rightSlot, showHelp = false } = props;
+  const { title, onBack, rightSlot, showHelp = true } = props;
 
   const handleBack = () => {
     if (onBack) {

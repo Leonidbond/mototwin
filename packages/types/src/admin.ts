@@ -27,6 +27,7 @@ export type AdminSectionKey =
   | "dictionaries"
   | "notifications"
   | "subscriptions"
+  | "feedback"
   | "audit"
   | "settings";
 
@@ -360,6 +361,95 @@ export interface AdminUserDetailWire {
     title: string | null;
     odometer: number;
   }>;
+}
+
+// ---------------------------------------------------------------------------
+// Feedback (Help & Feedback MVP)
+// ---------------------------------------------------------------------------
+
+export type FeedbackStatusWire = "NEW" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
+export type FeedbackTypeWire = "PROBLEM" | "IDEA" | "QUESTION";
+export type FeedbackPlatformWire = "web" | "ios" | "android";
+
+/** Filters for the admin feedback list (URL search params + API query). */
+export interface AdminFeedbackListFilters {
+  q?: string;
+  status?: FeedbackStatusWire | "all";
+  type?: FeedbackTypeWire | "all";
+  platform?: FeedbackPlatformWire | "all";
+  pageKey?: string | "all";
+}
+
+export interface AdminFeedbackListItemWire {
+  id: string;
+  status: FeedbackStatusWire;
+  type: FeedbackTypeWire;
+  message: string;
+  pageKey: string;
+  pageTitle: string;
+  platform: string;
+  routePath: string;
+  createdAt: string;
+  authorId: string | null;
+  authorLabel: string | null;
+}
+
+export interface AdminFeedbackListResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  items: AdminFeedbackListItemWire[];
+}
+
+export interface AdminFeedbackDetailWire {
+  id: string;
+  status: FeedbackStatusWire;
+  type: FeedbackTypeWire;
+  message: string;
+  pageKey: string;
+  pageTitle: string;
+  platform: string;
+  routePath: string;
+  appVersion: string | null;
+  locale: string | null;
+  vehicleId: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  updatedAt: string;
+  authorId: string | null;
+  authorLabel: string | null;
+  authorEmail: string | null;
+  adminNote: string | null;
+  reviewedByLabel: string | null;
+  reviewedAt: string | null;
+}
+
+/** PATCH body to change status and/or admin note on a feedback item. */
+export interface AdminFeedbackPatchPayload {
+  status: FeedbackStatusWire;
+  adminNote?: string | null;
+}
+
+/** Filters accepted by the NDJSON export endpoint. */
+export interface AdminFeedbackExportFilters extends AdminFeedbackListFilters {
+  /** Limit export to these feedback ids (selected rows). */
+  ids?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+/** Body sent by the public feedback submission form. */
+export interface SubmitFeedbackPayload {
+  type: FeedbackTypeWire;
+  message: string;
+  pageKey: string;
+  platform: FeedbackPlatformWire;
+  routePath: string;
+  appVersion?: string | null;
+  locale?: string | null;
+  vehicleId?: string | null;
+  userAgent?: string | null;
 }
 
 export type AdminVehicleSortKey =

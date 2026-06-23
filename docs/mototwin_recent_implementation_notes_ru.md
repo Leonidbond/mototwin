@@ -4,6 +4,16 @@
 
 **Шаблоны журнала (ADVANCED) и комплекты в подборе** (`includeInPartPicker`, коды `user_template:`, UI web/Expo) вынесены в отдельный документ: [mototwin_user_template_service_kits_implementation_ru.md](mototwin_user_template_service_kits_implementation_ru.md).
 
+## 0.0. Помощь и обратная связь (2026-06-23)
+
+- Единый реестр страниц `packages/domain/src/page-help-registry.ts` (`AppPageKey`, `getPageHelp`, `resolvePageKeyFromWebPath`/`resolvePageKeyFromMobileRoute`, лейблы статусов/типов) + тесты.
+- Помощь сделана page-aware и дополнена формой обратной связи: web `src/components/app-help-fab.tsx`, mobile `apps/app/src/components/app-help-fab.tsx` (реальный `HelpTriggerButton`, `appVersion` из `expo-constants`; `showHelp` по умолчанию включён в `ScreenHeader`/`InternalScreenChrome`).
+- Prisma: модель **`Feedback`** + enum `FeedbackStatus`/`FeedbackType`, миграция `add_feedback`.
+- API: `POST /api/feedback` (только залогиненные, авто-контекст, серверный userAgent); admin `GET /api/admin/feedback`, `GET/PATCH /api/admin/feedback/[id]`, `GET /api/admin/feedback/export` (NDJSON). Метод `submitFeedback` в `@mototwin/api-client`.
+- Админка: пункт меню «Обратная связь», `/admin/feedback` (список + фильтры + выбор/экспорт), `/admin/feedback/[id]` (детали + смена статуса для SUPER_ADMIN/MODERATOR, audit `feedback.status.change`).
+- Lib: `src/lib/admin-feedback.ts`. Типы: `packages/types/src/admin.ts` (+ `"feedback"` в `AdminSectionKey`).
+- Документация: [feedback-help-mvp.md](feedback-help-mvp.md), [admin-panel-readme.md](admin-panel-readme.md) §9, [api-backend.md](api-backend.md) §3.12.
+
 ## 0. Админка — назначение ролей из UI (2026-06-23)
 
 - SUPER_ADMIN может назначать и снимать роли админки без правок БД на сервере.
