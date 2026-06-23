@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { buildExpenseAnalyticsFromItems } from "@mototwin/domain";
-import type { ExpenseItem } from "@mototwin/types";
+import { buildExpenseAnalyticsFromItems, expenseCategoryRequiresNode, getDefaultExpenseInstallStatusForCategory } from "@mototwin/domain";
+import { EXPENSE_CATEGORIES, type ExpenseCategory, type ExpenseItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import { toCurrentUserContextErrorResponse } from "../../_shared/current-user-context";
 import { getVehicleInCurrentContext } from "../../_shared/vehicle-context";
@@ -36,7 +36,7 @@ const expenseModel = () => (prisma as unknown as { expenseItem: ExpenseModel }).
 // MT-SEC-068 + MT-SEC-070: mirror the create schema with bounded text/numerics.
 const patchExpenseSchema = strictObject({
   nodeId: boundedTextOptional({ max: 64 }),
-  category: z.enum(["PART", "CONSUMABLE", "SERVICE_WORK", "REPAIR", "DIAGNOSTICS", "OTHER"]).optional(),
+  category: z.enum(EXPENSE_CATEGORIES).optional(),
   installStatus: z.enum(["BOUGHT_NOT_INSTALLED", "INSTALLED", "NOT_APPLICABLE"]).optional(),
   purchaseStatus: z.enum(["PLANNED", "PURCHASED"]).optional(),
   installationStatus: z.enum(["NOT_INSTALLED", "INSTALLED"]).optional(),
@@ -105,20 +105,39 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    if (data.nodeId) {
+    if (data.nodeId && expenseCategoryRequiresNode(data.category ?? existing.category)) {
       const node = await prisma.node.findUnique({ where: { id: data.nodeId }, select: { id: true } });
       if (!node) {
         return NextResponse.json({ error: "Node not found" }, { status: 404 });
       }
     }
 
+    const effectiveCategory = data.category ?? existing.category;
+    const effectiveInstallStatus = data.installStatus ?? existing.installStatus;
+    const resolved = expenseCategoryRequiresNode(effectiveCategory)
+      ? {
+          nodeId: data.nodeId === undefined ? undefined : data.nodeId || null,
+          installStatus: effectiveInstallStatus,
+        }
+      : {
+          nodeId: null as string | null,
+          installStatus: getDefaultExpenseInstallStatusForCategory(effectiveCategory),
+        };
+
     const updated = await expenseModel().update({
       where: { id: expenseId },
       data: {
         ...data,
+        category: data.category,
+        installStatus: resolved.installStatus,
         expenseDate: data.expenseDate ? new Date(data.expenseDate) : undefined,
         currency: data.currency ? data.currency.toUpperCase() : undefined,
-        nodeId: data.nodeId === undefined ? undefined : data.nodeId || null,
+        nodeId:
+          resolved.nodeId === undefined
+            ? expenseCategoryRequiresNode(effectiveCategory)
+              ? undefined
+              : null
+            : resolved.nodeId,
         comment: data.comment === undefined ? undefined : data.comment?.trim() || null,
         partSku: data.partSku === undefined ? undefined : data.partSku?.trim() || null,
         partName: data.partName === undefined ? undefined : data.partName?.trim() || null,

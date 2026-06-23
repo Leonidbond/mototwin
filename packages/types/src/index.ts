@@ -154,6 +154,7 @@ export type {
   UpdateExpenseItemInput,
   UpdateExpenseItemResponse,
 } from "./expense-item";
+export { EXPENSE_CATEGORIES } from "./expense-item";
 export type {
   ServiceEventsSortField,
   ServiceEventsSortDirection,

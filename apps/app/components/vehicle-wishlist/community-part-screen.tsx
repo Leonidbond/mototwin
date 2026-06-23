@@ -21,6 +21,7 @@ import {
   RIDE_RIDING_STYLE_OPTIONS,
   RIDE_USAGE_INTENSITY_OPTIONS,
   RIDE_USAGE_TYPE_OPTIONS,
+  buildCommunityPartCategoryOptions,
   buildRestrictedPlanVehicleLeafPickerSets,
   buildVehicleDetailViewModel,
   getLeafNodeOptions,
@@ -379,15 +380,14 @@ export function CommunityPartScreen(props: {
     return getNodeTreeIconAsset(selectedLeaf.code, selectedLeaf.name) as ImageSourcePropType | null;
   }, [selectedLeaf]);
 
-  const categoryOptions = useMemo(() => {
-    const fromRecs = [...new Set(recs.map((r) => r.partType?.trim()).filter(Boolean))] as string[];
-    const nodeName = selectedNodeName;
-    const merged =
-      nodeName && !fromRecs.includes(nodeName) ? [nodeName, ...fromRecs] : [...fromRecs];
-    if (merged.length === 0 && nodeName) return [nodeName];
-    if (merged.length === 0) return ["ЗАПЧАСТЬ"];
-    return merged;
-  }, [recs, selectedNodeName]);
+  const categoryOptions = useMemo(
+    () =>
+      buildCommunityPartCategoryOptions({
+        nodeName: selectedNodeName,
+        recommendationPartTypes: recs.map((r) => r.partType ?? ""),
+      }),
+    [recs, selectedNodeName]
+  );
 
   useEffect(() => {
     if (!category && categoryOptions.length > 0) {

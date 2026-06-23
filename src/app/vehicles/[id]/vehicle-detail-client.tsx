@@ -58,6 +58,7 @@ import {
   WISHLIST_INSTALLED_NO_NODE_SERVICE_HINT,
   buildTopNodeOverviewCards,
   getPartRecommendationWarningLabel,
+  getPartWishlistNextStatusActionLabelRu,
   getWishlistItemIdsFromInstalledPartsJson,
   getWishlistItemSkuDisplayLines,
   isNodeSnoozed,
@@ -898,18 +899,7 @@ function NodeContextReferencePanel({
               <div style={{ display: "grid", gap: 8 }}>
                 {visibleUninstalledParts.map((item) => {
                   const isUpdating = updatingWishlistItemId === item.id;
-                  const nextStatus =
-                    item.status === "NEEDED"
-                      ? "ORDERED"
-                      : item.status === "ORDERED"
-                      ? "BOUGHT"
-                      : "INSTALLED";
-                  const nextStatusLabel =
-                    item.status === "NEEDED"
-                      ? "Заказать"
-                      : item.status === "ORDERED"
-                      ? "Куплено"
-                      : "Установить";
+                  const actionLabel = getPartWishlistNextStatusActionLabelRu(item.status);
                   return (
                     <div
                       key={item.id}
@@ -946,15 +936,21 @@ function NodeContextReferencePanel({
                           event.stopPropagation();
                           onAdvanceWishlistPartStatus(item);
                         }}
-                        disabled={isUpdating}
-                        title={`Сделать статус: ${nextStatus}`}
+                        disabled={isUpdating || !actionLabel}
+                        title={actionLabel ? actionLabel : item.statusLabelRu}
                         style={{
                           flex: "0 0 auto",
                           border: `1px solid ${productSemanticColors.borderStrong}`,
                           borderRadius: 999,
-                          backgroundColor: item.status === "BOUGHT" ? productSemanticColors.primaryAction : productSemanticColors.cardMuted,
-                          color: item.status === "BOUGHT" ? productSemanticColors.onPrimaryAction : productSemanticColors.textPrimary,
-                          cursor: isUpdating ? "not-allowed" : "pointer",
+                          backgroundColor:
+                            item.status === "BOUGHT"
+                              ? productSemanticColors.primaryAction
+                              : productSemanticColors.cardMuted,
+                          color:
+                            item.status === "BOUGHT"
+                              ? productSemanticColors.onPrimaryAction
+                              : productSemanticColors.textPrimary,
+                          cursor: isUpdating || !actionLabel ? "not-allowed" : "pointer",
                           opacity: isUpdating ? 0.6 : 1,
                           padding: "7px 10px",
                           fontSize: 11,
@@ -963,7 +959,7 @@ function NodeContextReferencePanel({
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {isUpdating ? "Обновляем..." : nextStatusLabel}
+                        {isUpdating ? "Обновляем..." : actionLabel ?? item.statusLabelRu}
                       </button>
                     </div>
                   );

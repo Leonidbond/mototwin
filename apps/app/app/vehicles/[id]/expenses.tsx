@@ -22,11 +22,14 @@ import {
   buildVehicleDetailViewModel,
   vehicleDetailFromApiRecord,
   expenseCategoryLabelsRu,
+  expenseCategoryRequiresNode,
   expenseInstallStatusLabelsRu,
   formatExpenseAmountRu,
+  getDefaultExpenseInstallStatusForCategory,
   getExpenseMonthKeyFromIso,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
+import { EXPENSE_CATEGORIES } from "@mototwin/types";
 import type {
   ExpenseAmountByCurrency,
   ExpenseCategory,
@@ -47,14 +50,7 @@ import { GarageVehicleContextPlaque } from "../../../components/garage/GarageVeh
 import { MobileNodePickerModal } from "../../../components/vehicle-detail/mobile-node-picker-modal";
 import { useMobileSubscription } from "../../../src/use-mobile-subscription";
 
-const categoryOptions: ExpenseCategory[] = [
-  "PART",
-  "CONSUMABLE",
-  "SERVICE_WORK",
-  "REPAIR",
-  "DIAGNOSTICS",
-  "OTHER",
-];
+const categoryOptions: ExpenseCategory[] = [...EXPENSE_CATEGORIES];
 
 const installStatusOptions: ExpenseInstallStatus[] = [
   "BOUGHT_NOT_INSTALLED",
@@ -69,7 +65,18 @@ const categoryColors: Record<ExpenseCategory, string> = {
   REPAIR: "#ef4444",
   DIAGNOSTICS: "#9ca3af",
   OTHER: "#8b5cf6",
+  FUEL: "#eab308",
 };
+
+function applyExpenseCategoryToForm(category: ExpenseCategory): {
+  category: ExpenseCategory;
+  installStatus: ExpenseInstallStatus;
+} {
+  return {
+    category,
+    installStatus: getDefaultExpenseInstallStatusForCategory(category),
+  };
+}
 
 function todayYmd(): string {
   return new Date().toISOString().slice(0, 10);
@@ -646,13 +653,29 @@ export default function VehicleExpensesScreen() {
             <Text style={styles.smallLabel}>Категория</Text>
             <ChipRow>
               {categoryOptions.map((category) => (
-                <FilterChip key={category} active={form.category === category} label={expenseCategoryLabelsRu[category]} onPress={() => setForm((prev) => ({ ...prev, category }))} />
+                <FilterChip
+                  key={category}
+                  active={form.category === category}
+                  label={expenseCategoryLabelsRu[category]}
+                  onPress={() => {
+                    setForm((prev) => ({ ...prev, ...applyExpenseCategoryToForm(category) }));
+                    if (!expenseCategoryRequiresNode(category)) {
+                      setSelectedNodeIds([]);
+                    }
+                  }}
+                />
               ))}
             </ChipRow>
             <Text style={styles.smallLabel}>Статус</Text>
             <ChipRow>
               {installStatusOptions.map((status) => (
-                <FilterChip key={status} active={form.installStatus === status} label={expenseInstallStatusLabelsRu[status]} onPress={() => setForm((prev) => ({ ...prev, installStatus: status }))} />
+                <FilterChip
+                  key={status}
+                  active={form.installStatus === status}
+                  label={expenseInstallStatusLabelsRu[status]}
+                  disabled={!expenseCategoryRequiresNode(form.category)}
+                  onPress={() => setForm((prev) => ({ ...prev, installStatus: status }))}
+                />
               ))}
             </ChipRow>
             <Field label="Комментарий">
@@ -967,9 +990,17 @@ function ChipRow(props: { children: ReactNode }) {
   );
 }
 
-function FilterChip(props: { label: string; active: boolean; onPress: () => void }) {
+function FilterChip(props: { label: string; active: boolean; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={props.onPress} style={[styles.filterChip, props.active && styles.filterChipActive]}>
+    <Pressable
+      onPress={props.onPress}
+      disabled={props.disabled}
+      style={[
+        styles.filterChip,
+        props.active && styles.filterChipActive,
+        props.disabled && styles.filterChipDisabled,
+      ]}
+    >
       <Text style={[styles.filterChipText, props.active && styles.filterChipTextActive]}>{props.label}</Text>
     </Pressable>
   );
@@ -1353,6 +1384,9 @@ const styles = StyleSheet.create({
   filterChipActive: {
     borderColor: c.primaryAction,
     backgroundColor: c.primaryAction,
+  },
+  filterChipDisabled: {
+    opacity: 0.45,
   },
   filterChipText: {
     color: c.textSecondary,

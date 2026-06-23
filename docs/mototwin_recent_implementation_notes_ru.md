@@ -4,6 +4,15 @@
 
 **Шаблоны журнала (ADVANCED) и комплекты в подборе** (`includeInPartPicker`, коды `user_template:`, UI web/Expo) вынесены в отдельный документ: [mototwin_user_template_service_kits_implementation_ru.md](mototwin_user_template_service_kits_implementation_ru.md).
 
+## 0. Расходы — категория «Топливо» (2026-06-23)
+
+- Enum **`FUEL`** в `ExpenseCategory` (Prisma + `EXPENSE_CATEGORIES` в `packages/types/src/expense-item.ts`).
+- Подпись **«Топливо»**, хелперы `getDefaultExpenseInstallStatusForCategory` / `expenseCategoryRequiresNode` — `packages/domain/src/expense-summary.ts`.
+- API: `POST/PATCH /api/expenses` нормализует `FUEL` → `nodeId: null`, `installStatus: NOT_APPLICABLE`.
+- UI: web `ExpensesPageClient`, Expo `vehicles/[id]/expenses` — chip/select «Топливо», авто-статус «Не требует установки».
+- Документация: [expense-tracking-mvp.md](expense-tracking-mvp.md), [data-model.md](data-model.md).
+- Миграция: `prisma/migrations/20260623120000_add_expense_category_fuel`.
+
 ## 1. Данные и Prisma
 
 - Модели и перечисления для **PartMaster**, **FitmentReport**, **FitmentVote**, **FitmentEvidence**, **FitmentConfidence**, статусы wishlist (в т.ч. `REJECTED`) — в [prisma/schema.prisma](../prisma/schema.prisma).

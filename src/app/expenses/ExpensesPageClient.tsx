@@ -10,13 +10,16 @@ import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
   buildExpenseAnalyticsFromItems,
   expenseCategoryLabelsRu,
+  expenseCategoryRequiresNode,
   expenseInstallStatusLabelsRu,
   buildRestrictedPlanVehicleLeafPickerSets,
   findNodeTreeItemById,
   formatExpenseAmountRu,
+  getDefaultExpenseInstallStatusForCategory,
   getExpenseMonthKeyFromIso,
 } from "@mototwin/domain";
 import { productSemanticColors as c } from "@mototwin/design-tokens";
+import { EXPENSE_CATEGORIES } from "@mototwin/types";
 import type {
   ExpenseAmountByCurrency,
   ExpenseCategory,
@@ -52,14 +55,7 @@ function decodeMototwinInternalReturnTo(raw: string | null): string | null {
   return decoded;
 }
 
-const categoryOptions: ExpenseCategory[] = [
-  "PART",
-  "CONSUMABLE",
-  "SERVICE_WORK",
-  "REPAIR",
-  "DIAGNOSTICS",
-  "OTHER",
-];
+const categoryOptions: ExpenseCategory[] = [...EXPENSE_CATEGORIES];
 
 const installStatusOptions: ExpenseInstallStatus[] = [
   "BOUGHT_NOT_INSTALLED",
@@ -74,10 +70,21 @@ const categoryColors: Record<ExpenseCategory, string> = {
   REPAIR: "#ef4444",
   DIAGNOSTICS: "#9ca3af",
   OTHER: "#8b5cf6",
+  FUEL: "#eab308",
 };
 
 function todayYmd(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function applyExpenseCategoryToForm(category: ExpenseCategory): {
+  category: ExpenseCategory;
+  installStatus: ExpenseInstallStatus;
+} {
+  return {
+    category,
+    installStatus: getDefaultExpenseInstallStatusForCategory(category),
+  };
 }
 
 function formatTotals(rows: ExpenseAmountByCurrency[]): string {
@@ -736,12 +743,27 @@ export function ExpensesPageClient(props: {
                   <input type="date" value={form.expenseDate} onChange={(e) => setForm((prev) => ({ ...prev, expenseDate: e.target.value }))} style={fieldStyle} />
                 </Field>
                 <Field label="Категория">
-                  <select value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value as ExpenseCategory }))} style={fieldStyle}>
+                  <select
+                    value={form.category}
+                    onChange={(e) => {
+                      const category = e.target.value as ExpenseCategory;
+                      setForm((prev) => ({ ...prev, ...applyExpenseCategoryToForm(category) }));
+                      if (!expenseCategoryRequiresNode(category)) {
+                        setSelectedNodeIds([]);
+                      }
+                    }}
+                    style={fieldStyle}
+                  >
                     {categoryOptions.map((category) => <option key={category} value={category}>{expenseCategoryLabelsRu[category]}</option>)}
                   </select>
                 </Field>
                 <Field label="Статус">
-                  <select value={form.installStatus} onChange={(e) => setForm((prev) => ({ ...prev, installStatus: e.target.value as ExpenseInstallStatus }))} style={fieldStyle}>
+                  <select
+                    value={form.installStatus}
+                    onChange={(e) => setForm((prev) => ({ ...prev, installStatus: e.target.value as ExpenseInstallStatus }))}
+                    disabled={!expenseCategoryRequiresNode(form.category)}
+                    style={fieldStyle}
+                  >
                     {installStatusOptions.map((status) => <option key={status} value={status}>{expenseInstallStatusLabelsRu[status]}</option>)}
                   </select>
                 </Field>

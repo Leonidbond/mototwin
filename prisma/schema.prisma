@@ -185,6 +185,7 @@ enum ExpenseCategory {
   REPAIR
   DIAGNOSTICS
   OTHER
+  FUEL
 }
 
 enum ExpenseInstallStatus {

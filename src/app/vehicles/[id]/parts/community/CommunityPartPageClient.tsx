@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createApiClient, createMotoTwinEndpoints } from "@mototwin/api-client";
 import {
+  buildCommunityPartCategoryOptions,
   buildRestrictedPlanVehicleLeafPickerSets,
   buildVehicleDetailViewModel,
   formatRideStyleChipRu,
@@ -688,14 +689,14 @@ export function CommunityPartPageClient(props: {
     return getNodeTreeIconWebSrc(selectedLeafCode, selectedNodeName);
   }, [selectedLeafCode, selectedNodeName]);
 
-  const categoryOptions = useMemo(() => {
-    const fromRecs = [...new Set(recs.map((r) => r.partType?.trim()).filter(Boolean))] as string[];
-    const nodeName = selectedNodeName;
-    const merged = nodeName && !fromRecs.includes(nodeName) ? [nodeName, ...fromRecs] : [...fromRecs];
-    if (merged.length === 0 && nodeName) return [nodeName];
-    if (merged.length === 0) return ["ЗАПЧАСТЬ"];
-    return merged;
-  }, [recs, selectedNodeName]);
+  const categoryOptions = useMemo(
+    () =>
+      buildCommunityPartCategoryOptions({
+        nodeName: selectedNodeName,
+        recommendationPartTypes: recs.map((r) => r.partType ?? ""),
+      }),
+    [recs, selectedNodeName]
+  );
 
   useEffect(() => {
     if (!category && categoryOptions.length > 0) {

@@ -37,6 +37,38 @@ export function getPartWishlistStatusLabelRu(status: PartWishlistItemStatus): st
   return partWishlistStatusLabelsRu[status];
 }
 
+/** Next status when advancing an active wishlist line from node context or compact cart rows. */
+export function getPartWishlistNextStatus(
+  status: PartWishlistItemStatus
+): PartWishlistItemStatus | null {
+  switch (status) {
+    case "NEEDED":
+      return "ORDERED";
+    case "ORDERED":
+      return "BOUGHT";
+    case "BOUGHT":
+      return "INSTALLED";
+    default:
+      return null;
+  }
+}
+
+/** Short action label for the next status transition (infinitive, not status noun). */
+export function getPartWishlistNextStatusActionLabelRu(
+  status: PartWishlistItemStatus
+): string | null {
+  switch (status) {
+    case "NEEDED":
+      return "Заказать";
+    case "ORDERED":
+      return "Купить";
+    case "BOUGHT":
+      return "Установить";
+    default:
+      return null;
+  }
+}
+
 export function isPartWishlistItemStatus(value: string): value is PartWishlistItemStatus {
   return (
     value === "NEEDED" ||

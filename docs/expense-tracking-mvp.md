@@ -1,6 +1,6 @@
 # Expense tracking MVP (`ExpenseItem`)
 
-**Дата:** 2026-04-28 (deep link из журнала + `returnTo` / `serviceEventId` / `highlightExpenseId`: 2026-05-10)  
+**Дата:** 2026-04-28 (deep link из журнала + `returnTo` / `serviceEventId` / `highlightExpenseId`: 2026-05-10; категория **`FUEL` («Топливо»)**: 2026-06-23)  
 **Статус:** реализована отдельная модель расходов `ExpenseItem`.
 
 ## Источник данных
@@ -11,27 +11,29 @@ Expense analytics строится только из таблицы **`expense_i
 
 - `ServiceEvent` с валидной стоимостью и валютой;
 - `PartWishlistItem` со статусом `BOUGHT`, стоимостью и валютой;
-- ручной технический расход без `ServiceEvent` (например диагностика, работа сервиса, ремонт).
+- ручной расход без `ServiceEvent` (диагностика, работа сервиса, ремонт, **заправка / топливо** и т.п.).
 
 Старые поля **`ServiceEvent.costAmount/currency`** и **`PartWishlistItem.costAmount/currency`** остаются для совместимости форм, но аналитика читает `ExpenseItem`.
 
 ## Что входит в сводку
 
-- Только технические расходы: обслуживание, запчасти, ремонт, диагностика, работа сервиса, прочие технические расходы.
+- Технические расходы: обслуживание, запчасти, ремонт, диагностика, работа сервиса, прочие технические расходы.
+- **Топливо** (`FUEL`) — заправки на уровне мотоцикла (ручной ввод; без привязки к узлу дерева).
 - **`amount > 0`** и непустая **`currency`**.
 - Сезон = календарный год: `YYYY-01-01` включительно до `(YYYY+1)-01-01` исключительно.
 
 ## Что исключается
 
-- Бензин, страховка, штрафы, парковка, мойка, экипировка.
-- Любые нетехнические категории: они не представлены в `ExpenseCategory`, поэтому не попадают в UI/API аналитики.
+- Страховка, штрафы, парковка, мойка, экипировка и прочие нетехнические траты.
+- Любые категории вне `ExpenseCategory` — не попадают в UI/API аналитики.
 - `STATE_UPDATE` не создаёт расход.
 
 ## Data model
 
 Prisma:
 
-- `ExpenseCategory`: `PART`, `CONSUMABLE`, `SERVICE_WORK`, `REPAIR`, `DIAGNOSTICS`, `OTHER`.
+- `ExpenseCategory`: `PART`, `CONSUMABLE`, `SERVICE_WORK`, `REPAIR`, `DIAGNOSTICS`, `OTHER`, **`FUEL`**.
+- Канонический список: `EXPENSE_CATEGORIES` в `packages/types/src/expense-item.ts`.
 - `ExpenseInstallStatus`: legacy display/status field `BOUGHT_NOT_INSTALLED`, `INSTALLED`, `NOT_APPLICABLE`.
 - `ExpensePurchaseStatus`: `PLANNED`, `PURCHASED`.
 - `ExpenseInstallationStatus`: `NOT_INSTALLED`, `INSTALLED`.
@@ -48,7 +50,16 @@ Prisma:
 
 - `BOUGHT_NOT_INSTALLED` — деталь куплена заранее, но ещё не установлена.
 - `INSTALLED` — расход связан с установленной деталью/сервисным событием.
-- `NOT_APPLICABLE` — расход без установки: диагностика, работа сервиса и подобные.
+- `NOT_APPLICABLE` — расход без установки: диагностика, работа сервиса, **топливо** и подобные.
+
+### Категория `FUEL` («Топливо»)
+
+- Только **ручной** `POST /api/expenses` / форма на странице расходов; из `ServiceEvent` и wishlist не создаётся.
+- **`nodeId` всегда `null`** (заправка не привязана к узлу `FUEL.*` в дереве); переданный `nodeId` на API игнорируется.
+- **`installStatus = NOT_APPLICABLE`** (на клиенте и сервере); статус установки в форме блокируется.
+- В **`GET /api/expenses/node-summary`** не попадает (фильтр `nodeId IS NOT NULL`); в общей аналитике и donut «Структура расходов» — да, группа **«Топливо»**.
+- Domain-хелперы: `getDefaultExpenseInstallStatusForCategory`, `expenseCategoryRequiresNode` в `packages/domain/src/expense-summary.ts`.
+- Миграция: `prisma/migrations/20260623120000_add_expense_category_fuel`.
 
 Отдельная метрика **«куплено, но не установлено»** считается только по:
 
@@ -118,7 +129,7 @@ Prisma:
 - `GET /api/expenses?year=2026&vehicleId=...` — список расходов + analytics.
 - `GET /api/expenses/node-summary?vehicleId=...&year=2026` — агрегаты расходов для полного дерева узлов.
 - `GET /api/expenses/uninstalled?vehicleId=...&nodeId=...` — купленные, но не установленные детали для выбора в ServiceEvent.
-- `POST /api/expenses` — ручной технический расход.
+- `POST /api/expenses` — ручной расход (в т.ч. топливо).
 - `PATCH /api/expenses/[expenseId]` — редактирование.
 - `DELETE /api/expenses/[expenseId]` — удаление.
 - `POST /api/shopping-list/[id]/create-expense` — создать `ExpenseItem` из позиции списка покупок.
@@ -140,7 +151,7 @@ API возвращает:
 - `nodeId = ServiceEvent.nodeId`;
 - `expenseDate = ServiceEvent.eventDate`;
 - `title = ServiceEvent.serviceType`;
-- category классифицируется эвристически: `PART` / `CONSUMABLE` / `SERVICE_WORK` / `REPAIR` / `DIAGNOSTICS` / `OTHER`;
+- category классифицируется эвристически: `PART` / `CONSUMABLE` / `SERVICE_WORK` / `REPAIR` / `DIAGNOSTICS` / `OTHER` (не `FUEL`).
 - `installedPartsJson.source === "wishlist"` + `wishlistItemId` заполняет `shoppingListItemId`.
 
 Если `ServiceEvent` устанавливает позицию из wishlist или выбранный ранее купленный `ExpenseItem`, standalone-расход `NOT_INSTALLED` обновляется в той же транзакции:
@@ -189,17 +200,17 @@ API возвращает:
 
 ## Shared API
 
-- Типы: `packages/types/src/expense-item.ts` (`ExpenseItem`, `ExpenseAnalyticsSummary`, DTO create/update).
+- Типы: `packages/types/src/expense-item.ts` (`ExpenseItem`, `ExpenseAnalyticsSummary`, `EXPENSE_CATEGORIES`, DTO create/update).
 - Доменные хелперы: `packages/domain/src/expense-summary.ts` — `buildExpenseAnalyticsFromItems`, labels категорий/статусов, форматирование сумм.
 - HTTP client: `packages/api-client/src/mototwin-endpoints.ts` — `getExpenses`, `createExpense`, `updateExpense`, `deleteExpense`.
 
 ## QA (кратко)
 
 1. Расходы в RUB и EUR отображаются отдельными итогами, без конвертации и сложения.
-2. `POST /api/expenses` создаёт ручной технический расход без `ServiceEvent`.
+2. `POST /api/expenses` создаёт ручной расход без `ServiceEvent` (в т.ч. `category: FUEL` → `nodeId: null`, `installStatus: NOT_APPLICABLE`).
 3. `ServiceEvent` с суммой создаёт связанный `ExpenseItem`; редактирование стоимости пересинхронизирует его.
 4. Wishlist item `BOUGHT` со стоимостью создаёт метрику «куплено, но не установлено».
 5. Сезон 2026 включает даты `2026-01-01` … `2026-12-31`.
 6. `/expenses` показывает общий гараж, `/vehicles/[id]/expenses` — один мотоцикл.
-7. `/expenses?vehicleId=<id>&nodeId=<nodeId>&year=<year>` фильтрует расходы по узлу и всем descendants.
+7. `/expenses?vehicleId=<id>&nodeId=<nodeId>&year=<year>` фильтрует расходы по узлу и всем descendants (расходы `FUEL` без узла в этот фильтр не попадают).
 8. Блок «Куплено, не установлено» ведёт в подбор с `partsStatus=BOUGHT`; конкретная позиция запускает установку через service-event flow.

@@ -121,6 +121,7 @@ export {
   buildVehicleDashboardExpensesViewModelFromAnalytics,
   formatExpenseTotalsByCurrency,
   expenseCategoryLabelsRu,
+  expenseCategoryRequiresNode,
   expenseInstallStatusLabelsRu,
   groupExpensesByCurrency,
   groupExpensesByMonth,
@@ -133,6 +134,7 @@ export {
   parseExpenseAmountInputToNumberOrNull,
   getCurrentExpenseYear,
   getExpenseCategoryLabelRu,
+  getDefaultExpenseInstallStatusForCategory,
   getExpenseInstallStatusLabelRu,
   getExpenseYearDateRange,
   getCurrentExpenseMonthKey,
@@ -340,6 +342,8 @@ export {
   wishlistQuantityForLine,
   createInitialPartWishlistFormValues,
   filterActiveWishlistItems,
+  getPartWishlistNextStatus,
+  getPartWishlistNextStatusActionLabelRu,
   getPartWishlistStatusLabelRu,
   groupPartWishlistItemsByStatus,
   isActiveWishlistItem,
@@ -454,6 +458,7 @@ export {
   sortPartRecommendations,
   sortPartRecommendationsWithinGroup,
 } from "./part-recommendation";
+export { buildCommunityPartCategoryOptions } from "./community-part-category";
 export {
   computeFitmentConfidenceState,
   type PublishedReportStats,

@@ -1,10 +1,14 @@
-export type ExpenseCategory =
-  | "PART"
-  | "CONSUMABLE"
-  | "SERVICE_WORK"
-  | "REPAIR"
-  | "DIAGNOSTICS"
-  | "OTHER";
+export const EXPENSE_CATEGORIES = [
+  "PART",
+  "CONSUMABLE",
+  "SERVICE_WORK",
+  "REPAIR",
+  "DIAGNOSTICS",
+  "OTHER",
+  "FUEL",
+] as const;
+
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
 export type ExpenseInstallStatus =
   | "BOUGHT_NOT_INSTALLED"

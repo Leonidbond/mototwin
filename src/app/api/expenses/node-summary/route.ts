@@ -12,6 +12,7 @@ const TECHNICAL_CATEGORIES: ExpenseCategory[] = [
   "REPAIR",
   "DIAGNOSTICS",
   "OTHER",
+  "FUEL",
 ];
 
 type ExpenseRow = {

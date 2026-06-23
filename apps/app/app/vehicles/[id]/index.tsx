@@ -58,6 +58,7 @@ import {
   findNodeTreeItemById,
   formatSnoozeUntilLabel,
   getNodeSubtreeById,
+  getPartWishlistNextStatusActionLabelRu,
   getTopLevelNodeTreeItems,
   isNodeSnoozed,
   partWishlistStatusLabelsRu,
@@ -3166,12 +3167,7 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                         </Text>
                       ) : (
                         selectedUninstalledParts.slice(0, 3).map((item) => {
-                          const nextStatus: PartWishlistItemStatus =
-                            item.status === "NEEDED"
-                              ? "ORDERED"
-                              : item.status === "ORDERED"
-                                ? "BOUGHT"
-                                : "INSTALLED";
+                          const actionLabel = getPartWishlistNextStatusActionLabelRu(item.status);
                           return (
                             <Pressable
                               key={item.id}
@@ -3186,6 +3182,8 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                               <View style={styles.searchResultTextCol}>
                                 <Text style={styles.searchResultTitle}>{item.title}</Text>
                                 <Text style={styles.searchResultPath}>
+                                  {item.statusLabelRu}
+                                  {" · "}
                                   {item.quantity} шт.
                                   {item.costLabelRu ? ` · ${item.costLabelRu}` : " · цена не указана"}
                                   {item.kitOriginKitCode
@@ -3195,22 +3193,31 @@ export function VehicleDetailScreen({ forcedView }: VehicleDetailScreenProps) {
                                       : ""}
                                 </Text>
                               </View>
-                              <Pressable
-                                onPress={(event) => {
-                                  event.stopPropagation();
-                                  void advanceWishlistItemStatusFromNodeContext(item);
-                                }}
-                                style={({ pressed }) => [
-                                  styles.wishlistStatusAdvanceBadge,
-                                  pressed && styles.badgePressed,
-                                ]}
-                                accessibilityRole="button"
-                                accessibilityLabel={`Перевести в статус ${partWishlistStatusLabelsRu[nextStatus]}`}
-                              >
-                                <Text style={styles.wishlistStatusAdvanceText}>
-                                  {partWishlistStatusLabelsRu[nextStatus]}
-                                </Text>
-                              </Pressable>
+                              {actionLabel ? (
+                                <Pressable
+                                  onPress={(event) => {
+                                    event.stopPropagation();
+                                    void advanceWishlistItemStatusFromNodeContext(item);
+                                  }}
+                                  style={({ pressed }) => [
+                                    styles.wishlistStatusAdvanceBadge,
+                                    styles.wishlistStatusActionBadge,
+                                    pressed && styles.badgePressed,
+                                  ]}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={actionLabel}
+                                >
+                                  <Text style={styles.wishlistStatusActionText}>{actionLabel}</Text>
+                                </Pressable>
+                              ) : (
+                                <View
+                                  style={styles.wishlistStatusAdvanceBadge}
+                                  accessibilityRole="text"
+                                  accessibilityLabel={`Статус: ${item.statusLabelRu}`}
+                                >
+                                  <Text style={styles.wishlistStatusAdvanceText}>{item.statusLabelRu}</Text>
+                                </View>
+                              )}
                             </Pressable>
                           );
                         })
@@ -5391,10 +5398,19 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     maxWidth: 116,
   },
+  wishlistStatusActionBadge: {
+    backgroundColor: "rgba(249, 115, 22, 0.12)",
+    borderColor: "rgba(249, 115, 22, 0.35)",
+  },
   wishlistStatusAdvanceText: {
     fontSize: 10,
     fontWeight: "800",
     color: c.textSecondary,
+  },
+  wishlistStatusActionText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: c.primaryAction,
   },
   searchActionBtn: {
     borderWidth: 1,

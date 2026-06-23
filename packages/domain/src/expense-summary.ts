@@ -21,7 +21,21 @@ export const expenseCategoryLabelsRu: Record<ExpenseCategory, string> = {
   REPAIR: "Ремонт",
   DIAGNOSTICS: "Диагностика",
   OTHER: "Прочие технические",
+  FUEL: "Топливо",
 };
+
+export function getDefaultExpenseInstallStatusForCategory(
+  category: ExpenseCategory
+): ExpenseInstallStatus {
+  if (category === "FUEL" || category === "DIAGNOSTICS" || category === "SERVICE_WORK") {
+    return "NOT_APPLICABLE";
+  }
+  return "BOUGHT_NOT_INSTALLED";
+}
+
+export function expenseCategoryRequiresNode(category: ExpenseCategory): boolean {
+  return category !== "FUEL";
+}
 
 export const expenseInstallStatusLabelsRu: Record<ExpenseInstallStatus, string> = {
   BOUGHT_NOT_INSTALLED: "Куплено, не установлено",

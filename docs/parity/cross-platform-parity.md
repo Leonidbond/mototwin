@@ -66,7 +66,7 @@ Parity оценивается по core workflows, business outcome и поль�
 - **Web:** `/expenses` shows garage-wide technical expense analytics; `/vehicles/[id]/expenses` shows the same analytics filtered to one motorcycle.
 - **Expo:** `vehicles/[id]/expenses` shows vehicle-scoped technical expense analytics.
 - **Parity status:** aligned for vehicle-scoped business outcome (totals by currency, selected calendar year/season, month/category/node breakdowns, all expenses list, and “куплено, но не установлено” metric).
-- **Notes:** analytics is backed by `ExpenseItem`, not directly by `ServiceEvent`. Technical categories only: service, parts, repair, diagnostics, labor, other technical. Fuel/insurance/fines/parking/wash/gear are intentionally out of scope — see [expense-tracking-mvp.md(../expense-tracking-mvp.md).
+- **Notes:** analytics is backed by `ExpenseItem`, not directly by `ServiceEvent`. Categories: service, parts, repair, diagnostics, labor, other technical, **fuel (`FUEL`)**. Insurance/fines/parking/wash/gear remain out of scope — see [expense-tracking-mvp.md](../expense-tracking-mvp.md).
 
 ## 3.4.2 Expense entry points and journal filter
 

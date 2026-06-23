@@ -18,7 +18,7 @@
 - `NodeStatus`: `OK`, `SOON`, `OVERDUE`, `RECENTLY_REPLACED`
 - `MaintenanceTriggerMode`: `WHICHEVER_COMES_FIRST`, `ANY`, `ALL`
 - `ServiceEventKind`: `SERVICE`, `STATE_UPDATE`
-- `ExpenseCategory`: `PART`, `CONSUMABLE`, `SERVICE_WORK`, `REPAIR`, `DIAGNOSTICS`, `OTHER`
+- `ExpenseCategory`: `PART`, `CONSUMABLE`, `SERVICE_WORK`, `REPAIR`, `DIAGNOSTICS`, `OTHER`, `FUEL`
 - `ExpenseInstallStatus`: `BOUGHT_NOT_INSTALLED`, `INSTALLED`, `NOT_APPLICABLE`
 - `ExpensePurchaseStatus`: `PLANNED`, `PURCHASED`
 - `ExpenseInstallationStatus`: `NOT_INSTALLED`, `INSTALLED`
@@ -136,9 +136,9 @@
 
 The product metric **«куплено, но не установлено»** is intentionally stricter than legacy `installStatus`: it counts only `purchaseStatus = PURCHASED`, `installationStatus = NOT_INSTALLED`, and `serviceEventId = null`.
 
-Only technical expense categories exist in the enum. Fuel, insurance, fines, parking, wash, and gear are intentionally not representable in expense analytics.
+Only expense categories defined in `ExpenseCategory` are representable in analytics. **`FUEL`** covers fuel top-ups at vehicle level (`nodeId` null, manual entry only). Insurance, fines, parking, wash, and gear remain out of scope.
 
-Expense node summaries for the full node tree are exposed by `GET /api/expenses/node-summary?vehicleId=...&year=...`. The API aggregates `ExpenseItem` totals separately by currency and rolls child-node expenses up to every parent node.
+Expense node summaries for the full node tree are exposed by `GET /api/expenses/node-summary?vehicleId=...&year=...`. The API aggregates `ExpenseItem` totals separately by currency and rolls child-node expenses up to every parent node. **`FUEL` rows are excluded** from node-summary (no `nodeId`).
 
 ### NodeState / TopNodeState
 

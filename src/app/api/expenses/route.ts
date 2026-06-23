@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { buildExpenseAnalyticsFromItems, getCurrentExpenseYear } from "@mototwin/domain";
-import type { ExpenseItem } from "@mototwin/types";
+import { buildExpenseAnalyticsFromItems, getCurrentExpenseYear, getDefaultExpenseInstallStatusForCategory, expenseCategoryRequiresNode } from "@mototwin/domain";
+import { EXPENSE_CATEGORIES, type ExpenseCategory, type ExpenseInstallStatus, type ExpenseItem } from "@mototwin/types";
 import { prisma } from "@/lib/prisma";
 import { expenseVehicleInclude, toExpenseItemVehicleSummary } from "@/lib/vehicle-wire";
 import { getCurrentUserContext, toCurrentUserContextErrorResponse } from "../_shared/current-user-context";
@@ -29,14 +29,7 @@ type ExpenseModel = {
 
 const expenseModel = () => (prisma as unknown as { expenseItem: ExpenseModel }).expenseItem;
 
-const categorySchema = z.enum([
-  "PART",
-  "CONSUMABLE",
-  "SERVICE_WORK",
-  "REPAIR",
-  "DIAGNOSTICS",
-  "OTHER",
-]);
+const categorySchema = z.enum(EXPENSE_CATEGORIES);
 
 const installStatusSchema = z.enum([
   "BOUGHT_NOT_INSTALLED",
@@ -73,6 +66,29 @@ const createExpenseSchema = strictObject({
   odometer: boundedInt({ min: 0, max: 10_000_000 }).nullable().optional(),
   engineHours: boundedInt({ min: 0, max: 1_000_000 }).nullable().optional(),
 });
+
+function resolveManualExpenseFields(input: {
+  category: ExpenseCategory;
+  nodeId?: string | null;
+  installStatus: ExpenseInstallStatus;
+  installationStatus?: "NOT_INSTALLED" | "INSTALLED";
+}): {
+  nodeId: string | null;
+  installStatus: ExpenseInstallStatus;
+  installationStatus: "NOT_INSTALLED" | "INSTALLED";
+} {
+  const installStatus = expenseCategoryRequiresNode(input.category)
+    ? input.installStatus
+    : getDefaultExpenseInstallStatusForCategory(input.category);
+  const installationStatus =
+    input.installationStatus ??
+    (installStatus === "BOUGHT_NOT_INSTALLED" ? "NOT_INSTALLED" : "INSTALLED");
+  return {
+    nodeId: expenseCategoryRequiresNode(input.category) ? input.nodeId || null : null,
+    installStatus,
+    installationStatus,
+  };
+}
 
 function toWire(row: ExpenseRow): ExpenseItem {
   return {
@@ -159,7 +175,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
-    if (data.nodeId) {
+    if (data.nodeId && expenseCategoryRequiresNode(data.category)) {
       const node = await prisma.node.findUnique({ where: { id: data.nodeId }, select: { id: true } });
       if (!node) {
         return NextResponse.json({ error: "Node not found" }, { status: 404 });
@@ -167,18 +183,21 @@ export async function POST(request: NextRequest) {
     }
 
     const expenseDate = new Date(data.expenseDate);
-    const installationStatus =
-      data.installationStatus ??
-      (data.installStatus === "BOUGHT_NOT_INSTALLED" ? "NOT_INSTALLED" : "INSTALLED");
+    const resolved = resolveManualExpenseFields({
+      category: data.category,
+      nodeId: data.nodeId,
+      installStatus: data.installStatus,
+      installationStatus: data.installationStatus,
+    });
 
     const row = await expenseModel().create({
       data: {
         vehicleId: data.vehicleId,
-        nodeId: data.nodeId || null,
+        nodeId: resolved.nodeId,
         category: data.category,
-        installStatus: data.installStatus,
+        installStatus: resolved.installStatus,
         purchaseStatus: data.purchaseStatus ?? "PURCHASED",
-        installationStatus,
+        installationStatus: resolved.installationStatus,
         expenseDate,
         title: data.title,
         amount: data.amount,
@@ -192,7 +211,7 @@ export async function POST(request: NextRequest) {
         installedAt:
           data.installedAt
             ? new Date(data.installedAt)
-            : installationStatus === "NOT_INSTALLED"
+            : resolved.installationStatus === "NOT_INSTALLED"
               ? null
               : expenseDate,
         odometer: data.odometer ?? null,
