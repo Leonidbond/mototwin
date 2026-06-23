@@ -160,7 +160,10 @@ export async function POST(request: NextRequest) {
           variantId: motorcycleVariantId,
           variant: {
             familyId: motorcycleModelFamilyId,
-            family: { brandId: motorcycleBrandId, isCatalogPlaceholder: false },
+            family: {
+              brandId: motorcycleBrandId,
+              brand: { isCatalogPlaceholder: false },
+            },
           },
         },
         select: { id: true },

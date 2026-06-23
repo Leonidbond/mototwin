@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { CatalogApplicationType, PrismaClient } from "@prisma/client";
 import {
   buildPartMasterIdentity,
   catalogConfidenceToNumeric,
@@ -276,7 +276,7 @@ async function upsertFitmentForApplication(
     motorcycleVariantId: string | null;
     motorcycleGenerationId: string | null;
     market: string;
-    applicationType: string;
+    applicationType: CatalogApplicationType;
     safetyCritical: boolean;
     confidence: "HIGH" | "MEDIUM" | "LOW";
     rawNotes: string | null;

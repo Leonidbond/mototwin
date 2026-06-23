@@ -5,7 +5,6 @@ import { AdminPageChrome } from "../../_components/AdminPageChrome";
 import { AdminFilterBar } from "../../_components/AdminFilterBar";
 import { loadAdminSelf } from "@/lib/admin-self";
 import { loadCatalogStagingList } from "@/lib/admin-catalog-staging";
-import { ruAdmin } from "../../_locales/ru";
 
 const REVIEW_STATUSES: ReviewStatus[] = [
   "NEW",
@@ -46,10 +45,6 @@ export default async function AdminCatalogStagingPage({ searchParams }: PageProp
     <AdminPageChrome
       title="Staging каталога"
       self={self}
-      breadcrumbs={[
-        { label: ruAdmin.nav.catalog, href: "/admin/catalog" },
-        { label: "Staging" },
-      ]}
     >
       <AdminFilterBar
         fields={[
@@ -132,7 +127,7 @@ const thStyle: React.CSSProperties = {
 
 const tdStyle: React.CSSProperties = {
   padding: "10px",
-  borderBottom: `1px solid ${productSemanticColors.borderSubtle}`,
+  borderBottom: `1px solid ${productSemanticColors.border}`,
   verticalAlign: "top",
 };
 

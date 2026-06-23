@@ -8,7 +8,6 @@ import {
   formatStagingMetadataForAdmin,
   loadCatalogStagingDetail,
 } from "@/lib/admin-catalog-staging";
-import { ruAdmin } from "../../../_locales/ru";
 import { StagingActions } from "./_components/StagingActions";
 
 interface PageProps {
@@ -33,11 +32,6 @@ export default async function AdminCatalogStagingDetailPage({ params }: PageProp
     <AdminPageChrome
       title={detail.partName}
       self={self}
-      breadcrumbs={[
-        { label: ruAdmin.nav.catalog, href: "/admin/catalog" },
-        { label: "Staging", href: "/admin/catalog/staging" },
-        { label: detail.partNumber || detail.id.slice(0, 8) },
-      ]}
       rightSlot={
         canMutate(self.role) ? (
           <StagingActions

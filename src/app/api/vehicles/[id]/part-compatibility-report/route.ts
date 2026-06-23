@@ -116,6 +116,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       prisma.partSku.findMany({
         where: { partMasterId, isActive: true },
         select: {
+          id: true,
           fitments: {
             select: {
               motorcycleBrandId: true,
