@@ -351,7 +351,50 @@ See [custom-top-nodes-mvp.md](./custom-top-nodes-mvp.md).
 
 UI: `/admin/settings` (user search + team roster), `/admin/users/[id]` (per-user card for SUPER_ADMIN). See [admin-panel-readme.md](./admin-panel-readme.md).
 
-## 3.10 Auth
+## 3.10 Admin catalog (PartMaster)
+
+Read routes require any admin (`requireAnyAdmin`). Destructive catalog ops require `SUPER_ADMIN` or `CATALOG_MANAGER` (same as merge).
+
+### `GET /api/admin/parts`
+- Filters: `q`, `status`, `brand`, `source`, `page`.
+- Response `200`: `AdminPartListResponse`.
+
+### `POST /api/admin/parts`
+- Create manual PartMaster. Roles: `SUPER_ADMIN`, `CATALOG_MANAGER`.
+
+### `GET /api/admin/parts/[id]`
+- Response `200`: `AdminPartDetailWire` (aliases, fitment summaries, recent reports, duplicate hints).
+
+### `PATCH /api/admin/parts/[id]`
+- Partial update of master fields / status. Roles: `SUPER_ADMIN`, `CATALOG_MANAGER`, `MODERATOR`.
+- Audit: `part.update`.
+
+### `POST /api/admin/parts/[id]/merge`
+- Body: `{ intoPartMasterId, reason }`. Re-points community data to survivor; marks duplicate `MERGED`.
+- Roles: `SUPER_ADMIN`, `CATALOG_MANAGER`. Audit: `part.merge`.
+
+### `POST /api/admin/parts/bulk-delete`
+- Body: `{ ids: string[] (1..50), reason: string (min 3) }`.
+- Hard-deletes masters and related SKU / fitment / community rows (see [admin-panel-readme.md](./admin-panel-readme.md) §3).
+- Response `200`: `{ deleted: string[], skipped: AdminPartDeleteSkipWire[] }`.
+- Audit: `part.delete` or `part.bulk_delete`. Lib: `src/lib/admin-part-delete.ts`.
+
+### `GET /api/admin/catalog/staging`, `GET/PATCH /api/admin/catalog/staging/[id]`
+- Staging application list/detail; PATCH actions `approve` / `reject`.
+- Approve/reject roles: `SUPER_ADMIN`, `CATALOG_MANAGER`.
+- Detail wire includes extended v1.2 fields: `evidenceLevel`, `sourceKey`, `verificationRegion`, `regionMatchStatus`, etc.
+
+### `GET /api/admin/imports/template`
+- Query: `type` = `PARTS` | `PARTS_STAGING` | `PART_ALIASES` | `SERVICE_RULES`; optional `headersOnly=1`.
+- Response: `text/csv` attachment (UTF-8 BOM). Roles: any admin (`requireAnyAdmin`).
+- `PARTS_STAGING`: 39 columns from `PARTS_STAGING_COLUMNS`; full template includes example row from `data/catalog/templates/parts-staging.csv`.
+
+### `POST /api/admin/imports`, dry-run / commit / rollback
+- See [admin-panel-readme.md](./admin-panel-readme.md) §5. `PARTS_STAGING` commit → `importPartsStagingRows` → `PartCatalogApplication`.
+
+Types: `AdminPartBulkDeletePayload`, `AdminPartBulkDeleteResultWire` in `packages/types/src/admin.ts`.
+
+## 3.11 Auth
 
 ### Custom session API (email/password, mobile tokens)
 

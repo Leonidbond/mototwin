@@ -2,7 +2,7 @@
 
 Каноническое описание web-сессий, защиты маршрутов и клиентских контрактов после рефакторинга устойчивости (2026-06).
 
-См. также: [auth-oauth-production.md](./auth-oauth-production.md) (OAuth env и Google Console), [auth-implementation-plan.md](./auth-implementation-plan.md) (история фаз), [api-backend.md](./api-backend.md) §3.10.
+См. также: [auth-oauth-production.md](./auth-oauth-production.md) (OAuth env и Google Console), [auth-implementation-plan.md](./auth-implementation-plan.md) (история фаз), [api-backend.md](./api-backend.md) §3.11.
 
 ---
 

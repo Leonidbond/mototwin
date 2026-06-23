@@ -44,10 +44,12 @@ The script hits every admin page (17 routes) and every read-only admin API (17 e
 | `/admin/users`, `/admin/users/[id]`   | Users list + detail + block/unblock; SUPER_ADMIN assigns admin roles on user detail |
 | `/admin/vehicles`                     | Filterable list of all garage vehicles               |
 | `/admin/models`, `/admin/models/[id]` | brand × family × variant × generation table + support-level editor (4-уровневая иерархия, см. [data-model.md](./data-model.md)) |
-| `/admin/catalog`, `/admin/catalog/[id]` | PartMaster CRUD, aliases, fitments, merge          |
+| `/admin/catalog`, `/admin/catalog/[id]` | PartMaster CRUD, aliases, fitments, merge; bulk/single delete (SUPER_ADMIN / CATALOG_MANAGER) |
+| `/admin/catalog/staging`, `/admin/catalog/staging/[id]` | Staging rows from `parts-staging.csv` — review, approve, reject |
+| `/admin/catalog/staging`, `/admin/catalog/staging/[id]` | Parts staging (`PartCatalogApplication`) — review, approve, promote |
 | `/admin/fitment`                      | MotorcycleBrand × node coverage matrix and conflict lists |
 | `/admin/moderation`                   | 7 queues + right-side inspector                      |
-| `/admin/imports`, `/admin/imports/new`, `/admin/imports/[id]` | Bulk import wizard (PARTS + PART_ALIASES) |
+| `/admin/imports`, `/admin/imports/new`, `/admin/imports/[id]` | Bulk import wizard (PARTS, **PARTS_STAGING**, PART_ALIASES, SERVICE_RULES) |
 | `/admin/audit`                        | Searchable audit log (read-only)                     |
 | `/admin/dictionaries`                 | Brands and node tree (read-only)                     |
 | `/admin/reports`                      | Hub of links into pre-filtered sections              |
@@ -70,12 +72,26 @@ Authentication is the existing dev-stub (`apps/.../api/_shared/current-user-cont
   - `requireAdminRole(['SUPER_ADMIN', ...])` gates `/api/admin/*` route handlers.
   - `requireAnyAdmin()` is the read-only equivalent.
   - `canMutate(role)` is the helper used by mutating controls that remain read-only for `ANALYST`.
+  - `canDeleteCatalogParts(role)` gates destructive catalog deletes (same roles as merge: `SUPER_ADMIN`, `CATALOG_MANAGER`).
 
 User management actions:
 
 - `GET /api/admin/users`, `GET /api/admin/users/[id]` — read user directory and profile.
 - `PATCH /api/admin/users/[id]` — block/unblock account (requires any admin role, reason is mandatory, action is written to audit log).
 - Blocking a user revokes app sessions (`auth_sessions`, `refresh_tokens`, `authjs_sessions`) and denies further auth until unblocked.
+
+Catalog part management (SUPER_ADMIN / CATALOG_MANAGER):
+
+- **`/admin/catalog`** — list with checkbox selection, «select all on page», bulk delete bar (mandatory audit reason, max 50 IDs per request).
+- **`/admin/catalog/[id]`** — card **«Удалить из каталога»** on the Information tab (same API as bulk, single ID).
+- **`/admin/catalog/staging`** — approve/reject staging applications before promote (see [catalog skill v1.2](./catalog/mototwin_cursor_parts_catalog_skill_v1_2.md)).
+- `POST /api/admin/parts/bulk-delete` — body `{ ids: string[], reason: string }` (reason min 3 chars, max 50 ids).
+  - Hard-deletes each `PartMaster` and cascades: `PartSku` subtree (`PartNumber`, `PartSkuNodeLink`, `PartFitment`, `PartOffer`), community layer (`FitmentReport`, `FitmentVote`, `FitmentEvidence`, `FitmentConfidence`, `PartAlias`).
+  - Nulls `PartWishlistItem.skuId` for linked wishlist rows (items themselves stay).
+  - Partial success: response `{ deleted: string[], skipped: { id, code, message }[] }` (`NOT_FOUND`, `DELETE_FAILED`).
+  - Audit: `part.delete` (one id) or `part.bulk_delete` (several); implementation in `src/lib/admin-part-delete.ts`.
+- Other catalog APIs (read any admin; mutate per role): `GET/POST /api/admin/parts`, `GET/PATCH /api/admin/parts/[id]`, `POST /api/admin/parts/[id]/merge`, alias routes, `GET/PATCH /api/admin/catalog/staging/[id]`.
+- **MODERATOR** may edit part fields and aliases but **cannot** bulk-delete or merge.
 
 Team / admin role management (SUPER_ADMIN only):
 
@@ -94,7 +110,7 @@ On **production** (`https://mototwin.space/admin`), sign in with an account that
 
 Every mutating action calls `logAdminAction()` (`src/lib/admin-audit.ts`) which writes to `AdminAuditLog` with:
 
-- `actorId`, `action` (dot-namespaced like `part.merge`, `support.change`, `import.commit`),
+- `actorId`, `action` (dot-namespaced like `part.merge`, `part.delete`, `part.bulk_delete`, `team.role.change`, `import.commit`),
 - `entityType` + `entityId`,
 - `before` / `after` snapshots (Prisma `Json`),
 - `reason` (free text supplied by the operator), `importBatchId`, `ip`, `userAgent`.
@@ -105,17 +121,34 @@ The `/admin/audit` page exposes filtering by action, actor, and entity type with
 
 `src/lib/admin-imports.ts` covers the full lifecycle:
 
-1. **Upload** (`POST /api/admin/imports`) — parses CSV/TSV via Papaparse and XLSX via SheetJS in-memory (max 8 MB), persists rows to `ImportBatchRow`.
-2. **Dry-run** (`POST /api/admin/imports/[id]/dry-run`) — validates each row, marks `action`, `status`, `errorMessage`, returns aggregate `summary`.
-3. **Commit** (`POST /api/admin/imports/[id]/commit`) — applies rows transactionally per row; sets `mappedEntityId`.
-4. **Rollback** (`POST /api/admin/imports/[id]/rollback`) — SUPER_ADMIN only; deletes entities created by this batch when they have no dependents.
+1. **Download template** (`GET /api/admin/imports/template?type=…`) — CSV with required columns (+ example row). Query `headersOnly=1` for header line only. See `src/lib/admin-import-templates.ts`.
+2. **Upload** (`POST /api/admin/imports`) — parses CSV/TSV via Papaparse and XLSX via SheetJS in-memory (max 8 MB), persists full row JSON to `ImportBatchRow`. For `PARTS_STAGING`, missing columns are rejected before batch creation.
+3. **Dry-run** (`POST /api/admin/imports/[id]/dry-run`) — validates each row, marks `action`, `status`, `errorMessage`, returns aggregate `summary`.
+4. **Commit** (`POST /api/admin/imports/[id]/commit`) — applies rows; sets `mappedEntityId` (staging application id for `PARTS_STAGING`).
+5. **Rollback** (`POST /api/admin/imports/[id]/rollback`) — SUPER_ADMIN only; deletes entities created by this batch when they have no dependents.
 
-Currently supported types in MVP v1: `PARTS`, `PART_ALIASES`. Other `ImportBatchType` values create the batch but display "В планах" in the wizard.
+### Supported types
 
-Expected columns:
+| Type | Purpose | Key columns |
+| --- | --- | --- |
+| `PARTS` | PartMaster catalog | `brand`, `sku`, `title`, optional `subcategory`, `description`, `imageUrl` |
+| `PARTS_STAGING` | OEM/staging evidence → `PartCatalogApplication` | **39 columns** — see [parts-catalog-schema.md](./catalog/parts-catalog-schema.md) |
+| `PART_ALIASES` | Alternative SKU strings | `brand`, `sku`, `alias` |
+| `SERVICE_RULES` | Node maintenance intervals | `nodeCode`, `intervalKm`, `intervalDays`, `intervalHours`, `triggerMode`, … |
 
-- `PARTS`: `brand`, `sku`, `title`, plus optional `subcategory`, `description`, `imageUrl`.
-- `PART_ALIASES`: `brand`, `sku`, `alias` — looks up the `PartMaster` by brand+sku and adds `PartAlias`.
+Template download links appear on **`/admin/imports/new`** when a supported type is selected.
+
+### Parts staging workflow
+
+1. Download template (`parts-staging-template.csv`) or use `data/catalog/templates/parts-staging.csv`.
+2. Fill all 39 columns (contract v1.2). Run `npm run parts:catalog:validate` locally on the full 5-file batch before upload if possible.
+3. Upload via admin → dry-run → commit.
+4. Open **`/admin/catalog/staging`** — review rows (extended fields visible in detail: `evidenceLevel`, `sourceKey`, `verificationRegion`, …).
+5. Approve + promote to production SKU/fitment (or `npm run parts:promote-batch -- --batch <import_batch>`).
+
+CLI equivalent: `npm run parts:import`, `scripts/parts/reset-local-catalog.ts` (local dev reset).
+
+Contract reference: [docs/catalog/parts-catalog-schema.md](./catalog/parts-catalog-schema.md).
 
 ## 6. Caching and refresh
 
@@ -138,7 +171,8 @@ Expected columns:
 ## 8. What's next (post-MVP backlog)
 
 - Real visualization of the «8-step» import wizard (mapping step + preview before persisting rows).
-- Import types beyond PARTS/PART_ALIASES.
+- Import types beyond current four (`FITMENT_RULES`, `MODELS`, `OEM_CROSS` still stubbed in UI).
+- Companion CSV upload in admin (`catalog-sources`, `part-applications-staging`) — today validated via CLI only.
 - Notification editor (currently stub).
 - Stripe-aware subscriptions admin (currently aggregate counts only).
 - Pagination controls (currently URL-only `?page=`).

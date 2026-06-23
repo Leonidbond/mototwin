@@ -37,6 +37,18 @@
 
 [`garage-dashboard-mvp.md`](./garage-dashboard-mvp.md) · [`service-log-mvp.md`](./service-log-mvp.md) · [`expense-tracking-mvp.md`](./expense-tracking-mvp.md) · [`attention-flow-mvp.md`](./attention-flow-mvp.md) · [`vehicle-profile-mvp.md`](./vehicle-profile-mvp.md) · [`vehicle-trash-mvp.md`](./vehicle-trash-mvp.md) · [`upcoming-maintenance-mvp.md`](./upcoming-maintenance-mvp.md) · [`parts-wishlist-mvp.md`](./parts-wishlist-mvp.md) · [`parts-catalog-mvp.md`](./parts-catalog-mvp.md) · [`service-kits-mvp.md`](./service-kits-mvp.md) · [`user-settings-mvp.md`](./user-settings-mvp.md) · [`custom-top-nodes-mvp.md`](./custom-top-nodes-mvp.md) · [`subscription-access-mvp.md`](./subscription-access-mvp.md)
 
+### Parts catalog staging (v1.2)
+
+| Документ | Назначение |
+|----------|------------|
+| [`catalog/parts-catalog-schema.md`](./catalog/parts-catalog-schema.md) | **Canonical:** 39-column CSV contract, enums, validation, DB mapping, CLI + admin import |
+| [`catalog/parts-source-policy.md`](./catalog/parts-source-policy.md) | Иерархия источников, региональные правила |
+| [`catalog/mototwin_cursor_parts_catalog_skill_v1_2.md`](./catalog/mototwin_cursor_parts_catalog_skill_v1_2.md) | Cursor skill: batch workflow, 5 CSV, QA |
+| [`admin-panel-readme.md`](./admin-panel-readme.md) §5 | Admin bulk import + шаблоны CSV |
+| `data/catalog/templates/` | Шаблоны для заполнения и admin download |
+
+Pilot batch: `data/parts/bmw/r-1300-gs/`.
+
 При расхождении с canonical — править спеки или canonical так, чтобы остался один согласованный источник.
 
 ---

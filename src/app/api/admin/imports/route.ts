@@ -7,6 +7,8 @@ import {
   loadImportBatchList,
   parseImportFile,
 } from "@/lib/admin-imports";
+import { validateStagingStructure } from "@/lib/catalog-staging/validate-rows";
+import { PARTS_STAGING_COLUMNS } from "@mototwin/types";
 import { parseSearchParamInt } from "@/lib/http/input-validation";
 
 const TYPES: AdminImportBatchTypeWire[] = [
@@ -92,6 +94,21 @@ export async function POST(request: Request) {
         { error: err instanceof Error ? err.message : "Не удалось разобрать файл" },
         { status: 400 }
       );
+    }
+
+    if (type === "PARTS_STAGING") {
+      const headerIssues = validateStagingStructure(parsed.rows, PARTS_STAGING_COLUMNS);
+      if (headerIssues.length > 0) {
+        const first = headerIssues[0]!;
+        return NextResponse.json(
+          {
+            error: first.field
+              ? `Колонка ${first.field}: ${first.message}`
+              : first.message,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const created = await createImportBatch({

@@ -600,6 +600,24 @@ export interface AdminPartMergePayload {
   reason: string;
 }
 
+export interface AdminPartBulkDeletePayload {
+  ids: string[];
+  reason: string;
+}
+
+export type AdminPartDeleteSkipCode = "NOT_FOUND" | "DELETE_FAILED";
+
+export interface AdminPartDeleteSkipWire {
+  id: string;
+  code: AdminPartDeleteSkipCode;
+  message: string;
+}
+
+export interface AdminPartBulkDeleteResultWire {
+  deleted: string[];
+  skipped: AdminPartDeleteSkipWire[];
+}
+
 export type AdminModerationQueueKey =
   | "pendingMasters"
   | "pendingCatalogRequests"

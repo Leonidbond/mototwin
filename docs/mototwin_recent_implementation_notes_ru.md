@@ -13,6 +13,15 @@
 - Компоненты: `AdminRoleAssignmentControl`, `GrantAdminAccessPanel`, `UserAdminRolePanel`; хелпер `resolveIsModeratorForAdminRole` — `src/lib/admin-team-role.ts`.
 - Документация: [admin-panel-readme.md](admin-panel-readme.md), [api-backend.md](api-backend.md) §3.9.
 
+## 0.2. Админка — удаление каталога деталей (2026-06-23)
+
+- Массовое и одиночное удаление PartMaster из web UI (`/admin/catalog`, `/admin/catalog/[id]`).
+- API: `POST /api/admin/parts/bulk-delete` — `{ ids, reason }`, до 50 id; audit `part.delete` / `part.bulk_delete`.
+- RBAC: `canDeleteCatalogParts()` — только `SUPER_ADMIN` и `CATALOG_MANAGER`.
+- Lib: `src/lib/admin-part-delete.ts`; UI: чекбоксы в `PartsTable`, `PartDeletePanel`.
+- CLI wipe (dev/prod ops, без re-import): `npx tsx scripts/parts/purge-catalog-data.ts [--dry-run]` — полная очистка каталога и community fitment в БД.
+- Документация: [admin-panel-readme.md](admin-panel-readme.md), [api-backend.md](api-backend.md) §3.10, [catalog skill v1.2](catalog/mototwin_cursor_parts_catalog_skill_v1_2.md).
+
 ## 0.1. Расходы — категория «Топливо» (2026-06-23)
 
 - Enum **`FUEL`** в `ExpenseCategory` (Prisma + `EXPENSE_CATEGORIES` в `packages/types/src/expense-item.ts`).

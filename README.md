@@ -47,6 +47,8 @@ In a second terminal, start the web API for local data: `npm run dev` (port 3000
 ## Docs
 
 - [`docs/README.md`](docs/README.md) — индекс документации
+- [`docs/catalog/parts-catalog-schema.md`](docs/catalog/parts-catalog-schema.md) — CSV контракт каталога запчастей (39 кол.), import, admin
+- [`docs/admin-panel-readme.md`](docs/admin-panel-readme.md) — админка, bulk import, шаблоны CSV
 - [`docs/subscription-access-mvp.md`](docs/subscription-access-mvp.md) — тарифы FREE / RIDER / PRO (реализовано)
 - [`docs/frontend-expo.md`](docs/frontend-expo.md) — Expo routes, architecture, platform notes
 - [`docs/mobile-build.md`](docs/mobile-build.md) — сборка и запуск мобильного приложения (Metro, APK, EAS)
@@ -76,12 +78,17 @@ Legacy (не деплоить): `mototwin-vps` / `195.24.71.143` / `mototwin.onl
 
 Подробнее: [`.cursor/skills/mototwin-deploy/SKILL.md`](.cursor/skills/mototwin-deploy/SKILL.md), [`docs/deploy/vps.md`](docs/deploy/vps.md).
 
-для запуска мобилного в режиме туннеля
+## Local demo user
 
-cd /Users/lbondarenko/Mototwin/mototwin/apps/app
-npx expo start --tunnel -c
-
-пользователь локально
+```
 URL:      /login
 Email:    demo@mototwin.local
 Пароль:   demo12345
+```
+
+## Mobile tunnel (local dev)
+
+```bash
+cd apps/app
+npx expo start --tunnel -c
+```

@@ -18,15 +18,15 @@ See also:
 
 | Concept | CSV | Prisma (staging) | Prisma (production) |
 | --- | --- | --- | --- |
-| Source registry | `catalog-sources.csv` | `CatalogSource` | — |
-| Full evidence row | `parts-staging.csv` | `PartCatalogApplication` | — |
+| Source registry | `catalog-sources.csv` | `CatalogSource` (+ `sourceKey`) | — |
+| Full evidence row | `parts-staging.csv` | `PartCatalogApplication` (incl. extended cols) | — |
 | Application link | `part-applications-staging.csv` | same row via `stagingRowKey` | — |
 | Review queue | `review-queue.csv` | filter on `reviewStatus` | — |
 | Coverage grid | `coverage-matrix.csv` | admin completeness | — |
 | Promoted SKU | — | `promotedSkuId` | `PartSku` + `PartNumber` |
 | Promoted fitment | — | `promotedFitmentId` | `PartFitment` |
 
-`PartCatalogApplication` embeds skill `PartSourceSnapshot` fields (no separate snapshot table).
+`PartCatalogApplication` stores the full v1.2 contract: base provenance fields plus explicit columns `sourceKey`, `sourceModelCode`, `sourceYear`, `verificationRegion`, `evidenceLevel`, `regionMatchStatus`, `supersessionStatus`, `verifiedAt`, `parserVersion` (and `importBatch`, `stagingRowKey`). Legacy metadata duplicated in `raw_notes` is still parsed as fallback for old rows only.
 
 ## Model batch layout
 
@@ -65,7 +65,7 @@ Registry of deduplicated sources. Referenced by `source_key` from staging and ap
 
 Canonical ingest row — full provenance. Maps 1:1 to `PartCatalogApplication`.
 
-### Base columns (29)
+### Base columns (28)
 
 | Column | Required | Notes |
 | --- | --- | --- |
@@ -260,10 +260,60 @@ Enrich legacy 29-column staging → full batch:
 npx tsx scripts/parts/enrich-staging-batch.ts data/parts/bmw/r-1300-gs
 ```
 
-## Import (separate step)
+## Import
+
+### CLI
 
 ```bash
-npm run parts:import -- --commit --batch <import_batch> data/parts/.../parts-staging.csv
+npm run parts:import -- --commit --file data/parts/.../parts-staging.csv
 ```
 
-Import reads `parts-staging.csv` only; companion files are validated pre-import, not loaded separately.
+- `--batch <id>` — fallback when CSV `import_batch` column is empty; **CSV column wins** when present.
+- `--auto-promote-approved` — promote rows with `review_status` in `MANUAL_APPROVED`, `NOT_APPLICABLE`.
+- Dry-run by default without `--commit`.
+
+Local full reset (purge catalog SKUs + re-import + promote):
+
+```bash
+npx tsx scripts/parts/reset-local-catalog.ts \
+  --file data/parts/bmw/r-1300-gs/parts-staging.csv \
+  --promote
+```
+
+Promote pending staging rows for one batch:
+
+```bash
+npm run parts:promote-batch -- --batch <import_batch>
+```
+
+Import reads **`parts-staging.csv` only**; companion files are validated pre-import, not loaded separately.
+
+### Admin bulk import (`PARTS_STAGING`)
+
+Path: **`/admin/imports/new`** → type **Parts staging (каталог v1.2)**.
+
+| Step | API / UI |
+| --- | --- |
+| Download template | `GET /api/admin/imports/template?type=PARTS_STAGING` — CSV with headers + example row from `data/catalog/templates/parts-staging.csv` |
+| Headers only | `GET /api/admin/imports/template?type=PARTS_STAGING&headersOnly=1` |
+| Upload | `POST /api/admin/imports` — CSV/TSV/XLSX, max 8 MB; validates all **39 columns** before creating batch |
+| Dry-run | `POST /api/admin/imports/[id]/dry-run` → `importPartsStagingRows(dryRun: true)` |
+| Commit | `POST /api/admin/imports/[id]/commit` → upserts `PartCatalogApplication` + `CatalogSource` |
+| Review / promote | `/admin/catalog/staging` — approve rows; promote to `PartSku` / `PartFitment` |
+
+Roles: upload requires `SUPER_ADMIN` or `CATALOG_MANAGER`.
+
+Other supported admin import types (each with template download):
+
+| Type | Template file |
+| --- | --- |
+| `PARTS` | `parts-master-template.csv` |
+| `PART_ALIASES` | `part-aliases-template.csv` |
+| `SERVICE_RULES` | `service-rules-template.csv` |
+
+Implementation: `src/lib/admin-import-templates.ts`, `src/lib/catalog-staging/import-core.ts`.
+
+### Post-import UX
+
+- Picker / fitment report show catalog provenance from promoted rows (`MANUAL_APPROVED` evidence only in user UI).
+- Extended fields (`evidenceLevel`, `regionMatchStatus`, …) come from DB columns, not `raw_notes` parsing, after v1.2 import.

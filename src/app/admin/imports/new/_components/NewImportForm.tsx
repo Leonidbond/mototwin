@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminImportBatchTypeWire } from "@mototwin/types";
+import { PARTS_STAGING_COLUMNS } from "@mototwin/types";
 import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 
 const TYPE_OPTIONS: Array<{
@@ -10,30 +11,35 @@ const TYPE_OPTIONS: Array<{
   label: string;
   hint: string;
   supported: boolean;
+  templateType?: "PARTS" | "PARTS_STAGING" | "PART_ALIASES" | "SERVICE_RULES";
 }> = [
   {
     value: "PARTS",
     label: "Каталог деталей (PartMaster)",
     hint: "Колонки: brand, sku, title, subcategory?, description?, imageUrl?",
     supported: true,
+    templateType: "PARTS",
   },
   {
     value: "PARTS_STAGING",
-    label: "Parts staging (28 cols)",
-    hint: "parts-staging.csv: brand, model_family, node_id, part_number, source_url, …",
+    label: "Parts staging (каталог v1.2)",
+    hint: `${PARTS_STAGING_COLUMNS.length} колонок: brand…parsed_at + staging_row_key, source_key, evidence_level, import_batch, …`,
     supported: true,
+    templateType: "PARTS_STAGING",
   },
   {
     value: "PART_ALIASES",
     label: "Альтернативные SKU (PartAlias)",
     hint: "Колонки: brand, sku, alias",
     supported: true,
+    templateType: "PART_ALIASES",
   },
   {
     value: "SERVICE_RULES",
     label: "Регламенты ТО (NodeMaintenanceRule)",
     hint: "Колонки: nodeCode, intervalKm?, intervalDays?, intervalHours?, triggerMode?",
     supported: true,
+    templateType: "SERVICE_RULES",
   },
   {
     value: "FITMENT_RULES",
@@ -89,6 +95,7 @@ export function NewImportForm() {
   };
 
   const selectedOption = TYPE_OPTIONS.find((opt) => opt.value === type);
+  const templateType = selectedOption?.templateType;
 
   return (
     <form onSubmit={submit} style={cardStyle}>
@@ -143,6 +150,30 @@ export function NewImportForm() {
           Поддерживаются CSV, TSV и XLSX (до 8 МБ).
           {selectedOption ? ` Ожидаемые колонки: ${selectedOption.hint}` : ""}
         </div>
+        {templateType ? (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              marginTop: 12,
+              alignItems: "center",
+            }}
+          >
+            <a
+              href={`/api/admin/imports/template?type=${templateType}`}
+              style={templateButtonStyle}
+            >
+              Скачать шаблон CSV
+            </a>
+            <a
+              href={`/api/admin/imports/template?type=${templateType}&headersOnly=1`}
+              style={templateLinkStyle}
+            >
+              Только заголовки колонок
+            </a>
+          </div>
+        ) : null}
       </div>
 
       {error ? <div style={errorBox}>{error}</div> : null}
@@ -197,4 +228,24 @@ const errorBox: React.CSSProperties = {
   padding: "8px 10px",
   borderRadius: radiusScale.sm,
   fontSize: 12,
+};
+
+const templateButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  height: 32,
+  padding: "0 12px",
+  borderRadius: radiusScale.sm,
+  backgroundColor: productSemanticColors.card,
+  border: `1px solid ${productSemanticColors.border}`,
+  color: productSemanticColors.textPrimary,
+  fontSize: 12,
+  fontWeight: 600,
+  textDecoration: "none",
+};
+
+const templateLinkStyle: React.CSSProperties = {
+  color: productSemanticColors.primaryAction,
+  fontSize: 12,
+  textDecoration: "none",
 };

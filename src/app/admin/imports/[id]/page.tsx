@@ -108,7 +108,7 @@ export default async function AdminImportDetailPage({ params }: AdminImportDetai
                         <span style={{ color: "#FCA5A5" }}>{row.errorMessage}</span>
                       ) : (
                         <span style={{ color: productSemanticColors.textMuted }}>
-                          {previewRaw(row.raw)}
+                          {previewRaw(row.raw, detail.type)}
                         </span>
                       )}
                     </td>
@@ -175,7 +175,23 @@ function RowStatus({ status }: { status: "ok" | "warning" | "error" }) {
   );
 }
 
-function previewRaw(raw: Record<string, string>): string {
+function previewRaw(raw: Record<string, string>, batchType: string): string {
+  if (batchType === "PARTS_STAGING") {
+    const keys = [
+      "node_id",
+      "part_number",
+      "normalized_part_number",
+      "evidence_level",
+      "region_match_status",
+      "source_key",
+      "import_batch",
+      "review_status",
+    ];
+    return keys
+      .filter((k) => raw[k]?.trim())
+      .map((k) => `${k}=${raw[k]}`)
+      .join(" · ");
+  }
   const entries = Object.entries(raw).slice(0, 3);
   return entries.map(([k, v]) => `${k}=${v}`).join(" · ");
 }

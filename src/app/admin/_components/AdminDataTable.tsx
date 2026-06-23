@@ -21,6 +21,12 @@ interface AdminDataTableProps<T> {
   /** Total result count for the pager footer (when paginated server-side). */
   total?: number;
   pageInfo?: { page: number; pageSize: number; pageCount: number };
+  enableSelection?: boolean;
+  getRowId?: (row: T) => string;
+  selectedIds?: string[];
+  onToggleRow?: (id: string, checked: boolean) => void;
+  allSelected?: boolean;
+  onToggleAll?: (checked: boolean) => void;
 }
 
 export function AdminDataTable<T>({
@@ -31,12 +37,20 @@ export function AdminDataTable<T>({
   loading = false,
   total,
   pageInfo,
+  enableSelection = false,
+  getRowId,
+  selectedIds = [],
+  onToggleRow,
+  allSelected = false,
+  onToggleAll,
 }: AdminDataTableProps<T>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
+
+  const colSpan = columns.length + (enableSelection ? 1 : 0);
 
   return (
     <div
@@ -54,6 +68,16 @@ export function AdminDataTable<T>({
           <thead>
             {table.getHeaderGroups().map((group) => (
               <tr key={group.id}>
+                {enableSelection ? (
+                  <th style={{ ...thStyle, width: 42 }}>
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(event) => onToggleAll?.(event.target.checked)}
+                      aria-label="Выбрать все на странице"
+                    />
+                  </th>
+                ) : null}
                 {group.headers.map((header) => (
                   <th key={header.id} style={thStyle}>
                     {flexRender(header.column.columnDef.header, header.getContext())}
@@ -66,7 +90,7 @@ export function AdminDataTable<T>({
             {data.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={colSpan}
                   style={{
                     padding: "32px 18px",
                     textAlign: "center",
@@ -79,7 +103,15 @@ export function AdminDataTable<T>({
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <DataRow key={row.id} row={row} getRowHref={getRowHref} />
+                <DataRow
+                  key={row.id}
+                  row={row}
+                  getRowHref={getRowHref}
+                  enableSelection={enableSelection}
+                  rowId={getRowId?.(row.original)}
+                  selected={getRowId ? selectedIds.includes(getRowId(row.original)) : false}
+                  onToggleRow={onToggleRow}
+                />
               ))
             )}
           </tbody>
@@ -99,25 +131,40 @@ export function AdminDataTable<T>({
   );
 }
 
-function DataRow<T>({ row, getRowHref }: { row: Row<T>; getRowHref?: (row: T) => string | undefined }) {
+function DataRow<T>({
+  row,
+  getRowHref,
+  enableSelection,
+  rowId,
+  selected,
+  onToggleRow,
+}: {
+  row: Row<T>;
+  getRowHref?: (row: T) => string | undefined;
+  enableSelection?: boolean;
+  rowId?: string;
+  selected?: boolean;
+  onToggleRow?: (id: string, checked: boolean) => void;
+}) {
   const href = getRowHref?.(row.original);
   const cells = row.getVisibleCells();
-  if (!href) {
-    return (
-      <tr style={trStyle}>
-        {cells.map((cell) => (
-          <td key={cell.id} style={tdStyle}>
-            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-          </td>
-        ))}
-      </tr>
-    );
-  }
+
   return (
-    <tr style={{ ...trStyle, cursor: "pointer" }}>
+    <tr style={{ ...trStyle, cursor: href ? "pointer" : undefined }}>
+      {enableSelection && rowId ? (
+        <td style={{ ...tdStyle, width: 42 }}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(event) => onToggleRow?.(rowId, event.target.checked)}
+            onClick={(event) => event.stopPropagation()}
+            aria-label="Выбрать строку"
+          />
+        </td>
+      ) : null}
       {cells.map((cell, idx) => (
         <td key={cell.id} style={tdStyle}>
-          {idx === 0 ? (
+          {href && idx === 0 ? (
             <Link
               href={href}
               prefetch={false}

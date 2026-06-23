@@ -135,3 +135,8 @@ const READ_ONLY_ROLE: AdminRole = "ANALYST";
 export function canMutate(role: AdminRole): boolean {
   return role !== READ_ONLY_ROLE;
 }
+
+/** Destructive catalog deletes — same roles as merge/import commit. */
+export function canDeleteCatalogParts(role: AdminRole): boolean {
+  return role === "SUPER_ADMIN" || role === "CATALOG_MANAGER";
+}

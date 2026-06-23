@@ -3,7 +3,7 @@ import { AdminPageChrome } from "../_components/AdminPageChrome";
 import { AdminFilterBar } from "../_components/AdminFilterBar";
 import { loadAdminSelf } from "@/lib/admin-self";
 import { loadAdminPartList } from "@/lib/admin-parts";
-import { canMutate } from "@/lib/admin-auth";
+import { canDeleteCatalogParts, canMutate } from "@/lib/admin-auth";
 import { PartsTable } from "./_components/PartsTable";
 import { CreatePartButton } from "./_components/CreatePartButton";
 import { ruAdmin } from "../_locales/ru";
@@ -64,7 +64,7 @@ export default async function AdminCatalogPage({ searchParams }: AdminCatalogPag
           },
         ]}
       />
-      <PartsTable data={list} />
+      <PartsTable data={list} canDelete={canDeleteCatalogParts(self.role)} />
     </AdminPageChrome>
   );
 }

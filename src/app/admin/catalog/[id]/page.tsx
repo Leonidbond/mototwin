@@ -4,7 +4,8 @@ import { productSemanticColors, radiusScale } from "@mototwin/design-tokens";
 import { AdminPageChrome } from "../../_components/AdminPageChrome";
 import { loadAdminSelf } from "@/lib/admin-self";
 import { loadAdminPartDetail } from "@/lib/admin-parts";
-import { canMutate } from "@/lib/admin-auth";
+import { canDeleteCatalogParts, canMutate } from "@/lib/admin-auth";
+import { PartDeletePanel } from "./_components/PartDeletePanel";
 import { formatDateRu, formatNumberRu } from "../../_components/format";
 import { PartTabs } from "./_components/PartTabs";
 import { PartEditForm } from "./_components/PartEditForm";
@@ -26,6 +27,7 @@ export default async function AdminPartDetailPage({
 
   const tab = sp.tab ?? "info";
   const allowMutate = canMutate(self.role);
+  const allowDelete = canDeleteCatalogParts(self.role);
   const title = `${detail.brandName} ${detail.sku}`;
 
   const tabs = [
@@ -81,7 +83,10 @@ export default async function AdminPartDetailPage({
 
       {tab === "info" ? (
         <section style={twoCol}>
-          <PartEditForm part={detail} canMutate={allowMutate} />
+          <div style={{ display: "grid", gap: 16 }}>
+            <PartEditForm part={detail} canMutate={allowMutate} />
+            <PartDeletePanel part={detail} canDelete={allowDelete} />
+          </div>
           <SidePanel detail={detail} />
         </section>
       ) : null}

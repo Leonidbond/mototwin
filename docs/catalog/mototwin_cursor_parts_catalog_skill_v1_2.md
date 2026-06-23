@@ -127,7 +127,7 @@ DRIVETRAIN.CHAIN, DRIVETRAIN.FRONT_SPROCKET, DRIVETRAIN.REAR_SPROCKET
 ```text
 data/parts/<brand>/<model-slug>/
   catalog-sources.csv              # source registry (source_key)
-  parts-staging.csv                # full evidence row (40 columns)
+  parts-staging.csv                # full evidence row (39 columns)
   part-applications-staging.csv    # mandatory companion (1 row per staging row)
   review-queue.csv                 # NEW / NEEDS_REVIEW / NOT_APPLICABLE queue
   coverage-matrix.csv              # 18 MVP nodes × coverage_status
@@ -235,11 +235,19 @@ Update `review-notes.md`: Confirmed / Needs review / Conflicts / Not applicable 
 ### Step 7 — Import (optional, after human OK)
 
 ```bash
-npm run parts:import -- --commit --batch <brand>-<model-slug>-<date> \
-  data/parts/<brand>/<model-slug>/parts-staging.csv
+npm run parts:import -- --commit --file data/parts/<brand>/<model-slug>/parts-staging.csv
 ```
 
+(`--batch` optional fallback if CSV `import_batch` column is empty.)
+
 Admin: `/admin/catalog/staging`, `/admin/imports` (`PARTS_STAGING`).
+
+**Catalog maintenance (web):** `/admin/catalog` — checkbox selection + bulk delete; `/admin/catalog/[id]` — single delete on Information tab. Roles: `SUPER_ADMIN`, `CATALOG_MANAGER`. API: `POST /api/admin/parts/bulk-delete` with `{ ids, reason }` (max 50). See [admin-panel-readme.md](../admin-panel-readme.md).
+
+**Full DB wipe (ops):** `npx tsx scripts/parts/purge-catalog-data.ts [--dry-run]` — removes all promoted catalog + community fitment data without re-import. Use when resetting test data on dev/prod; not the same as staging reject (status-only).
+
+**CSV templates (admin):** on `/admin/imports/new` → «Скачать шаблон CSV», or  
+`GET /api/admin/imports/template?type=PARTS_STAGING` (add `&headersOnly=1` for column headers only).
 
 Promote approved rows:
 
@@ -253,12 +261,12 @@ npm run parts:promote-batch -- --batch <import_batch>
 
 | Skill concept | Repo model / file |
 | --- | --- |
-| `CatalogSource` | `CatalogSource` + `catalog-sources.csv` |
-| `PartSourceSnapshot` | Embedded in `PartCatalogApplication` (no separate table) |
-| Staging application row | `PartCatalogApplication` ← `parts-staging.csv` |
+| `CatalogSource` | `CatalogSource` (+ `sourceKey`) ← `catalog-sources.csv` / staging `source_key` |
+| Staging application row | `PartCatalogApplication` ← `parts-staging.csv` (39 cols incl. extended metadata) |
 | Production SKU | `PartSku` + `PartNumber` (after promote) |
 | Production fitment | `PartFitment` (after promote) |
 | Community identity | `PartMaster` (separate from OEM staging) |
+| Admin CSV templates | `GET /api/admin/imports/template`, `data/catalog/templates/` |
 
 Do **not** add `PartApplication` or `PartSourceSnapshot` Prisma tables.
 
@@ -350,8 +358,11 @@ scripts/parts/validate-parts-staging.ts
 scripts/parts/enrich-staging-batch.ts
 scripts/parts/import-parts-staging.ts
 scripts/parts/promote-staging-batch.ts
+scripts/parts/reset-local-catalog.ts
+src/lib/admin-import-templates.ts
 src/lib/catalog-staging/*
 /admin/catalog/staging
+/admin/imports/new  (+ GET /api/admin/imports/template)
 ```
 
 ---
