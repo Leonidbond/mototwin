@@ -18,6 +18,7 @@ apps/app/android/**/build
 # iOS — Pods reinstalled by EAS via `pod install`; source kept for future iOS builds
 apps/app/ios/Pods
 apps/app/ios/build
+apps/app/ios/.xcode.env.local
 
 # Web/backend — not used by mobile EAS build (prisma/ kept for postinstall).
 # Mobile bundles repo-root src/node-tree-icons.ts and images/* — do not exclude wholesale.
