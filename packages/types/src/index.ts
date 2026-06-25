@@ -532,6 +532,8 @@ export type {
   ForgotPasswordResponse,
   ResetPasswordInput,
   ResetPasswordResponse,
+  DeleteAccountInput,
+  DeleteAccountResponse,
 } from "./auth";
 export { MOBILE_CLIENT_HEADER, MOBILE_CLIENT_EXPO } from "./auth";
 export type { DevUserOption } from "./dev-user";

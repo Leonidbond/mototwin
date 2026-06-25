@@ -93,3 +93,12 @@ export type ResetPasswordInput = {
 export type ResetPasswordResponse = {
   ok: boolean;
 };
+
+export type DeleteAccountInput = {
+  confirmation: "DELETE";
+  refreshToken?: string;
+};
+
+export type DeleteAccountResponse = {
+  deleted: true;
+};

@@ -16,6 +16,7 @@ export type AuthAuditEvent =
   | "oauth.login.success"
   | "oauth.linked"
   | "session.revoked"
+  | "account.deleted"
   | "auth.rate_limited";
 
 export interface LogAuthEventInput {

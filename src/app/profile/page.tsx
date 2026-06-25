@@ -84,6 +84,8 @@ export default function ProfilePage() {
   const [topNodesExpanded, setTopNodesExpanded] = useState(false);
   const [pickerMode, setPickerMode] = useState<"add" | "replace">("add");
   const [replaceTargetCode, setReplaceTargetCode] = useState<string | null>(null);
+  const [deleteAccountError, setDeleteAccountError] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const devLoginEnabled = isDevLoginEnabled();
   const devUserOptions = getDevUserOptions();
 
@@ -258,6 +260,29 @@ export default function ProfilePage() {
     clearWebSessionCache();
     await signOut({ redirect: false });
     router.replace("/login");
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "Удалить аккаунт безвозвратно? Будут удалены мотоциклы, журнал обслуживания, расходы и настройки. Это действие нельзя отменить."
+    );
+    if (!confirmed) {
+      return;
+    }
+    setDeleteAccountError("");
+    setIsDeletingAccount(true);
+    try {
+      await profileApi.deleteAccount({ confirmation: "DELETE" });
+      clearWebSessionCache();
+      await signOut({ redirect: false });
+      router.replace("/login");
+    } catch {
+      setDeleteAccountError(
+        "Не удалось удалить аккаунт. Попробуйте позже или напишите на support@mototwin.online."
+      );
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const effectiveTopNodeCodes = useMemo(
@@ -824,6 +849,24 @@ export default function ProfilePage() {
           >
             Выйти из аккаунта
           </button>
+          {!devLoginEnabled ? (
+            <div className="mt-4 space-y-3 border-t border-gray-200 pt-4">
+              <p className="text-sm text-gray-600">
+                Удаление аккаунта безвозвратно удалит мотоциклы, журнал обслуживания, расходы и настройки.
+              </p>
+              {deleteAccountError ? (
+                <p className="text-sm text-red-600">{deleteAccountError}</p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void handleDeleteAccount()}
+                disabled={isDeletingAccount}
+                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+              >
+                {isDeletingAccount ? "Удаление…" : "Удалить аккаунт"}
+              </button>
+            </div>
+          ) : null}
         </section>
 
         {devLoginEnabled ? (

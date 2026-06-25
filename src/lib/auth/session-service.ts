@@ -355,7 +355,7 @@ export async function assertUserNotBlocked(userId: string): Promise<void> {
 
 export async function revokeAllUserSessions(
   userId: string,
-  options?: { cause?: "password_reset" | "admin" }
+  options?: { cause?: "password_reset" | "admin" | "account_deleted" }
 ): Promise<void> {
   await prisma.$transaction([
     prisma.authSession.deleteMany({ where: { userId } }),

@@ -5,10 +5,12 @@ import {
   Text,
   Pressable,
   View,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { createMobileApiClient, clearMobileSession } from "../src/create-mobile-api-client";
+import { readAuthTokens } from "../src/auth-storage";
 import {
   DEFAULT_USER_LOCAL_SETTINGS,
   buildTopNodeProfileGroups,
@@ -67,6 +69,8 @@ export default function ProfileScreen() {
   const [subscriptionNotice, setSubscriptionNotice] = useState("");
   const [selectedDevUserEmail, setSelectedDevUserEmail] = useState(DEFAULT_DEV_USER_EMAIL);
   const [apiProfile, setApiProfile] = useState<ReturnType<typeof buildProfileData> | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState("");
 
   const [serviceNodes, setServiceNodes] = useState<ServiceNodeItem[]>([]);
   const [topServiceNodes, setTopServiceNodes] = useState<TopServiceNodeItem[]>([]);
@@ -376,6 +380,41 @@ export default function ProfileScreen() {
     setReplaceTargetCode(null);
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Удалить аккаунт?",
+      "Аккаунт и все данные (мотоциклы, журнал ТО, расходы, настройки) будут удалены безвозвратно. Это действие нельзя отменить.",
+      [
+        { text: "Отмена", style: "cancel" },
+        {
+          text: "Удалить аккаунт",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              setDeleteAccountError("");
+              setIsDeletingAccount(true);
+              try {
+                const tokens = await readAuthTokens();
+                await createMobileApiClient().deleteAccount({
+                  confirmation: "DELETE",
+                  refreshToken: tokens?.refreshToken,
+                });
+                await clearMobileSession();
+                router.replace("/login");
+              } catch {
+                setDeleteAccountError(
+                  "Не удалось удалить аккаунт. Попробуйте позже или напишите на support@mototwin.online."
+                );
+              } finally {
+                setIsDeletingAccount(false);
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScreenHeader title="Профиль" />
@@ -400,6 +439,23 @@ export default function ProfileScreen() {
             >
               <Text style={styles.logoutButtonText}>Выйти из аккаунта</Text>
             </Pressable>
+          ) : null}
+          {!__DEV__ ? (
+            <View style={styles.deleteAccountBlock}>
+              <Text style={styles.deleteAccountHint}>
+                Удаление аккаунта безвозвратно удалит мотоциклы, журнал обслуживания, расходы и настройки.
+              </Text>
+              {deleteAccountError ? <Text style={styles.errorText}>{deleteAccountError}</Text> : null}
+              <Pressable
+                style={[styles.deleteAccountButton, isDeletingAccount && styles.deleteAccountButtonDisabled]}
+                onPress={handleDeleteAccount}
+                disabled={isDeletingAccount}
+              >
+                <Text style={styles.deleteAccountButtonText}>
+                  {isDeletingAccount ? "Удаление…" : "Удалить аккаунт"}
+                </Text>
+              </Pressable>
+            </View>
           ) : null}
         </View>
 
@@ -756,6 +812,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoutButtonText: { fontSize: 14, fontWeight: "600", color: c.textPrimary },
+  deleteAccountBlock: { marginTop: 12, gap: 8 },
+  deleteAccountHint: { fontSize: 12, color: c.textMuted, lineHeight: 18 },
+  deleteAccountButton: {
+    borderWidth: 1,
+    borderColor: c.error,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: c.card,
+  },
+  deleteAccountButtonDisabled: { opacity: 0.6 },
+  deleteAccountButtonText: { fontSize: 14, fontWeight: "600", color: c.error },
   settingRow: { gap: 6 },
   settingLabel: { fontSize: 12, color: c.textSecondary },
   settingOptionsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },

@@ -102,6 +102,8 @@ import type {
   ForgotPasswordResponse,
   ResetPasswordInput,
   ResetPasswordResponse,
+  DeleteAccountInput,
+  DeleteAccountResponse,
 } from "@mototwin/types";
 import type { ApiClient } from "./fetcher";
 
@@ -175,6 +177,13 @@ export function createMotoTwinEndpoints(client: ApiClient) {
     resetPassword(input: ResetPasswordInput) {
       return client.request<ResetPasswordResponse>("/api/auth/reset-password", {
         method: "POST",
+        body: JSON.stringify(input),
+      });
+    },
+
+    deleteAccount(input: DeleteAccountInput) {
+      return client.request<DeleteAccountResponse>("/api/account", {
+        method: "DELETE",
         body: JSON.stringify(input),
       });
     },
