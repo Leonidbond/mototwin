@@ -42,7 +42,7 @@
 | `MT-SEC-056` | P2 | **resolved** | `src/app/layout.tsx` — `metadata.title = "MotoTwin"` |
 | `MT-SEC-063` | P2 | **resolved** | `apps/app/src/auth-storage.ts` — `keychainAccessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY` |
 | `MT-SEC-057` | P2 | **resolved** | `apps/app/src/mobile-biometric-gate.tsx` + `_layout.tsx` |
-| `MT-SEC-059` | P2 | **resolved** | `apps/app/src/use-private-screen-protection.ts` — `/login`, `/profile` |
+| `MT-SEC-059` | P2 | **open** | Screenshot-блокировка снята (`expo-screen-capture` удалён); `/login`, `/profile` записываются в screen recording |
 | `MT-SEC-065` | **P0** | **resolved** | `fitment/evidence` — `safeUrl()` zod helper; `part-compatibility-report` — `safeRenderUrl()` фильтрация legacy записей в БД |
 | `MT-SEC-066` | P1 | **resolved** | `vehicles/[id]/service-events` POST+PATCH — `boundedJsonValue({64KB, depth 24})` вместо `z.any()`/`z.unknown()` |
 | `MT-SEC-067` | P1 | **resolved** | `user-service-event-templates` POST — `boundedJsonValue({128KB, depth 20})` для `formSnapshot` |
@@ -60,7 +60,7 @@
 Открытые приоритеты:
 
 - `MT-SEC-010` (Yandex mobile implicit → code+PKCE) — **resolved** (итерация 6 — public release hardening).
-- `MT-SEC-057` / `MT-SEC-059` — **resolved** (biometric gate + screenshot block).
+- `MT-SEC-057` — **resolved** (biometric gate). `MT-SEC-059` — **open** (screenshot block removed).
 - `MT-SEC-049` (npm audit) — операционная задача, требует решения по обновлению `next-auth` 4 → 5.
 - `MT-SEC-068`/`069`/`070`/`071` (input-validation hardening) — **полностью закрыты** в итерации 3 (см. ниже). Регрессий не будет — ESLint guard в `eslint.config.mjs` блокирует `await request.json()` и `z.object(` в `src/app/api/**/route.ts`.
 
@@ -604,7 +604,7 @@ export async function fetchWithTimeout(url: string, opts: RequestInit & { timeou
 | `MT-SEC-056` | `metadata.title = "Create Next App"` | A05 (косметика) | web | XS | Заменить на «MotoTwin» |
 | `MT-SEC-057` | ~~Нет biometric-gate~~ **resolved** — `MobileBiometricGate` | M3 | mobile | M | — |
 | `MT-SEC-058` | Нет certificate pinning | M5 | mobile | L | Для MASVS L2; через `expo-ssl-pinning` или нативный модуль |
-| `MT-SEC-059` | ~~Нет screenshot-блокировки~~ **resolved** — `usePrivateScreenProtection` | M6 | mobile | S | — |
+| `MT-SEC-059` | Нет screenshot-блокировки на `/login`, `/profile` (защита снята намеренно) | M6 | mobile | S | — |
 | `MT-SEC-060` | Аналитики/трекинга нет — OK (info) | M6 | mobile | — | Зафиксировать в политике |
 | `MT-SEC-061` | gap для MASVS L2 (jailbreak detection, app integrity) | M7 | mobile | L | Отдельный milestone |
 | `MT-SEC-062` | `"projectId": "REPLACE_AFTER_eas_init"` | M8 | mobile | XS | Заменить на реальный EAS project ID |

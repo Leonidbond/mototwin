@@ -31,7 +31,6 @@ import {
 import { promptYandexOAuthSignIn } from "../src/yandex-oauth-flow";
 import { OauthProviderIcon } from "../components/icons/oauth-provider-icon";
 import type { OauthProviderKey } from "@mototwin/icons/oauth-providers";
-import { usePrivateScreenProtection } from "../src/use-private-screen-protection";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -265,7 +264,6 @@ function YandexSignInButton(props: {
 }
 
 export default function LoginScreen() {
-  usePrivateScreenProtection();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
